@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LUMIX Finanças — App del Cobrador</title>
+
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide/dist/lucide.js"></script>
+
+<!-- Leaflet CSS (map) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<style>
+  /* Minimal styles: ajusta según tu tema/CSS existente */
+  :root {
+    --bg: #f7f7fb;
+    --card: #fff;
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #ef4444;
+  }
+  [data-theme="dark"] {
+    --bg: #0b1220;
+    --card: #061021;
+    --text: #e6eef8;
+    --muted: #9aa6bd;
+  }
+  html,body { height:100%; margin:0; font-family: Inter, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  .app { max-width:1100px; margin:18px auto; padding:16px; }
+  header { display:flex; gap:12px; align-items:center; justify-content:space-between; }
+  .kpis { display:flex; gap:12px; margin-top:12px; }
+  .card { background:var(--card); padding:12px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.06); flex:1; }
+  #clients-list { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .client-row { display:flex; justify-content:space-between; gap:12px; padding:8px; border-radius:8px; background:linear-gradient(180deg, rgba(0,0,0,0.01), transparent); }
+  .btn { padding:8px 12px; border-radius:8px; border:0; cursor:pointer; }
+  .primary { background:var(--accent); color:white; }
+  .muted { color:var(--muted); }
+  #map { height:360px; border-radius:10px; margin-top:12px; }
+  .hidden { display:none; }
+  /* simple modal */
+  .modal { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); z-index:50; }
+  .modal .panel { width:92%; max-width:720px; max-height:90vh; overflow:auto; background:var(--card); padding:16px; border-radius:10px; }
+  input, select, textarea { width:100%; padding:8px; margin:6px 0 12px 0; border-radius:8px; border:1px solid #e5e7eb; background:transparent; color:var(--text); }
+  label { font-weight:600; font-size:13px; color:var(--muted); }
+  .row { display:flex; gap:12px; }
+  .col { flex:1; }
+  .small { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>LUMIX Finanças — App del Cobrador</h1>
+      <div class="small">Panel del cobrador — sincronización en tiempo real</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="toggle-theme" class="btn">Tema</button>
+      <select id="lang-select" class="btn">
+        <option value="pt">Português</option>
+        <option value="es" selected>Español</option>
+        <option value="en">English</option>
+      </select>
+      <button id="btn-new-client" class="btn primary">+ Nuevo Cliente</button>
+    </div>
+  </header>
+
+  <section class="kpis">
+    <div class="card">
+      <div class="small">Meta Diaria</div>
+      <div id="kpi-target">R$ 0</div>
+    </div>
+    <div class="card">
+      <div class="small">Recibido Hoy</div>
+      <div id="kpi-received">R$ 0</div>
+    </div>
+    <div class="card">
+      <div class="small">Clientes Restantes</div>
+      <div id="kpi-remaining">0</div>
+    </div>
+  </section>
+
+  <section style="margin-top:14px;">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">Lista de Clientes</h3>
+        <div class="small muted" id="last-sync">Sincronizando...</div>
+      </div>
+      <div id="clients-list"></div>
+    </div>
+
+    <div id="map" class="card" style="margin-top:12px;"></div>
+  </section>
+</div>
+
+<!-- Modal: New/Edit Client -->
+<div id="client-modal" class="modal hidden">
+  <div class="panel">
+    <h3 id="client-modal-title">Nuevo Cliente</h3>
+    <form id="client-form">
+      <div class="row">
+        <div class="col">
+          <label>Nombre / Razón</label>
+          <input id="client-name" type="text" required />
+        </div>
+        <div class="col">
+          <label>Teléfono</label>
+          <input id="client-phone" type="text" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Valor Empréstimo (R$)</label>
+          <input id="client-amount" type="number" min="0" step="0.01" required />
+        </div>
+        <div class="col">
+          <label>Juros (%)</label>
+          <input id="client-interest" type="number" min="0" step="0.1" value="20" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Número de Parcelas</label>
+          <input id="client-installments" type="number" min="1" step="1" value="1" />
+        </div>
+        <div class="col">
+          <label>Juros por Atraso (%)</label>
+          <input id="client-late-interest" type="number" min="0" step="0.1" value="0" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Dirección</label>
+          <input id="client-address" type="text" />
+        </div>
+        <div class="col">
+          <label>Ciudad</label>
+          <input id="client-city" type="text" />
+        </div>
+      </div>
+
+      <div>
+        <label>Ubicación (lat,lng) — opcional</label>
+        <input id="client-location" type="text" placeholder="lat,lng" />
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="btn-get-location" type="button" class="btn">Obtener Localización</button>
+          <div id="location-msg" class="small muted"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:8px;">
+        <label>Documentos / Fotos</label>
+        <input id="client-files" type="file" multiple accept="image/*" />
+        <div id="doc-previews" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;"></div>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+        <button id="btn-cancel-client" type="button" class="btn">Cancelar</button>
+        <button id="btn-save-client" type="submit" class="btn primary">Guardar Cliente</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Register Payment -->
+<div id="payment-modal" class="modal hidden">
+  <div class="panel">
+    <h3>Registrar Pago</h3>
+    <div id="payment-client-name" style="font-weight:700;"></div>
+    <form id="payment-form">
+      <label>Monto (R$)</label>
+      <input id="payment-amount" type="number" min="0" step="0.01" required />
+      <label>Método</label>
+      <select id="payment-method">
+        <option value="cash">Efectivo</option>
+        <option value="card">Tarjeta</option>
+        <option value="pix">PIX</option>
+      </select>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+        <button id="btn-cancel-payment" type="button" class="btn">Cancelar</button>
+        <button id="btn-save-payment" type="submit" class="btn primary">Confirmar Pago</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Firebase 9 modular SDK (ajusta versión si quieres) -->
+<script type="module">
+  // IMPORTS: Firebase modular v9
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import {
+    getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
+    serverTimestamp, arrayUnion, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+  import {
+    getStorage, ref as storageRef, uploadBytes, getDownloadURL
+  } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+
+  // ------------------------------
+  // CONFIG: reemplaza con tu Firebase config
+  // ------------------------------
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_PROJECT.firebaseapp.com",
+    projectId: "TU_PROJECT",
+    storageBucket: "TU_PROJECT.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123:web:abcdef"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  // ------------------------------
+  // Estado de la app
+  // ------------------------------
+  let collectorId = "collector_demo"; // reemplaza con el id real del cobrador cuando tengas auth
+  let allClients = [];
+  let collectorData = {};
+  let filesToUpload = []; // archivos pendientes en el formulario
+  let editingClient = null;
+
+  // DOM
+  const clientsListEl = document.getElementById('clients-list');
+  const lastSyncEl = document.getElementById('last-sync');
+  const kpiTargetEl = document.getElementById('kpi-target');
+  const kpiReceivedEl = document.getElementById('kpi-received');
+  const kpiRemainingEl = document.getElementById('kpi-remaining');
+
+  const clientModal = document.getElementById('client-modal');
+  const btnNewClient = document.getElementById('btn-new-client');
+  const btnCancelClient = document.getElementById('btn-cancel-client');
+  const clientForm = document.getElementById('client-form');
+
+  const clientNameInput = document.getElementById('client-name');
+  const clientPhoneInput = document.getElementById('client-phone');
+  const clientAmountInput = document.getElementById('client-amount');
+  const clientInterestInput = document.getElementById('client-interest');
+  const clientInstallmentsInput = document.getElementById('client-installments');
+  const clientLateInterestInput = document.getElementById('client-late-interest');
+  const clientAddressInput = document.getElementById('client-address');
+  const clientCityInput = document.getElementById('client-city');
+  const clientLocationInput = document.getElementById('client-location');
+  const clientFilesInput = document.getElementById('client-files');
+  const docPreviews = document.getElementById('doc-previews');
+  const btnGetLocation = document.getElementById('btn-get-location');
+  const locationMsg = document.getElementById('location-msg');
+
+  // Payment modal
+  const paymentModal = document.getElementById('payment-modal');
+  const paymentClientNameEl = document.getElementById('payment-client-name');
+  const paymentForm = document.getElementById('payment-form');
+  const paymentAmountInput = document.getElementById('payment-amount');
+  const paymentMethodInput = document.getElementById('payment-method');
+  const btnCancelPayment = document.getElementById('btn-cancel-payment');
+
+  // Theme & Lang
+  const toggleThemeBtn = document.getElementById('toggle-theme');
+  const langSelect = document.getElementById('lang-select');
+
+  // Map
+  let map = null;
+  let markersLayer = null;
+
+  // Inicialización básica del mapa
+  function initMap() {
+    if (map) return;
+    map = L.map('map').setView([-23.55052, -46.633308], 11); // São Paulo por defecto
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OSM'
+    }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
+  }
+
+  initMap();
+
+  // ------------------------------
+  // Utility: form previews
+  // ------------------------------
+  function renderDocPreviews() {
+    docPreviews.innerHTML = '';
+    filesToUpload.forEach((f, idx) => {
+      const el = document.createElement('div');
+      el.style.width = '96px';
+      el.style.height = '96px';
+      el.style.borderRadius = '8px';
+      el.style.overflow = 'hidden';
+      el.style.position = 'relative';
+      el.style.background = '#f3f4f6';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+      const img = document.createElement('img');
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '100%';
+      img.src = URL.createObjectURL(f);
+      el.appendChild(img);
+      const del = document.createElement('button');
+      del.textContent = 'X';
+      del.style.position = 'absolute';
+      del.style.top = '4px';
+      del.style.right = '4px';
+      del.className = 'btn';
+      del.addEventListener('click', () => {
+        filesToUpload.splice(idx, 1);
+        renderDocPreviews();
+      });
+      el.appendChild(del);
+      docPreviews.appendChild(el);
+    });
+  }
+
+  // ------------------------------
+  // Event listeners: theme/lang
+  // ------------------------------
+  toggleThemeBtn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    if (current === 'dark') {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.removeItem('lumix_theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('lumix_theme', 'dark');
+    }
+  });
+
+  // carga tema guardado
+  (function loadTheme() {
+    const t = localStorage.getItem('lumix_theme');
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  })();
+
+  langSelect.addEventListener('change', (e) => {
+    const lang = e.target.value;
+    localStorage.setItem('lumix_lang', lang);
+    // Aquí podrías llamar a applyLanguage(lang)
+  });
+
+  // ------------------------------
+  // Handle files: arreglo del bug (spread)
+  // ------------------------------
+  function handleFiles(selectedFiles) {
+    // selectedFiles expected as FileList or array
+    const arr = Array.from(selectedFiles || []);
+    filesToUpload.push(...arr);
+    renderDocPreviews();
+  }
+
+  clientFilesInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+    clientFilesInput.value = ''; // limpiar input para reusar
+  });
+
+  // ------------------------------
+  // Obtener localización del dispositivo
+  // ------------------------------
+  btnGetLocation.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      locationMsg.textContent = 'Geolocation no soportada';
+      return;
+    }
+    locationMsg.textContent = 'Obteniendo...';
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lng = pos.coords.longitude.toFixed(6);
+      clientLocationInput.value = `${lat},${lng}`;
+      locationMsg.textContent = `OK: ${lat},${lng}`;
+    }, (err) => {
+      locationMsg.textContent = 'Error: ' + (err.message || 'denegado');
+    }, { timeout: 10000, maximumAge: 60000 });
+  });
+
+  // ------------------------------
+  // SNAPSHOT: clients (corregido)
+  // ------------------------------
+  function mapDocToClient(d) {
+    const data = d.data();
+    const client = {
+      id: d.id,
+      name: data.name || '',
+      phone: data.phone || '',
+      address: data.address || '',
+      city: data.city || '',
+      location: data.location || '', // string "lat,lng" o { lat, lng }
+      totalLoan: (typeof data.totalLoan === 'number') ? data.totalLoan : (Number(data.totalLoan) || 0),
+      amount: (typeof data.amount === 'number') ? data.amount : (Number(data.amount) || 0),
+      installments: data.installments || `0/1`,
+      paid: (typeof data.paid === 'number') ? data.paid : (Number(data.paid) || 0),
+      history: Array.isArray(data.history) ? data.history : [],
+      documents: Array.isArray(data.documents) ? data.documents : [],
+      paymentDays: Array.isArray(data.paymentDays) ? data.paymentDays : [1,2,3,4,5,6],
+      collectorId: data.collectorId || collectorId,
+      startDate: data.startDate || null,
+      interestRate: data.interestRate || (data.interestRate === 0 ? 0 : 20),
+      lateInterest: data.lateInterest || 0
+    };
+    client.status = calculateClientStatus(client);
+    return client;
+  }
+
+  // escucha en tiempo real
+  onSnapshot(collection(db, 'clients'), (snapshot) => {
+    allClients = snapshot.docs.map(mapDocToClient);
+    lastSyncEl.textContent = 'Última actualización: ' + new Date().toLocaleString();
+    updateTodaysRouteList();
+    updateAllClientsList();
+    plotClientsOnMap();
+  }, (err) => {
+    console.error('Error snapshot clients:', err);
+    lastSyncEl.textContent = 'Error sincronizando clientes';
+    clientsListEl.innerHTML = '<div class="small muted">Error cargando clientes. Revisa Firestore.</div>';
+  });
+
+  // ------------------------------
+  // Renderizar lista de clientes
+  // ------------------------------
+  function updateAllClientsList() {
+    clientsListEl.innerHTML = '';
+    if (!Array.isArray(allClients) || allClients.length === 0) {
+      clientsListEl.innerHTML = '<div class="small muted">No hay clientes</div>';
+      kpiRemainingEl.textContent = '0';
+      return;
+    }
+
+    allClients.forEach(client => {
+      const row = document.createElement('div');
+      row.className = 'client-row';
+      const left = document.createElement('div');
+      const name = document.createElement('div');
+      name.textContent = client.name || '(Sin nombre)';
+      name.style.fontWeight = '700';
+      const meta = document.createElement('div');
+      meta.className = 'small muted';
+      meta.textContent = `Saldo: R$ ${ (client.totalLoan - (client.paid||0)).toFixed(2) } • Estado: ${client.status || 'Pendente'}`;
+      left.appendChild(name);
+      left.appendChild(meta);
+
+      const right = document.createElement('div');
+      right.style.display = 'flex';
+      right.style.gap = '8px';
+      const btnDetails = document.createElement('button');
+      btnDetails.className = 'btn';
+      btnDetails.textContent = 'Detalles';
+      btnDetails.addEventListener('click', () => openClientDetails(client));
+      const btnPay = document.createElement('button');
+      btnPay.className = 'btn primary';
+      btnPay.textContent = 'Registrar Pago';
+      btnPay.addEventListener('click', () => openPaymentModal(client));
+      right.appendChild(btnDetails);
+      right.appendChild(btnPay);
+
+      row.appendChild(left);
+      row.appendChild(right);
+      clientsListEl.appendChild(row);
+    });
+
+    // KPIs rápidos
+    const remaining = allClients.filter(c => c.status === 'Pendente' || c.status === 'Atrasado').length;
+    kpiRemainingEl.textContent = String(remaining);
+  }
+
+  // simplified: calcula KPIs diarios (ejemplo)
+  function updateTodaysRouteList() {
+    // placeholder: suma pagos hoy
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    let received = 0;
+    allClients.forEach(c => {
+      if (!Array.isArray(c.history)) return;
+      c.history.forEach(h => {
+        // si usas serverTimestamp, la forma será un objeto Timestamp con seconds
+        const d = h.date;
+        let t = 0;
+        if (d && typeof d.seconds === 'number') t = d.seconds * 1000;
+        else if (d && typeof d.toMillis === 'function') t = d.toMillis();
+        else if (typeof d === 'string' || typeof d === 'number') t = new Date(d).getTime();
+        else if (d instanceof Date) t = d.getTime();
+        if (t >= startOfDay) received += Number(h.amount || 0);
+      });
+    });
+    kpiReceivedEl.textContent = `R$ ${received.toFixed(2)}`;
+  }
+
+  // ------------------------------
+  // calculateClientStatus (corregido sortedHistory)
+  // ------------------------------
+  function calculateClientStatus(client) {
+    try {
+      // Default: Pendente
+      let status = 'Pendente';
+      // Obtener último pago si existe
+      let lastPaymentDate = null;
+      if (client.history && client.history.length > 0) {
+        const sortedHistory = [...client.history]
+          .filter(h => h && h.date)
+          .sort((a, b) => {
+            // orden por timestamp (maneja Timestamp, Date, string)
+            const ad = a.date;
+            const bd = b.date;
+            const at = (ad && typeof ad.seconds === 'number') ? ad.seconds * 1000 : (ad instanceof Date ? ad.getTime() : new Date(ad).getTime());
+            const bt = (bd && typeof bd.seconds === 'number') ? bd.seconds * 1000 : (bd instanceof Date ? bd.getTime() : new Date(bd).getTime());
+            return bt - at;
+          });
+        if (sortedHistory.length > 0) {
+          const d = sortedHistory[0].date;
+          lastPaymentDate = (d && typeof d.seconds === 'number') ? new Date(d.seconds * 1000) : (d instanceof Date ? d : new Date(d));
+        }
+      }
+
+      // Si ha pagado el total -> Pago
+      if ((client.paid || 0) >= (client.totalLoan || client.amount || 0)) {
+        status = 'Pago';
+        return status;
+      }
+
+      // Determinar si Atrasado:
+      // Si no hay pagos y la fecha de inicio + días de pago ya excede ...
+      // Implementación simple: compara fechas de último pago con hoy
+      const now = new Date();
+      let dueExceeded = false;
+      // Si existe lastPaymentDate, chequear si pasó más de X días desde la última cuota
+      const installmentsCount = parseInt((client.installments || '0/1').split('/').pop()) || 1;
+      const paidCount = parseInt((client.installments || '0/1').split('/')[0]) || 0;
+      if (!lastPaymentDate) {
+        // si no hay pagos y hay fecha de inicio o solo se asume que debe comenzar
+        // marcar atrasado si ya pasó más de 7 días desde startDate
+        if (client.startDate) {
+          const s = client.startDate;
+          const st = (s && typeof s.seconds === 'number') ? s.seconds * 1000 : (s instanceof Date ? s.getTime() : new Date(s).getTime());
+          if (Date.now() - st > 7 * 24 * 3600 * 1000) dueExceeded = true;
+        }
+      } else {
+        // si pasó más de 14 días desde último pago -> considerarlo atrasado
+        if ((Date.now() - lastPaymentDate.getTime()) > 14 * 24 * 3600 * 1000) dueExceeded = true;
+      }
+      if (dueExceeded) status = 'Atrasado';
+      return status;
+    } catch (e) {
+      console.error('Error calculateClientStatus', e);
+      return 'Pendente';
+    }
+  }
+
+  // ------------------------------
+  // Mapear clientes en el mapa
+  // ------------------------------
+  function plotClientsOnMap() {
+    if (!map || !markersLayer) return;
+    markersLayer.clearLayers();
+    allClients.forEach(cl => {
+      let latlng = null;
+      if (typeof cl.location === 'string' && cl.location.includes(',')) {
+        const parts = cl.location.split(',').map(s => s.trim());
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lng)) latlng = [lat, lng];
+      } else if (cl.location && typeof cl.location === 'object' && cl.location.lat && cl.location.lng) {
+        latlng = [Number(cl.location.lat), Number(cl.location.lng)];
+      }
+      if (latlng) {
+        const marker = L.marker(latlng).bindPopup(`<strong>${cl.name}</strong><br/>Saldo: R$ ${(cl.totalLoan - (cl.paid||0)).toFixed(2)}`);
+        markersLayer.addLayer(marker);
+      }
+    });
+    // Ajustar bounds si hay marcadores
+    const layers = markersLayer.getLayers();
+    if (layers.length > 0) {
+      const group = L.featureGroup(layers);
+      map.fitBounds(group.getBounds().pad(0.2));
+    }
+  }
+
+  // ------------------------------
+  // Abrir modal nuevo cliente
+  // ------------------------------
+  btnNewClient.addEventListener('click', () => {
+    openClientModal();
+  });
+  btnCancelClient.addEventListener('click', () => {
+    closeClientModal();
+  });
+
+  function openClientModal(client = null) {
+    editingClient = client;
+    clientModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('client-modal-title').textContent = client ? 'Editar Cliente' : 'Nuevo Cliente';
+    // rellenar campos si edit
+    if (client) {
+      clientNameInput.value = client.name || '';
+      clientPhoneInput.value = client.phone || '';
+      clientAmountInput.value = client.totalLoan || client.amount || 0;
+      clientInterestInput.value = client.interestRate || 20;
+      // client.installments tiene formato 'paid/total' o '0/1'
+      const installmentsParts = (client.installments || '0/1').split('/');
+      clientInstallmentsInput.value = installmentsParts[1] || installmentsParts[0] || 1;
+      clientLateInterestInput.value = client.lateInterest || 0;
+      clientAddressInput.value = client.address || '';
+      clientCityInput.value = client.city || '';
+      clientLocationInput.value = typeof client.location === 'string' ? client.location : (client.location && client.location.lat ? `${client.location.lat},${client.location.lng}` : '');
+      // documents: no los cargamos en filesToUpload por seguridad; mostramos previews si hay URLs
+      docPreviews.innerHTML = '';
+      (client.documents || []).forEach(url => {
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.width = '96px';
+        img.style.height = '96px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '8px';
+        docPreviews.appendChild(img);
+      });
+    } else {
+      clientForm.reset();
+      filesToUpload = [];
+      renderDocPreviews();
+    }
+  }
+
+  function closeClientModal() {
+    clientModal.classList.add('hidden');
+    document.body.style.overflow = '';
+    editingClient = null;
+    clientForm.reset();
+    filesToUpload = [];
+    renderDocPreviews();
+  }
+
+  // ------------------------------
+  // Guardar nuevo cliente (normalizar installments)
+  // ------------------------------
+  clientForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const name = clientNameInput.value.trim();
+      if (!name) return alert('Nombre requerido');
+      const amount = Number(clientAmountInput.value) || 0;
+      const interest = Number(clientInterestInput.value) || 0;
+      const installments = parseInt(clientInstallmentsInput.value) || 1;
+      const lateInterest = Number(clientLateInterestInput.value) || 0;
+      const address = clientAddressInput.value.trim();
+      const city = clientCityInput.value.trim();
+      const location = clientLocationInput.value.trim();
+
+      // construir objeto
+      const clientData = {
+        name,
+        phone: clientPhoneInput.value.trim(),
+        totalLoan: amount,
+        amount,
+        interestRate: interest,
+        lateInterest,
+        address,
+        city,
+        location,
+        paymentDays: [1,2,3,4,5,6], // default
+        collectorId,
+        paid: editingClient ? (editingClient.paid || 0) : 0,
+        history: editingClient ? (editingClient.history || []) : [],
+        documents: editingClient ? (editingClient.documents || []) : [],
+        // installments: "paid/total" — si editando, respetar la parte 'paid' existente
+        installments: (() => {
+          const existingPaid = editingClient ? parseInt((editingClient.installments || '0/1').split('/')[0]) || 0 : 0;
+          return `${existingPaid}/${installments}`;
+        })()
+      };
+
+      // Subir archivos a Storage (si hay)
+      if (filesToUpload.length > 0) {
+        const uploadedUrls = [];
+        for (const f of filesToUpload) {
+          const path = `clients/${Date.now()}_${f.name}`;
+          const sRef = storageRef(storage, path);
+          const snapshot = await uploadBytes(sRef, f);
+          const url = await getDownloadURL(snapshot.ref);
+          uploadedUrls.push(url);
+        }
+        // añadir a clientData.documents
+        clientData.documents = (clientData.documents || []).concat(uploadedUrls);
+      }
+
+      if (editingClient) {
+        // Actualizar documento
+        const clientRef = doc(db, 'clients', editingClient.id);
+        await updateDoc(clientRef, clientData);
+      } else {
+        // Nuevo documento: incluir timestamp de inicio
+        clientData.startDate = serverTimestamp();
+        await addDoc(collection(db, 'clients'), clientData);
+      }
+
+      closeClientModal();
+      alert('Cliente guardado correctamente');
+    } catch (err) {
+      console.error('Error guardando cliente:', err);
+      alert('Error al guardar cliente: ' + (err.message || err));
+    }
+  });
+
+  // ------------------------------
+  // Abrir detalles (simplificado)
+  // ------------------------------
+  function openClientDetails(client) {
+    // Para simplificar aquí abrimos el modal en modo editar
+    openClientModal(client);
+  }
+
+  // ------------------------------
+  // Pagos: abrir modal y registrar (usar serverTimestamp)
+  // ------------------------------
+  function openPaymentModal(client) {
+    paymentModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    paymentClientNameEl.textContent = client.name || '(Sin nombre)';
+    paymentForm.dataset.clientId = client.id;
+    paymentAmountInput.value = '';
+    paymentMethodInput.value = 'cash';
+  }
+
+  function closePaymentModal() {
+    paymentModal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  btnCancelPayment.addEventListener('click', () => {
+    closePaymentModal();
+  });
+
+  paymentForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const clientId = paymentForm.dataset.clientId;
+      if (!clientId) return alert('Cliente no identificado');
+      const amount = Number(paymentAmountInput.value) || 0;
+      if (amount <= 0) return alert('Monto inválido');
+      const method = paymentMethodInput.value || 'unknown';
+
+      const clientRef = doc(db, 'clients', clientId);
+      // agregar history con serverTimestamp
+      await updateDoc(clientRef, {
+        paid: arrayUnion ? (/* placeholder handled below */ 0) : 0 // dummy
+      });
+
+      // Debido a que queremos incrementar 'paid' de forma atómica, pero Firestore modular no tiene increment importado
+      // Haremos una lectura-actualización simple (ideal: usar transaction o increment)
+      const clientSnap = await getDoc(clientRef);
+      const cdata = clientSnap.exists() ? clientSnap.data() : null;
+      const previousPaid = cdata && typeof cdata.paid === 'number' ? cdata.paid : 0;
+      const newPaidTotal = previousPaid + amount;
+
+      // actualizar con nuevo paid y append history con serverTimestamp
+      await updateDoc(clientRef, {
+        paid: newPaidTotal,
+        history: arrayUnion({ amount: amount, method: method, date: serverTimestamp() })
+      });
+
+      alert('Pago registrado: R$ ' + amount.toFixed(2));
+      closePaymentModal();
+    } catch (err) {
+      console.error('Error registrando pago:', err);
+      alert('Error al registrar pago: ' + (err.message || err));
+    }
+  });
+
+  // ------------------------------
+  // Abrir/Cerrar modales al hacer click fuera
+  // ------------------------------
+  window.addEventListener('click', (e) => {
+    if (!clientModal.classList.contains('hidden') && e.target === clientModal) closeClientModal();
+    if (!paymentModal.classList.contains('hidden') && e.target === paymentModal) closePaymentModal();
+  });
+
+  // ------------------------------
+  // Utilities extra
+  // ------------------------------
+  function formatCurrency(v) {
+    return (Number(v) || 0).toFixed(2);
+  }
+
+  // ------------------------------
+  // Inicial - fetch collector (opcional)
+  // ------------------------------
+  (async function loadCollector() {
+    try {
+      const colRef = doc(db, 'collectors', collectorId);
+      const snap = await getDoc(colRef);
+      if (snap.exists()) {
+        collectorData = snap.data();
+        kpiTargetEl.textContent = `R$ ${(collectorData.target || 0).toFixed ? (collectorData.target||0).toFixed(2) : (collectorData.target||0)}`;
+      } else {
+        kpiTargetEl.textContent = 'R$ 0.00';
+      }
+    } catch (e) {
+      console.warn('Error cargar collector:', e);
+      kpiTargetEl.textContent = 'R$ 0.00';
+    }
+  })();
+
+  // ------------------------------
+  // open payment via keyboard (extra)
+  // ------------------------------
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'N' && (e.ctrlKey || e.metaKey)) {
+      openClientModal();
+    }
+  });
+
+  // ------------------------------
+  // FIN
+  // ------------------------------
+  console.log('LUMIX cobrador - script listo');
+</script>
+</body>
+</html>
