@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LUMIX">
+    <meta name="theme-color" content="#6f42c1">
+    <link rel="manifest" href="data:application/manifest+json;base64,ew0KICAgICJuYW1lIjogIkxVTUlYIEZpbmFuw6dhcyIsDQogICAgInNob3J0X25hbWUiOiAiTFVNSVgiLA0KICAgICJzdGFydF91cmwiOiAiLiIsDQogICAgImRpc3BsYXkiOiAiZnVsbHNjcmVlbiIsDQogICAgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZmZmZiIsDQogICAgInRoZW1lX2NvbG9yIjogIiM2ZjQyYzEiLA0KICAgICJkZXNjcmlwdGlvbiI6ICJBcHAgbm8gZ2Vzdj28gZGUgY8Oic3RhbW9zIHBhcmEgY29icmFkb3Jlcy4iLA0KICAgICJvcmllbnRhdGlvbiI6ICJwb3J0cmFpdCIsDQogICAgImljb25zIjogWw0KICAgICAgICB7DQogICAgICAgICAgICAic3JjIjogImh0dHBzOi8vcGxhY2Vob2xkLmNvLzE5MngxOTIvNmY0MmMxL0ZGRkZGRj90ZXh0PUwiLA0KICAgICAgICAgICAgInNpemVzIjogIjE5MngxOTIiLA0KICAgICAgICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIg0KICAgICAgICB9LA0KICAgICAgICB7DQogICAgICAgICAgICAic3JjIjogImh0dHBzOi8vcGxhY2Vob2xkLmNvLzUxMng1MTIvNmY0MmMxL0ZGRkZGRj90ZXh0PUwiLA0KICAgICAgICAgICAgInNpemVzIjogIjUxMng1MTIiLA0KICAgICAgICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIg0KICAgICAgICB9DQogICAgXQ0KfQ0K">
     <title>Painel do Cobrador</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,24 +21,155 @@
             --text-primary: #212529;
             --text-secondary: #6c757d;
             --accent-green: #28a745;
+            --accent-yellow: #facc15;
+            --accent-orange: #fb923c;
             --accent-purple: #6f42c1;
+            --accent-purple-darker: #5a349c;
             --border-color: #e9ecef;
             --danger-color: #dc3545;
         }
         body.dark-mode {
-            --bg: #0a0e1a;
-            --surface: #121829;
-            --text-primary: #f0f2f5;
-            --text-secondary: #a0aec0;
-            --border-color: #2d3748;
-            --danger-color: #fc8181;
+            --bg: #020617;
+            --surface: #0f172a;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border-color: #1e293b;
+            --danger-color: #f87171;
+            --accent-yellow: #fde047;
+            --accent-orange: #fdba74;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-primary); margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; }
-        #app-container { padding-bottom: 80px; }
-        .main-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: var(--surface); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; transition: background-color 0.3s, border-color 0.3s; }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; 
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-primary); transition: background-color 0.3s, color 0.3s; }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.9; }
+        }
+
+        @keyframes subtle-glow {
+            0%, 100% {
+                filter: drop-shadow(0 0 8px rgba(138, 43, 226, 0.7));
+            }
+            50% {
+                filter: drop-shadow(0 0 16px rgba(57, 255, 20, 0.7));
+            }
+        }
+
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            transition: opacity 0.5s ease-out;
+        }
+        #splash-screen img {
+            width: 150px; 
+            height: 150px; 
+            animation: pulse 2.5s infinite ease-in-out;
+        }
+
+        #login-view {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 20px;
+            background-color: var(--bg);
+        }
+        .login-card {
+            background-color: transparent;
+            box-shadow: none;
+            border: none;
+            width: 100%; max-width: 400px; text-align: center;
+        }
+        .login-card .logo {
+            display: flex;
+            justify-content: center;
+        }
+        .login-card .logo img {
+            width: 140px; 
+            height: 140px; 
+            margin-bottom: 30px; 
+            animation: subtle-glow 5s ease-in-out infinite;
+        }
+        .login-card h2 {
+            margin-bottom: 10px;
+            font-size: 1.8em; 
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .login-card p {
+            margin-bottom: 40px;
+            color: var(--text-secondary);
+        }
+        .login-card .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .login-card .form-group label {
+             display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary);
+        }
+        .login-card .form-group input { 
+            width: 100%; 
+            padding: 15px; 
+            font-size: 1em; 
+            border-radius: 8px; 
+            border: 1px solid #334155; 
+            background-color: #1e293b; 
+            color: var(--text-primary); 
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .login-card .form-group input:focus {
+            border-color: var(--accent-purple);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.3);
+        }
+
+        .login-card .btn-primary {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: var(--accent-purple);
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .login-card .btn-primary:hover {
+            background-color: var(--accent-purple-darker);
+        }
+
+        #app-container { 
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+        main {
+            flex-grow: 1; 
+            overflow-y: auto; 
+        }
+        .container { padding: 20px; }
+        
+        .main-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: var(--surface); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; transition: background-color 0.3s, border-color 0.3s; flex-shrink: 0; }
         .logo { display: flex; align-items: center; gap: 10px; }
-        .logo img { height: 40px; width: 40px; border-radius: 50%; }
+        .logo img { height: 40px; width: 40px; object-fit: cover; }
         .logo-text { font-size: 1.2em; font-weight: 700; color: var(--text-primary); }
         .header-controls { display: flex; align-items: center; gap: 10px; }
         .header-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 5px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; }
@@ -48,51 +182,128 @@
         .profile-name { font-weight: 600; font-size: 0.9em; }
         .profile-role { font-size: 0.8em; color: var(--text-secondary); }
         .profile img { height: 40px; width: 40px; border-radius: 50%; border: 2px solid var(--accent-purple); object-fit: cover; }
-        .container { padding: 20px; }
+        
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px; }
         .kpi-card { background-color: var(--surface); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); border: 1px solid var(--border-color); transition: background-color 0.3s, border-color 0.3s; }
         body.dark-mode .kpi-card { box-shadow: none; }
         .kpi-title { display: flex; align-items: center; gap: 8px; font-size: 0.9em; color: var(--text-secondary); margin: 0 0 10px; }
-        .kpi-value { font-size: 1.8em; font-weight: 700; margin: 0; }
+        .kpi-value {
+            font-size: 1.6em; 
+            font-weight: 700;
+            margin: 0;
+            overflow-wrap: break-word; 
+            word-break: break-all;
+        }
         .kpi-value.green { color: var(--accent-green); }
+
+        .kpi-grid-profile {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
         .section-title { font-size: 1.3em; font-weight: 600; margin-bottom: 20px; border-bottom: 2px solid var(--accent-purple); padding-bottom: 10px; }
-        .client-list { display: flex; flex-direction: column; gap: 15px; }
-        .client-card { background-color: var(--surface); border-radius: 12px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--border-color); transition: background-color 0.2s, box-shadow 0.2s, border-color 0.3s; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); cursor: pointer; }
-        body.dark-mode .client-card { box-shadow: none; }
-        .client-card:active { background-color: var(--bg); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08); }
-        .client-info { flex-grow: 1; }
-        .client-name { font-weight: 600; margin: 0 0 5px; }
-        .client-address { font-size: 0.9em; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
-        .payment-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-        .payment-amount { font-size: 1.2em; font-weight: 700; color: var(--accent-green); }
-        .payment-status { font-size: 0.8em; padding: 3px 8px; border-radius: 10px; font-weight: 500; margin-top: 5px; }
+        .client-list, .expense-list, .notification-list { display: flex; flex-direction: column; gap: 15px; }
+        .client-card, .expense-card, .notification-card { background-color: var(--surface); border-radius: 12px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--border-color); transition: background-color 0.2s, box-shadow 0.2s, border-color 0.3s, transform 0.2s; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); cursor: pointer; }
+        .client-card:hover, .expense-card:hover, .notification-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.07); }
+        body.dark-mode .client-card, body.dark-mode .expense-card, body.dark-mode .notification-card { box-shadow: none; }
+        .client-card:active, .expense-card:active, .notification-card:active { background-color: var(--bg); transform: translateY(0); }
+        .client-info, .expense-info, .notification-info { flex-grow: 1; }
+        .client-name, .expense-category, .notification-title { font-weight: 600; margin: 0 0 5px; }
+        .client-address, .expense-obs, .notification-subtitle { font-size: 0.9em; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
+        .payment-info, .expense-value-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .payment-amount, .expense-amount { font-size: 1.2em; font-weight: 700; color: var(--accent-green); }
+        .expense-amount { color: var(--danger-color); }
+        .payment-status, .expense-date { font-size: 0.8em; padding: 3px 8px; border-radius: 10px; font-weight: 500; margin-top: 5px; }
         .status-pending { background-color: #fff3cd; color: #856404; } .status-paid { background-color: #d4edda; color: #155724; } .status-late { background-color: #f8d7da; color: #721c24; }
         body.dark-mode .status-pending { background-color: #b98c3633; color: #f6e05e; } body.dark-mode .status-paid { background-color: #38a16933; color: #68d391; } body.dark-mode .status-late { background-color: #c5303033; color: #fc8181; }
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background-color: var(--surface); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05); transition: background-color 0.3s, border-color 0.3s; z-index: 150; }
+        
+        .reputation-score { display: flex; align-items: center; gap: 4px; font-size: 0.8em; font-weight: 700; padding: 3px 8px; border-radius: 10px; margin-top: 5px; }
+        .rep-perfect { background-color: rgba(40, 167, 69, 0.15); color: var(--accent-green); }
+        .rep-good { background-color: rgba(251, 146, 60, 0.15); color: #b45309; }
+        body.dark-mode .rep-good { color: var(--accent-orange); }
+        .rep-regular { background-color: rgba(250, 204, 21, 0.15); color: #856404; }
+        body.dark-mode .rep-regular { color: var(--accent-yellow); }
+        .rep-bad { background-color: rgba(220, 53, 69, 0.15); color: var(--danger-color); }
+        .client-card .payment-info { flex-shrink: 0; }
+        .reputation-bar-container { width: 100%; background-color: var(--border-color); border-radius: 8px; height: 16px; overflow: hidden; margin-bottom: 10px; }
+        .reputation-bar { height: 100%; border-radius: 8px; width: 0%; transition: width 1s ease-out, background-color 0.5s; }
+        .reputation-bar.status-perfect { background-color: var(--accent-green); }
+        .reputation-bar.status-good { background-color: var(--accent-orange); }
+        .reputation-bar.status-regular { background-color: var(--accent-yellow); }
+        .reputation-bar.status-bad { background-color: var(--danger-color); }
+        .reputation-status { display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; }
+        .reputation-value { font-weight: 700; }
+        .reputation-text { font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+        .reputation-text.status-perfect { color: var(--accent-green); background-color: rgba(40, 167, 69, 0.1); }
+        .reputation-text.status-good { color: #b45309; background-color: rgba(251, 146, 60, 0.15); }
+        body.dark-mode .reputation-text.status-good { color: var(--accent-orange); background-color: rgba(253, 186, 116, 0.1); }
+        .reputation-text.status-regular { color: #856404; background-color: rgba(250, 204, 21, 0.15); }
+        body.dark-mode .reputation-text.status-regular { color: var(--accent-yellow); background-color: rgba(253, 224, 71, 0.1); }
+        .reputation-text.status-bad { color: var(--danger-color); background-color: rgba(220, 53, 69, 0.1); }
+
+        .bottom-nav { position: static; flex-shrink: 0; background-color: var(--surface); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05); transition: background-color 0.3s, border-color 0.3s; z-index: 150; }
         body.dark-mode .bottom-nav { box-shadow: none; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--text-secondary); text-decoration: none; font-size: 0.8em; padding: 5px 15px; cursor: pointer; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--text-secondary); text-decoration: none; font-size: 0.8em; padding: 5px 15px; cursor: pointer; position: relative; }
         .nav-item.active { color: var(--accent-purple); }
-        .modal-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg); z-index: 200; transform: translateX(100%); transition: transform 0.3s ease-in-out; overflow-y: auto; display: flex; flex-direction: column; }
+        .notification-badge {
+            position: absolute;
+            top: 2px;
+            right: 8px;
+            background-color: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--surface);
+            transform: scale(0);
+            transition: transform 0.2s;
+        }
+        .notification-badge.visible { transform: scale(1); }
+        .notification-card img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .notification-card { cursor: pointer; } 
+        #verification-receipt-img {
+            width: 100%;
+            max-height: 40vh;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg);
+        }
+        
+        .modal-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg); z-index: 200; transform: translateX(100%); transition: transform 0.3s ease-in-out; display: flex; flex-direction: column; }
         .modal-view.active { transform: translateX(0); }
-        .modal-header { display: flex; align-items: center; padding: 15px 20px; background-color: var(--surface); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 210; }
+        .modal-header { display: flex; align-items: center; padding: 15px 20px; background-color: var(--surface); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 210; flex-shrink: 0; }
         .modal-header button { background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 0; margin-right: 15px; }
         .modal-title { font-size: 1.2em; font-weight: 600; }
-        .modal-content-wrapper { flex-grow: 1; }
+        .modal-content-wrapper { flex-grow: 1; overflow-y: auto; }
         .loan-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
         .payment-history-item, .document-list-item { display: flex; justify-content: space-between; align-items: center; background-color: var(--surface); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; }
         .payment-date { color: var(--text-secondary); font-size: 0.9em; }
         .payment-history-amount { font-weight: 600; color: var(--accent-green); }
-        .no-history { color: var(--text-secondary); text-align: center; padding: 20px; }
-        .action-buttons { background-color: var(--surface); border-top: 1px solid var(--border-color); padding: 15px 20px; display: flex; gap: 15px; margin-top: auto; position: sticky; bottom: 0; }
-        .action-buttons button { flex-grow: 1; padding: 15px; font-size: 1em; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .no-history, .no-items { color: var(--text-secondary); text-align: center; padding: 20px; }
+        .action-buttons { background-color: var(--surface); border-top: 1px solid var(--border-color); padding: 15px 20px; display: flex; gap: 15px; margin-top: auto; position: sticky; bottom: 0; flex-shrink: 0; }
+        .action-buttons button { flex-grow: 1; padding: 15px; font-size: 1em; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s; }
         .btn-primary { background-color: var(--accent-purple); color: white; }
         .btn-secondary { background-color: transparent; color: var(--accent-purple); border: 2px solid var(--accent-purple); }
+        .btn-danger { background-color: var(--danger-color); color: white; }
+        .action-buttons button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .action-buttons button:active { transform: translateY(0); }
+        .btn-primary:hover { background-color: var(--accent-purple-darker); }
+        
         .form-group { margin-bottom: 20px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
-        .form-group input, .form-group select { width: 100%; padding: 12px; font-size: 1em; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--surface); color: var(--text-primary); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; font-size: 1em; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--surface); color: var(--text-primary); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
         .form-group .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .form-group input[readonly] { background-color: var(--bg); opacity: 0.7; }
-        .radio-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .radio-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin-bottom: 20px; }
         .radio-group label, .day-selector label { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background-color: var(--surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; cursor: pointer; text-align: center; }
         .radio-group input, .day-selector input { display: none; }
         .radio-group input:checked + label, .day-selector input:checked + label { background-color: var(--accent-purple); color: white; border-color: var(--accent-purple); }
@@ -100,7 +311,11 @@
         .day-selector { display: flex; justify-content: space-between; gap: 5px; margin-bottom: 20px; }
         .day-selector label { padding: 10px; flex-grow: 1; font-weight: 600; font-size: 0.9em; }
         .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
-        .fab { position: fixed; bottom: 100px; right: 20px; width: 60px; height: 60px; background-color: var(--accent-purple); color: white; border-radius: 50%; border: none; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 160; }
+        
+        .fab { position: fixed; bottom: 90px; right: 20px; width: 60px; height: 60px; background-color: var(--accent-purple); color: white; border-radius: 50%; border: none; box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 160; transition: transform 0.2s, opacity 0.3s; }
+        .fab:hover { transform: scale(1.1); }
+        .fab.hidden { transform: scale(0.5); opacity: 0; pointer-events: none; }
+        
         #doc-preview-container .preview-item { display: flex; align-items: center; justify-content: space-between; background-color: var(--bg); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 0.9em; }
         .document-list-item a { color: var(--accent-purple); text-decoration: none; font-weight: 500; }
         .view { display: none; }
@@ -108,15 +323,29 @@
         .search-bar-wrapper { position: relative; margin-bottom: 20px; }
         .search-bar-wrapper input { width: 100%; padding: 12px 12px 12px 40px; font-size: 1em; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--surface); color: var(--text-primary); }
         .search-bar-wrapper .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); }
-        .filter-buttons { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 10px; }
+        .filter-buttons { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
+        .filter-buttons::-webkit-scrollbar { display: none; } /* Oculta scrollbar en webkit */
+        .filter-buttons.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); } /* For expense categories */
         .filter-btn { padding: 8px 16px; border: 1px solid var(--border-color); background-color: var(--surface); color: var(--text-secondary); border-radius: 20px; font-weight: 500; cursor: pointer; white-space: nowrap; }
         .filter-btn.active { background-color: var(--accent-purple); color: white; border-color: var(--accent-purple); }
-        #map-container { height: calc(100vh - 145px); width: 100%; border-radius: 12px; }
+        
+        #map-view.view.active {
+            display: flex; 
+            height: 100%;
+        }
+        #map-container {
+            flex-grow: 1; 
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+        
         .leaflet-popup-content-wrapper { border-radius: 8px; }
         .leaflet-popup-content { margin: 13px 20px; font-size: 1em; }
         .popup-client-name { font-weight: 600; margin-bottom: 5px; }
         .popup-client-amount { color: var(--accent-green); font-weight: 700; margin-bottom: 10px; }
         .popup-navigate-btn { width: 100%; padding: 10px; font-size: 0.9em; }
+        
         .settings-item { display: flex; align-items: center; gap: 15px; background-color: var(--surface); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; cursor: pointer; font-weight: 500; text-decoration: none; color: var(--text-primary); }
         .settings-item:active { background-color: var(--bg); }
         .settings-item i { color: var(--text-secondary); }
@@ -125,18 +354,71 @@
         .profile-pic-wrapper { position: relative; cursor: pointer; }
         .profile-pic-wrapper::after { content: '✎'; position: absolute; bottom: 5px; right: 5px; background-color: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
         .profile-pic-wrapper img.loading { opacity: 0.5; }
-        #profile-view-img {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            border: 3px solid var(--accent-purple);
-            object-fit: cover;
-        }
+        #profile-view-img { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--accent-purple); object-fit: cover; }
         #cropper-container { height: calc(100% - 150px); }
         #cropper-container img { max-width: 100%; height: auto; }
+        
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .toast { background-color: #333; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-size: 0.9em; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.toast-error { background-color: var(--danger-color); }
+        .toast.toast-success { background-color: var(--accent-green); }
+
+        #username-validation-msg {
+            font-size: 0.8em;
+            margin-top: 5px;
+            height: 1.2em;
+        }
+        #username-validation-msg.valid { color: var(--accent-green); }
+        #username-validation-msg.invalid { color: var(--danger-color); }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 480px) {
+            .form-group .grid-2 {
+                grid-template-columns: 1fr; /* Apila los campos del formulario */
+            }
+            .profile-info {
+                display: none; /* Oculta nombre y rol en cabecera muy pequeña */
+            }
+            .day-selector label {
+                padding: 8px;
+                font-size: 0.8em;
+            }
+            .login-card {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
+    <div id="splash-screen">
+        <img id="splash-logo" src="https://res.cloudinary.com/dc6as14p0/image/upload/v1759611967/LOGO---LUMIX-FINANZAS-REDUCIDO_gc8zow.png" alt="Logo">
+    </div>
+
+    <div id="login-view">
+        <div class="login-card">
+            <div class="logo">
+                <img id="login-logo" src="https://res.cloudinary.com/dc6as14p0/image/upload/v1759611967/LOGO---LUMIX-FINANZAS-REDUCIDO_gc8zow.png" alt="Logo">
+            </div>
+            <h2>Bem-vindo, Cobrador!</h2>
+            <p>Faça login para acessar seu painel.</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Usuário</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="btn-primary">Entrar</button>
+            </form>
+        </div>
+    </div>
 
     <div id="app-container">
         <!-- El contenido principal se genera con JS -->
@@ -145,50 +427,78 @@
     <div id="clientDetailView" class="modal-view"></div>
     <div id="paymentModal" class="modal-view"></div>
     <div id="clientFormModal" class="modal-view"></div>
+    <div id="expenseFormModal" class="modal-view"></div>
     <div id="cropperModal" class="modal-view"></div>
-
-    <nav class="bottom-nav">
-        <!-- El contenido se genera con JS -->
-    </nav>
+    <div id="shareCredentialsModal" class="modal-view"></div>
+    <div id="locationPermissionModal" class="modal-view" style="--bg: rgba(10, 14, 26, 0.8); backdrop-filter: blur(5px); z-index: 9999;"></div>
+    <div id="verificationModal" class="modal-view"></div>
+    <div id="refinanceModal" class="modal-view"></div>
+    <div id="toast-container"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, updateDoc, arrayUnion, addDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
-
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        
         const firebaseConfig = {
-          apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
-          authDomain: "lumix-financas-app.firebaseapp.com",
-          projectId: "lumix-financas-app",
-          storageBucket: "lumix-financas-app.appspot.com",
-          messagingSenderId: "463777495321",
-          appId: "1:463777495321:web:106118f53f56abd206ed88"
+            apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
+            authDomain: "lumix-financas-app.firebaseapp.com",
+            projectId: "lumix-financas-app",
+            storageBucket: "lumix-financas-app.appspot.com",
+            messagingSenderId: "463777495321",
+            appId: "1:463777495321:web:106118f53f56abd206ed88"
         };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const storage = getStorage(app);
+
+        const CLOUDINARY_CLOUD_NAME = "dc6as14p0";
+        const CLOUDINARY_UPLOAD_PRESET = "lumix-financas-uploads";
+        const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+        const DEFAULT_LOGO_URL = "https://res.cloudinary.com/dc6as14p0/image/upload/v1759611967/LOGO---LUMIX-FINANZAS-REDUCIDO_gc8zow.png";
 
         let allClients = [];
+        let allExpenses = [];
         let currentLang = localStorage.getItem('language') || 'pt';
         let mapInstance = null;
         let mapMarkers = [];
-        const collectorId = 'joao_silva'; // Hardcoded for now
+        const collectorId = 'joao_silva'; 
         
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         const translations = {
-            pt: { collector: 'Cobrador', dailyGoal: 'Meta Diária', receivedToday: 'Recebido Hoje', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Rota de Hoje', navHome: 'Início', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', viewOnMap: 'Ver no Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar' },
-            es: { collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Ruta de Hoy', navHome: 'Inicio', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', viewOnMap: 'Ver en Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar' },
-            en: { collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', clientsRemaining: 'Remaining Clients', todaysRoute: 'Today\'s Route', navHome: 'Home', navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', viewOnMap: 'View on Map', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel' }
+            pt: { paymentApproved: 'Pagamento aprovado com sucesso!', paymentRejected: 'Pagamento rejeitado.', approve: 'Aprovar', reject: 'Rejeitar', paymentReceipt: 'Comprovante de Pagamento', sentAmount: 'Valor Enviado', paymentVerification: 'Verificação de Pagamento', reputation: 'Reputação', reputationScore: 'Pontuação de Reputação', reputationPerfect: 'Excelente', reputationGood: 'Bom', reputationRegular: 'Regular', reputationBad: 'Ruim', reputationInfo: 'Mantenha seus pagamentos em dia para uma boa reputação.', collector: 'Cobrador', dailyGoal: 'Meta Diária', receivedToday: 'Recebido Hoje', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Rota de Hoje', navHome: 'Início', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', viewOnMap: 'Ver no Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mês', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Nome de Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*USUÁRIO*\n{username}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamento de', reviewRequest: 'Revisar solicitação.' },
+            es: { paymentApproved: '¡Pago aprobado con éxito!', paymentRejected: 'Pago rechazado.', approve: 'Aprobar', reject: 'Rechazar', paymentReceipt: 'Comprobante de Pago', sentAmount: 'Monto Enviado', paymentVerification: 'Verificación de Pago', reputation: 'Reputación', reputationScore: 'Puntuación de Reputación', reputationPerfect: 'Excelente', reputationGood: 'Bueno', reputationRegular: 'Regular', reputationBad: 'Mala', reputationInfo: 'Mantén tus pagos al día para tener una buena reputación.', collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Ruta de Hoy', navHome: 'Inicio', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', viewOnMap: 'Ver en Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Nombre de Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*USUÁRIO*\n{username}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificaciones', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.' },
+            en: { paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments up to date for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', remainingClients: 'Remaining Clients', todaysRoute: 'Today\'s Route', navHome: 'Home', navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', viewOnMap: 'View on Map', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', uploadReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*USERNAME*\n{username}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.' }
         };
 
         const money = val => (typeof val !== 'number' || isNaN(val)) ? (currentLang === 'pt' ? 'R$ 0,00' : '$ 0.00') : val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         
+        function showToast(message, isError = false) {
+            const toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) return;
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
+            toast.textContent = message;
+
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                }, 500);
+            }, 3500);
+        }
+
         function getTodaysRouteClients() {
             return allClients.filter(client => {
                 const today = new Date();
-                const dayOfWeek = today.getDay();
+                const dayOfWeek = today.getDay(); 
                 const isPaymentDay = (client.paymentDays || []).includes(dayOfWeek);
                 return isPaymentDay && (client.status === 'pending' || client.status === 'late');
             });
@@ -197,7 +507,7 @@
         function renderMainLayout() {
             document.getElementById('app-container').innerHTML = `
                 <header class="main-header">
-                    <div class="logo"><img src="https://placehold.co/100x100/6f42c1/FFFFFF?text=L" alt="Logo da Empresa"><span class="logo-text">LUMIX Finanças</span></div>
+                    <div class="logo"><img id="header-logo" src="${DEFAULT_LOGO_URL}" alt="Logo da Empresa"><span id="header-logo-text" class="logo-text">LUMIX Finanças</span></div>
                     <div class="header-controls">
                         <div style="position: relative;">
                             <button class="header-btn" id="lang-toggle" title="Mudar idioma"><i data-lucide="globe"></i></button>
@@ -205,7 +515,7 @@
                         </div>
                         <button class="header-btn" id="theme-toggle" title="Mudar tema"><i data-lucide="moon"></i></button>
                         <div class="profile">
-                            <div class="profile-info"><span class="profile-name">João Silva</span><span class="profile-role" data-lang-key="collector">Cobrador</span></div>
+                            <div class="profile-info"><span class="profile-name">João Silva</span><span class="profile-role" data-lang-key="collector"></span></div>
                             <img id="header-profile-img" src="" alt="Foto do Cobrador">
                         </div>
                     </div>
@@ -213,25 +523,47 @@
                 <main>
                     <div id="home-view" class="view active container">
                         <section class="kpi-grid">
-                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="dailyGoal"><i data-lucide="target"></i> Meta Diária</h3><p class="kpi-value" id="kpi-goal">R$ 0,00</p></div>
-                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="receivedToday"><i data-lucide="check-circle"></i> Recebido Hoje</h3><p class="kpi-value green" id="kpi-received">R$ 0,00</p></div>
-                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="clientsRemaining"><i data-lucide="users"></i> Clientes Restantes</h3><p class="kpi-value" id="kpi-remaining">0</p></div>
+                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="dailyGoal"><i data-lucide="target"></i></h3><p class="kpi-value" id="kpi-goal"></p></div>
+                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="receivedToday"><i data-lucide="check-circle"></i></h3><p class="kpi-value green" id="kpi-received"></p></div>
+                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="clientsRemaining"><i data-lucide="users"></i></h3><p class="kpi-value" id="kpi-remaining"></p></div>
                         </section>
-                        <section class="route-section"><h2 class="section-title" data-lang-key="todaysRoute">Rota de Hoje</h2><div class="client-list" id="todays-route-list"><div class="loading">Carregando clientes...</div></div></section>
+                        <section class="route-section"><h2 class="section-title" data-lang-key="todaysRoute"></h2><div class="client-list" id="todays-route-list"><div class="loading">Carregando clientes...</div></div></section>
                     </div>
                     <div id="clients-view" class="view container">
                         <div class="search-bar-wrapper">
                             <i class="icon" data-lucide="search"></i>
-                            <input type="text" id="client-search-input" placeholder="Buscar cliente...">
+                            <input type="text" id="client-search-input">
                         </div>
                         <div class="filter-buttons">
-                            <button class="filter-btn active" data-filter="all">Todos</button>
-                            <button class="filter-btn" data-filter="pending">Pendentes</button>
-                            <button class="filter-btn" data-filter="paid">Pagos</button>
-                            <button class="filter-btn" data-filter="late">Atrasados</button>
+                            <button class="filter-btn active" data-filter="all" data-lang-key="all"></button>
+                            <button class="filter-btn" data-filter="pending" data-lang-key="pending"></button>
+                            <button class="filter-btn" data-filter="paid" data-lang-key="paid"></button>
+                            <button class="filter-btn" data-filter="late" data-lang-key="late"></button>
                         </div>
                         <div class="client-list" id="all-clients-list"></div>
                     </div>
+                    <div id="notifications-view" class="view container">
+                         <h2 class="section-title" data-lang-key="navNotifications"></h2>
+                         <div class="notification-list" id="notifications-list-container"></div>
+                    </div>
+                     <div id="expenses-view" class="view container">
+                         <h2 class="section-title" data-lang-key="myExpenses"></h2>
+                         <div class="filter-buttons">
+                             <button class="filter-btn active" data-period="today" data-lang-key="today"></button>
+                             <button class="filter-btn" data-period="week" data-lang-key="thisWeek"></button>
+                             <button class="filter-btn" data-period="month" data-lang-key="thisMonth"></button>
+                             <button class="filter-btn" data-period="all" data-lang-key="fromBeginning"></button>
+                         </div>
+                          <div class="filter-buttons grid">
+                             <button class="filter-btn active" data-category="all" data-lang-key="all"></button>
+                             <button class="filter-btn" data-category="fuel" data-lang-key="fuel"></button>
+                             <button class="filter-btn" data-category="food" data-lang-key="food"></button>
+                             <button class="filter-btn" data-category="rent" data-lang-key="rent"></button>
+                             <button class="filter-btn" data-category="mechanics" data-lang-key="mechanics"></button>
+                             <button class="filter-btn" data-category="other" data-lang-key="other"></button>
+                         </div>
+                         <div class="expense-list" id="expenses-list-container"></div>
+                     </div>
                     <div id="map-view" class="view container">
                         <div id="map-container"></div>
                     </div>
@@ -241,55 +573,59 @@
                                 <img id="profile-view-img" src="" alt="Foto do Cobrador">
                             </label>
                             <input type="file" id="profile-pic-input" accept="image/*" style="display: none;">
-                            <h2 style="margin: 15px 0 0; font-size: 1.5em;" class="profile-name">João Silva</h2>
-                            <p style="margin: 5px 0 0; color: var(--text-secondary);" data-lang-key="collector">Cobrador</p>
+                            <h2 style="margin: 15px 0 0; font-size: 1.5em;" class="profile-name"></h2>
+                            <p style="margin: 5px 0 0; color: var(--text-secondary);" data-lang-key="collector"></p>
                         </div>
 
-                         <div class="kpi-card" style="margin-bottom: 20px; text-align: center;">
-                            <h3 class="kpi-title" style="justify-content: center;" data-lang-key="capitalTotal"><i data-lucide="wallet"></i> Capital em Mãos</h3>
-                            <p class="kpi-value" id="kpi-capital-total">R$ 0,00</p>
+                        <div class="kpi-card" style="margin-bottom: 20px; text-align: center;">
+                            <h3 class="kpi-title" style="justify-content: center;" data-lang-key="capitalTotal"><i data-lucide="wallet"></i></h3>
+                            <p class="kpi-value" id="kpi-capital-total"></p>
                         </div>
 
-                        <section class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));">
+                        <section class="kpi-grid-profile">
                              <div class="kpi-card">
-                                <h3 class="kpi-title" data-lang-key="dailyTotal"><i data-lucide="sun"></i> Total do Dia</h3>
-                                <p class="kpi-value green" id="kpi-daily-total">R$ 0,00</p>
-                            </div>
-                            <div class="kpi-card">
-                                <h3 class="kpi-title" data-lang-key="weeklyTotal"><i data-lucide="calendar"></i> Total Semanal</h3>
-                                <p class="kpi-value green" id="kpi-weekly-total">R$ 0,00</p>
-                            </div>
-                            <div class="kpi-card">
-                                <h3 class="kpi-title" data-lang-key="monthlyTotal"><i data-lucide="calendar-days"></i> Total Mensal</h3>
-                                <p class="kpi-value green" id="kpi-monthly-total">R$ 0,00</p>
-                            </div>
+                                 <h3 class="kpi-title" data-lang-key="dailyTotal"><i data-lucide="sun"></i></h3>
+                                 <p class="kpi-value green" id="kpi-daily-total"></p>
+                             </div>
+                             <div class="kpi-card">
+                                 <h3 class="kpi-title" data-lang-key="weeklyTotal"><i data-lucide="calendar"></i></h3>
+                                 <p class="kpi-value green" id="kpi-weekly-total"></p>
+                             </div>
+                             <div class="kpi-card">
+                                 <h3 class="kpi-title" data-lang-key="monthlyTotal"><i data-lucide="calendar-days"></i></h3>
+                                 <p class="kpi-value green" id="kpi-monthly-total"></p>
+                             </div>
                         </section>
                         <section>
-                            <h2 class="section-title" data-lang-key="accountSettings">Ajustes da Conta</h2>
+                            <h2 class="section-title" data-lang-key="accountSettings"></h2>
                             <div class="client-list">
                                 <a class="settings-item" id="change-password-btn">
-                                    <i data-lucide="key-round"></i>
-                                    <span data-lang-key="changePassword">Mudar Senha</span>
+                                    <i data-lucide="key-round"></i><span data-lang-key="changePassword"></span>
                                 </a>
                                 <a class="settings-item" id="export-report-btn">
-                                    <i data-lucide="download"></i>
-                                    <span data-lang-key="exportReport">Exportar Relatório Diário</span>
+                                    <i data-lucide="download"></i><span data-lang-key="exportReport"></span>
                                 </a>
                                  <a class="settings-item logout" id="logout-btn">
-                                    <i data-lucide="log-out"></i>
-                                    <span data-lang-key="logout">Sair da Conta</span>
-                                </a>
+                                     <i data-lucide="log-out"></i><span data-lang-key="logout"></span>
+                                 </a>
                             </div>
                         </section>
                     </div>
                 </main>
-                <button class="fab" id="addClientBtn" title="Adicionar Cliente"><i data-lucide="plus"></i></button>`;
-            
-            document.querySelector('.bottom-nav').innerHTML = `
-                <a class="nav-item active" data-view="home"><i data-lucide="home"></i><span data-lang-key="navHome">Início</span></a>
-                <a class="nav-item" data-view="clients"><i data-lucide="users"></i><span data-lang-key="navClients">Clientes</span></a>
-                <a class="nav-item" data-view="map"><i data-lucide="map"></i><span data-lang-key="navMap">Mapa</span></a>
-                <a class="nav-item" data-view="profile"><i data-lucide="user-circle"></i><span data-lang-key="navProfile">Perfil</span></a>`;
+                <nav class="bottom-nav">
+                    <a class="nav-item active" data-view="home"><i data-lucide="home"></i><span data-lang-key="navHome"></span></a>
+                    <a class="nav-item" data-view="clients"><i data-lucide="users"></i><span data-lang-key="navClients"></span></a>
+                    <a class="nav-item" data-view="notifications">
+                        <i data-lucide="bell"></i>
+                        <span data-lang-key="navNotifications"></span>
+                        <span class="notification-badge" id="notification-badge">0</span>
+                    </a>
+                    <a class="nav-item" data-view="expenses"><i data-lucide="receipt"></i><span data-lang-key="navExpenses"></span></a>
+                    <a class="nav-item" data-view="map"><i data-lucide="map"></i><span data-lang-key="navMap"></span></a>
+                    <a class="nav-item" data-view="profile"><i data-lucide="user-circle"></i><span data-lang-key="navProfile"></span></a>
+                </nav>
+                <button class="fab" id="addClientBtn" title="Adicionar Cliente"><i data-lucide="plus"></i></button>
+                <button class="fab hidden" id="addExpenseBtn" title="Adicionar Gasto"><i data-lucide="plus"></i></button>`;
         }
         
         function applyTheme(theme) {
@@ -300,6 +636,277 @@
                 themeToggle.innerHTML = `<i data-lucide="${theme === 'dark' ? 'sun' : 'moon'}"></i>`;
                 lucide.createIcons({ nodes: [themeToggle] });
             }
+        }
+        
+        function updateNotifications() {
+            const container = document.getElementById('notifications-list-container');
+            const badge = document.getElementById('notification-badge');
+            if (!container || !badge) return;
+
+            let notifications = [];
+            
+            allClients.forEach(client => {
+                // Notificaciones de Pagos Pendientes
+                (client.history || []).forEach((payment, index) => {
+                    if (payment.status === 'pending_verification') {
+                        notifications.push({ 
+                            type: 'payment',
+                            date: payment.date,
+                            clientName: client.name, 
+                            clientId: client.id, 
+                            amount: payment.amount,
+                            historyIndex: index, 
+                            profilePictureUrl: client.profilePictureUrl 
+                        });
+                    }
+                });
+
+                // Notificaciones de Refinanciamiento
+                if (client.refinanceRequest && client.refinanceRequest.status === 'pending') {
+                    notifications.push({
+                        type: 'refinance',
+                        date: client.refinanceRequest.requestDate,
+                        ...client.refinanceRequest,
+                        clientName: client.name,
+                        clientId: client.id,
+                        profilePictureUrl: client.profilePictureUrl
+                    });
+                }
+            });
+
+            badge.textContent = notifications.length;
+            badge.classList.toggle('visible', notifications.length > 0);
+
+            if (notifications.length === 0) {
+                container.innerHTML = `<div class="no-items" data-lang-key="noNotifications">${translations[currentLang].noNotifications}</div>`;
+                return;
+            }
+
+            container.innerHTML = notifications
+                .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
+                .map(p => {
+                    const nameInitial = (p.clientName || 'C').charAt(0).toUpperCase();
+                    const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+                    const photoUrl = p.profilePictureUrl || placeholderUrl;
+                    
+                    let title = '';
+                    let subtitle = '';
+
+                    if (p.type === 'payment') {
+                        title = p.clientName;
+                        subtitle = `${translations[currentLang].paymentSent} ${money(p.amount)}. ${translations[currentLang].pleaseVerify}`;
+                    } else if (p.type === 'refinance') {
+                        title = p.clientName;
+                        subtitle = `${translations[currentLang].refinanceRequested} ${money(p.amount)}. ${translations[currentLang].reviewRequest}`;
+                    }
+
+                    return `
+                    <div class="notification-card" data-client-id="${p.clientId}" data-history-index="${p.historyIndex}" data-type="${p.type}">
+                        <img src="${photoUrl}" alt="Foto do Cliente">
+                        <div class="notification-info">
+                            <h4 class="notification-title">${title}</h4>
+                            <p class="notification-subtitle">${subtitle}</p>
+                        </div>
+                    </div>`;
+                }).join('');
+
+            container.querySelectorAll('.notification-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const type = card.dataset.type;
+                    const clientId = card.dataset.clientId;
+                    if(type === 'payment') {
+                        const historyIndex = parseInt(card.dataset.historyIndex, 10);
+                        showVerificationModal(clientId, historyIndex);
+                    } else if (type === 'refinance') {
+                        showRefinanceModal(clientId);
+                    }
+                });
+            });
+        }
+
+        function showRefinanceModal(clientId) {
+            const refinanceModal = document.getElementById('refinanceModal');
+            const client = allClients.find(c => c.id === clientId);
+            if (!client || !client.refinanceRequest) {
+                showToast('Solicitação de refinanciamento não encontrada.', true);
+                return;
+            }
+
+            const request = client.refinanceRequest;
+
+            const lateDays = calculateLatePaymentDays(client);
+            const score = Math.max(0, 10 - lateDays);
+            let reputationStatusKey = 'reputationBad';
+            if (score === 10) reputationStatusKey = 'reputationPerfect';
+            else if (score >= 7) reputationStatusKey = 'reputationGood';
+            else if (score >= 3) reputationStatusKey = 'reputationRegular';
+
+            let barStatusClass = 'status-bad';
+            if (score === 10) barStatusClass = 'status-perfect';
+            else if (score >= 7) barStatusClass = 'status-good';
+            else if (score >= 3) barStatusClass = 'status-regular';
+
+            const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
+            const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+            const photoUrl = client.profilePictureUrl || placeholderUrl;
+
+            refinanceModal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closeRefinanceModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title">Solicitação de Refinanciamento</span>
+                </header>
+                <div class="modal-content-wrapper container">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                        <img src="${photoUrl}" alt="Foto do Cliente" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;">
+                        <div>
+                            <h3 style="margin: 0 0 5px;">${client.name}</h3>
+                            <div class="reputation-status">
+                                <span class="reputation-value">${score} / 10</span>
+                                <span class="reputation-text ${barStatusClass}" data-lang-key="${reputationStatusKey}"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <h3 class="kpi-title">Detalhes da Solicitação</h3>
+                        <div class="loan-summary" style="grid-template-columns: 1fr; gap: 10px; text-align: center;">
+                            <div>
+                                <p class="kpi-title" style="justify-content: center;">Valor Solicitado</p>
+                                <p class="kpi-value">${money(request.amount)}</p>
+                            </div>
+                            <div>
+                                <p class="kpi-title" style="justify-content: center;">Nº de Parcelas</p>
+                                <p class="kpi-value">${request.installments}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-danger" id="reject-refinance-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
+                    <button class="btn-primary" id="approve-refinance-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
+                </div>`;
+            
+            refinanceModal.classList.add('active');
+            lucide.createIcons({ nodes: refinanceModal.querySelectorAll('[data-lucide]') });
+            applyLanguage(currentLang);
+
+            document.getElementById('closeRefinanceModal').addEventListener('click', () => refinanceModal.classList.remove('active'));
+
+            document.getElementById('approve-refinance-btn').addEventListener('click', async () => {
+                const clientRef = doc(db, 'clients', clientId);
+                
+                const remainingBalance = (client.totalLoan || 0) - (client.paid || 0);
+                const newPrincipal = request.amount;
+                const totalPrincipal = remainingBalance + newPrincipal;
+                const interestRate = client.interestRate || 20;
+                const newTotalLoan = totalPrincipal * (1 + (interestRate / 100));
+                const newInstallments = request.installments;
+                const newInstallmentValue = newInstallments > 0 ? newTotalLoan / newInstallments : 0;
+                
+                try {
+                    await updateDoc(clientRef, {
+                        totalLoan: newTotalLoan,
+                        amount: newInstallmentValue,
+                        installments: `0/${newInstallments}`,
+                        paid: 0,
+                        history: [],
+                        startDate: serverTimestamp(),
+                        status: 'pending',
+                        refinanceRequest: null 
+                    });
+                    showToast('Refinanciamento aprovado!');
+                    refinanceModal.classList.remove('active');
+                } catch (error) {
+                    console.error("Error approving refinance:", error);
+                    showToast('Erro ao aprovar refinanciamento.', true);
+                }
+            });
+
+            document.getElementById('reject-refinance-btn').addEventListener('click', async () => {
+                const clientRef = doc(db, 'clients', clientId);
+                try {
+                    await updateDoc(clientRef, {
+                        refinanceRequest: null
+                    });
+                    showToast('Solicitação rejeitada.');
+                    refinanceModal.classList.remove('active');
+                } catch (error) {
+                    console.error("Error rejecting refinance:", error);
+                    showToast('Erro ao rejeitar solicitação.', true);
+                }
+            });
+        }
+
+        function showVerificationModal(clientId, historyIndex) {
+            const verificationModal = document.getElementById('verificationModal');
+            const client = allClients.find(c => c.id === clientId);
+            if (!client || !client.history || !client.history[historyIndex]) {
+                showToast('Notificação não encontrada ou inválida.', true);
+                return;
+            }
+
+            const payment = client.history[historyIndex];
+
+            verificationModal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closeVerificationModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title" data-lang-key="paymentVerification"></span>
+                </header>
+                <div class="modal-content-wrapper container">
+                    <div class="kpi-card">
+                        <p class="kpi-title" style="margin-bottom: 5px;">${client.name}</p>
+                        <p class="kpi-title" data-lang-key="sentAmount"></p>
+                        <p class="kpi-value green">${money(payment.amount)}</p>
+                    </div>
+                    <div class="kpi-card" style="margin-top: 15px;">
+                        <h3 class="kpi-title" data-lang-key="paymentReceipt"></h3>
+                        <img id="verification-receipt-img" src="${payment.receiptUrl}" alt="Comprovante">
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-danger" id="reject-payment-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
+                    <button class="btn-primary" id="approve-payment-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
+                </div>`;
+
+            verificationModal.classList.add('active');
+            lucide.createIcons({ nodes: verificationModal.querySelectorAll('[data-lucide]') });
+            applyLanguage(currentLang);
+
+            document.getElementById('closeVerificationModal').addEventListener('click', () => verificationModal.classList.remove('active'));
+
+            document.getElementById('approve-payment-btn').addEventListener('click', async () => {
+                const clientRef = doc(db, 'clients', clientId);
+                const updatedHistory = [...client.history];
+                updatedHistory[historyIndex].status = 'approved';
+                
+                const newPaidAmount = (client.paid || 0) + payment.amount;
+
+                try {
+                    await updateDoc(clientRef, {
+                        history: updatedHistory,
+                        paid: newPaidAmount
+                    });
+                    showToast(translations[currentLang].paymentApproved);
+                    verificationModal.classList.remove('active');
+                } catch (error) {
+                    console.error("Error approving payment:", error);
+                    showToast('Erro ao aprovar pagamento.', true);
+                }
+            });
+
+            document.getElementById('reject-payment-btn').addEventListener('click', async () => {
+                const clientRef = doc(db, 'clients', clientId);
+                const updatedHistory = client.history.filter((_, index) => index !== historyIndex);
+
+                try {
+                    await updateDoc(clientRef, { history: updatedHistory });
+                    showToast(translations[currentLang].paymentRejected);
+                    verificationModal.classList.remove('active');
+                } catch (error) {
+                    console.error("Error rejecting payment:", error);
+                    showToast('Erro ao rejeitar pagamento.', true);
+                }
+            });
         }
         
         function applyLanguage(lang) {
@@ -314,7 +921,9 @@
             
             updateTodaysRouteList();
             updateAllClientsList();
+            updateExpensesView();
             updateProfileView();
+            updateNotifications();
         }
 
         function updateDashboard(clientsForDashboard) {
@@ -326,14 +935,17 @@
                  kpiGoal.textContent = money(0);
                  kpiRemaining.textContent = 0;
             } else {
-                const dailyGoal = clientsForDashboard.filter(c => c.status !== 'paid').reduce((sum, c) => sum + c.amount, 0);
+                const dailyGoal = clientsForDashboard.filter(c => c.status !== 'paid').reduce((sum, c) => sum + (c.amount || 0), 0);
                 const remainingClients = clientsForDashboard.filter(c => c.status === 'pending' || c.status === 'late').length;
                 kpiGoal.textContent = money(dailyGoal);
                 kpiRemaining.textContent = remainingClients;
             }
             
             const todayStr = new Date().toLocaleDateString('pt-BR');
-            const receivedToday = allClients.filter(c => c.history && Array.isArray(c.history)).flatMap(c => c.history).filter(h => h && h.date && h.date.seconds && new Date(h.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr).reduce((sum, h) => sum + h.amount, 0);
+            const receivedToday = allClients
+                .flatMap(c => c.history || [])
+                .filter(h => h?.date?.seconds && new Date(h.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr && h.status !== 'pending_verification')
+                .reduce((sum, h) => sum + h.amount, 0);
             kpiReceived.textContent = money(receivedToday);
         }
 
@@ -342,7 +954,7 @@
             const weeklyTotalEl = document.getElementById('kpi-weekly-total');
             const monthlyTotalEl = document.getElementById('kpi-monthly-total');
             const capitalTotalEl = document.getElementById('kpi-capital-total');
-            if (!dailyTotalEl || !weeklyTotalEl || !monthlyTotalEl || !capitalTotalEl) return;
+            if (!dailyTotalEl) return;
 
             const now = new Date();
             const todayStr = now.toLocaleDateString('pt-BR');
@@ -355,38 +967,76 @@
             let dailyTotal = 0, weeklyTotal = 0, monthlyTotal = 0, totalPaymentsReceived = 0, totalLoansMade = 0;
 
             allClients.forEach(client => {
-                if (client.collectorId === collectorId) {
-                     if (client.totalLoan && client.interestRate) {
-                        const principal = client.totalLoan / (1 + client.interestRate / 100);
-                        totalLoansMade += principal;
-                    }
-                    (client.history || []).forEach(h => {
-                        if (h.date && h.date.seconds) {
-                            const paymentDate = new Date(h.date.seconds * 1000);
-                            const amount = h.amount || 0;
-                            totalPaymentsReceived += amount;
-
-                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) { dailyTotal += amount; }
-                            if (paymentDate >= oneWeekAgo) { weeklyTotal += amount; }
-                            if (paymentDate >= startOfMonth) { monthlyTotal += amount; }
-                        }
-                    });
+                if (client.totalLoan && client.interestRate) {
+                    const principal = client.totalLoan / (1 + client.interestRate / 100);
+                    totalLoansMade += principal;
                 }
+                (client.history || []).forEach(h => {
+                    if (h.date?.seconds && h.status !== 'pending_verification') {
+                        const paymentDate = new Date(h.date.seconds * 1000);
+                        const amount = h.amount || 0;
+                        totalPaymentsReceived += amount;
+
+                        if (paymentDate.toLocaleDateString('pt-BR') === todayStr) { dailyTotal += amount; }
+                        if (paymentDate >= oneWeekAgo) { weeklyTotal += amount; }
+                        if (paymentDate >= startOfMonth) { monthlyTotal += amount; }
+                    }
+                });
             });
             
+            const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
+            
             const currentStartingCapital = (collectorData && collectorData.startingCapital) || 0;
-            const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived;
+            const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses;
 
             dailyTotalEl.textContent = money(dailyTotal);
             weeklyTotalEl.textContent = money(weeklyTotal);
             monthlyTotalEl.textContent = money(monthlyTotal);
             capitalTotalEl.textContent = money(capitalTotal);
         }
+        
+        function calculateLatePaymentDays(client) {
+            if (!client || (client.paid >= client.totalLoan)) return 0;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let lastRelevantDate;
+            if (client.history && client.history.length > 0) {
+                const sortedHistory = [...client.history]
+                    .filter(h => h.date?.seconds && h.status !== 'pending_verification')
+                    .sort((a, b) => b.date.seconds - a.date.seconds);
+                if (sortedHistory.length > 0) lastRelevantDate = new Date(sortedHistory[0].date.seconds * 1000);
+            }
+            if (!lastRelevantDate) {
+                if (client.startDate?.seconds) {
+                    lastRelevantDate = new Date(client.startDate.seconds * 1000);
+                } else {
+                    return 0; // Si no hay fecha de inicio, no podemos calcular.
+                }
+            }
+            
+            lastRelevantDate.setHours(0, 0, 0, 0);
+            if (lastRelevantDate >= today) return 0;
+
+            let workingDaysToPay = 0;
+            let checkDate = new Date(lastRelevantDate);
+            while (checkDate < today) {
+                checkDate.setDate(checkDate.getDate() + 1);
+                const dayOfWeek = checkDate.getDay();
+                const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
+                const isHoliday = nationalHolidays.includes(formattedDate);
+                const isPaymentDay = (client.paymentDays || []).includes(dayOfWeek);
+                if (!isHoliday && isPaymentDay) {
+                    workingDaysToPay++;
+                }
+            }
+            return workingDaysToPay > 0 ? workingDaysToPay : 0;
+        }
 
         function renderClientCards(container, clients) {
             if (!container) return;
             if (clients.length === 0) {
-                container.innerHTML = `<div class="loading">Nenhum cliente encontrado.</div>`;
+                container.innerHTML = `<div class="no-items">Nenhum cliente encontrado.</div>`;
                 return;
             }
             container.innerHTML = ''; 
@@ -396,7 +1046,26 @@
                 card.dataset.clientId = client.id;
                 const statusClass = `status-${client.status}`;
                 const statusText = (translations[currentLang] && translations[currentLang][client.status]) || client.status;
-                card.innerHTML = `<div class="client-info"><h4 class="client-name">${client.name}</h4><p class="client-address"><i data-lucide="map-pin" style="width: 14px; height: 14px; stroke-width: 2.5;"></i>${client.address}</p></div><div class="payment-info"><span class="payment-amount">${money(client.amount)}</span><span class="payment-status ${statusClass}">${statusText}</span></div>`;
+                
+                const lateDays = calculateLatePaymentDays(client);
+                const reputationScore = Math.max(0, 10 - lateDays);
+                let repClass = 'rep-bad';
+                if (reputationScore === 10) repClass = 'rep-perfect';
+                else if (reputationScore >= 7) repClass = 'rep-good';
+                else if (reputationScore >= 3) repClass = 'rep-regular';
+
+                card.innerHTML = `
+                    <div class="client-info">
+                        <h4 class="client-name">${client.name}</h4>
+                        <p class="client-address"><i data-lucide="map-pin" style="width: 14px; height: 14px; stroke-width: 2.5;"></i>${client.address}</p>
+                    </div>
+                    <div class="payment-info">
+                        <span class="payment-amount">${money(client.amount)}</span>
+                        <div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;">
+                           <span class="reputation-score ${repClass}"><i data-lucide="star" style="width: 12px; height: 12px;"></i> ${reputationScore}/10</span>
+                           <span class="payment-status ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>`;
                 container.appendChild(card);
             });
             lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
@@ -412,7 +1081,7 @@
         function updateAllClientsList() {
             const container = document.getElementById('all-clients-list');
             const searchInput = document.getElementById('client-search-input');
-            const activeFilter = document.querySelector('.filter-btn.active');
+            const activeFilter = document.querySelector('#clients-view .filter-btn.active');
             if (!container || !searchInput || !activeFilter) return;
 
             const searchTerm = searchInput.value.toLowerCase();
@@ -444,26 +1113,22 @@
                     .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
                     .map(p => {
                         let dateString = 'Data inválida';
-                        if (p && p.date && typeof p.date.seconds === 'number') { dateString = new Date(p.date.seconds * 1000).toLocaleDateString('pt-BR'); }
+                        if (p?.date?.seconds) { dateString = new Date(p.date.seconds * 1000).toLocaleDateString('pt-BR'); }
                         return `<div class="payment-history-item"><span class="payment-date">${dateString}</span><span class="payment-history-amount">${money(p.amount)}</span></div>`;
                     }).join('');
             }
 
-            let documentsHtml = '';
-            if (client.documents && client.documents.length > 0) {
-                documentsHtml = `
-                    <section>
-                        <h2 class="section-title" data-lang-key="attachedDocs">Documentos Anexados</h2>
-                        <div class="client-list">
-                            ${client.documents.map(doc => `
-                                <div class="document-list-item">
-                                    <span>${doc.name}</span>
-                                    <a href="${doc.url}" target="_blank" rel="noopener noreferrer"><i data-lucide="eye"></i></a>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </section>`;
-            }
+            const lateDays = calculateLatePaymentDays(client);
+            const score = Math.max(0, 10 - lateDays);
+            let reputationStatusKey = 'reputationBad';
+            if (score === 10) reputationStatusKey = 'reputationPerfect';
+            else if (score >= 7) reputationStatusKey = 'reputationGood';
+            else if (score >= 3) reputationStatusKey = 'reputationRegular';
+
+            let barStatusClass = 'status-bad';
+            if (score === 10) barStatusClass = 'status-perfect';
+            else if (score >= 7) barStatusClass = 'status-good';
+            else if (score >= 3) barStatusClass = 'status-regular';
 
             clientDetailView.innerHTML = `
                 <header class="modal-header" style="justify-content: space-between;">
@@ -473,19 +1138,35 @@
                     </div>
                     <button id="editClientBtn" class="header-btn" title="Editar Cliente"><i data-lucide="edit"></i></button>
                 </header>
-                <div class="modal-content-wrapper container">
-                    <section class="loan-summary">
+                <div class="modal-content-wrapper">
+                  <div class="container">
+                    <section class="loan-summary" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));">
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(client.totalLoan)}</p></div>
+                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(client.amount)}</p></div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(client.paid)}</p></div>
                     </section>
-                    ${documentsHtml}
+                    
                     <section>
+                         <h2 class="section-title" data-lang-key="reputationScore"></h2>
+                         <div class="kpi-card">
+                             <div class="reputation-bar-container">
+                                 <div class="reputation-bar ${barStatusClass}" style="width: ${score * 10}%"></div>
+                             </div>
+                             <div class="reputation-status">
+                                 <span class="reputation-value">${score} / 10</span>
+                                 <span class="reputation-text ${barStatusClass}" data-lang-key="${reputationStatusKey}"></span>
+                             </div>
+                         </div>
+                    </section>
+
+                    <section style="margin-top: 30px;">
                         <h2 class="section-title">Histórico de Pagamentos</h2>
                         <div class="client-list">${historyHtml}</div>
                     </section>
+                  </div>
                 </div>
                 <div class="action-buttons">
-                    <button class="btn-secondary" id="viewMapBtn"><i data-lucide="map"></i> <span data-lang-key="viewOnMap">Ver no Mapa</span></button>
+                    <button class="btn-secondary" id="viewMapBtn"><i data-lucide="map"></i> <span data-lang-key="viewOnMap"></span></button>
                     <button class="btn-primary" id="registerPaymentBtn"><i data-lucide="dollar-sign"></i> Registrar Pagamento</button>
                 </div>`;
             
@@ -514,7 +1195,8 @@
                     <button id="closePaymentModal"><i data-lucide="x"></i></button>
                     <span class="modal-title">Registrar Pagamento</span>
                 </header>
-                <div class="modal-content-wrapper container">
+                <div class="modal-content-wrapper">
+                  <div class="container">
                     <h2 class="section-title" style="border: none; margin-bottom: 5px;">${client.name}</h2>
                     <p style="color: var(--text-secondary); margin-top:0; margin-bottom: 30px;">Parcela de hoje: ${money(client.amount)}</p>
                     <form id="payment-form" class="payment-form">
@@ -536,6 +1218,7 @@
                             </div>
                         </div>
                     </form>
+                  </div>
                 </div>
                 <div class="action-buttons">
                     <button class="btn-primary" id="confirmPaymentBtn"><i data-lucide="check-circle"></i> Confirmar Pagamento</button>
@@ -545,13 +1228,20 @@
             document.getElementById('closePaymentModal').addEventListener('click', () => paymentModal.classList.remove('active'));
             document.getElementById('confirmPaymentBtn').addEventListener('click', async () => {
                 const paymentValue = parseFloat(document.getElementById('payment-value').value);
-                if (isNaN(paymentValue) || paymentValue <= 0) { alert('Valor de pagamento inválido.'); return; }
+                if (isNaN(paymentValue) || paymentValue <= 0) { 
+                    showToast('Valor de pagamento inválido.', true);
+                    return; 
+                }
                 const clientRef = doc(db, 'clients', clientId);
                 try {
                     await updateDoc(clientRef, { status: 'paid', paid: (client.paid || 0) + paymentValue, history: arrayUnion({ amount: paymentValue, date: new Date() }) });
                     paymentModal.classList.remove('active');
                     document.getElementById('clientDetailView').classList.remove('active');
-                } catch(error) { console.error("Error updating document: ", error); alert("Falha ao registrar pagamento."); }
+                    showToast('Pagamento registrado com sucesso!');
+                } catch(error) { 
+                    console.error("Error updating document: ", error);
+                    showToast('Falha ao registrar pagamento.', true);
+                }
             });
         }
         
@@ -572,77 +1262,144 @@
                     <button id="closeClientFormModal"><i data-lucide="arrow-left"></i></button>
                     <span class="modal-title" data-lang-key="${modalTitleKey}"></span>
                 </header>
-                <div class="modal-content-wrapper container">
+                <div class="modal-content-wrapper">
+                  <div class="container">
                     <form id="client-form">
-                        <div class="form-group"><label data-lang-key="clientName">Nome do Cliente</label><input type="text" id="client-name" required value="${client.name || ''}"></div>
-                        <div class="form-group"><label data-lang-key="address">Endereço</label><input type="text" id="client-address" required value="${client.address || ''}"></div>
-                        <div class="form-group"><label data-lang-key="city">Cidade</label><input type="text" id="client-city" required value="${client.city || ''}"></div>
+                        <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}"></div>
+                        <div class="form-group"><label data-lang-key="address"></label><input type="text" id="client-address" required value="${client.address || ''}"></div>
+                        <div class="form-group"><label data-lang-key="city"></label><input type="text" id="client-city" required value="${client.city || ''}"></div>
+                        <div class="form-group"><label data-lang-key="whatsapp"></label><input type="tel" id="client-whatsapp" required value="${client.whatsapp || ''}"></div>
                         <div class="form-group">
-                            <label data-lang-key="location">Localização GPS</label>
+                            <label data-lang-key="location"></label>
                             <input type="text" id="client-location" readonly placeholder="Clique no botão para obter" value="${client.location || ''}">
                             <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%; margin-top: 10px;">
                                 <i data-lucide="map-pin"></i> Obter Localização GPS
                             </button>
                         </div>
-                        <div class="form-group grid-2">
-                            <div><label data-lang-key="totalLoan">Valor do Empréstimo</label><input type="number" id="client-loan-amount" required value="${(client.totalLoan && client.interestRate) ? (client.totalLoan / (1 + client.interestRate/100)) : ''}"></div>
-                            <div><label data-lang-key="interest">Juros (%)</label><input type="number" id="client-interest" required value="${client.interestRate || '20'}"></div>
-                        </div>
-                        <div class="form-group"><label data-lang-key="totalToPay">Valor Total a Pagar</label><input type="text" id="client-total-to-pay" readonly></div>
-                        <div class="form-group grid-2">
-                             <div><label data-lang-key="numInstallments">Número de Parcelas</label><input type="number" id="client-installments" required value="${isEditMode ? (client.installments || '').split('/')[1] : ''}"></div>
-                            <div><label data-lang-key="installmentValue">Valor da Parcela</label><input type="text" id="client-installment-value" readonly></div>
+                        
+                        <!-- Client Access Section -->
+                        <h3 class="section-title" data-lang-key="clientAccess" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px;"></h3>
+                        <div class="form-group">
+                            <label data-lang-key="username"></label>
+                            <input type="text" id="client-username" required value="${client.username || ''}">
+                            <div id="username-validation-msg"></div>
                         </div>
                         <div class="form-group">
-                            <label data-lang-key="paymentDays">Dias de Pagamento</label>
+                            <label data-lang-key="password"></label>
+                            <input type="password" id="client-password" required value="${client.password || ''}">
+                        </div>
+
+                        <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Detalhes do Empréstimo</h3>
+                        <div class="form-group grid-2">
+                            <div><label data-lang-key="totalLoan"></label><input type="number" id="client-loan-amount" required value="${(client.totalLoan && client.interestRate) ? (client.totalLoan / (1 + client.interestRate/100)) : ''}"></div>
+                            <div><label data-lang-key="interest"></label><input type="number" id="client-interest" required value="${client.interestRate || '20'}"></div>
+                        </div>
+                        <div class="form-group"><label data-lang-key="totalToPay"></label><input type="text" id="client-total-to-pay" readonly></div>
+                        <div class="form-group grid-2">
+                            <div><label data-lang-key="numInstallments"></label><input type="number" id="client-installments" required value="${isEditMode ? (client.installments || '').split('/')[1] : ''}"></div>
+                            <div><label data-lang-key="installmentValue"></label><input type="text" id="client-installment-value" readonly></div>
+                        </div>
+                        <div class="form-group">
+                            <label data-lang-key="paymentDays"></label>
                             <div class="day-selector">
                                 ${['D','S','T','Q','Q','S','S'].map((day, i) => `<div><input type="checkbox" id="form-day-${i}" value="${i}"><label for="form-day-${i}">${day}</label></div>`).join('')}
                             </div>
                         </div>
+                        
                         <div class="form-group">
-                            <label data-lang-key="clientDocs">Documentos do Cliente</label>
+                            <label data-lang-key="clientDocs"></label>
+                            <div id="doc-preview-container" style="margin-bottom: 15px;"></div>
                             <div class="grid-2">
                                 <button type="button" class="btn-secondary" id="take-photo-btn"><i data-lucide="camera"></i> <span data-lang-key="takePhoto"></span></button>
                                 <button type="button" class="btn-secondary" id="upload-file-btn"><i data-lucide="upload"></i> <span data-lang-key="uploadFile"></span></button>
                             </div>
                             <input type="file" id="doc-file-input" multiple accept="image/*,application/pdf" style="display: none;">
-                            <div id="doc-preview-container" style="margin-top: 15px;"></div>
                         </div>
                     </form>
+                  </div>
                 </div>
                 <div class="action-buttons">
                     <button class="btn-primary" id="saveClientBtn"><i data-lucide="save"></i> <span data-lang-key="${saveButtonKey}"></span></button>
                 </div>`;
             clientFormModal.classList.add('active');
             
+            let isUsernameAvailable = isEditMode; 
+            const usernameInput = document.getElementById('client-username');
+            const validationMsg = document.getElementById('username-validation-msg');
+
+            usernameInput.addEventListener('blur', async () => {
+                const username = usernameInput.value.trim();
+                if (!username) {
+                    validationMsg.textContent = '';
+                    isUsernameAvailable = false;
+                    return;
+                }
+                
+                validationMsg.textContent = 'Verificando...';
+                validationMsg.className = '';
+
+                const q = query(collection(db, "clients"), where("username", "==", username));
+                const querySnapshot = await getDocs(q);
+                
+                let isTaken = false;
+                if (!querySnapshot.empty) {
+                    if (isEditMode) {
+                        isTaken = querySnapshot.docs.some(doc => doc.id !== clientId);
+                    } else {
+                        isTaken = true;
+                    }
+                }
+
+                if (isTaken) {
+                    validationMsg.textContent = translations[currentLang].usernameTaken;
+                    validationMsg.classList.add('invalid');
+                    isUsernameAvailable = false;
+                } else {
+                    validationMsg.textContent = translations[currentLang].usernameAvailable;
+                    validationMsg.classList.add('valid');
+                    isUsernameAvailable = true;
+                }
+            });
+
             const docPreviewContainer = document.getElementById('doc-preview-container');
 
             function renderDocPreviews() {
                 docPreviewContainer.innerHTML = '';
-                // Render existing docs
-                existingDocs.forEach(doc => {
+                if(existingDocs.length === 0 && filesToUpload.length === 0){
+                    docPreviewContainer.innerHTML = `<p class="no-items" style="padding: 10px 0;">Nenhum documento anexado.</p>`;
+                }
+
+                existingDocs.forEach((doc, index) => {
                     const previewItem = document.createElement('div');
                     previewItem.className = 'preview-item';
-                    previewItem.innerHTML = `<span>${doc.name}</span><button type="button" class="remove-existing-doc" style="background:none; border:none; color: var(--text-secondary); cursor:pointer;"><i data-lucide="x-circle"></i></button>`;
+                    previewItem.innerHTML = `<span><a href="${doc.url}" target="_blank" rel="noopener noreferrer" style="color: var(--text-primary); text-decoration: none;">${doc.name}</a></span><button type="button" data-index="${index}" class="remove-existing-doc" style="background:none; border:none; color: var(--danger-color); cursor:pointer;"><i data-lucide="trash-2"></i></button>`;
                     docPreviewContainer.appendChild(previewItem);
-                    previewItem.querySelector('button').addEventListener('click', () => {
-                        existingDocs = existingDocs.filter(d => d.url !== doc.url);
-                        renderDocPreviews();
-                    });
                 });
-                // Render new files to upload
-                 filesToUpload.forEach(file => {
+                 filesToUpload.forEach((file, index) => {
                     const previewItem = document.createElement('div');
                     previewItem.className = 'preview-item';
-                    previewItem.innerHTML = `<span>${file.name} (novo)</span><button type="button" class="remove-new-doc" style="background:none; border:none; color: var(--text-secondary); cursor:pointer;"><i data-lucide="x-circle"></i></button>`;
+                    previewItem.innerHTML = `<span>${file.name} (novo)</span><button type="button" data-index="${index}" class="remove-new-doc" style="background:none; border:none; color: var(--danger-color); cursor:pointer;"><i data-lucide="trash-2"></i></button>`;
                     docPreviewContainer.appendChild(previewItem);
-                    previewItem.querySelector('button').addEventListener('click', () => {
-                         filesToUpload = filesToUpload.filter(f => f !== file);
-                         renderDocPreviews();
-                    });
                 });
                 lucide.createIcons({nodes: docPreviewContainer.querySelectorAll('i')});
             }
+
+            docPreviewContainer.addEventListener('click', (e) => {
+                const removeExistingBtn = e.target.closest('.remove-existing-doc');
+                if (removeExistingBtn) {
+                    const index = parseInt(removeExistingBtn.dataset.index, 10);
+                    existingDocs.splice(index, 1);
+                    renderDocPreviews();
+                }
+
+                const removeNewBtn = e.target.closest('.remove-new-doc');
+                if (removeNewBtn) {
+                    const index = parseInt(removeNewBtn.dataset.index, 10);
+                    filesToUpload.splice(index, 1);
+                    renderDocPreviews();
+                }
+            });
+
 
             if(isEditMode) renderDocPreviews();
 
@@ -682,8 +1439,7 @@
             [loanAmountInput, interestInput, installmentsInput].forEach(input => input.addEventListener('input', calculateLoanDetails));
             calculateLoanDetails();
 
-            // Pre-fill payment days
-            const paymentDays = client.paymentDays || [1,2,3,4,5,6]; // Default for new clients
+            const paymentDays = client.paymentDays || [1,2,3,4,5,6];
             paymentDays.forEach(day => {
                 const checkbox = document.getElementById(`form-day-${day}`);
                 if (checkbox) checkbox.checked = true;
@@ -695,107 +1451,180 @@
                     locationInput.placeholder = 'Obtendo localização...';
                     navigator.geolocation.getCurrentPosition(position => {
                         const { latitude, longitude } = position.coords;
-                        locationInput.value = `https://maps.google.com/?q=${latitude},${longitude}`;
+                        locationInput.value = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
                     }, error => {
                         locationInput.placeholder = 'Não foi possível obter a localização.';
-                        alert('Erro ao obter localização. Verifique as permissões do navegador.');
+                        showToast('Erro ao obter localização.', true);
                     });
                 } else {
-                    alert('Geolocalização não é suportada neste navegador.');
+                    showToast('Geolocalização não é suportada.', true);
                 }
             });
             
             document.getElementById('closeClientFormModal').addEventListener('click', () => clientFormModal.classList.remove('active'));
+            
             document.getElementById('saveClientBtn').addEventListener('click', async (e) => {
                 const saveButton = e.currentTarget;
-                saveButton.disabled = true; 
-                const buttonSpan = saveButton.querySelector('span');
-                buttonSpan.textContent = 'Salvando...';
-
-                // 1. Upload new files
-                let newUploadedDocuments = [];
-                if (filesToUpload.length > 0) {
-                    const clientFolderId = client.id || crypto.randomUUID();
-                    const uploadPromises = filesToUpload.map(async file => {
-                        const storageRef = ref(storage, `client_docs/${clientFolderId}/${file.name}`);
-                        await uploadBytes(storageRef, file);
-                        const downloadURL = await getDownloadURL(storageRef);
-                        return { name: file.name, url: downloadURL };
-                    });
-                    try {
-                        newUploadedDocuments = await Promise.all(uploadPromises);
-                    } catch (error) {
-                        console.error("Error uploading new files:", error);
-                        alert("Falha ao carregar os novos documentos.");
-                        saveButton.disabled = false; buttonSpan.textContent = translations[currentLang][saveButtonKey];
-                        return;
-                    }
-                }
+                const originalButtonHTML = saveButton.innerHTML;
                 
-                // 2. Combine with existing documents
-                const finalDocuments = [...existingDocs, ...newUploadedDocuments];
-
-                // 3. Gather all data from form
-                const loanAmount = parseFloat(loanAmountInput.value);
-                const interest = parseFloat(interestInput.value);
-                const installments = parseInt(installmentsInput.value);
-                const totalToPay = loanAmount * (1 + (interest / 100));
-                const installmentValue = installments > 0 ? totalToPay / installments : 0;
+                const clientNameInput = document.getElementById('client-name');
+                const loanAmountInputVal = document.getElementById('client-loan-amount');
+                const usernameInputVal = document.getElementById('client-username');
+                const passwordInputVal = document.getElementById('client-password');
+                const whatsappInputVal = document.getElementById('client-whatsapp');
                 
-                const clientData = {
-                    name: document.getElementById('client-name').value,
-                    address: document.getElementById('client-address').value,
-                    city: document.getElementById('client-city').value,
-                    location: document.getElementById('client-location').value,
-                    totalLoan: totalToPay,
-                    amount: installmentValue,
-                    installments: isEditMode && client.installments ? `${client.installments.split('/')[0]}/${installments}` : `0/${installments}`,
-                    paid: client.paid || 0,
-                    status: client.status || 'pending',
-                    history: client.history || [],
-                    documents: finalDocuments,
-                    paymentDays: Array.from(document.querySelectorAll('.day-selector input:checked')).map(el => parseInt(el.value)),
-                    collectorId: client.collectorId || 'joao_silva',
-                    startDate: client.startDate || new Date(),
-                    interestRate: interest
-                };
-
-                if (!clientData.name || !clientData.totalLoan) { 
-                    alert('Nome e Valor do Empréstimo são obrigatórios.'); 
-                    saveButton.disabled = false; buttonSpan.textContent = translations[currentLang][saveButtonKey];
+                if (!clientNameInput.value || !loanAmountInputVal.value || !usernameInputVal.value || !passwordInputVal.value || !whatsappInputVal.value) {
+                    showToast('Nome, WhatsApp, Valor do Empréstimo, Usuário e Senha são obrigatórios.', true);
                     return;
                 }
+                
+                if (!isUsernameAvailable) {
+                     showToast(translations[currentLang].usernameTaken, true);
+                     return;
+                }
 
-                // 4. Save or Update
+                saveButton.disabled = true;
+                saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> <span>Salvando...</span>`;
+                lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+
                 try {
+                    let newUploadedDocuments = [];
+                    if (filesToUpload.length > 0) {
+                        const uploadPromises = filesToUpload.map(async (file) => {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                            const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+                            if (!response.ok) { throw new Error(`Cloudinary upload failed: ${response.statusText}`); }
+                            const data = await response.json();
+                            return { name: file.name, url: data.secure_url };
+                        });
+                        newUploadedDocuments = await Promise.all(uploadPromises);
+                    }
+
+                    const finalDocuments = [...existingDocs, ...newUploadedDocuments];
+                    const loanAmount = parseFloat(document.getElementById('client-loan-amount').value);
+                    const interest = parseFloat(document.getElementById('client-interest').value);
+                    const installments = parseInt(document.getElementById('client-installments').value);
+                    const totalToPay = loanAmount * (1 + (interest / 100));
+                    const installmentValue = installments > 0 ? totalToPay / installments : 0;
+
+                    const clientData = {
+                        name: document.getElementById('client-name').value,
+                        address: document.getElementById('client-address').value,
+                        city: document.getElementById('client-city').value,
+                        whatsapp: document.getElementById('client-whatsapp').value,
+                        location: document.getElementById('client-location').value,
+                        username: document.getElementById('client-username').value.trim(),
+                        password: document.getElementById('client-password').value,
+                        totalLoan: totalToPay,
+                        amount: installmentValue,
+                        installments: isEditMode && client.installments ? `${client.installments.split('/')[0]}/${installments}` : `0/${installments}`,
+                        paid: client.paid || 0,
+                        status: client.status || 'pending',
+                        history: client.history || [],
+                        documents: finalDocuments,
+                        paymentDays: Array.from(document.querySelectorAll('.day-selector input:checked')).map(el => parseInt(el.value)),
+                        collectorId: collectorId,
+                        startDate: client.startDate || serverTimestamp(),
+                        interestRate: interest
+                    };
+
                     if (isEditMode) {
-                        const clientRef = doc(db, 'clients', clientId);
-                        await updateDoc(clientRef, clientData);
+                        await updateDoc(doc(db, 'clients', clientId), clientData);
                     } else {
                         await addDoc(collection(db, "clients"), clientData);
                     }
-                    clientFormModal.classList.remove('active');
+                    
+                    showShareCredentialsModal(clientData, isEditMode);
+
                 } catch (err) {
-                    console.error("Error saving document: ", err);
-                    alert("Falha ao salvar cliente.");
-                    saveButton.disabled = false; buttonSpan.textContent = translations[currentLang][saveButtonKey];
+                    console.error("Falha ao salvar cliente:", err);
+                    showToast('Falha ao salvar. Verifique o console para detalhes.', true);
+                    
+                    saveButton.innerHTML = `<i data-lucide="alert-circle"></i> <span>Erro!</span>`;
+                    lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+                    
+                    setTimeout(() => {
+                        saveButton.disabled = false;
+                        saveButton.innerHTML = originalButtonHTML;
+                        lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+                    }, 3000);
                 }
             });
 
             lucide.createIcons({ nodes: clientFormModal.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
         }
-        
+
+        function showShareCredentialsModal(clientData, isEditMode) {
+            const modal = document.getElementById('shareCredentialsModal');
+            const titleKey = isEditMode ? 'clientUpdatedSuccess' : 'clientRegisteredSuccess';
+            const appLink = 'https://sua-app-cliente.web.app'; // Placeholder link
+
+            let messageTemplate = translations[currentLang].whatsappMessageTemplate;
+            messageTemplate = messageTemplate.replace('{clientName}', clientData.name)
+                                             .replace('{appLink}', appLink)
+                                             .replace('{username}', clientData.username)
+                                             .replace('{password}', clientData.password);
+            
+            const cleanPhoneNumber = clientData.whatsapp.replace(/\D/g, '');
+            const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhoneNumber}&text=${encodeURIComponent(messageTemplate)}`;
+
+            modal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closeShareModal"><i data-lucide="x"></i></button>
+                    <span class="modal-title" data-lang-key="${titleKey}"></span>
+                </header>
+                <div class="modal-content-wrapper">
+                    <div class="container" style="text-align: center;">
+                        <i data-lucide="check-circle" style="color: var(--accent-green); width: 80px; height: 80px; stroke-width: 1.5; margin-bottom: 20px;"></i>
+                        <h3 data-lang-key="appInstructions"></h3>
+                        <div style="background-color: var(--surface); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; margin-top: 20px; text-align: left; display: flex; flex-direction: column; gap: 15px;">
+                            <div>
+                                <strong data-lang-key="appLink"></strong>: <a href="${appLink}" target="_blank" style="color: var(--accent-purple);">${appLink}</a>
+                            </div>
+                            <div>
+                                <strong data-lang-key="username"></strong>: ${clientData.username}
+                            </div>
+                            <div>
+                                <strong data-lang-key="password"></strong>: ${clientData.password}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-primary" id="share-whatsapp-btn">
+                        <i data-lucide="send"></i> <span data-lang-key="shareOnWhatsApp"></span>
+                    </button>
+                </div>
+            `;
+
+            modal.classList.add('active');
+            document.getElementById('clientFormModal').classList.remove('active');
+            
+            applyLanguage(currentLang);
+            lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
+
+            document.getElementById('closeShareModal').addEventListener('click', () => {
+                modal.classList.remove('active');
+            });
+
+            document.getElementById('share-whatsapp-btn').addEventListener('click', () => {
+                window.open(whatsappUrl, '_blank');
+            });
+        }
+
         function calculateClientStatus(client) {
             if (client.paid >= client.totalLoan) return 'paid';
             const today = new Date(); today.setHours(0, 0, 0, 0);
             
             let lastPaymentDate;
             if (client.history && client.history.length > 0) {
-                const sortedHistory = [...client.history].filter(h => h.date && h.date.seconds).sort((a, b) => b.date.seconds - a.date.seconds);
+                const sortedHistory = [...client.history].filter(h => h.date?.seconds).sort((a, b) => b.date.seconds - a.date.seconds);
                 if (sortedHistory.length > 0) lastPaymentDate = new Date(sortedHistory[0].date.seconds * 1000);
             } 
-            if (!lastPaymentDate && client.startDate && client.startDate.seconds) {
+            if (!lastPaymentDate && client.startDate?.seconds) {
                 lastPaymentDate = new Date(client.startDate.seconds * 1000);
             }
 
@@ -821,30 +1650,205 @@
             return 'paid';
         }
 
+        // --- MÓDULO DE GASTOS ---
+        function renderExpensesList(expenses) {
+            const container = document.getElementById('expenses-list-container');
+            if (!container) return;
+            if (expenses.length === 0) {
+                container.innerHTML = `<div class="no-items">Nenhum gasto encontrado.</div>`;
+                return;
+            }
+            container.innerHTML = expenses
+                .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
+                .map(expense => {
+                    const categoryText = (translations[currentLang] && translations[currentLang][expense.category]) || expense.category;
+                    const dateText = expense.date?.seconds ? new Date(expense.date.seconds * 1000).toLocaleDateString('pt-BR') : 'N/A';
+                    return `
+                        <div class="expense-card" data-expense-id="${expense.id}">
+                            <div class="expense-info">
+                                <h4 class="expense-category">${categoryText}</h4>
+                                <p class="expense-obs">${expense.observations || 'Sem observações'}</p>
+                            </div>
+                            <div class="expense-value-info">
+                                <span class="expense-amount">-${money(expense.value)}</span>
+                                <span class="expense-date">${dateText}</span>
+                            </div>
+                        </div>`;
+                }).join('');
+        }
+
+        function updateExpensesView() {
+            const container = document.getElementById('expenses-list-container');
+            const periodFilter = document.querySelector('#expenses-view [data-period].active');
+            const categoryFilter = document.querySelector('#expenses-view [data-category].active');
+            if (!container || !periodFilter || !categoryFilter) return;
+
+            const period = periodFilter.dataset.period;
+            const category = categoryFilter.dataset.category;
+            
+            let filteredExpenses = [...allExpenses];
+
+            // Filter by period
+            const now = new Date();
+            if (period !== 'all') {
+                let startDate;
+                if (period === 'today') {
+                    startDate = new Date(now.setHours(0, 0, 0, 0));
+                } else if (period === 'week') {
+                    startDate = new Date(now.setDate(now.getDate() - now.getDay()));
+                    startDate.setHours(0,0,0,0);
+                } else if (period === 'month') {
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                }
+                
+                if(startDate) {
+                    filteredExpenses = filteredExpenses.filter(e => e.date?.seconds && new Date(e.date.seconds * 1000) >= startDate);
+                }
+            }
+
+            // Filter by category
+            if (category !== 'all') {
+                filteredExpenses = filteredExpenses.filter(e => e.category === category);
+            }
+
+            renderExpensesList(filteredExpenses);
+        }
+
+        function showExpenseFormModal() {
+            const expenseFormModal = document.getElementById('expenseFormModal');
+            let receiptFile = null;
+
+            expenseFormModal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closeExpenseFormModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title" data-lang-key="addExpense"></span>
+                </header>
+                <div class="modal-content-wrapper">
+                  <div class="container">
+                    <form id="expense-form">
+                        <div class="form-group">
+                            <label data-lang-key="expenseType"></label>
+                            <select id="expense-category" required>
+                                <option value="fuel" data-lang-key="fuel"></option>
+                                <option value="food" data-lang-key="food"></option>
+                                <option value="rent" data-lang-key="rent"></option>
+                                <option value="mechanics" data-lang-key="mechanics"></option>
+                                <option value="other" data-lang-key="other"></option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label data-lang-key="expenseValue"></label>
+                            <input type="number" id="expense-value" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label data-lang-key="observations"></label>
+                            <textarea id="expense-obs"></textarea>
+                        </div>
+                         <div class="form-group">
+                            <label data-lang-key="uploadReceipt"></label>
+                            <div id="receipt-preview-container" style="margin-bottom: 15px;"></div>
+                            <button type="button" class="btn-secondary" id="upload-receipt-btn" style="width: 100%;">
+                                <i data-lucide="upload"></i> <span>Anexar Recibo</span>
+                            </button>
+                            <input type="file" id="receipt-file-input" accept="image/*,application/pdf" style="display: none;">
+                        </div>
+                    </form>
+                  </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-primary" id="saveExpenseBtn"><i data-lucide="save"></i> <span data-lang-key="saveExpense"></span></button>
+                </div>`;
+            expenseFormModal.classList.add('active');
+            
+            document.getElementById('upload-receipt-btn').addEventListener('click', () => {
+                document.getElementById('receipt-file-input').click();
+            });
+
+            document.getElementById('receipt-file-input').addEventListener('change', e => {
+                receiptFile = e.target.files[0];
+                if (receiptFile) {
+                    document.getElementById('receipt-preview-container').innerHTML = `<div class="preview-item"><span>${receiptFile.name}</span></div>`;
+                }
+            });
+
+            document.getElementById('closeExpenseFormModal').addEventListener('click', () => expenseFormModal.classList.remove('active'));
+
+            document.getElementById('saveExpenseBtn').addEventListener('click', async (e) => {
+                const saveButton = e.currentTarget;
+                const valueInput = document.getElementById('expense-value');
+
+                if (!valueInput.value || parseFloat(valueInput.value) <= 0) {
+                    showToast('O valor do gasto é obrigatório.', true);
+                    valueInput.style.borderColor = 'var(--danger-color)';
+                    setTimeout(() => { valueInput.style.borderColor = ''; }, 2500);
+                    return;
+                }
+                
+                saveButton.disabled = true;
+                saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> <span>Salvando...</span>`;
+                lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+
+                try {
+                    let receiptUrl = '';
+                    if (receiptFile) {
+                         const formData = new FormData();
+                        formData.append('file', receiptFile);
+                        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                        const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+                        if (!response.ok) throw new Error('Cloudinary upload failed');
+                        const data = await response.json();
+                        receiptUrl = data.secure_url;
+                    }
+
+                    const expenseData = {
+                        collectorId,
+                        category: document.getElementById('expense-category').value,
+                        value: parseFloat(valueInput.value),
+                        observations: document.getElementById('expense-obs').value,
+                        receiptUrl,
+                        date: serverTimestamp()
+                    };
+
+                    await addDoc(collection(db, 'expenses'), expenseData);
+                    expenseFormModal.classList.remove('active');
+                    showToast('Gasto salvo com sucesso!');
+
+                } catch (err) {
+                    console.error("Falha ao salvar gasto:", err);
+                    showToast('Falha ao salvar o gasto.', true);
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = `<i data-lucide="save"></i> <span data-lang-key="saveExpense"></span>`;
+                    applyLanguage(currentLang);
+                    lucide.createIcons({nodes: [saveButton.querySelector('i')]});
+                }
+            });
+            
+            applyLanguage(currentLang);
+            lucide.createIcons({ nodes: expenseFormModal.querySelectorAll('[data-lucide]') });
+        }
+
+
+        // --- MAPA E OUTRAS FUNÇÕES ---
         function initMap() {
             if (mapInstance) {
                 mapInstance.invalidateSize();
                 return;
             };
-            mapInstance = L.map('map-container').setView([-16.68, -49.25], 13); // Centered on Goiânia
+            mapInstance = L.map('map-container').setView([-16.68, -49.25], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(mapInstance);
         }
 
         function plotClientsOnMap() {
             if (!mapInstance) return;
-
-            // Clear existing markers
             mapMarkers.forEach(marker => marker.remove());
             mapMarkers = [];
-
             const clientsToPlot = getTodaysRouteClients();
             const locations = [];
-
             clientsToPlot.forEach(client => {
                 if (client.location) {
-                    const match = client.location.match(/q=([\d.-]+),([\d.-]+)/);
+                    const match = client.location.match(/query=([\d.-]+),([\d.-]+)/);
                     if (match) {
                         const lat = parseFloat(match[1]);
                         const lng = parseFloat(match[2]);
@@ -857,19 +1861,12 @@
                                 <i data-lucide="navigation" style="width:14px; height:14px;"></i> ${translations[currentLang].navigate || 'Navigate'}
                             </button>
                         `;
-
-                        const marker = L.marker([lat, lng]).addTo(mapInstance)
-                            .bindPopup(popupContent);
-                        
-                        marker.on('popupopen', () => {
-                           lucide.createIcons();
-                        });
-
+                        const marker = L.marker([lat, lng]).addTo(mapInstance).bindPopup(popupContent);
+                        marker.on('popupopen', () => { lucide.createIcons(); });
                         mapMarkers.push(marker);
                     }
                 }
             });
-
             if (locations.length > 0) {
                 mapInstance.fitBounds(locations, { padding: [50, 50] });
             }
@@ -884,7 +1881,7 @@
             const dailyPayments = [];
              allClients.forEach(client => {
                 (client.history || []).forEach(h => {
-                    if (h.date && h.date.seconds) {
+                    if (h.date?.seconds) {
                         const paymentDate = new Date(h.date.seconds * 1000);
                         if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
                             dailyPayments.push({
@@ -897,12 +1894,19 @@
                 });
             });
 
-            if (dailyPayments.length === 0) {
-                alert(translations[lang].noPaymentsToday);
+            const dailyExpenses = allExpenses.filter(e => {
+                if (!e.date?.seconds) return false;
+                return new Date(e.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
+            });
+            
+            if (dailyPayments.length === 0 && dailyExpenses.length === 0) {
+                showToast("Nenhuma atividade registrada hoje.", true);
                 return;
             }
 
             const totalCollected = dailyPayments.reduce((sum, p) => sum + p.amount, 0);
+            const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.value, 0);
+            const netBalance = totalCollected - totalExpenses;
 
             doc.setFontSize(18);
             doc.text(translations[lang].reportTitle, 105, 20, { align: 'center' });
@@ -912,28 +1916,61 @@
             doc.text(`${translations[lang].reportCollector}: João Silva`, 14, 35);
             
             doc.text(`${translations[lang].reportTotalCollected}: ${money(totalCollected)}`, 196, 30, { align: 'right' });
-            doc.text(`${translations[lang].reportNumPayments}: ${dailyPayments.length}`, 196, 35, { align: 'right' });
+            doc.text(`${translations[lang].reportTotalExpenses}: ${money(totalExpenses)}`, 196, 35, { align: 'right' });
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(`${translations[lang].reportNetBalance}: ${money(netBalance)}`, 196, 42, { align: 'right' });
+            doc.setFont(undefined, 'normal');
 
+
+            let y = 55;
             doc.setLineWidth(0.5);
-            doc.line(14, 40, 196, 40);
+            doc.line(14, y - 5, 196, y - 5);
 
-            let y = 50;
-            doc.setFontSize(10);
-            doc.text(translations[lang].reportClient, 14, y);
-            doc.text(translations[lang].reportAmount, 150, y);
-            doc.text(translations[lang].reportTime, 180, y);
-            y += 7;
+            if(dailyPayments.length > 0) {
+                 doc.setFontSize(12);
+                 doc.setFont(undefined, 'bold');
+                 doc.text(translations[lang].receivedToday, 14, y);
+                 y += 7;
+                 doc.setFontSize(10);
+                 doc.setFont(undefined, 'normal');
+                 doc.text(translations[lang].reportClient, 14, y);
+                 doc.text(translations[lang].reportAmount, 150, y);
+                 doc.text(translations[lang].reportTime, 180, y);
+                 y += 7;
+                 dailyPayments.sort((a,b) => a.time.localeCompare(b.time)).forEach(p => {
+                     if (y > 280) { doc.addPage(); y = 20; }
+                     doc.text(p.clientName, 14, y);
+                     doc.text(money(p.amount), 150, y);
+                     doc.text(p.time, 180, y);
+                     y += 7;
+                 });
+            }
 
-            dailyPayments.sort((a,b) => a.time.localeCompare(b.time)).forEach(p => {
-                 if (y > 280) {
-                    doc.addPage();
-                    y = 20;
-                 }
-                doc.text(p.clientName, 14, y);
-                doc.text(money(p.amount), 150, y);
-                doc.text(p.time, 180, y);
-                y += 7;
-            });
+            if(dailyExpenses.length > 0) {
+                y += 10;
+                doc.setLineWidth(0.2);
+                doc.line(14, y - 5, 196, y - 5);
+                 doc.setFontSize(12);
+                 doc.setFont(undefined, 'bold');
+                 doc.text(translations[lang].myExpenses, 14, y);
+                 y += 7;
+                 doc.setFontSize(10);
+                 doc.setFont(undefined, 'normal');
+                 doc.text(translations[lang].expenseType, 14, y);
+                 doc.text(translations[lang].reportAmount, 150, y);
+                 doc.text(translations[lang].reportTime, 180, y);
+                 y += 7;
+                 dailyExpenses.sort((a,b) => (a.date.seconds || 0) - (b.date.seconds || 0)).forEach(e => {
+                     if (y > 280) { doc.addPage(); y = 20; }
+                     const categoryText = translations[lang][e.category] || e.category;
+                     const time = new Date(e.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                     doc.text(categoryText, 14, y);
+                     doc.text(`-${money(e.value)}`, 150, y);
+                     doc.text(time, 180, y);
+                     y += 7;
+                 });
+            }
             
             doc.save(`relatorio-diario-${todayStr.replace(/\//g, '-')}.pdf`);
         }
@@ -945,8 +1982,10 @@
                     <button id="closeCropperModal"><i data-lucide="x"></i></button>
                     <span class="modal-title" data-lang-key="cropImage"></span>
                 </header>
-                <div class="modal-content-wrapper container" id="cropper-container">
-                    <img id="cropper-image">
+                <div class="modal-content-wrapper">
+                    <div id="cropper-container" class="container">
+                        <img id="cropper-image">
+                    </div>
                 </div>
                 <div class="action-buttons">
                     <button class="btn-secondary" id="cancelCropBtn"><i data-lucide="x-circle"></i> <span data-lang-key="cancel"></span></button>
@@ -963,31 +2002,14 @@
 
             reader.onload = (e) => {
                 image.src = e.target.result;
-                cropper = new Cropper(image, {
-                    aspectRatio: 1,
-                    viewMode: 1,
-                    background: false,
-                    responsive: true,
-                    restore: false,
-                    checkOrientation: false,
-                    guides: false,
-                    center: false,
-                    highlight: false,
-                    cropBoxMovable: true,
-                    cropBoxResizable: true,
-                    toggleDragModeOnDblclick: false,
-                });
+                cropper = new Cropper(image, { aspectRatio: 1, viewMode: 1, background: false });
             };
             reader.readAsDataURL(file);
 
             document.getElementById('closeCropperModal').addEventListener('click', () => cropperModal.classList.remove('active'));
             document.getElementById('cancelCropBtn').addEventListener('click', () => cropperModal.classList.remove('active'));
             document.getElementById('confirmCropBtn').addEventListener('click', () => {
-                cropper.getCroppedCanvas({
-                    width: 256,
-                    height: 256,
-                    imageSmoothingQuality: 'high',
-                }).toBlob((blob) => {
+                cropper.getCroppedCanvas({ width: 256, height: 256, imageSmoothingQuality: 'high' }).toBlob((blob) => {
                     handleProfilePictureChange(blob);
                     cropperModal.classList.remove('active');
                 }, 'image/jpeg');
@@ -1002,22 +2024,23 @@
             const localUrl = URL.createObjectURL(blob);
             profileImageView.src = localUrl;
             headerImageView.src = localUrl;
-            
             profileImageView.classList.add('loading');
             
-            const imageName = `${collectorId}-${Date.now()}.jpg`;
-            const storageRef = ref(storage, `profile_pictures/${imageName}`);
-            
             try {
-                await uploadBytes(storageRef, blob);
-                const downloadURL = await getDownloadURL(storageRef);
+                const formData = new FormData();
+                formData.append('file', blob);
+                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+                if (!response.ok) throw new Error('Cloudinary profile picture upload failed');
+                const data = await response.json();
+                const downloadURL = data.secure_url;
                 
                 const collectorRef = doc(db, 'collectors', collectorId);
                 await setDoc(collectorRef, { profilePictureUrl: downloadURL }, { merge: true });
-
+                showToast('Foto de perfil atualizada!');
             } catch (error) {
-                console.error("Error updating profile picture: ", error);
-                alert("Falha ao atualizar a foto de perfil.");
+                console.error("Error al actualizar foto de perfil: ", error);
+                showToast('Falha ao atualizar a foto de perfil.', true);
             } finally {
                 profileImageView.classList.remove('loading');
             }
@@ -1025,38 +2048,33 @@
 
         function setupEventListeners() {
             document.body.addEventListener('click', e => {
-                const themeToggle = document.getElementById('theme-toggle');
-                if (themeToggle && e.target.closest('#theme-toggle')) {
+                const target = e.target;
+                if (target.closest('#theme-toggle')) {
                     const newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
                     localStorage.setItem('theme', newTheme);
                     applyTheme(newTheme);
                 }
                 const langToggle = document.getElementById('lang-toggle');
                 const langDropdown = document.getElementById('lang-dropdown');
-                if (langToggle && e.target.closest('#lang-toggle')) {
+                if (langToggle && target.closest('#lang-toggle')) {
                     e.stopPropagation();
                     langDropdown.style.display = langDropdown.style.display === 'block' ? 'none' : 'block';
                 } else if (langDropdown) {
                     langDropdown.style.display = 'none';
                 }
-                if (langDropdown && e.target.closest('[data-lang]')) {
-                    const newLang = e.target.dataset.lang;
+                if (langDropdown && target.closest('[data-lang]')) {
+                    const newLang = target.dataset.lang;
                     localStorage.setItem('language', newLang);
                     applyLanguage(newLang);
                 }
-                const addClientBtn = document.getElementById('addClientBtn');
-                if(addClientBtn && e.target.closest('#addClientBtn')) {
-                    showClientFormModal();
+                if(target.closest('#addClientBtn')) showClientFormModal();
+                if(target.closest('#addExpenseBtn')) showExpenseFormModal();
+                if (target.closest('#logout-btn')) {
+                    sessionStorage.removeItem('isLoggedIn');
+                    location.reload();
                 }
-                if (e.target.closest('#logout-btn')) {
-                    console.log("Logout a ser implementado.");
-                }
-                if (e.target.closest('#change-password-btn')) {
-                    console.log("Mudar senha a ser implementado.");
-                }
-                if (e.target.closest('#export-report-btn')) {
-                    exportDailyReport();
-                }
+                if (target.closest('#change-password-btn')) console.log("Mudar senha a ser implementado.");
+                if (target.closest('#export-report-btn')) exportDailyReport();
             });
             
             document.body.addEventListener('change', e => {
@@ -1066,113 +2084,183 @@
                 }
             });
 
-            const nav = document.querySelector('.bottom-nav');
-            if(nav) {
-                nav.addEventListener('click', e => {
-                    const navItem = e.target.closest('.nav-item');
-                    if (!navItem) return;
-                    
-                    const targetView = navItem.dataset.view;
-                    if (!targetView) return;
+            document.body.addEventListener('click', e => {
+                 const navItem = e.target.closest('.nav-item');
+                if (!navItem) return;
+                 const nav = navItem.parentElement;
+                if (!nav || !nav.classList.contains('bottom-nav')) return;
+                
+                const targetView = navItem.dataset.view;
+                if (!targetView) return;
 
-                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-                    navItem.classList.add('active');
+                nav.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                navItem.classList.add('active');
 
-                    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-                    const viewToShow = document.getElementById(`${targetView}-view`);
-                    if(viewToShow) viewToShow.classList.add('active');
+                document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+                const viewToShow = document.getElementById(`${targetView}-view`);
+                if(viewToShow) viewToShow.classList.add('active');
 
-                    const fab = document.getElementById('addClientBtn');
-                    if (fab) {
-                        const isVisible = targetView !== 'map' && targetView !== 'profile';
-                        fab.style.display = isVisible ? 'flex' : 'none';
-                    }
+                document.getElementById('addClientBtn').classList.toggle('hidden', !['home', 'clients'].includes(targetView));
+                document.getElementById('addExpenseBtn').classList.toggle('hidden', targetView !== 'expenses');
 
-                    if (targetView === 'map') {
-                        // Delay map initialization slightly to ensure container is visible
-                        setTimeout(() => {
-                           initMap();
-                           plotClientsOnMap();
-                        }, 50);
-                    }
-                });
-            }
+                if (targetView === 'map') {
+                    setTimeout(() => {
+                        initMap();
+                        plotClientsOnMap();
+                    }, 50);
+                }
+            });
 
             const clientsView = document.getElementById('clients-view');
             if (clientsView) {
                 clientsView.addEventListener('input', e => {
-                    if (e.target.id === 'client-search-input') {
-                        updateAllClientsList();
-                    }
+                    if (e.target.id === 'client-search-input') updateAllClientsList();
                 });
                 clientsView.addEventListener('click', e => {
-                    if (e.target.classList.contains('filter-btn')) {
-                        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-                        e.target.classList.add('active');
+                    const filterBtn = e.target.closest('.filter-btn');
+                    if (filterBtn) {
+                        clientsView.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                        filterBtn.classList.add('active');
                         updateAllClientsList();
                     }
                 });
             }
+
+            const expensesView = document.getElementById('expenses-view');
+            if (expensesView) {
+                expensesView.addEventListener('click', e => {
+                     const filterBtn = e.target.closest('.filter-btn');
+                     if(filterBtn) {
+                         const parent = filterBtn.parentElement;
+                         parent.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                         filterBtn.classList.add('active');
+                         updateExpensesView();
+                     }
+                });
+            }
         }
         
-        function init() {
+        function showMainApp() {
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('splash-screen').style.display = 'none';
+            document.getElementById('app-container').style.display = 'flex';
+
             renderMainLayout();
+            lucide.createIcons();
             setupEventListeners();
-            applyTheme(localStorage.getItem('theme') || 'light');
+            const preferredTheme = localStorage.getItem('theme') || 'light';
+            applyTheme(preferredTheme);
             
             let collectorData = null;
 
-            // Listener for collector data
             onSnapshot(doc(db, 'collectors', collectorId), (docSnap) => {
                 if (docSnap.exists()) {
                     collectorData = docSnap.data();
                     document.querySelectorAll('.profile-name').forEach(el => el.textContent = collectorData.name || 'João Silva');
                     
-                    if (collectorData.profilePictureUrl) {
-                        const cacheBustedUrl = `${collectorData.profilePictureUrl}&t=${new Date().getTime()}`;
-                        document.getElementById('header-profile-img').src = cacheBustedUrl;
-                        document.getElementById('profile-view-img').src = cacheBustedUrl;
-                    } else {
-                        const name = collectorData.name || 'C';
-                        const initial = name.charAt(0).toUpperCase();
-                        const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${initial}`;
-                        document.getElementById('header-profile-img').src = placeholderUrl.replace('120x120', '80x80');
-                        document.getElementById('profile-view-img').src = placeholderUrl;
+                    const imageUrl = collectorData.profilePictureUrl;
+                    const nameInitial = (collectorData.name || 'C').charAt(0).toUpperCase();
+                    const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${nameInitial}`;
+                    
+                    document.getElementById('header-profile-img').src = imageUrl || placeholderUrl.replace('120x120', '80x80');
+                    document.getElementById('profile-view-img').src = imageUrl || placeholderUrl;
+
+                    if (collectorData.isRealtimeTrackingActive) {
+                        startRealtimeGeolocation();
                     }
 
                 } else {
-                    // Create a default collector document if it doesn't exist
-                    const collectorRef = doc(db, 'collectors', collectorId);
-                    setDoc(collectorRef, { 
-                        name: 'João Silva',
-                        profilePictureUrl: '',
-                        startingCapital: 30000
+                    setDoc(doc(db, 'collectors', collectorId), { 
+                        name: 'João Silva', profilePictureUrl: '', startingCapital: 30000, isRealtimeTrackingActive: false  
                     });
                 }
-                // Update profile view with collector data
                 updateProfileView(collectorData);
             });
 
-            // Listener for clients data
-            onSnapshot(collection(db, 'clients'), (snapshot) => {
-                allClients = snapshot.docs.map(doc => {
-                    const data = doc.data();
-                    const client = { id: doc.id, ...data };
+            const clientsQuery = query(collection(db, 'clients'), where("collectorId", "==", collectorId));
+            onSnapshot(clientsQuery, (snapshot) => {
+                allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                allClients.forEach(client => {
                     client.status = calculateClientStatus(client);
-                    return client;
                 });
+
                 updateTodaysRouteList();
                 updateAllClientsList();
                 updateProfileView(collectorData);
+                updateNotifications();
+                if (document.querySelector('#map-view.active')) plotClientsOnMap();
                 applyLanguage(currentLang);
-                if (document.querySelector('#map-view.active')) {
-                   plotClientsOnMap();
-                }
             }, (error) => {
-                console.error("Error fetching clients: ", error);
-                const clientListContainer = document.getElementById('todays-route-list');
-                if(clientListContainer) clientListContainer.innerHTML = '<div class="loading">Falha ao carregar clientes. Verifique a configuração do Firebase.</div>';
+                console.error("Error al obtener clientes: ", error);
+                showToast('Falha ao carregar clientes.', true);
             });
+
+            const expensesQuery = query(collection(db, 'expenses'), where("collectorId", "==", collectorId));
+            onSnapshot(expensesQuery, (snapshot) => {
+                allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateExpensesView();
+                updateProfileView(collectorData);
+            }, (error) => {
+                console.error("Error al obtener gastos: ", error);
+                showToast('Falha ao carregar gastos.', true);
+            });
+        }
+        
+        function loadGlobalSettings(settings) {
+            const companyName = settings.companyName || 'LUMIX Finanças';
+            const companyLogo = settings.companyLogo || DEFAULT_LOGO_URL;
+            
+            const elements = {
+                headerLogoText: document.getElementById('header-logo-text'),
+                headerLogo: document.getElementById('header-logo'),
+                splashLogo: document.getElementById('splash-logo'),
+                loginLogo: document.getElementById('login-logo')
+            };
+
+            if (elements.headerLogoText) elements.headerLogoText.textContent = companyName;
+            if (elements.headerLogo) elements.headerLogo.src = companyLogo;
+            if (elements.splashLogo) elements.splashLogo.src = companyLogo;
+            if (elements.loginLogo) elements.loginLogo.src = companyLogo;
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+
+            if (user === 'cobrador1' && pass === '0000') {
+                sessionStorage.setItem('isLoggedIn', 'true');
+                showMainApp();
+            } else {
+                showToast('Usuário ou senha inválidos.', true);
+            }
+        }
+        
+        function init() {
+            document.body.classList.add('dark-mode');
+            
+            onSnapshot(doc(db, 'config', 'global'), (docSnap) => {
+                if (docSnap.exists()) {
+                    loadGlobalSettings(docSnap.data());
+                } else {
+                    loadGlobalSettings({});
+                }
+            });
+
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                splash.style.opacity = '0';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    if (sessionStorage.getItem('isLoggedIn') === 'true') {
+                        showMainApp();
+                    } else {
+                        document.getElementById('login-view').style.display = 'flex';
+                        document.getElementById('login-form').addEventListener('submit', handleLogin);
+                    }
+                }, 500);
+            }, 1500);
         }
         init();
     </script>
