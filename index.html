@@ -208,6 +208,14 @@
         .client-card:hover, .expense-card:hover, .notification-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.07); }
         body.dark-mode .client-card, body.dark-mode .expense-card, body.dark-mode .notification-card { box-shadow: none; }
         .client-card:active, .expense-card:active, .notification-card:active { background-color: var(--bg); transform: translateY(0); }
+        .client-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+            flex-shrink: 0;
+        }
         .client-info, .expense-info, .notification-info { flex-grow: 1; }
         .client-name, .expense-category, .notification-title { font-weight: 600; margin: 0 0 5px; }
         .client-address, .expense-obs, .notification-subtitle { font-size: 0.9em; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
@@ -1054,7 +1062,12 @@
                 else if (reputationScore >= 7) repClass = 'rep-good';
                 else if (reputationScore >= 3) repClass = 'rep-regular';
 
+                const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
+                const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+                const photoUrl = client.profilePictureUrl || placeholderUrl;
+
                 card.innerHTML = `
+                    <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar">
                     <div class="client-info">
                         <h4 class="client-name">${client.name}</h4>
                         <p class="client-address"><i data-lucide="map-pin" style="width: 14px; height: 14px; stroke-width: 2.5;"></i>${client.address}</p>
