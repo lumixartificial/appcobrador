@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Portal Cobrador">
     <meta name="theme-color" content="#6f42c1">
-    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIlBvcnRhbCBDb2JyYWRvciIsCiAgInNob3J0X25hbWUiOiAiUG9ydGFsIENvYnJhZG9yIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwMjA2MTciLAogICJ0aGVtZV9jb2xvciI6ICIjNmY0MmMxIiwKICAiZGVzY3JpcHRpb24iOiAiQXBwIGRlIGdlc3Rpw7NuIHBhcmEgY29icmFkb3Jlcy4iLAogICJvcmllbnRhdGlvbiI6ICJwb3J0cmFpdCIsCiAgImljb25zIjogWwogICAgewogICAgICAic3JjIjogImh0dHBzOi8vcmVzLmNsb3VkaW5hcnkuY29tL2RjNmFzMTRwMC9pbWFnZS91cGxvYWQvdjE3NTk4NzMxODMvTE9HT19MVU1JWF9SRURVQ0lfY3prdzRwLnBuZyIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIiwKICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIiwKICAgICAgInB1cnBvc2UiOiAiYW55IG1hc2thYmxlIgogICAgfSwKICAgIHsKICAgICAgInNyYyIjogImh0dHBzOi8vcmVzLmNsb3VkaW5hcnkuY29tL2RjNmFzMTRwMC9pbWFnZS91cGxvYWQvdjE3NTk4NzMxODMvTE9HT19MVU1JWF9SRURVQ0lfY3prdzRwLnBuZyIsCiAgICAgICJzaXplcyI6ICI1MTJ4NTEyIiwKICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIiwKICAgICAgInB1cnBvc2UiOiAiYW55IG1hc2thYmxlIgogICAgfQogIF0KfQ==">
+    <link rel="manifest">
     <link rel="apple-touch-icon" href="https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png">
     <title>Painel do Cobrador</title>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -2266,8 +2266,27 @@
         function init() {
             document.body.classList.add('dark-mode');
 
-            // --- CORRECCIÓN FINAL: Registro del Service Worker ---
-            // Se restaura el método estándar de Firebase, igual al de la app del cliente, que es el correcto.
+            // --- PWA Manifest Setup ---
+            // Creates the manifest dynamically, mirroring the working client app's method.
+            const manifest = {
+                "name": "Portal Cobrador",
+                "short_name": "Portal Cobrador",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#020617",
+                "theme_color": "#6f42c1",
+                "description": "App de gestão para cobradores.",
+                "icons": [
+                    { "src": "https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+                    { "src": "https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+                ]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            const manifestURL = URL.createObjectURL(manifestBlob);
+            document.querySelector('link[rel="manifest"]').setAttribute('href', manifestURL);
+
+            // --- Service Worker Registration ---
+            // Restores the standard Firebase method, identical to the working client app.
             if ('serviceWorker' in navigator) {
               if (location.protocol === 'https:' || location.hostname === 'localhost') {
                 navigator.serviceWorker.register('/firebase-messaging-sw.js')
