@@ -828,11 +828,12 @@
                     <button class="btn-primary" id="approve-refinance-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
                 </div>`;
             
+            history.pushState({ modal: 'refinanceModal' }, 'Refinance Modal', '#refinance');
             refinanceModal.classList.add('active');
             lucide.createIcons({ nodes: refinanceModal.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
 
-            document.getElementById('closeRefinanceModal').addEventListener('click', () => refinanceModal.classList.remove('active'));
+            document.getElementById('closeRefinanceModal').addEventListener('click', () => window.history.back());
 
             document.getElementById('approve-refinance-btn').addEventListener('click', async () => {
                 const clientRef = doc(db, 'clients', clientId);
@@ -857,7 +858,7 @@
                         refinanceRequest: null 
                     });
                     showToast('Refinanciamento aprovado!');
-                    refinanceModal.classList.remove('active');
+                    window.history.back();
                 } catch (error) {
                     console.error("Error approving refinance:", error);
                     showToast('Erro ao aprovar refinanciamento.', true);
@@ -871,7 +872,7 @@
                         refinanceRequest: null
                     });
                     showToast('Solicitação rejeitada.');
-                    refinanceModal.classList.remove('active');
+                    window.history.back();
                 } catch (error) {
                     console.error("Error rejecting refinance:", error);
                     showToast('Erro ao rejeitar solicitação.', true);
@@ -910,11 +911,12 @@
                     <button class="btn-primary" id="approve-payment-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
                 </div>`;
 
+            history.pushState({ modal: 'verificationModal' }, 'Verification Modal', '#verification');
             verificationModal.classList.add('active');
             lucide.createIcons({ nodes: verificationModal.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
 
-            document.getElementById('closeVerificationModal').addEventListener('click', () => verificationModal.classList.remove('active'));
+            document.getElementById('closeVerificationModal').addEventListener('click', () => window.history.back());
 
             document.getElementById('approve-payment-btn').addEventListener('click', async () => {
                 const clientRef = doc(db, 'clients', clientId);
@@ -929,7 +931,7 @@
                         paid: newPaidAmount
                     });
                     showToast(translations[currentLang].paymentApproved);
-                    verificationModal.classList.remove('active');
+                    window.history.back();
                 } catch (error) {
                     console.error("Error approving payment:", error);
                     showToast('Erro ao aprovar pagamento.', true);
@@ -943,7 +945,7 @@
                 try {
                     await updateDoc(clientRef, { history: updatedHistory });
                     showToast(translations[currentLang].paymentRejected);
-                    verificationModal.classList.remove('active');
+                    window.history.back();
                 } catch (error) {
                     console.error("Error rejecting payment:", error);
                     showToast('Erro ao rejeitar pagamento.', true);
@@ -1235,10 +1237,11 @@
                     <button class="btn-primary" id="registerPaymentBtn"><i data-lucide="dollar-sign"></i> Registrar Pagamento</button>
                 </div>`;
             
+            history.pushState({ modal: 'clientDetailView', clientId: clientId }, `Details for ${client.name}`, `#client/${clientId}`);
             clientDetailView.classList.add('active');
             lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
-            document.getElementById('closeDetailView').addEventListener('click', () => clientDetailView.classList.remove('active'));
+            document.getElementById('closeDetailView').addEventListener('click', () => window.history.back());
             document.getElementById('registerPaymentBtn').addEventListener('click', () => showPaymentModal(clientId));
             document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId));
             
@@ -1288,9 +1291,10 @@
                 <div class="action-buttons">
                     <button class="btn-primary" id="confirmPaymentBtn"><i data-lucide="check-circle"></i> Confirmar Pagamento</button>
                 </div>`;
+            history.pushState({ modal: 'paymentModal' }, 'Payment Modal', '#payment');
             paymentModal.classList.add('active');
             lucide.createIcons({ nodes: paymentModal.querySelectorAll('[data-lucide]') });
-            document.getElementById('closePaymentModal').addEventListener('click', () => paymentModal.classList.remove('active'));
+            document.getElementById('closePaymentModal').addEventListener('click', () => window.history.back());
             document.getElementById('confirmPaymentBtn').addEventListener('click', async () => {
                 const paymentValue = parseFloat(document.getElementById('payment-value').value);
                 if (isNaN(paymentValue) || paymentValue <= 0) { 
@@ -1300,9 +1304,9 @@
                 const clientRef = doc(db, 'clients', clientId);
                 try {
                     await updateDoc(clientRef, { status: 'paid', paid: (client.paid || 0) + paymentValue, history: arrayUnion({ amount: paymentValue, date: new Date() }) });
-                    paymentModal.classList.remove('active');
-                    document.getElementById('clientDetailView').classList.remove('active');
+                    window.history.back();
                     showToast('Pagamento registrado com sucesso!');
+                    setTimeout(() => window.history.back(), 100); // Close details view after a short delay
                 } catch(error) { 
                     console.error("Error updating document: ", error);
                     showToast('Falha ao registrar pagamento.', true);
@@ -1386,6 +1390,7 @@
                 <div class="action-buttons">
                     <button class="btn-primary" id="saveClientBtn"><i data-lucide="save"></i> <span data-lang-key="${saveButtonKey}"></span></button>
                 </div>`;
+            history.pushState({ modal: 'clientFormModal' }, 'Client Form', '#client-form');
             clientFormModal.classList.add('active');
             
             let isUsernameAvailable = isEditMode; 
@@ -1526,7 +1531,7 @@
                 }
             });
             
-            document.getElementById('closeClientFormModal').addEventListener('click', () => clientFormModal.classList.remove('active'));
+            document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
             
             document.getElementById('saveClientBtn').addEventListener('click', async (e) => {
                 const saveButton = e.currentTarget;
@@ -1601,7 +1606,12 @@
                         await addDoc(collection(db, "clients"), clientData);
                     }
                     
-                    showShareCredentialsModal(clientData, isEditMode);
+                    window.history.back(); // Cierra el modal de formulario
+                    if (isEditMode) {
+                        setTimeout(() => window.history.back(), 100); // Cierra el modal de detalles
+                    }
+                    setTimeout(() => showShareCredentialsModal(clientData, isEditMode), isEditMode ? 250 : 150);
+                    
 
                 } catch (err) {
                     console.error("Falha ao salvar cliente:", err);
@@ -1665,14 +1675,14 @@
                 </div>
             `;
 
+            history.pushState({ modal: 'shareCredentialsModal' }, 'Share Credentials', '#share');
             modal.classList.add('active');
-            document.getElementById('clientFormModal').classList.remove('active');
             
             applyLanguage(currentLang);
             lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
 
             document.getElementById('closeShareModal').addEventListener('click', () => {
-                modal.classList.remove('active');
+                window.history.back();
             });
 
             document.getElementById('share-whatsapp-btn').addEventListener('click', () => {
@@ -1823,6 +1833,7 @@
                 <div class="action-buttons">
                     <button class="btn-primary" id="saveExpenseBtn"><i data-lucide="save"></i> <span data-lang-key="saveExpense"></span></button>
                 </div>`;
+            history.pushState({ modal: 'expenseFormModal' }, 'Expense Form', '#expense-form');
             expenseFormModal.classList.add('active');
             
             document.getElementById('upload-receipt-btn').addEventListener('click', () => {
@@ -1836,7 +1847,7 @@
                 }
             });
 
-            document.getElementById('closeExpenseFormModal').addEventListener('click', () => expenseFormModal.classList.remove('active'));
+            document.getElementById('closeExpenseFormModal').addEventListener('click', () => window.history.back());
 
             document.getElementById('saveExpenseBtn').addEventListener('click', async (e) => {
                 const saveButton = e.currentTarget;
@@ -1875,7 +1886,7 @@
                     };
 
                     await addDoc(collection(db, 'expenses'), expenseData);
-                    expenseFormModal.classList.remove('active');
+                    window.history.back();
                     showToast('Gasto salvo com sucesso!');
 
                 } catch (err) {
@@ -2057,6 +2068,7 @@
                     <button class="btn-primary" id="confirmCropBtn"><i data-lucide="check-circle"></i> <span data-lang-key="confirmCrop"></span></button>
                 </div>
             `;
+            history.pushState({ modal: 'cropperModal' }, 'Crop Image', '#crop');
             cropperModal.classList.add('active');
             lucide.createIcons({nodes: cropperModal.querySelectorAll('[data-lucide]')});
             applyLanguage(currentLang);
@@ -2071,12 +2083,12 @@
             };
             reader.readAsDataURL(file);
 
-            document.getElementById('closeCropperModal').addEventListener('click', () => cropperModal.classList.remove('active'));
-            document.getElementById('cancelCropBtn').addEventListener('click', () => cropperModal.classList.remove('active'));
+            document.getElementById('closeCropperModal').addEventListener('click', () => window.history.back());
+            document.getElementById('cancelCropBtn').addEventListener('click', () => window.history.back());
             document.getElementById('confirmCropBtn').addEventListener('click', () => {
                 cropper.getCroppedCanvas({ width: 256, height: 256, imageSmoothingQuality: 'high' }).toBlob((blob) => {
                     handleProfilePictureChange(blob);
-                    cropperModal.classList.remove('active');
+                    window.history.back();
                 }, 'image/jpeg');
             });
         }
@@ -2149,6 +2161,12 @@
                 if (target.closest('#export-report-btn')) exportDailyReport();
             });
             
+            window.addEventListener('popstate', (event) => {
+                document.querySelectorAll('.modal-view.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+            });
+
             document.body.addEventListener('change', e => {
                 if (e.target.id === 'profile-pic-input') {
                     const file = e.target.files[0];
@@ -2395,3 +2413,4 @@
     </script>
 </body>
 </html>
+
