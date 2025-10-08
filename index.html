@@ -2264,6 +2264,21 @@
         
         function init() {
             document.body.classList.add('dark-mode');
+
+            // --- CORRECCIÓN: Registro del Service Worker ---
+            // Este bloque es necesario para que la app sea reconocida como instalable (PWA)
+            if ('serviceWorker' in navigator) {
+              if (location.protocol === 'https:' || location.hostname === 'localhost') {
+                navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                  .then(function(registration) {
+                    console.log('Service Worker del Cobrador registrado con éxito:', registration);
+                  }).catch(function(error) {
+                    console.log('Error al registrar el Service Worker del Cobrador:', error);
+                  });
+              } else {
+                  console.warn('Service Worker no registrado. El entorno no es seguro (HTTPS) o no es localhost.');
+              }
+            }
             
             // Lógica del Banner de Instalación PWA
             window.addEventListener('beforeinstallprompt', (e) => {
