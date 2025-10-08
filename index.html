@@ -207,7 +207,7 @@
         .progress-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
         .progress-circle circle { fill: none; stroke-width: 10; }
         .progress-circle .bg-circle { stroke: var(--border-color); }
-        .progress-circle .progress-bar { stroke: var(--accent-purple); stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
+        .progress-circle .progress-bar { stroke: var(--accent-green); stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
         .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5em; font-weight: 700; }
 
         .kpi-grid-profile {
@@ -529,6 +529,14 @@
                 const dayOfWeek = today.getDay(); 
                 const isPaymentDay = (client.paymentDays || []).includes(dayOfWeek);
                 return isPaymentDay && (client.status === 'pending' || client.status === 'late');
+            });
+        }
+
+        function getTodaysTotalClients() {
+             return allClients.filter(client => {
+                const today = new Date();
+                const dayOfWeek = today.getDay();
+                return (client.paymentDays || []).includes(dayOfWeek);
             });
         }
 
@@ -961,9 +969,9 @@
         }
 
         function updateRouteProgress() {
-            const todaysRouteClients = getTodaysRouteClients();
-            const totalClients = todaysRouteClients.length;
-            const paidClients = todaysRouteClients.filter(c => c.status === 'paid').length;
+            const todaysTotalClients = getTodaysTotalClients();
+            const totalClients = todaysTotalClients.length;
+            const paidClients = todaysTotalClients.filter(c => c.status === 'paid').length;
 
             const progressPercentage = totalClients > 0 ? (paidClients / totalClients) * 100 : 0;
 
