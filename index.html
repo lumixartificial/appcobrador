@@ -2266,7 +2266,8 @@
         function init() {
             document.body.classList.add('dark-mode');
 
-            // --- Service Worker Registration ---
+            // --- CORRECCIÓN FINAL: Registro del Service Worker ---
+            // Se restaura el método estándar de Firebase, igual al de la app del cliente, que es el correcto.
             if ('serviceWorker' in navigator) {
               if (location.protocol === 'https:' || location.hostname === 'localhost') {
                 navigator.serviceWorker.register('/firebase-messaging-sw.js')
@@ -2328,5 +2329,3 @@
     </script>
 </body>
 </html>
-
-
