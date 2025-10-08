@@ -450,6 +450,7 @@
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot, doc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
@@ -2265,8 +2266,7 @@
         function init() {
             document.body.classList.add('dark-mode');
 
-            // --- CORRECCIÓN: Registro del Service Worker ---
-            // Este bloque es necesario para que la app sea reconocida como instalable (PWA)
+            // --- Service Worker Registration ---
             if ('serviceWorker' in navigator) {
               if (location.protocol === 'https:' || location.hostname === 'localhost') {
                 navigator.serviceWorker.register('/firebase-messaging-sw.js')
@@ -2328,3 +2328,5 @@
     </script>
 </body>
 </html>
+
+
