@@ -2162,9 +2162,21 @@
             });
             
             window.addEventListener('popstate', (event) => {
+                // Primero, oculta todos los modales activos para limpiar el estado.
                 document.querySelectorAll('.modal-view.active').forEach(modal => {
                     modal.classList.remove('active');
                 });
+
+                // Luego, si el estado al que estamos regresando es un modal, lo volvemos a mostrar.
+                // Esto maneja correctamente el apilamiento de modales (ej: detalles del cliente -> registrar pago).
+                if (event.state && event.state.modal) {
+                    const modalToShow = document.getElementById(event.state.modal);
+                    if (modalToShow) {
+                        // El contenido ya fue renderizado cuando se abrió por primera vez,
+                        // solo necesitamos hacerlo visible de nuevo.
+                        modalToShow.classList.add('active');
+                    }
+                }
             });
 
             document.body.addEventListener('change', e => {
