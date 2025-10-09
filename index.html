@@ -2123,15 +2123,40 @@
             }
         }
 
+        function showView(viewName) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            
+            if (viewName !== 'profile') {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                const navItem = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+                if (navItem) navItem.classList.add('active');
+            } else {
+                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            }
+
+            const viewEl = document.getElementById(`${viewName}-view`);
+            if (viewEl) viewEl.classList.add('active');
+
+            document.getElementById('addClientBtn').classList.toggle('hidden', !['home', 'clients'].includes(viewName));
+            document.getElementById('addExpenseBtn').classList.toggle('hidden', viewName !== 'expenses');
+            
+            if (viewName === 'map') {
+                setTimeout(() => {
+                    initMap();
+                    plotClientsOnMap();
+                }, 50);
+            }
+        }
+
         function setupEventListeners() {
             document.body.addEventListener('click', e => {
                 const target = e.target;
                 if (target.closest('#header-profile-link')) {
-                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-                    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-                    document.getElementById('profile-view').classList.add('active');
-                    document.getElementById('addClientBtn').classList.add('hidden');
-                    document.getElementById('addExpenseBtn').classList.add('hidden');
+                    location.hash = 'profile';
+                }
+                const navItem = target.closest('.nav-item[data-view]');
+                if (navItem) {
+                    location.hash = navItem.dataset.view;
                 }
                 if (target.closest('#theme-toggle')) {
                     const newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
@@ -2162,54 +2187,29 @@
             });
             
             window.addEventListener('popstate', (event) => {
-                // Primero, oculta todos los modales activos para limpiar el estado.
+                // Oculta todos los modales activos para limpiar el estado
                 document.querySelectorAll('.modal-view.active').forEach(modal => {
                     modal.classList.remove('active');
                 });
 
-                // Luego, si el estado al que estamos regresando es un modal, lo volvemos a mostrar.
-                // Esto maneja correctamente el apilamiento de modales (ej: detalles del cliente -> registrar pago).
+                // Si el estado de la historia es para un modal, lo muestra y detiene
                 if (event.state && event.state.modal) {
                     const modalToShow = document.getElementById(event.state.modal);
                     if (modalToShow) {
-                        // El contenido ya fue renderizado cuando se abrió por primera vez,
-                        // solo necesitamos hacerlo visible de nuevo.
                         modalToShow.classList.add('active');
                     }
+                    return;
                 }
+                
+                // Si no, maneja la navegación de la vista principal basada en el hash
+                const viewName = location.hash.substring(1) || 'home';
+                showView(viewName);
             });
 
             document.body.addEventListener('change', e => {
                 if (e.target.id === 'profile-pic-input') {
                     const file = e.target.files[0];
                     if (file) showCropperModal(file);
-                }
-            });
-
-            document.body.addEventListener('click', e => {
-                 const navItem = e.target.closest('.nav-item');
-                if (!navItem) return;
-                 const nav = navItem.parentElement;
-                if (!nav || !nav.classList.contains('bottom-nav')) return;
-                
-                const targetView = navItem.dataset.view;
-                if (!targetView) return;
-
-                nav.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-                navItem.classList.add('active');
-
-                document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-                const viewToShow = document.getElementById(`${targetView}-view`);
-                if(viewToShow) viewToShow.classList.add('active');
-
-                document.getElementById('addClientBtn').classList.toggle('hidden', !['home', 'clients'].includes(targetView));
-                document.getElementById('addExpenseBtn').classList.toggle('hidden', targetView !== 'expenses');
-
-                if (targetView === 'map') {
-                    setTimeout(() => {
-                        initMap();
-                        plotClientsOnMap();
-                    }, 50);
                 }
             });
 
@@ -2252,6 +2252,9 @@
             setupEventListeners();
             const preferredTheme = localStorage.getItem('theme') || 'light';
             applyTheme(preferredTheme);
+            
+            const initialView = location.hash.substring(1) || 'home';
+            showView(initialView);
             
             let collectorData = null;
 
@@ -2425,3 +2428,5 @@
     </script>
 </body>
 </html>
+
+
