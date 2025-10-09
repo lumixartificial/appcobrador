@@ -551,14 +551,16 @@
             }, 3500);
         }
 
-        function getTodaysRouteClients() {
+        function getAllTodaysClients() {
+            const today = new Date();
+            const dayOfWeek = today.getDay(); // Sunday - Saturday : 0 - 6
+            const dayOfMonth = today.getDate(); // 1 - 31
+
             return allClients.filter(client => {
-                const today = new Date();
-                const dayOfWeek = today.getDay(); // Sunday - Saturday : 0 - 6
-                const dayOfMonth = today.getDate(); // 1 - 31
+                if (client.status === 'finished') return false;
 
                 let isPaymentDay = false;
-                const frequency = client.paymentFrequency || 'daily'; // Default to daily for old clients
+                const frequency = client.paymentFrequency || 'daily';
 
                 if (frequency === 'daily') {
                     isPaymentDay = (client.paymentDays || []).includes(dayOfWeek);
@@ -568,16 +570,13 @@
                     isPaymentDay = (client.paymentDays || [])[0] === dayOfMonth;
                 }
                 
-                return isPaymentDay && (client.status === 'pending' || client.status === 'late');
+                return isPaymentDay;
             });
         }
 
-        function getTodaysTotalClients() {
-             return allClients.filter(client => {
-                const today = new Date();
-                const dayOfWeek = today.getDay();
-                return (client.paymentDays || []).includes(dayOfWeek);
-            });
+        function getTodaysRouteClients() {
+            const todaysClients = getAllTodaysClients();
+            return todaysClients.filter(client => client.status === 'pending' || client.status === 'late');
         }
 
         function renderMainLayout() {
@@ -678,14 +677,6 @@
                              <div class="kpi-card" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface));">
                                  <h3 class="kpi-title" data-lang-key="receivedInDigital"><i data-lucide="smartphone" style="color: var(--accent-purple);"></i></h3>
                                  <p class="kpi-value" id="kpi-daily-digital"></p>
-                             </div>
-                             <div class="kpi-card">
-                                 <h3 class="kpi-title" data-lang-key="weeklyTotal"><i data-lucide="calendar"></i></h3>
-                                 <p class="kpi-value green" id="kpi-weekly-total"></p>
-                             </div>
-                             <div class="kpi-card">
-                                 <h3 class="kpi-title" data-lang-key="monthlyTotal"><i data-lucide="calendar-days"></i></h3>
-                                 <p class="kpi-value green" id="kpi-monthly-total"></p>
                              </div>
                         </section>
                         <section>
@@ -1276,9 +1267,9 @@
         }
 
         function updateRouteProgress() {
-            const todaysTotalClients = getTodaysTotalClients();
-            const totalClients = todaysTotalClients.length;
-            const paidClients = todaysTotalClients.filter(c => c.status === 'paid').length;
+            const todaysTotalClientsList = getAllTodaysClients();
+            const totalClients = todaysTotalClientsList.length;
+            const paidClients = todaysTotalClientsList.filter(c => c.status === 'paid').length;
 
             const progressPercentage = totalClients > 0 ? (paidClients / totalClients) * 100 : 0;
 
@@ -1318,8 +1309,6 @@
 
         function updateProfileView(collectorData = null) {
             const dailyTotalEl = document.getElementById('kpi-daily-total');
-            const weeklyTotalEl = document.getElementById('kpi-weekly-total');
-            const monthlyTotalEl = document.getElementById('kpi-monthly-total');
             const capitalTotalEl = document.getElementById('kpi-capital-total');
             const dailyCashEl = document.getElementById('kpi-daily-cash');
             const dailyDigitalEl = document.getElementById('kpi-daily-digital');
@@ -1328,12 +1317,7 @@
             const now = new Date();
             const todayStr = now.toLocaleDateString('pt-BR');
             
-            const oneWeekAgo = new Date();
-            oneWeekAgo.setDate(now.getDate() - 7);
-
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-            
-            let dailyTotal = 0, weeklyTotal = 0, monthlyTotal = 0, totalPaymentsReceived = 0, totalLoansMade = 0;
+            let dailyTotal = 0, totalPaymentsReceived = 0, totalLoansMade = 0;
             let dailyTotalCash = 0, dailyTotalDigital = 0;
 
             allClients.forEach(client => {
@@ -1355,8 +1339,6 @@
                                 dailyTotalDigital += amount;
                             }
                         }
-                        if (paymentDate >= oneWeekAgo) { weeklyTotal += amount; }
-                        if (paymentDate >= startOfMonth) { monthlyTotal += amount; }
                     }
                 });
             });
@@ -1367,8 +1349,6 @@
             const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses;
 
             dailyTotalEl.textContent = money(dailyTotal);
-            weeklyTotalEl.textContent = money(weeklyTotal);
-            monthlyTotalEl.textContent = money(monthlyTotal);
             capitalTotalEl.textContent = money(capitalTotal);
             if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
@@ -1496,6 +1476,10 @@
                     (c.address && c.address.toLowerCase().includes(searchTerm))
                 );
             }
+            
+            // Ordena a lista de clientes em ordem alfabética pelo nome
+            filteredClients.sort((a, b) => a.name.localeCompare(b.name));
+            
             renderClientCards(container, filteredClients);
         }
         
