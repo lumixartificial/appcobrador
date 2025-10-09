@@ -1207,6 +1207,13 @@
                 </header>
                 <div class="modal-content-wrapper">
                   <div class="container">
+                    <div class="kpi-card progress-card" style="margin-bottom: 20px;">
+                        <h3 class="kpi-title" style="justify-content: center;">Progresso do Empréstimo</h3>
+                        <div class="progress-circle">
+                            <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="client-detail-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292; stroke: var(--accent-purple);"></circle></svg>
+                            <div class="progress-text" id="client-detail-progress-text"></div>
+                        </div>
+                    </div>
                     <section class="kpi-grid-profile" style="margin-bottom: 30px;">
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(client.totalLoan)}</p></div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(client.amount)}</p></div>
@@ -1239,6 +1246,22 @@
             
             history.pushState({ modal: 'clientDetailView', clientId: clientId }, `Details for ${client.name}`, `#client/${clientId}`);
             clientDetailView.classList.add('active');
+
+            const paidInstallments = (client.history || []).filter(p => p.status !== 'pending_verification').length;
+            const totalInstallmentsString = (client.installments || "0/0").split('/')[1];
+            const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
+            const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
+            const circleCircumference = 2 * Math.PI * 54;
+            const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
+            
+            const progressBar = document.getElementById('client-detail-progress-bar');
+            const progressText = document.getElementById('client-detail-progress-text');
+
+            if(progressBar && progressText) {
+                progressBar.style.strokeDashoffset = strokeDashoffset;
+                progressText.textContent = `${paidInstallments}/${totalInstallments}`;
+            }
+
             lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
             document.getElementById('closeDetailView').addEventListener('click', () => window.history.back());
