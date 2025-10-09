@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#6f42c1">
     <link rel="manifest">
     <link rel="apple-touch-icon" href="https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png">
+    <link rel="icon" href="https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png" type="image/png">
     <title>Painel do Cobrador</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -311,7 +312,7 @@
         .payment-history-amount { font-weight: 600; color: var(--accent-green); }
         .no-history, .no-items { color: var(--text-secondary); text-align: center; padding: 20px; }
         .action-buttons { background-color: var(--surface); border-top: 1px solid var(--border-color); padding: 15px 20px; display: flex; gap: 15px; margin-top: auto; position: sticky; bottom: 0; flex-shrink: 0; }
-        .action-buttons button { flex-grow: 1; padding: 15px; font-size: 1em; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s; }
+        .action-buttons button, .action-buttons a { flex-grow: 1; padding: 15px; font-size: 1em; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s; text-decoration: none; }
         .btn-primary { background-color: var(--accent-purple); color: white; }
         .btn-secondary { background-color: transparent; color: var(--accent-purple); border: 2px solid var(--accent-purple); }
         .btn-danger { background-color: var(--danger-color); color: white; }
@@ -459,6 +460,7 @@
     <div id="locationPermissionModal" class="modal-view" style="--bg: rgba(10, 14, 26, 0.8); backdrop-filter: blur(5px); z-index: 9999;"></div>
     <div id="verificationModal" class="modal-view"></div>
     <div id="refinanceModal" class="modal-view"></div>
+    <div id="paymentDetailModal" class="modal-view"></div>
     <div id="toast-container"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -482,7 +484,8 @@
         const CLOUDINARY_CLOUD_NAME = "dc6as14p0";
         const CLOUDINARY_UPLOAD_PRESET = "lumix-financas-uploads";
         const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-        const DEFAULT_LOGO_URL = "https://res.cloudinary.com/dc6as14p0/image/upload/v1759611967/LOGO---LUMIX-FINANZAS-REDUCIDO_gc8zow.png";
+        const DEFAULT_LOGO_URL = "https://res.cloudinary.com/dc6as14p0/image/upload/v1759612401/bwwtyrbgnnyjpnkgmzxe.png";
+        const LOGO_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAgVBMVEUAAADySiPySiPySiLySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiPySiMAAADiV2wBAAAAKnRSTlMA+5YCCg7f2wz17xYX0aF9dTgN/c5PIRzqx7u5srCsoqCcjnpnZl5aUj2BDw9OAAAEKElEQVR4nO2dW3eiQAyFww4gFVRU8FJErVrr6v//42EriJQMwjsTdt/585lZNoQ9L2cmEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4G5aenr57fC/vH56/f7g9/rD85wP/cE1C/l/O0h+2d1dXd1dXR2kHu7tL80N/hP2H7+8/3L+9f1j+8wP/cE1C/u/5A0V7eXl5eXk5Sj24vLw0/2G7gL29vW8vbx9e3j69v/+Z/4m48A+WJoyr8wPKtB1sQhhl8T1F2i6G0QimfE/pGjSGEc/U/1L1T3F3jGvjV0/3uT01dpe349/3M9e7Mv0Hq6sL3/5J49931zN/Y+pSjP8J+yTzT+Pj05T/Afp/Zl8b/wn7F84/zR84/2T+T/i/4fzT/IHfL/wT9t/O/4z9T+ef5g+c/yT/f+D8U/bvgH8S55+2fxf8A/p/ZP8T/M/ZvzT/NH/g/DN5AfgH6f+ZfW38J+xfOP80f+D8k/k/4f+G80/zB36/8E/Yfzv/M/Y/nf+aP3D+k/z/gPNP2b8D/pE4/7T9u+Af0P8z+5/gf8b+rfln8wfOP5M3gH+Q/p/Z18Z/wv6F80/zB84/mf8T/m84/zR/4PeLf8L+2/nP2P90/mv+wPlP8v8Hzj9l/w74R+L80/bvgH9A/8/sf4L/Gfu35p/mD5x/Jm8A/yD9P7Ovjf8E/Qvnn+YPnH8y/yf833D+af7A7xf/hP238z9j/9P5r/kD5z/J/x84/5T9O+AfifNP278D/gH9P7P/Cf5n7N+af5o/cPyZvAH8g/T/zL42/hP0L5x/mj9w/sn8n/B/w/mn+QO/X/gn7L+d/xn7n84/zR84/0n+/8D5p+zfgX/i7f9c3sK/T+1/kv+Z/O/8A44/pX/i/DP5L9K/i/9e+Cfl//P5gT+hf6L8f6r9t/J/S/4v0r+v/5X+n3n+/y//38w/mH9w/vH5H6d/Jv8g/X/j/x/4p+yfAP+M/P/L/h3wT5X/L/xH7P8v+xfA/8X8v8j/N/N/kP/vnn/K/x/y/0L/ZPLPgH9G/n/bvwP+sfL/iX9I/q/l/wT/M/K/n/8n4X9L/9kAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADgu/kXo204r1H5kTkAAAAASUVORK5CYII=";
 
         let allClients = [];
         let allExpenses = [];
@@ -880,6 +883,249 @@
             });
         }
 
+        function showPaymentDetailModal(clientId, historyIndex) {
+            const modal = document.getElementById('paymentDetailModal');
+            const client = allClients.find(c => c.id === clientId);
+            if (!client || !client.history || !client.history[historyIndex]) {
+                showToast('Detalhe do pagamento não encontrado.', true);
+                return;
+            }
+
+            const payment = client.history[historyIndex];
+            
+            let dateStr = 'N/A';
+            let timeStr = 'N/A';
+
+            if (payment.date?.seconds) {
+                const d = new Date(payment.date.seconds * 1000);
+                dateStr = d.toLocaleDateString('pt-BR');
+                timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            let receiptPreviewHtml = `<p class="no-items">Nenhum comprovante anexado.</p>`;
+            if (payment.receiptUrl) {
+                receiptPreviewHtml = `<img src="${payment.receiptUrl}" alt="Comprovante de Pagamento" style="width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">`;
+            }
+
+            let receiptButtonHtml = '';
+            if (payment.receiptUrl) {
+                 receiptButtonHtml = `<a href="${payment.receiptUrl}" target="_blank" download="comprovante-${client.name.replace(/\s/g, '_')}-${dateStr}.jpg" class="btn-primary"><i data-lucide="download"></i> Baixar Comprovante</a>`;
+            }
+            const invoiceButtonHtml = `<button id="generate-invoice-btn" class="btn-secondary"><i data-lucide="receipt"></i> Emitir Fatura</button>`;
+
+
+            modal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closePaymentDetailModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title">Detalhes do Pagamento</span>
+                </header>
+                <div class="modal-content-wrapper container">
+                    <div class="kpi-card" style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <h3 class="kpi-title">Data</h3>
+                                <p class="kpi-value" style="font-size: 1.2em;">${dateStr} às ${timeStr}</p>
+                            </div>
+                            <div>
+                                <h3 class="kpi-title" style="justify-content: flex-end;">Valor Pago</h3>
+                                <p class="kpi-value green" style="font-size: 1.4em;">${money(payment.amount)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <h3 class="section-title" style="border: none;">Comprovante</h3>
+                    <div class="kpi-card">
+                        ${receiptPreviewHtml}
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    ${receiptButtonHtml}
+                    ${invoiceButtonHtml}
+                </div>
+            `;
+
+            history.pushState({ modal: 'paymentDetailModal' }, 'Payment Details', '#payment-detail');
+            modal.classList.add('active');
+
+            lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
+            
+            modal.querySelector('#closePaymentDetailModal').addEventListener('click', () => window.history.back());
+            modal.querySelector('#generate-invoice-btn').addEventListener('click', () => generateInvoicePDF(client, payment));
+        }
+
+        async function generateInvoicePDF(client, payment) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const now = new Date();
+            const paymentDate = new Date(payment.date.seconds * 1000);
+            const collectorName = document.querySelector('.profile-name')?.textContent || 'João Silva';
+
+            // --- Estilo y Contenido ---
+            const primaryColor = '#6f42c1';
+            const textColor = '#343a40';
+            const secondaryTextColor = '#6c757d';
+            const pageMargin = 15;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            let y = 0;
+
+            // 1. Encabezado con Logo y Datos de la Empresa
+            if (LOGO_BASE64) {
+                try {
+                    doc.addImage(LOGO_BASE64, 'PNG', pageMargin, 12, 35, 35);
+                } catch (e) {
+                    console.error("Não foi possível adicionar o logo (Base64) ao PDF", e);
+                }
+            } else {
+                 console.warn("O logo em Base64 não estava disponível. Gerando PDF sem logo.");
+            }
+
+            doc.setFontSize(10);
+            doc.setTextColor(textColor);
+            doc.setFont(undefined, 'bold');
+            doc.text('LUMIX Finanças', pageWidth - pageMargin, 15, { align: 'right' });
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(secondaryTextColor);
+            doc.text('Rua Fictícia, 123, Goiânia, GO', pageWidth - pageMargin, 21, { align: 'right' });
+            doc.text('contato@lumix.com | (62) 9999-8888', pageWidth - pageMargin, 27, { align: 'right' });
+
+            // 2. Título de la Factura
+            y = 55;
+            doc.setFontSize(26);
+            doc.setTextColor(textColor);
+            doc.setFont(undefined, 'bold');
+            doc.text('FATURA', pageMargin, y);
+            
+            doc.setFontSize(11);
+            doc.setTextColor(secondaryTextColor);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`, pageWidth - pageMargin, y, { align: 'right' });
+
+            // Línea divisoria
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(primaryColor);
+            doc.line(pageMargin, y + 5, pageWidth - pageMargin, y + 5);
+
+            // 3. Detalles del Cliente y Pago
+            y += 15;
+            doc.setFontSize(10);
+            doc.setTextColor(secondaryTextColor);
+            doc.text('COBRADOR', pageMargin, y);
+            doc.text('CLIENTE', pageWidth / 2, y);
+            
+            doc.setFontSize(12);
+            doc.setTextColor(textColor);
+            doc.setFont(undefined, 'bold');
+            doc.text(collectorName, pageMargin, y + 6);
+            doc.text(client.name, pageWidth / 2, y + 6);
+
+            y += 15;
+            doc.setFontSize(10);
+            doc.setTextColor(secondaryTextColor);
+            doc.text('DATA DO PAGAMENTO', pageMargin, y);
+            
+            doc.setFontSize(12);
+            doc.setTextColor(textColor);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${paymentDate.toLocaleDateString('pt-BR')} às ${paymentDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`, pageMargin, y + 6);
+
+            // 4. Cuerpo de la factura (Tabla)
+            y += 25;
+            doc.setFillColor('#f0e9ff'); // Un lila muy claro
+            doc.roundedRect(pageMargin, y, pageWidth - (pageMargin * 2), 10, 2, 2, 'F');
+            
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(primaryColor);
+            doc.text('Descrição', pageMargin + 5, y + 7);
+            doc.text('Valor Pago', pageWidth - pageMargin - 5, y + 7, { align: 'right' });
+
+            y += 18;
+            doc.setFontSize(12);
+            doc.setTextColor(textColor);
+            doc.setFont(undefined, 'normal');
+            doc.text('Pagamento de parcela do empréstimo', pageMargin + 5, y);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor('#28a745'); // accent-green
+            doc.setFontSize(14);
+            doc.text(money(payment.amount), pageWidth - pageMargin - 5, y, { align: 'right' });
+
+            // 5. Resumen del Préstamo
+            const paidInstallments = (client.history || []).filter(p => p.status !== 'pending_verification').length;
+            const totalInstallmentsStr = (client.installments || "0/0").split('/')[1];
+            const totalInstallments = totalInstallmentsStr ? parseInt(totalInstallmentsStr, 10) : 0;
+            const remainingValue = Math.max(0, (client.totalLoan || 0) - (client.paid || 0));
+
+            y += 20;
+            doc.setFillColor('#fafafa');
+            doc.roundedRect(pageMargin, y, pageWidth - (pageMargin * 2), 26, 3, 3, 'F');
+            doc.setFontSize(12);
+            doc.setTextColor(textColor);
+            doc.setFont(undefined, 'bold');
+            doc.text('Resumo do Empréstimo', pageMargin + 5, y + 8);
+            
+            y += 16;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(secondaryTextColor);
+            doc.text('Progresso das Parcelas:', pageMargin + 5, y);
+            doc.setTextColor(textColor);
+            doc.text(`${paidInstallments} de ${totalInstallments} pagas`, pageWidth - pageMargin - 5, y, { align: 'right' });
+            
+            y += 7;
+            doc.setTextColor(secondaryTextColor);
+            doc.text('Valor Restante:', pageMargin + 5, y);
+            doc.setTextColor(primaryColor);
+            doc.setFont(undefined, 'bold');
+            doc.text(money(remainingValue), pageWidth - pageMargin - 5, y, { align: 'right' });
+            
+            // 6. Pie de página
+            y = doc.internal.pageSize.getHeight() - 30;
+            doc.setLineWidth(0.2);
+            doc.setDrawColor(secondaryTextColor);
+            doc.line(pageMargin, y, pageWidth - pageMargin, y);
+            
+            y += 10;
+            doc.setFontSize(12);
+            doc.setTextColor(primaryColor);
+            doc.setFont(undefined, 'bold');
+            doc.text('Obrigado pela preferência!', pageWidth / 2, y, { align: 'center' });
+
+            const fileName = `fatura-${client.name.replace(/\s/g, '_')}-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
+
+            // 1. Iniciar o download automaticamente
+            doc.save(fileName);
+            showToast('Download da fatura iniciado...');
+
+            // 2. Tentar compartilhar usando a API de compartilhamento da web
+            if (navigator.share && navigator.canShare) {
+                const pdfBlob = doc.output('blob');
+                const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+                
+                const shareData = {
+                    files: [pdfFile],
+                    title: `Fatura - ${client.name}`,
+                    text: `Segue a fatura do pagamento de ${money(payment.amount)} para ${client.name}.`,
+                };
+
+                // Verifica se o navegador pode compartilhar esses dados
+                if (navigator.canShare(shareData)) {
+                    try {
+                        await navigator.share(shareData);
+                    } catch (err) {
+                        // O erro 'AbortError' ocorre se o usuário fechar a janela de compartilhamento, não é um erro crítico.
+                        if (err.name !== 'AbortError') {
+                            console.error('Erro ao compartilhar a fatura:', err);
+                            showToast('Não foi possível abrir a janela de compartilhamento.', true);
+                        }
+                    }
+                } else {
+                     // Isso pode acontecer em desktops onde o compartilhamento de arquivos não é suportado
+                    console.warn('O compartilhamento de arquivos não é suportado neste navegador.');
+                }
+            } else {
+                console.warn('A API de compartilhamento não está disponível neste navegador.');
+            }
+        }
+
         function showVerificationModal(clientId, historyIndex) {
             const verificationModal = document.getElementById('verificationModal');
             const client = allClients.find(c => c.id === clientId);
@@ -1176,12 +1422,22 @@
             
             let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
             if (client.history && client.history.length > 0) {
-                historyHtml = [...client.history]
+                historyHtml = client.history
+                    .map((p, index) => ({ ...p, originalIndex: index })) // Preserva o índice original
                     .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
                     .map(p => {
                         let dateString = 'Data inválida';
                         if (p?.date?.seconds) { dateString = new Date(p.date.seconds * 1000).toLocaleDateString('pt-BR'); }
-                        return `<div class="payment-history-item"><span class="payment-date">${dateString}</span><span class="payment-history-amount">${money(p.amount)}</span></div>`;
+                        
+                        const hasReceipt = p.receiptUrl ? '<i data-lucide="file-text" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>' : '';
+
+                        return `<div class="payment-history-item" data-history-index="${p.originalIndex}" style="cursor: pointer;">
+                                    <span class="payment-date">${dateString}</span>
+                                    <div style="display: flex; align-items: center; gap: 15px;">
+                                       <span class="payment-history-amount">${money(p.amount)}</span>
+                                       ${hasReceipt}
+                                    </div>
+                                </div>`;
                     }).join('');
             }
 
@@ -1267,6 +1523,14 @@
             document.getElementById('closeDetailView').addEventListener('click', () => window.history.back());
             document.getElementById('registerPaymentBtn').addEventListener('click', () => showPaymentModal(clientId));
             document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId));
+            
+            clientDetailView.querySelector('.client-list').addEventListener('click', (e) => {
+                const item = e.target.closest('.payment-history-item');
+                if (item && item.dataset.historyIndex) {
+                    const historyIndex = parseInt(item.dataset.historyIndex, 10);
+                    showPaymentDetailModal(clientId, historyIndex);
+                }
+            });
             
             const viewMapBtn = document.getElementById('viewMapBtn');
             if (client.location) {
@@ -2451,4 +2715,3 @@
     </script>
 </body>
 </html>
-
