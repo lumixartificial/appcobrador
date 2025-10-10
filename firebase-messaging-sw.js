@@ -1,9 +1,8 @@
-//Version 1
+// firebase-messaging-sw.js
+// Version: 1.1 (Incrementa este número para forzar actualizaciones)
+importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js');
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-import { getMessaging, onBackgroundMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-sw.js";
-
-// IMPORTANTE: Esta configuración debe ser idéntica a la de tus aplicaciones web.
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
@@ -13,21 +12,32 @@ const firebaseConfig = {
     appId: "1:463777495321:web:106118f53f56abd206ed88"
 };
 
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging();
 
-/**
- * onBackgroundMessage se encarga de procesar las notificaciones push
- * cuando la aplicación está en segundo plano o cerrada.
- */
-onBackgroundMessage(messaging, (payload) => {
-    console.log('[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ', payload);
+// Este evento se dispara cuando el Service Worker se instala.
+// self.skipWaiting() fuerza al nuevo Service Worker a activarse inmediatamente.
+self.addEventListener('install', (event) => {
+  console.log('Nuevo Service Worker instalado, forzando activación.');
+  self.skipWaiting();
+});
 
-    const notificationTitle = payload.notification.title;
-    const notificationOptions = {
-        body: payload.notification.body,
-        icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png'
-    };
+// Este evento se dispara cuando el Service Worker se activa.
+// self.clients.claim() hace que el SW tome control de todas las pestañas abiertas de la app.
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activado y tomando control.');
+  event.waitUntil(self.clients.claim());
+});
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ', payload);
+  
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: payload.notification.image || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png'
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
