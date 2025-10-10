@@ -525,7 +525,6 @@
                 }
         
                 // 2. Obtenemos el token único del dispositivo
-                // !! IMPORTANTE: Pega aquí la clave VAPID que generaste en el Paso 1.
                 const VAPID_KEY = "BAgKWBzKi_Z4eyNNgGtprgPRQhPzU2MqU1vyrHf0iQSMxy1UMkin4E3GJ7KQLtChcDJHtEx8mMYau4jtzQvtjfw";
                 const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
         
@@ -542,7 +541,6 @@
                 // 4. Esta función se activa si llega una notificación MIENTRAS la app está abierta
                 onMessage(messaging, (payload) => {
                     console.log('Notificación recibida en primer plano:', payload);
-                    // Mostramos un aviso simple en lugar de una notificación del sistema
                     showToast(`${payload.notification.title}: ${payload.notification.body}`);
                     updateNotifications(); // Actualiza tu lista de notificaciones en la app
                 });
@@ -3007,3 +3005,4 @@
     </script>
 </body>
 </html>
+
