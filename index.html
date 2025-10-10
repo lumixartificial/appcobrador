@@ -2984,8 +2984,7 @@
             const initialView = location.hash.substring(1) || 'home';
             showView(initialView);
 
-            setupFCM(collectorId); 
-            
+                   
             let collectorData = null;
 
             onSnapshot(doc(db, 'collectors', collectorId), (docSnap) => {
@@ -3284,31 +3283,50 @@
             document.querySelector('link[rel="manifest"]').setAttribute('href', manifestURL);
 
             // --- Service Worker Registration with Auto-Update Logic ---
+            // --- Service Worker Registration with Auto-Update and Ready Check ---
+            // --- Service Worker Registration with Auto-Update and Ready Check ---
+            // --- Service Worker Registration with Auto-Update and Ready Check ---
+            // --- Service Worker Registration with Environment Check ---
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('firebase-messaging-sw.js').then(reg => {
-                    console.log('Service Worker registrado.');
-                    reg.addEventListener('updatefound', () => {
-                        const newWorker = reg.installing;
-                        console.log('Nueva versión del Service Worker encontrada, instalando...');
-                        newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                // Se ha instalado un nuevo SW, la página se recargará para usar la nueva versión.
-                                console.log('Nuevo Service Worker instalado, recargando la página.');
-                                location.reload();
-                            }
+                // Service Workers não podem ser registrados a partir de uma URL 'blob:', usada por ambientes de pré-visualização.
+                // Esta verificação evita a tentativa de registro e o erro resultante nesses ambientes.
+                if (window.location.protocol === 'blob:') {
+                    console.warn("Service Worker: Registro ignorado. O ambiente de pré-visualização ('blob:') não suporta Service Workers. As notificações e o rastreamento em tempo real funcionarão corretamente online.");
+                } else {
+                    navigator.serviceWorker.register('firebase-messaging-sw.js')
+                    .then(reg => {
+                        console.log('Service Worker: Registro iniciado.');
+                        
+                        reg.addEventListener('updatefound', () => {
+                            const newWorker = reg.installing;
+                            console.log('Service Worker: Nova versão encontrada.');
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('Service Worker: Nova versão instalada, recarregando a página.');
+                                    location.reload();
+                                }
+                            });
                         });
-                    });
-                }).catch(error => {
-                    console.log('Error al registrar el Service Worker del Cobrador:', error);
-                });
 
-                // Este listener detecta cuando un nuevo SW toma el control y recarga la página.
-                let refreshing;
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    if (refreshing) return;
-                    window.location.reload();
-                    refreshing = true;
-                });
+                        return navigator.serviceWorker.ready;
+                    })
+                    .then(registration => {
+                        console.log('Service Worker: Ativo e pronto.');
+                        if (sessionStorage.getItem('isLoggedIn') === 'true') {
+                            setupFCM(collectorId);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Service Worker: Falha no registro ou na ativação.', error);
+                    });
+
+                    let refreshing;
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        if (refreshing) return;
+                        window.location.reload();
+                        refreshing = true;
+                    });
+                }
             }
             
             // Lógica del Banner de Instalación PWA
@@ -3359,4 +3377,5 @@
     </script>
 </body>
 </html>
+
 
