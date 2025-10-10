@@ -439,6 +439,13 @@
                 padding: 20px;
             }
         }
+
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch label { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 34px; }
+        .switch label:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        .switch input:checked + label { background-color: var(--accent-purple); }
+        .switch input:checked + label:before { transform: translateX(20px); }
     </style>
 </head>
 <body>
@@ -565,12 +572,14 @@
         let mapMarkers = [];
         let deferredPrompt; // Para la instalación de PWA
         const collectorId = 'joao_silva'; 
+        let collectorCurrentLocation = null; // Guardará tu ubicación en tiempo real
+        let locationWatchId = null; // ID para controlar el rastreador de GPS
         
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         const translations = {
-            pt: { postponePayment: 'Adiar Pagamento', postponeConfirmTitle: 'Confirmar Adiamento', postponeConfirmMsg: 'Isso moverá a data de vencimento do cliente em um dia útil, sem gerar atraso. Deseja continuar?', confirm: 'Confirmar', paymentApproved: 'Pagamento aprovado com sucesso!', paymentRejected: 'Pagamento rejeitado.', approve: 'Aprovar', reject: 'Rejeitar', paymentReceipt: 'Comprovante de Pagamento', sentAmount: 'Valor Enviado', paymentVerification: 'Verificação de Pagamento', reputation: 'Reputação', reputationScore: 'Pontuação de Reputação', reputationPerfect: 'Excelente', reputationGood: 'Bom', reputationRegular: 'Regular', reputationBad: 'Ruim', reputationInfo: 'Mantenha seus pagamentos em dia para uma boa reputação.', collector: 'Cobrador', dailyGoal: 'Meta Diária', receivedToday: 'Recebido Hoje', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Rota de Hoje', navHome: 'Início', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', viewOnMap: 'Ver no Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mês', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Nome de Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*USUÁRIO*\n{username}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamento de', reviewRequest: 'Revisar solicitação.', installAppMsg: 'Instale o app para uma melhor experiência!', installBtn: 'Instalar', receivedInCash: 'Recebido em Dinheiro', receivedInDigital: 'Recebido em PIX/Cartão', finished: 'Finalizado', createNewLoan: 'Criar Novo Empréstimo', updateClientData: 'Atualizar Dados', paymentFrequency: 'Forma de Pagamento', daily: 'Diário', weekly: 'Semanal', monthly: 'Mensal', dayOfWeek: 'Dia da Semana', dayOfMonth: 'Dia do Mês', sunday: 'Domingo', monday: 'Segunda-feira', tuesday: 'Terça-feira', wednesday: 'Quarta-feira', thursday: 'Quinta-feira', friday: 'Sexta-feira', saturday: 'Sábado', collectionTimeLabel: 'Horário de Cobrança Preferencial' },
-            es: { postponePayment: 'Aplazar Pago', postponeConfirmTitle: 'Confirmar Aplazamiento', postponeConfirmMsg: 'Esto moverá la fecha de vencimiento del cliente un día hábil, sin generar atraso. ¿Desea continuar?', confirm: 'Confirmar', paymentApproved: '¡Pago aprobado con éxito!', paymentRejected: 'Pago rechazado.', approve: 'Aprobar', reject: 'Rechazar', paymentReceipt: 'Comprobante de Pago', sentAmount: 'Monto Enviado', paymentVerification: 'Verificación de Pago', reputation: 'Reputación', reputationScore: 'Puntuación de Reputación', reputationPerfect: 'Excelente', reputationGood: 'Bueno', reputationRegular: 'Regular', reputationBad: 'Mala', reputationInfo: 'Mantén tus pagos al día para tener una buena reputación.', collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Ruta de Hoy', navHome: 'Inicio', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', viewOnMap: 'Ver en Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Nombre de Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*USUÁRIO*\n{username}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', monthly: 'Mensual', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida' },
-            en: { postponePayment: 'Postpone Payment', postponeConfirmTitle: 'Confirm Postponement', postponeConfirmMsg: 'This will move the client\'s due date by one business day without generating a late status. Do you wish to continue?', confirm: 'Confirm', paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments up to date for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', remainingClients: 'Remaining Clients', todaysRoute: 'Today\'s Route', navHome: 'Home', navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', viewOnMap: 'View on Map', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', attachReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*USERNAME*\n{username}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Details', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', dayOfWeek: 'Day of the Week', dayOfMonth: 'Day of the Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time' }
+            pt: { postponePayment: 'Adiar Pagamento', postponeConfirmTitle: 'Confirmar Adiamento', postponeConfirmMsg: 'Isso moverá a data de vencimento do cliente em um dia útil, sem gerar atraso. Deseja continuar?', confirm: 'Confirmar', paymentApproved: 'Pagamento aprovado com sucesso!', paymentRejected: 'Pagamento rejeitado.', approve: 'Aprovar', reject: 'Rejeitar', paymentReceipt: 'Comprovante de Pagamento', sentAmount: 'Valor Enviado', paymentVerification: 'Verificação de Pagamento', reputation: 'Reputação', reputationScore: 'Pontuação de Reputação', reputationPerfect: 'Excelente', reputationGood: 'Bom', reputationRegular: 'Regular', reputationBad: 'Ruim', reputationInfo: 'Mantenha seus pagamentos em dia para uma boa reputação.', collector: 'Cobrador', dailyGoal: 'Meta Diária', receivedToday: 'Recebido Hoje', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Rota de Hoje', navHome: 'Início', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', viewOnMap: 'Ver no Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mês', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Nome de Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*USUÁRIO*\n{username}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamento de', reviewRequest: 'Revisar solicitação.', installAppMsg: 'Instale o app para uma melhor experiência!', installBtn: 'Instalar', receivedInCash: 'Recebido em Dinheiro', receivedInDigital: 'Recebido em PIX/Cartão', finished: 'Finalizado', createNewLoan: 'Criar Novo Empréstimo', updateClientData: 'Atualizar Dados', paymentFrequency: 'Forma de Pagamento', daily: 'Diário', weekly: 'Semanal', monthly: 'Mensal', dayOfWeek: 'Dia da Semana', dayOfMonth: 'Dia do Mês', sunday: 'Domingo', monday: 'Segunda-feira', tuesday: 'Terça-feira', wednesday: 'Quarta-feira', thursday: 'Quinta-feira', friday: 'Sexta-feira', saturday: 'Sábado', collectionTimeLabel: 'Horário de Cobrança Preferencial', realtimeTracking: 'Rastreamento em Tempo Real' },
+            es: { postponePayment: 'Aplazar Pago', postponeConfirmTitle: 'Confirmar Aplazamiento', postponeConfirmMsg: 'Esto moverá la fecha de vencimiento del cliente un día hábil, sin generar atraso. ¿Desea continuar?', confirm: 'Confirmar', paymentApproved: '¡Pago aprobado con éxito!', paymentRejected: 'Pago rechazado.', approve: 'Aprobar', reject: 'Rechazar', paymentReceipt: 'Comprobante de Pago', sentAmount: 'Monto Enviado', paymentVerification: 'Verificación de Pago', reputation: 'Reputación', reputationScore: 'Puntuación de Reputación', reputationPerfect: 'Excelente', reputationGood: 'Bueno', reputationRegular: 'Regular', reputationBad: 'Mala', reputationInfo: 'Mantén tus pagos al día para tener una buena reputación.', collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', todaysRoute: 'Ruta de Hoy', navHome: 'Inicio', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', viewOnMap: 'Ver en Mapa', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Nombre de Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*USUÁRIO*\n{username}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', monthly: 'Mensual', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida', realtimeTracking: 'Seguimiento en Tiempo Real' },
+            en: { postponePayment: 'Postpone Payment', postponeConfirmTitle: 'Confirm Postponement', postponeConfirmMsg: 'This will move the client\'s due date by one business day without generating a late status. Do you wish to continue?', confirm: 'Confirm', paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments up to date for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', remainingClients: 'Remaining Clients', todaysRoute: 'Today\'s Route', navHome: 'Home', navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', viewOnMap: 'View on Map', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', attachReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*USERNAME*\n{username}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Details', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', dayOfWeek: 'Day of the Week', dayOfMonth: 'Day of the Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', realtimeTracking: 'Real-time Tracking' }
         };
 
         const money = val => (typeof val !== 'number' || isNaN(val)) ? (currentLang === 'pt' ? 'R$ 0,00' : '$ 0.00') : val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -728,8 +737,17 @@
                         <section>
                             <h2 class="section-title" data-lang-key="accountSettings"></h2>
                             <div class="client-list">
-                                <a class="settings-item" id="change-password-btn">
-                                    <i data-lucide="key-round"></i><span data-lang-key="changePassword"></span>
+                                <div class="settings-item" id="realtime-tracking-item">
+    <i data-lucide="map-pin"></i>
+    <span data-lang-key="realtimeTracking" style="flex-grow: 1;"></span>
+    <div class="switch">
+        <input type="checkbox" id="realtime-tracking-toggle">
+        <label for="realtime-tracking-toggle"></label>
+    </div>
+</div>
+<a class="settings-item" id="change-password-btn">
+    <i data-lucide="key-round"></i><span data-lang-key="changePassword"></span>
+</a>
                                 </a>
                                 <a class="settings-item" id="export-report-btn">
                                     <i data-lucide="download"></i><span data-lang-key="exportReport"></span>
@@ -1497,8 +1515,9 @@
 
         function updateTodaysRouteList() {
             const todaysRouteClients = getTodaysRouteClients();
-            renderClientCards(document.getElementById('todays-route-list'), todaysRouteClients);
-            updateDashboard(todaysRouteClients);
+            const optimizedClients = optimizeRoute(todaysRouteClients, collectorCurrentLocation);
+            renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
+            updateDashboard(todaysRouteClients); // El dashboard no necesita estar ordenado
         }
 
         function updateAllClientsList() {
@@ -2869,6 +2888,7 @@
                 if(target.closest('#addClientBtn')) showClientFormModal();
                 if(target.closest('#addExpenseBtn')) showExpenseFormModal();
                 if (target.closest('#logout-btn')) {
+                    stopRealtimeGeolocation(); // <-- AÑADE ESTA LÍNEA
                     sessionStorage.removeItem('isLoggedIn');
                     location.reload();
                 }
@@ -2930,6 +2950,24 @@
                      }
                 });
             }
+            const realtimeToggle = document.getElementById('realtime-tracking-toggle');
+            if(realtimeToggle) {
+                realtimeToggle.addEventListener('change', async (e) => {
+                    const isActive = e.target.checked;
+                    try {
+                        const collectorRef = doc(db, 'collectors', collectorId);
+                        await updateDoc(collectorRef, { isRealtimeTrackingActive: isActive });
+                        if (isActive) {
+                            startRealtimeGeolocation();
+                        } else {
+                            stopRealtimeGeolocation();
+                        }
+                    } catch (error) {
+                        console.error("Error al actualizar el estado de rastreo:", error);
+                        showToast('Falha ao atualizar preferência de rastreamento.', true);
+                    }
+                });
+            }
         }
         
         function showMainApp() {
@@ -2961,6 +2999,12 @@
                     
                     document.getElementById('header-profile-img').src = imageUrl || placeholderUrl.replace('120x120', '80x80');
                     document.getElementById('profile-view-img').src = imageUrl || placeholderUrl;
+                    const realtimeToggle = document.getElementById('realtime-tracking-toggle');
+                    if(realtimeToggle) realtimeToggle.checked = collectorData.isRealtimeTrackingActive || false;
+
+                    if (collectorData.isRealtimeTrackingActive) {
+                        startRealtimeGeolocation();
+                    }
 
                     if (collectorData.isRealtimeTrackingActive) {
                         startRealtimeGeolocation();
@@ -3035,6 +3079,180 @@
             }
         }
         
+        // --- INICIO: LÓGICA DE OPTIMIZACIÓN DE RUTA ---
+        
+        // Calcula la distancia haversine entre dos puntos en la Tierra
+        function getDistance(coords1, coords2) {
+            if (!coords1 || !coords2) return Infinity;
+            const toRad = x => x * Math.PI / 180;
+            const R = 6371; // Radio de la Tierra en km
+            const dLat = toRad(coords2.lat - coords1.lat);
+            const dLon = toRad(coords2.lng - coords1.lng);
+            const lat1 = toRad(coords1.lat);
+            const lat2 = toRad(coords2.lat);
+
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Extrae las coordenadas de una URL de Google Maps
+        function parseCoordinates(locationUrl) {
+            if (!locationUrl) return null;
+            const match = locationUrl.match(/query=([\d.-]+),([\d.-]+)/);
+            if (match) {
+                return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+            }
+            return null;
+        }
+
+        // Función principal para optimizar la ruta
+        function optimizeRoute(clients, startCoords) {
+            if (clients.length === 0) return [];
+            
+            // Si no tenemos la ubicación del cobrador, ordena por hora y luego alfabéticamente
+            if (!startCoords) {
+                return clients.sort((a, b) => {
+                    if (a.collectionTime && b.collectionTime) return a.collectionTime.localeCompare(b.collectionTime);
+                    if (a.collectionTime) return -1;
+                    if (b.collectionTime) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+            }
+
+            clients.forEach(c => c.coords = parseCoordinates(c.location));
+            const clientsWithTime = clients.filter(c => c.collectionTime).sort((a, b) => a.collectionTime.localeCompare(b.collectionTime));
+            let clientsWithoutTime = clients.filter(c => !c.collectionTime);
+
+            let optimizedRoute = [];
+            let lastCoords = startCoords;
+
+            const findAndRemoveNearest = (fromCoords, clientList) => {
+                let nearestClient = null;
+                let minDistance = Infinity;
+                let nearestIndex = -1;
+
+                clientList.forEach((client, index) => {
+                    if (client.coords) {
+                        const distance = getDistance(fromCoords, client.coords);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            nearestClient = client;
+                            nearestIndex = index;
+                        }
+                    }
+                });
+
+                if (nearestIndex !== -1) {
+                    clientList.splice(nearestIndex, 1);
+                }
+                return nearestClient;
+            };
+
+            // Procesa clientes con hora primero
+            clientsWithTime.forEach(timedClient => {
+                // Antes de añadir el cliente con hora, busca los clientes sin hora más cercanos
+                while (clientsWithoutTime.length > 0) {
+                    const nearestUntimed = findAndRemoveNearest(lastCoords, clientsWithoutTime);
+                    if (!nearestUntimed) break; 
+
+                    // Heurística simple: ¿Es más corto ir a este cliente sin hora y LUEGO al cliente con hora?
+                    const distToNearest = getDistance(lastCoords, nearestUntimed.coords);
+                    const distFromNearestToTimed = getDistance(nearestUntimed.coords, timedClient.coords);
+                    const distDirectToTimed = getDistance(lastCoords, timedClient.coords);
+
+                    if (distToNearest + distFromNearestToTimed < distDirectToTimed * 1.5) { // Factor de desvío
+                        optimizedRoute.push(nearestUntimed);
+                        lastCoords = nearestUntimed.coords;
+                    } else {
+                        clientsWithoutTime.push(nearestUntimed); // Lo devolvemos a la lista
+                        break;
+                    }
+                }
+                
+                optimizedRoute.push(timedClient);
+                if (timedClient.coords) {
+                    lastCoords = timedClient.coords;
+                }
+            });
+
+            // Añade los clientes restantes sin hora al final, en orden de proximidad
+            while (clientsWithoutTime.length > 0) {
+                const nearest = findAndRemoveNearest(lastCoords, clientsWithoutTime);
+                if (nearest) {
+                    optimizedRoute.push(nearest);
+                    if (nearest.coords) {
+                        lastCoords = nearest.coords;
+                    }
+                } else {
+                    // Si quedan clientes pero no tienen coordenadas, añádelos al final
+                    const withoutCoords = clientsWithoutTime.filter(c => !c.coords);
+                    optimizedRoute.push(...withoutCoords);
+                    break;
+                }
+            }
+            
+            return optimizedRoute;
+        }
+        
+        function startRealtimeGeolocation() {
+            if (locationWatchId) return; // Ya está activo
+            if ('geolocation' in navigator) {
+                // Primero, solicita la posición una vez para activar el aviso de permisos de forma segura.
+                navigator.geolocation.getCurrentPosition(
+                    (initialPosition) => {
+                        // Si el usuario da permiso, inicia el seguimiento continuo.
+                        console.log("Permiso de ubicación otorgado. Iniciando seguimiento.");
+                        locationWatchId = navigator.geolocation.watchPosition(
+                            (position) => {
+                                collectorCurrentLocation = {
+                                    lat: position.coords.latitude,
+                                    lng: position.coords.longitude
+                                };
+                                console.log('Ubicación actualizada:', collectorCurrentLocation);
+                                updateTodaysRouteList(); // Re-ordena la ruta con la nueva ubicación
+                            },
+                            (error) => {
+                                console.error("Error durante el seguimiento en tiempo real:", error);
+                                showToast('Falha ao obter localização. Verifique o GPS.', true);
+                                stopRealtimeGeolocation(); 
+                            },
+                            { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+                        );
+                    },
+                    (error) => {
+                        // Esto se ejecuta si el usuario deniega el permiso en la ventana emergente.
+                        console.error("Error al obtener la ubicación inicial:", error);
+                        showToast('Permissão de localização negada.', true);
+                        stopRealtimeGeolocation(); // Asegura que todo se detenga
+                    }
+                );
+            } else {
+                showToast('Geolocalização não é suportada neste navegador.', true);
+                stopRealtimeGeolocation();
+            }
+        }
+
+        function stopRealtimeGeolocation() {
+            if (locationWatchId) {
+                navigator.geolocation.clearWatch(locationWatchId);
+                locationWatchId = null;
+            }
+            // Apaga el interruptor en la interfaz si el seguimiento se detiene por cualquier motivo.
+            const trackingToggle = document.getElementById('realtime-tracking-toggle');
+            if (trackingToggle && trackingToggle.checked) {
+                trackingToggle.checked = false;
+                // También actualiza el estado en la base de datos para que sea consistente.
+                updateDoc(doc(db, 'collectors', collectorId), { isRealtimeTrackingActive: false });
+            }
+            collectorCurrentLocation = null;
+            console.log('Rastreo en tiempo real detenido.');
+            updateTodaysRouteList(); // Reordena una última vez sin ubicación
+        }
+
+        // --- FIN: LÓGICA DE OPTIMIZACIÓN DE RUTA ---
+        
         function init() {
             document.body.classList.add('dark-mode');
 
@@ -3059,7 +3277,7 @@
 
             // --- Service Worker Registration with Auto-Update Logic ---
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/firebase-messaging-sw.js').then(reg => {
+                navigator.serviceWorker.register('firebase-messaging-sw.js').then(reg => {
                     console.log('Service Worker registrado.');
                     reg.addEventListener('updatefound', () => {
                         const newWorker = reg.installing;
