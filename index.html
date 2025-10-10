@@ -517,48 +517,48 @@
 
         async function setupFCM(collectorId) {
             try {
-                // Comprobamos si el navegador soporta notificaciones
                 if (!('Notification' in window) || !('serviceWorker' in navigator)) {
                     console.warn("Las notificaciones push no son soportadas en este navegador.");
                     return;
                 }
-        
+
                 const messaging = getMessaging(app);
-        
-                // 1. Pedimos permiso al usuario
+                
+                // Solicita permiso
                 const permission = await Notification.requestPermission();
                 if (permission !== 'granted') {
                     showToast('Permiso de notificaciones denegado.', true);
                     return;
                 }
-        
-                // 2. Obtenemos el token único del dispositivo
+
                 const VAPID_KEY = "BAgKWBzKi_Z4eyNNgGtprgPRQhPzU2MqU1vyrHf0iQSMxy1UMkin4E3GJ7KQLtChcDJHtEx8mMYau4jtzQvtjfw";
                 const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
-        
+
                 if (currentToken) {
-                    console.log('Token de notificación obtenido:', currentToken);
-                    // 3. Guardamos el token en el perfil del cobrador en Firestore
                     const collectorRef = doc(db, 'collectors', collectorId);
-                    // Usamos arrayUnion para añadir el token sin duplicarlo
                     await updateDoc(collectorRef, { fcmTokens: arrayUnion(currentToken) });
+                    console.log('Token de notificação obtido e salvo.');
                 } else {
-                     console.log('No se pudo obtener el token. Asegúrate de que el Service Worker está bien configurado.');
+                    console.log('Não foi possível obter o token. Verifique a configuração do Service Worker.');
+                    showToast('Falha ao obter token de notificação.', true);
                 }
-        
-                // 4. Esta función se activa si llega una notificación MIENTRAS la app está abierta
+
                 onMessage(messaging, (payload) => {
-                    console.log('Notificación recibida en primer plano:', payload);
+                    console.log('Notificação recebida em primeiro plano:', payload);
                     showToast(`${payload.notification.title}: ${payload.notification.body}`);
-                    updateNotifications(); // Actualiza tu lista de notificaciones en la app
+                    updateNotifications();
                 });
-        
+
             } catch (err) {
-                console.error('Ocurrió un error al configurar las notificaciones.', err);
-                showToast('Falla al configurar notificaciones push.', true);
+                console.error('Ocorreu um erro ao configurar as notificações push:', err);
+                // Análise de erro mais detalhada
+                if (err.code === 'messaging/permission-blocked') {
+                    showToast('As notificações estão bloqueadas. Ative-as nas configurações do seu navegador.', true);
+                } else {
+                    showToast('Falha ao carregar notificações push. Verifique o console.', true);
+                }
             }
         }
-
         const CLOUDINARY_CLOUD_NAME = "dc6as14p0";
         const CLOUDINARY_UPLOAD_PRESET = "lumix-financas-uploads";
         const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -3196,44 +3196,52 @@
             return optimizedRoute;
         }
         
-        function startRealtimeGeolocation() {
+        async function startRealtimeGeolocation() {
             if (locationWatchId) return; // Ya está activo
-            if ('geolocation' in navigator) {
-                // Primero, solicita la posición una vez para activar el aviso de permisos de forma segura.
-                navigator.geolocation.getCurrentPosition(
-                    (initialPosition) => {
-                        // Si el usuario da permiso, inicia el seguimiento continuo.
-                        console.log("Permiso de ubicación otorgado. Iniciando seguimiento.");
-                        locationWatchId = navigator.geolocation.watchPosition(
-                            (position) => {
-                                collectorCurrentLocation = {
-                                    lat: position.coords.latitude,
-                                    lng: position.coords.longitude
-                                };
-                                console.log('Ubicación actualizada:', collectorCurrentLocation);
-                                updateTodaysRouteList(); // Re-ordena la ruta con la nueva ubicación
-                            },
-                            (error) => {
-                                console.error("Error durante el seguimiento en tiempo real:", error);
-                                showToast('Falha ao obter localização. Verifique o GPS.', true);
-                                stopRealtimeGeolocation(); 
-                            },
-                            { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-                        );
+            if (!('geolocation' in navigator) || !('permissions' in navigator)) {
+                showToast('Geolocalização não é suportada neste navegador.', true);
+                stopRealtimeGeolocation();
+                return;
+            }
+
+            try {
+                // 1. Verifica el estado del permiso ANTES de solicitar la ubicación
+                const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+
+                if (permissionStatus.state === 'denied') {
+                    // Si el permiso ya fue denegado, informa al usuario cómo solucionarlo.
+                    showToast('Permissão de localização bloqueada. Ative-a nas configurações do seu dispositivo para este site.', true);
+                    stopRealtimeGeolocation(); // Asegura que el interruptor se apague.
+                    return;
+                }
+
+                // Si el estado es 'granted' o 'prompt', procede a solicitar la ubicación.
+                // El navegador pedirá permiso si es 'prompt'.
+                locationWatchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        // Éxito: se obtuvo la ubicación
+                        collectorCurrentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        console.log('Ubicación actualizada:', collectorCurrentLocation);
+                        updateTodaysRouteList();
                     },
                     (error) => {
-                        // Esto se ejecuta si el usuario deniega el permiso en la ventana emergente.
-                        console.error("Error al obtener la ubicación inicial:", error);
-                        showToast('Permissão de localização negada.', true);
-                        stopRealtimeGeolocation(); // Asegura que todo se detenga
-                    }
+                        // Error: El usuario negó el permiso en el pop-up o hubo un fallo del GPS.
+                        console.error("Error durante el seguimiento en tiempo real:", error);
+                        showToast('Não foi possível obter a localização. Permissão negada ou GPS indisponível.', true);
+                        stopRealtimeGeolocation(); 
+                    },
+                    { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
                 );
-            } else {
-                showToast('Geolocalização não é suportada neste navegador.', true);
+
+            } catch (error) {
+                console.error("Error al verificar permisos de geolocalización:", error);
+                showToast('Erro ao verificar permissões de GPS.', true);
                 stopRealtimeGeolocation();
             }
         }
-
         function stopRealtimeGeolocation() {
             if (locationWatchId) {
                 navigator.geolocation.clearWatch(locationWatchId);
@@ -3351,3 +3359,4 @@
     </script>
 </body>
 </html>
+
