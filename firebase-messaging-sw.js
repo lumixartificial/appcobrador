@@ -1,5 +1,5 @@
 // firebase-messaging-sw.js
-// Version: 1.4 (Incrementa este número para forzar actualizaciones)
+// Version: 1.5 (Incrementa este número para forzar actualizaciones)
 importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js');
 
@@ -41,6 +41,7 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
+
 
 
 
