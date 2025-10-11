@@ -544,10 +544,12 @@
                 }
 
                 onMessage(messaging, (payload) => {
-                    console.log('Notificação recebida em primeiro plano:', payload);
-                    showToast(`${payload.notification.title}: ${payload.notification.body}`);
-                    updateNotifications();
-                });
+    console.log('Notificação recebida em primeiro plano:', payload);
+    // --- CORRECCIÓN ---
+    // Ahora lee el título y el cuerpo desde "payload.data", que es la estructura correcta.
+    showToast(`${payload.data.title}: ${payload.data.body}`);
+    updateNotifications(); // Esta función actualiza la lista de notificaciones, déjala como está.
+});
 
             } catch (err) {
                 console.error('Ocorreu um erro ao configurar as notificações push:', err);
