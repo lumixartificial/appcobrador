@@ -1,8 +1,10 @@
 // firebase-messaging-sw.js
-// Version: 1.6 (Incrementa este número para forzar actualizaciones)
-importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js');
+// Version: 1.7 (Incrementa este número para forzar actualizaciones)
+// Importa los scripts de Firebase
+importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
 
+// IMPORTANTE: Usa exactamente la misma configuración de Firebase que tienes en tu app
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
@@ -15,32 +17,51 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Este evento se dispara cuando el Service Worker se instala.
-// self.skipWaiting() fuerza al nuevo Service Worker a activarse inmediatamente.
-self.addEventListener('install', (event) => {
-  console.log('Nuevo Service Worker instalado, forzando activación.');
-  self.skipWaiting();
-});
-
-// Este evento se dispara cuando el Service Worker se activa.
-// self.clients.claim() hace que el SW tome control de todas las pestañas abiertas de la app.
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker activado y tomando control.');
-  event.waitUntil(self.clients.claim());
-});
-
-
+// Este es el manejador clave: se activa cuando llega una notificación "data-only"
+// con la app en segundo plano o cerrada.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ', payload);
-  
-  const notificationTitle = payload.notification.title;
+  console.log("[firebase-messaging-sw.js] Mensaje 'data-only' recibido en segundo plano: ", payload);
+
+  // Extraemos la información del payload "data" que configuramos en la Cloud Function
+  const notificationTitle = payload.data.title;
   const notificationOptions = {
-    body: payload.notification.body,
-    icon: payload.notification.image || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png'
+    body: payload.data.body,
+    icon: payload.data.icon,
+    // Pasamos la URL a la notificación para que se abra al hacer clic
+    data: {
+        click_action: payload.data.click_action 
+    }
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  // Mostramos la notificación usando los datos recibidos
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
+
+// Este manejador se activa cuando el usuario hace clic en la notificación
+self.addEventListener('notificationclick', (event) => {
+    // Cierra la notificación
+    event.notification.close(); 
+    
+    const urlToOpen = event.notification.data.click_action;
+    if (urlToOpen) {
+        // Busca si ya hay una ventana de la app abierta y la enfoca. Si no, abre una nueva.
+        event.waitUntil(clients.matchAll({
+            type: "window"
+        }).then(clientList => {
+            for (let i = 0; i < clientList.length; i++) {
+                const client = clientList[i];
+                if (client.url === '/' && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        }));
+    }
+});
+
+
 
 
 
