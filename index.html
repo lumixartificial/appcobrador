@@ -543,13 +543,15 @@
                     showToast('Falha ao obter token de notificação.', true);
                 }
 
-                onMessage(messaging, (payload) => {
+                // ...
+onMessage(messaging, (payload) => {
     console.log('Notificação recebida em primeiro plano:', payload);
     // --- CORRECCIÓN ---
     // Ahora lee el título y el cuerpo desde "payload.data", que es la estructura correcta.
     showToast(`${payload.data.title}: ${payload.data.body}`);
-    updateNotifications(); // Esta función actualiza la lista de notificaciones, déjala como está.
+    updateNotifications();
 });
+// ...
 
             } catch (err) {
                 console.error('Ocorreu um erro ao configurar as notificações push:', err);
@@ -3391,3 +3393,4 @@
     </script>
 </body>
 </html>
+
