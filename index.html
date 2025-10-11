@@ -784,91 +784,61 @@
             }
         }
         
-        function updateNotifications() {
-            const container = document.getElementById('notifications-list-container');
-            const badge = document.getElementById('notification-badge');
-            if (!container || !badge) return;
+        // REEMPLAZA ESTA FUNCIÓN COMPLETA
+function updateNotifications() {
+    const container = document.getElementById('notifications-list-container');
+    const badge = document.getElementById('notification-badge');
+    if (!container || !badge) return;
 
-            let notifications = [];
-            
-            allClients.forEach(client => {
-                // Notificaciones de Pagos Pendientes
-                (client.history || []).forEach((payment, index) => {
-                    if (payment.status === 'pending_verification') {
-                        notifications.push({ 
-                            type: 'payment',
-                            date: payment.date,
-                            clientName: client.name, 
-                            clientId: client.id, 
-                            amount: payment.amount,
-                            historyIndex: index, 
-                            profilePictureUrl: client.profilePictureUrl 
-                        });
+    // Esta es la nueva forma: escuchar directamente tu bandeja de entrada de notificaciones.
+    const notifsQuery = query(collection(db, 'collectors', collectorId, 'notifications'));
+    
+    onSnapshot(notifsQuery, (snapshot) => {
+        const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        badge.textContent = notifications.length;
+        badge.classList.toggle('visible', notifications.length > 0);
+
+        if (notifications.length === 0) {
+            container.innerHTML = `<div class="no-items" data-lang-key="noNotifications">${translations[currentLang].noNotifications}</div>`;
+            return;
+        }
+
+        container.innerHTML = notifications
+            .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))
+            .map(notif => {
+                const nameInitial = (notif.from || 'C').charAt(0).toUpperCase();
+                const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+                const photoUrl = notif.profilePictureUrl || placeholderUrl;
+                
+                return `
+                <div class="notification-card" data-notification-id="${notif.id}">
+                    <img src="${photoUrl}" alt="Foto do Cliente">
+                    <div class="notification-info">
+                        <h4 class="notification-title">${notif.title}</h4>
+                        <p class="notification-subtitle">${notif.body}</p>
+                    </div>
+                </div>`;
+            }).join('');
+
+        container.querySelectorAll('.notification-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const notifId = card.dataset.notificationId;
+                const clickedNotification = notifications.find(n => n.id === notifId);
+                if (clickedNotification) {
+                    if (clickedNotification.type === 'payment') {
+                        showVerificationModal(clickedNotification);
+                    } else if (clickedNotification.type === 'refinance') {
+                        showRefinanceModal(clickedNotification);
                     }
-                });
-
-                // Notificaciones de Refinanciamiento
-                if (client.refinanceRequest && client.refinanceRequest.status === 'pending') {
-                    notifications.push({
-                        type: 'refinance',
-                        date: client.refinanceRequest.requestDate,
-                        ...client.refinanceRequest,
-                        clientName: client.name,
-                        clientId: client.id,
-                        profilePictureUrl: client.profilePictureUrl
-                    });
                 }
             });
-
-            badge.textContent = notifications.length;
-            badge.classList.toggle('visible', notifications.length > 0);
-
-            if (notifications.length === 0) {
-                container.innerHTML = `<div class="no-items" data-lang-key="noNotifications">${translations[currentLang].noNotifications}</div>`;
-                return;
-            }
-
-            container.innerHTML = notifications
-                .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
-                .map(p => {
-                    const nameInitial = (p.clientName || 'C').charAt(0).toUpperCase();
-                    const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
-                    const photoUrl = p.profilePictureUrl || placeholderUrl;
-                    
-                    let title = '';
-                    let subtitle = '';
-
-                    if (p.type === 'payment') {
-                        title = p.clientName;
-                        subtitle = `${translations[currentLang].paymentSent} ${money(p.amount)}. ${translations[currentLang].pleaseVerify}`;
-                    } else if (p.type === 'refinance') {
-                        title = p.clientName;
-                        subtitle = `${translations[currentLang].refinanceRequested} ${money(p.amount)}. ${translations[currentLang].reviewRequest}`;
-                    }
-
-                    return `
-                    <div class="notification-card" data-client-id="${p.clientId}" data-history-index="${p.historyIndex}" data-type="${p.type}">
-                        <img src="${photoUrl}" alt="Foto do Cliente">
-                        <div class="notification-info">
-                            <h4 class="notification-title">${title}</h4>
-                            <p class="notification-subtitle">${subtitle}</p>
-                        </div>
-                    </div>`;
-                }).join('');
-
-            container.querySelectorAll('.notification-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const type = card.dataset.type;
-                    const clientId = card.dataset.clientId;
-                    if(type === 'payment') {
-                        const historyIndex = parseInt(card.dataset.historyIndex, 10);
-                        showVerificationModal(clientId, historyIndex);
-                    } else if (type === 'refinance') {
-                        showRefinanceModal(clientId);
-                    }
-                });
-            });
-        }
+        });
+    }, (error) => {
+        console.error("Error listening to notifications:", error);
+        showToast("Falha ao carregar notificações.", true);
+    });
+}
 
         function showConfirmationModal(title, message, onConfirm) {
             const modal = document.getElementById('confirmationModal');
@@ -3389,6 +3359,3 @@
     </script>
 </body>
 </html>
-
-
-
