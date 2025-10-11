@@ -1280,16 +1280,28 @@
 
             document.getElementById('approve-payment-btn').addEventListener('click', async () => {
                 const clientRef = doc(db, 'clients', clientId);
-                const updatedHistory = [...client.history];
-                updatedHistory[historyIndex].status = 'approved';
                 
-                const newPaidAmount = (client.paid || 0) + payment.amount;
-
                 try {
+                    // CORRECCIÓN: Ahora el cobrador añade el pago al historial.
+                    const newPayment = {
+                        amount: payment.paymentData.amount,
+                        date: new Date(),
+                        receiptUrl: payment.paymentData.receiptUrl,
+                        status: 'approved'
+                    };
+
+                    const currentPaidAmount = client.paid || 0;
+                    const newPaidAmount = currentPaidAmount + newPayment.amount;
+
                     await updateDoc(clientRef, {
-                        history: updatedHistory,
+                        history: arrayUnion(newPayment),
                         paid: newPaidAmount
                     });
+
+                    // Elimina el "ticket" de notificación después de ser procesado
+                    const notifRef = doc(db, 'collectors', collectorId, 'notifications', payment.id);
+                    await deleteDoc(notifRef);
+
                     showToast(translations[currentLang].paymentApproved);
                     window.history.back();
                 } catch (error) {
@@ -3377,5 +3389,6 @@
     </script>
 </body>
 </html>
+
 
 
