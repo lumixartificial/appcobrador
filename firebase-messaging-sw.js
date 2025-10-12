@@ -20,10 +20,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Este manejador se activa cuando llega una notificación con la app en segundo plano
 messaging.onBackgroundMessage((payload) => {
-    console.log("[SW Final] Mensaje recibido en segundo plano: ", payload);
-
+    console.log("[SW Definitivo] Mensaje recibido: ", payload);
     const notificationTitle = payload.data.title;
     const notificationOptions = {
         body: payload.data.body,
@@ -31,53 +29,42 @@ messaging.onBackgroundMessage((payload) => {
         badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
         tag: 'lumix-cobrador-notification', // Evita notificaciones duplicadas
         data: {
-            hash: '#notifications' 
+            // [CAMBIO CLAVE] Guardamos la URL completa y absoluta a la que debemos navegar.
+            // Esto elimina cualquier ambigüedad en el momento del clic.
+            url: new URL('#notifications', self.location.origin).href
         }
     };
-
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-
-// [SOLUCIÓN DEFINITIVA PARA EL CLIC] - Este manejador se activa cuando el usuario hace clic en la notificación
+// [SOLUCIÓN DEFINITIVA FINAL]
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW Final] Notificación clickeada:', event.notification.data);
-    
+    console.log('[SW Definitivo] Notificación clickeada:', event.notification);
     event.notification.close();
 
-    const targetHash = event.notification.data.hash || '#';
-    // self.registration.scope es la URL base de tu PWA (ej: "https://cobrador.lumixartificial.com/")
-    const targetUrl = new URL(targetHash, self.registration.scope).href;
+    // La URL de destino ya la guardamos al recibir la notificación, así que solo la leemos.
+    const targetUrl = event.notification.data.url;
 
-    console.log(`[SW Final] URL de destino construida: ${targetUrl}`);
-
-    event.waitUntil(
-        (async () => {
-            const clientList = await clients.matchAll({
-                type: "window",
-                includeUncontrolled: true 
-            });
-
-            // 1. Revisa si la app ya está abierta en alguna pestaña.
-            for (const client of clientList) {
-                if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
-                    console.log('[SW Final] App ya está abierta. Navegando y enfocando.');
-                    await client.navigate(targetUrl);
-                    return client.focus();
-                }
+    const promiseChain = clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+    }).then((windowClients) => {
+        // Revisa si ya hay una ventana de la app abierta.
+        for (let i = 0; i < windowClients.length; i++) {
+            const client = windowClients[i];
+            // Si encontramos la app, la enfocamos y la dirigimos a la URL.
+            // Usamos startsWith(scope) para asegurar que es nuestra PWA y no otra página.
+            if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
+                console.log("[SW Definitivo] App encontrada, enfocando y navegando.");
+                return client.focus().then(c => c.navigate(targetUrl));
             }
+        }
+        // Si no hay ninguna ventana abierta, abrimos una nueva.
+        if (clients.openWindow) {
+            console.log("[SW Definitivo] App no encontrada, abriendo nueva ventana.");
+            return clients.openWindow(targetUrl);
+        }
+    });
 
-            // 2. Si no hay ninguna pestaña abierta, la abrimos.
-            // ESTA ES LA LÓGICA MÁS ROBUSTA PARA ANDROID CUANDO LA APP ESTÁ CERRADA:
-            if (clients.openWindow) {
-                console.log('[SW Final] App no encontrada. Abriendo una nueva ventana.');
-                // Primero, abre la app en su URL base (el "scope").
-                const windowClient = await clients.openWindow(self.registration.scope);
-                // Una vez que la ventana está abierta y lista, la dirigimos a la sección correcta.
-                if (windowClient) {
-                    return windowClient.navigate(targetUrl);
-                }
-            }
-        })()
-    );
+    event.waitUntil(promiseChain);
 });
