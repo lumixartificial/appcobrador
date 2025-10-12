@@ -21,7 +21,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// [CÓDIGO MEJORADO] - Manejador para notificaciones en segundo plano.
+// Manejador para notificaciones en segundo plano.
 messaging.onBackgroundMessage((payload) => {
     console.log("[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ", payload);
 
@@ -30,10 +30,10 @@ messaging.onBackgroundMessage((payload) => {
         body: payload.data.body,
         icon: payload.data.icon || '/favicon.ico',
         badge: '/badge-icon.png',
-        // [CAMBIO CLAVE] - Hacemos la URL de destino explícita para evitar ambigüedades.
-        // Apuntamos directamente al archivo HTML principal con el hash de la vista.
+        // [CAMBIO CLAVE #1] - Almacenamos una ruta relativa simple, sin './'.
+        // Esto es más limpio y menos propenso a errores de interpretación.
         data: {
-            url: './app_cobrador.html#notifications'
+            url: 'app_cobrador.html#notifications'
         }
     };
 
@@ -41,14 +41,14 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 
-// [CÓDIGO DEFINITIVO] - Este manejador se activa cuando el usuario hace clic en la notificación.
-// Esta versión es más robusta para asegurar que la app se abra o se enfoque correctamente en todos los dispositivos.
+// [CÓDIGO FINAL Y DEFINITIVO] - Manejador de clic en la notificación.
 self.addEventListener('notificationclick', (event) => {
     console.log('[Service Worker] Notificación clickeada.');
     event.notification.close();
 
-    // Construimos la URL completa y absoluta a la que queremos navegar.
-    const targetUrl = new URL(event.notification.data.url, self.location.origin).href;
+    // [CAMBIO CLAVE #2] - Construimos la URL de destino de la forma más robusta posible.
+    // `self.registration.scope` es la URL base de la PWA, garantizando que siempre apuntemos al lugar correcto.
+    const targetUrl = new URL(event.notification.data.url, self.registration.scope).href;
 
     // event.waitUntil() asegura que el Service Worker no se termine antes de que la operación se complete.
     event.waitUntil(
@@ -59,8 +59,8 @@ self.addEventListener('notificationclick', (event) => {
             // 1. Buscamos si ya hay una ventana de nuestra app abierta.
             for (const client of clientList) {
                 // Verificamos si la ventana es del mismo origen (nuestro sitio) y puede ser enfocada.
-                if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
-                    console.log('App ya está abierta, navegando a la sección y enfocando.');
+                if (new URL(client.url).origin === new URL(self.registration.scope).origin && 'focus' in client) {
+                    console.log('App ya está abierta, navegando a la sección y enfocando.', targetUrl);
                     // Si la encontramos, la dirigimos a la URL correcta (la pestaña de notificaciones).
                     client.navigate(targetUrl);
                     // Y lo más importante, la traemos al frente para que el usuario la vea.
@@ -70,12 +70,13 @@ self.addEventListener('notificationclick', (event) => {
             
             // 2. Si el bucle termina y no encontró ninguna ventana, significa que la app está cerrada.
             if (clients.openWindow) {
-                console.log('App está cerrada, abriendo una nueva ventana.');
+                console.log('App está cerrada, abriendo una nueva ventana.', targetUrl);
                 // Abrimos una nueva ventana directamente en la URL de destino.
                 return clients.openWindow(targetUrl);
             }
         })
     );
 });
+
 
 
