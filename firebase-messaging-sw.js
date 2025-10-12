@@ -20,70 +20,74 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// [CÓDIGO REFORZADO] - Manejador para notificaciones en segundo plano.
-messaging.onBackgroundMessage((payload) => {
-    console.log("[SW] Mensaje recibido en segundo plano: ", payload);
+// [CÓDIGO REFORZADO FINAL] - Manejador para notificaciones en segundo plano.
+messaging.onBackgroundMessage(async (payload) => {
+    console.log("[SW Final] Mensaje recibido:", payload);
 
-    // Hace el código más robusto al aceptar datos de 'data' o 'notification'
-    const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
-    const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
-    
-    // [CAMBIO CLAVE #1] - Construimos la URL de destino completa y absoluta aquí mismo.
-    // Esto elimina cualquier ambigüedad en el manejador de clics.
+    const notificationTitle = payload.data?.title || 'Nova Notificação';
+    const notificationBody = payload.data?.body || 'Você recebeu uma nova notificação.';
     const targetUrl = new URL('#notifications', self.registration.scope).href;
 
     const notificationOptions = {
         body: notificationBody,
-        icon: payload.data?.icon || '/favicon.ico',
-        badge: '/badge-icon.png', // Ícono para la barra de Android
+        // Usamos URLs absolutas para los íconos para máxima compatibilidad
+        icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
+        badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
+        
+        // [FIX DUPLICADOS] - La 'tag' asegura que solo haya una notificación de este tipo a la vez.
+        // Si el sistema muestra una y luego nuestro código muestra otra, esta la reemplazará.
+        tag: 'lumix-cobrador-notification',
+        renotify: true, // Permite que el dispositivo vibre o suene de nuevo al reemplazar.
+
         data: {
-            url: targetUrl // Guardamos la URL completa y lista para usar.
+            url: targetUrl // Guardamos la URL completa para el evento 'notificationclick'
         }
     };
 
-    console.log('[SW] Mostrando notificación con título:', notificationTitle, 'y datos:', notificationOptions.data);
-    return self.registration.showNotification(notificationTitle, notificationOptions);
+    console.log('[SW Final] Mostrando notificación controlada:', notificationTitle);
+    await self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// [CÓDIGO FINAL Y DEFINITIVO] - Manejador de clic en la notificación.
+
+// [SOLUCIÓN DEFINITIVA PARA EL CLIC] - Manejador de clic en la notificación.
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW] Notificación clickeada.');
+    console.log('[SW Final] Notificación clickeada:', event.notification.data);
     event.notification.close();
 
-    // [CAMBIO CLAVE #2] - Obtenemos la URL de destino, ya pre-construida, directamente de los datos.
-    let targetUrl = event.notification.data.url;
+    const targetUrl = event.notification.data.url;
     if (!targetUrl) {
-        console.error('[SW] URL de destino não encontrada. Abrindo a página inicial como fallback.');
-        // Como fallback de seguridad, abre la página de inicio.
-        targetUrl = self.registration.scope;
+        console.error('[SW Final] URL no encontrada en los datos de la notificación.');
+        return;
     }
 
-    console.log(`[SW] Intentando abrir o enfocar: ${targetUrl}`);
-
-    // Este es el patrón correcto: buscar una ventana existente antes de abrir una nueva.
+    // `waitUntil` asegura que el Service Worker se mantenga activo hasta que la acción se complete.
     event.waitUntil(
-        clients.matchAll({
-            type: 'window',
-            includeUncontrolled: true
-        }).then((clientList) => {
-            // 1. Busca una ventana de la app que ya esté abierta.
+        (async () => {
+            const clientList = await clients.matchAll({
+                type: "window",
+                includeUncontrolled: true
+            });
+
+            // 1. Revisa si la app ya está abierta en alguna pestaña.
             for (const client of clientList) {
-                // Comparamos el origen (dominio) para asegurarnos de que es nuestra app.
-                if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
-                    console.log('[SW] App encontrada. Navegando para a seção de notificações e focando.');
-                    // Si la encontramos, la dirigimos a la URL correcta y la traemos al frente.
-                    return client.navigate(targetUrl).then(c => c.focus());
+                if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
+                    console.log('[SW Final] App ya está abierta. Navegando y enfocando.');
+                    // La trae al frente y la navega a la sección correcta.
+                    await client.navigate(targetUrl);
+                    return client.focus();
                 }
             }
-            
-            // 2. Si el bucle termina y no se encontró ninguna ventana, la app está cerrada.
+
+            // 2. Si no hay ninguna pestaña abierta, abre una nueva.
             if (clients.openWindow) {
-                console.log('[SW] App não encontrada. Abrindo uma nova janela.');
-                // Abrimos la URL de destino que ya preparamos.
-                return clients.openWindow(targetUrl);
+                console.log('[SW Final] App no encontrada. Abriendo una nueva ventana.');
+                // Este método es el más robusto para Android: abre la app y LUEGO navega.
+                const windowClient = await clients.openWindow(self.registration.scope);
+                if (windowClient) {
+                    return windowClient.navigate(targetUrl);
+                }
             }
-        }).catch(err => {
-            console.error('[SW] Erro no manejador de notificationclick:', err);
-        })
+        })()
     );
 });
+
