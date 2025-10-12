@@ -20,59 +20,70 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Manejador para notificaciones en segundo plano.
+// [CÓDIGO REFORZADO] - Manejador para notificaciones en segundo plano.
 messaging.onBackgroundMessage((payload) => {
-    console.log("[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ", payload);
+    console.log("[SW] Mensaje recibido en segundo plano: ", payload);
 
-    const notificationTitle = payload.data.title;
+    // Hace el código más robusto al aceptar datos de 'data' o 'notification'
+    const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
+    const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
+    
+    // [CAMBIO CLAVE #1] - Construimos la URL de destino completa y absoluta aquí mismo.
+    // Esto elimina cualquier ambigüedad en el manejador de clics.
+    const targetUrl = new URL('#notifications', self.registration.scope).href;
+
     const notificationOptions = {
-        body: payload.data.body,
-        icon: payload.data.icon || '/favicon.ico',
-        badge: '/badge-icon.png',
-        // [CAMBIO CLAVE #1] - Ya no guardamos una URL completa, solo el "hash"
-        // que representa la vista a la que queremos ir (#notifications).
+        body: notificationBody,
+        icon: payload.data?.icon || '/favicon.ico',
+        badge: '/badge-icon.png', // Ícono para la barra de Android
         data: {
-            targetHash: '#notifications'
+            url: targetUrl // Guardamos la URL completa y lista para usar.
         }
     };
 
+    console.log('[SW] Mostrando notificación con título:', notificationTitle, 'y datos:', notificationOptions.data);
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-
-// [CÓDIGO FINAL REVISADO Y REFORZADO] - Manejador de clic en la notificación.
+// [CÓDIGO FINAL Y DEFINITIVO] - Manejador de clic en la notificación.
 self.addEventListener('notificationclick', (event) => {
-    console.log('[Service Worker] Notificación clickeada.');
+    console.log('[SW] Notificación clickeada.');
     event.notification.close();
 
-    // [CAMBIO CLAVE #2] - Construimos la URL de la forma más robusta.
-    // Usamos `self.registration.scope`, que es la URL base de tu PWA (ej: https://dominio.com/),
-    // y le añadimos el hash de destino. Esto siempre abre el punto de entrada correcto de la app.
-    const targetHash = event.notification.data.targetHash || '#';
-    const targetUrl = new URL(targetHash, self.registration.scope).href;
+    // [CAMBIO CLAVE #2] - Obtenemos la URL de destino, ya pre-construida, directamente de los datos.
+    let targetUrl = event.notification.data.url;
+    if (!targetUrl) {
+        console.error('[SW] URL de destino não encontrada. Abrindo a página inicial como fallback.');
+        // Como fallback de seguridad, abre la página de inicio.
+        targetUrl = self.registration.scope;
+    }
 
+    console.log(`[SW] Intentando abrir o enfocar: ${targetUrl}`);
+
+    // Este es el patrón correcto: buscar una ventana existente antes de abrir una nueva.
     event.waitUntil(
         clients.matchAll({
             type: 'window',
             includeUncontrolled: true
         }).then((clientList) => {
-            // 1. Buscamos si la app ya está abierta en alguna pestaña.
+            // 1. Busca una ventana de la app que ya esté abierta.
             for (const client of clientList) {
-                // Comparamos el origen (dominio) para encontrar la ventana correcta.
-                if (new URL(client.url).origin === new URL(self.registration.scope).origin && 'focus' in client) {
-                    console.log('App ya está abierta, navegando y enfocando:', targetUrl);
-                    // Si la encontramos, la dirigimos a la sección de notificaciones.
-                    client.navigate(targetUrl);
-                    // Y la traemos al frente.
-                    return client.focus();
+                // Comparamos el origen (dominio) para asegurarnos de que es nuestra app.
+                if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
+                    console.log('[SW] App encontrada. Navegando para a seção de notificações e focando.');
+                    // Si la encontramos, la dirigimos a la URL correcta y la traemos al frente.
+                    return client.navigate(targetUrl).then(c => c.focus());
                 }
             }
             
-            // 2. Si la app está cerrada, abrimos una nueva ventana en su URL principal con el hash.
+            // 2. Si el bucle termina y no se encontró ninguna ventana, la app está cerrada.
             if (clients.openWindow) {
-                console.log('App está cerrada, abriendo nueva ventana en:', targetUrl);
+                console.log('[SW] App não encontrada. Abrindo uma nova janela.');
+                // Abrimos la URL de destino que ya preparamos.
                 return clients.openWindow(targetUrl);
             }
+        }).catch(err => {
+            console.error('[SW] Erro no manejador de notificationclick:', err);
         })
     );
 });
