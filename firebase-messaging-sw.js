@@ -21,28 +21,31 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-    console.log("[SW Definitivo] Mensaje recibido: ", payload);
-    const notificationTitle = payload.data.title;
+    console.log("[SW CORREGIDO] Mensaje recibido: ", payload);
+    
+    // [CORRECCIÓN FINAL ANTI-CRASH] - Lee el título y el cuerpo de 'data' O de 'notification'.
+    // El '?' (optional chaining) evita el error si 'data' o 'notification' no existen.
+    const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
+    const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
+
     const notificationOptions = {
-        body: payload.data.body,
-        icon: payload.data.icon || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
+        body: notificationBody,
+        icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
         badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
         tag: 'lumix-cobrador-notification', // Evita notificaciones duplicadas
         data: {
-            // [CAMBIO CLAVE] Guardamos la URL completa y absoluta a la que debemos navegar.
-            // Esto elimina cualquier ambigüedad en el momento del clic.
+            // Guardamos la URL completa y absoluta a la que debemos navegar.
             url: new URL('#notifications', self.location.origin).href
         }
     };
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// [SOLUCIÓN DEFINITIVA FINAL]
+// [LÓGICA DE CLIC FINAL]
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW Definitivo] Notificación clickeada:', event.notification);
+    console.log('[SW CORREGIDO] Notificación clickeada:', event.notification);
     event.notification.close();
 
-    // La URL de destino ya la guardamos al recibir la notificación, así que solo la leemos.
     const targetUrl = event.notification.data.url;
 
     const promiseChain = clients.matchAll({
@@ -53,18 +56,18 @@ self.addEventListener('notificationclick', (event) => {
         for (let i = 0; i < windowClients.length; i++) {
             const client = windowClients[i];
             // Si encontramos la app, la enfocamos y la dirigimos a la URL.
-            // Usamos startsWith(scope) para asegurar que es nuestra PWA y no otra página.
             if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
-                console.log("[SW Definitivo] App encontrada, enfocando y navegando.");
+                console.log("[SW CORREGIDO] App encontrada, enfocando y navegando.");
                 return client.focus().then(c => c.navigate(targetUrl));
             }
         }
         // Si no hay ninguna ventana abierta, abrimos una nueva.
         if (clients.openWindow) {
-            console.log("[SW Definitivo] App no encontrada, abriendo nueva ventana.");
+            console.log("[SW CORREGIDO] App no encontrada, abriendo nueva ventana.");
             return clients.openWindow(targetUrl);
         }
     });
 
     event.waitUntil(promiseChain);
 });
+
