@@ -20,11 +20,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Este manejador está funcionando correctamente.
 messaging.onBackgroundMessage((payload) => {
-    console.log("[SW CORREGIDO] Mensaje recibido: ", payload);
-    
-    // [CORRECCIÓN FINAL ANTI-CRASH] - Lee el título y el cuerpo de 'data' O de 'notification'.
-    // El '?' (optional chaining) evita el error si 'data' o 'notification' no existen.
+    console.log("[SW FINAL] Mensaje recibido: ", payload);
+
     const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
     const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
 
@@ -35,38 +34,48 @@ messaging.onBackgroundMessage((payload) => {
         tag: 'lumix-cobrador-notification', // Evita notificaciones duplicadas
         data: {
             // Guardamos la URL completa y absoluta a la que debemos navegar.
-            url: new URL('#notifications', self.location.origin).href
+            url: new URL('/#notifications', self.location.origin).href
         }
     };
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// [LÓGICA DE CLIC FINAL]
+// [LÓGICA DE CLIC DEFINITIVA Y A PRUEBA DE FALLOS]
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW CORREGIDO] Notificación clickeada:', event.notification);
+    console.log('[SW FINAL] Notificación clickeada:', event.notification);
     event.notification.close();
 
     const targetUrl = event.notification.data.url;
 
+    // waitUntil() asegura que el Service Worker no termine antes de que completemos la acción.
     const promiseChain = clients.matchAll({
         type: 'window',
         includeUncontrolled: true
     }).then((windowClients) => {
-        // Revisa si ya hay una ventana de la app abierta.
+        let matchingClient = null;
+
+        // 1. Busca si ya hay una ventana/pestaña de la app abierta.
         for (let i = 0; i < windowClients.length; i++) {
             const client = windowClients[i];
-            // Si encontramos la app, la enfocamos y la dirigimos a la URL.
-            if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
-                console.log("[SW CORREGIDO] App encontrada, enfocando y navegando.");
-                return client.focus().then(c => c.navigate(targetUrl));
+            // Usamos el 'scope' para asegurarnos de que es nuestra PWA.
+            if (client.url.startsWith(self.registration.scope)) {
+                matchingClient = client;
+                break; // Encontramos una, no necesitamos buscar más.
             }
         }
-        // Si no hay ninguna ventana abierta, abrimos una nueva.
-        if (clients.openWindow) {
-            console.log("[SW CORREGIDO] App no encontrada, abriendo nueva ventana.");
-            return clients.openWindow(targetUrl);
+
+        // 2. Si encontramos una ventana abierta...
+        if (matchingClient) {
+            console.log("[SW FINAL] App encontrada. Navegando y enfocando.");
+            // La navegamos a la URL correcta y LUEGO la traemos al frente (focus).
+            return matchingClient.navigate(targetUrl).then((client) => client.focus());
         }
+        
+        // 3. Si no hay ninguna ventana abierta, abrimos una nueva.
+        console.log("[SW FINAL] App no encontrada. Abriendo nueva ventana.");
+        return clients.openWindow(targetUrl);
     });
 
     event.waitUntil(promiseChain);
 });
+
