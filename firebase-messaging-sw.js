@@ -22,66 +22,61 @@ const messaging = firebase.messaging();
 
 // Este manejador se activa cuando llega una notificación con la app en segundo plano
 messaging.onBackgroundMessage((payload) => {
-    console.log("[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ", payload);
+    console.log("[SW Final] Mensaje recibido en segundo plano: ", payload);
 
-    // Extraemos la información del payload "data"
     const notificationTitle = payload.data.title;
     const notificationOptions = {
         body: payload.data.body,
-        icon: payload.data.icon || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png', // Un ícono por si acaso
-        badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png', // Ícono para la barra de notificaciones de Android
-        
-        // [CAMBIO CLAVE] - Guardamos el "hash" de destino en lugar de una URL completa.
-        // Esto hace que el manejador de clics sea más robusto y flexible.
+        icon: payload.data.icon || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
+        badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
+        tag: 'lumix-cobrador-notification', // Evita notificaciones duplicadas
         data: {
             hash: '#notifications' 
         }
     };
 
-    // Mostramos la notificación
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 
-// [CÓDIGO ACTUALIZADO] - Este manejador se activa cuando el usuario hace clic en la notificación
+// [SOLUCIÓN DEFINITIVA PARA EL CLIC] - Este manejador se activa cuando el usuario hace clic en la notificación
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW] Notificación clickeada:', event.notification.data);
+    console.log('[SW Final] Notificación clickeada:', event.notification.data);
     
-    // Cierra la notificación
     event.notification.close();
 
-    // Construimos la URL de destino completa y segura.
-    // self.registration.scope es la URL base de tu PWA (ej: "https://cobrador.lumixartificial.com/")
-    // Le añadimos el hash para ir a la sección correcta.
     const targetHash = event.notification.data.hash || '#';
+    // self.registration.scope es la URL base de tu PWA (ej: "https://cobrador.lumixartificial.com/")
     const targetUrl = new URL(targetHash, self.registration.scope).href;
 
-    console.log(`[SW] URL de destino construida: ${targetUrl}`);
+    console.log(`[SW Final] URL de destino construida: ${targetUrl}`);
 
-    // event.waitUntil() asegura que el navegador no termine el service worker
-    // antes de que nuestra operación asíncrona se complete.
     event.waitUntil(
         (async () => {
-            // Buscamos si ya hay una ventana o pestaña de nuestra app abierta.
             const clientList = await clients.matchAll({
                 type: "window",
                 includeUncontrolled: true 
             });
 
-            // 1. Si encontramos una ventana abierta, la enfocamos y la dirigimos a la sección correcta.
+            // 1. Revisa si la app ya está abierta en alguna pestaña.
             for (const client of clientList) {
-                // Comparamos el `scope` para asegurarnos de que es nuestra PWA
                 if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
-                    console.log('[SW] App encontrada. Navegando y enfocando.');
+                    console.log('[SW Final] App ya está abierta. Navegando y enfocando.');
                     await client.navigate(targetUrl);
                     return client.focus();
                 }
             }
 
-            // 2. Si el bucle termina, significa que la app está cerrada. La abrimos.
+            // 2. Si no hay ninguna pestaña abierta, la abrimos.
+            // ESTA ES LA LÓGICA MÁS ROBUSTA PARA ANDROID CUANDO LA APP ESTÁ CERRADA:
             if (clients.openWindow) {
-                console.log('[SW] App no encontrada. Abriendo una nueva ventana.');
-                return clients.openWindow(targetUrl);
+                console.log('[SW Final] App no encontrada. Abriendo una nueva ventana.');
+                // Primero, abre la app en su URL base (el "scope").
+                const windowClient = await clients.openWindow(self.registration.scope);
+                // Una vez que la ventana está abierta y lista, la dirigimos a la sección correcta.
+                if (windowClient) {
+                    return windowClient.navigate(targetUrl);
+                }
             }
         })()
     );
