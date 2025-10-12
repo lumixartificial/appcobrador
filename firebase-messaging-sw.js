@@ -22,7 +22,7 @@ const messaging = firebase.messaging();
 
 // Este manejador está funcionando correctamente.
 messaging.onBackgroundMessage((payload) => {
-    console.log("[SW ULTIMATE] Mensaje recibido: ", payload);
+    console.log("[SW FINAL-DEFINITIVO] Mensaje recibido: ", payload);
 
     const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
     const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
@@ -40,32 +40,35 @@ messaging.onBackgroundMessage((payload) => {
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// [LÓGICA DE CLIC FINAL Y SIMPLIFICADA]
+// [LÓGICA DE CLIC FINAL Y ROBUSTA]
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW ULTIMATE] Notificación clickeada:', event.notification);
+    console.log('[SW FINAL-DEFINITIVO] Notificación clickeada:', event.notification);
     event.notification.close();
 
     const targetUrl = event.notification.data.url;
 
-    // Esta es la forma más directa y compatible de abrir la ventana.
-    // Si la app ya está abierta, la enfoca. Si no, la abre.
-    // Es una sola acción, lo que reduce la posibilidad de error.
+    // waitUntil() asegura que el Service Worker no termine antes de que completemos la acción.
     const promiseChain = clients.matchAll({
-        type: 'window',
+        type: "window",
         includeUncontrolled: true
-    }).then((windowClients) => {
-        for (let i = 0; i < windowClients.length; i++) {
-            const client = windowClients[i];
-            if (client.url === targetUrl && 'focus' in client) {
-                return client.focus();
+    }).then((clientList) => {
+        // 1. Revisa si hay una ventana de la app ya abierta.
+        for (const client of clientList) {
+            // Busca la primera ventana disponible de nuestra app.
+            if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
+                console.log("[SW FINAL-DEFINITIVO] App ya está abierta. Navegando y enfocando.");
+                // La dirige a la URL correcta y LUEGO la trae al frente.
+                return client.navigate(targetUrl).then(c => c.focus());
             }
         }
+
+        // 2. Si no se encontró ninguna ventana, abre una nueva.
         if (clients.openWindow) {
+            console.log("[SW FINAL-DEFINITIVO] App no encontrada. Abriendo nueva ventana.");
             return clients.openWindow(targetUrl);
         }
     });
 
     event.waitUntil(promiseChain);
 });
-
 
