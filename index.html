@@ -515,63 +515,39 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        async function setupFCM() {
-    try {
-        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-            console.warn("Push notifications are not fully supported in this browser.");
-            return;
-        }
+        async function setupFCM(collectorId) {
+            try {
+                if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+                    console.warn("Las notificaciones push no son soportadas en este navegador.");
+                    return;
+                }
 
-        // --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
-        // Esperamos a que el Service Worker esté completamente registrado y activo.
-        // Esto resuelve el error "no active Service Worker".
-        await navigator.serviceWorker.ready;
-        console.log("Service Worker está ativo e pronto.");
+                const messaging = getMessaging(app);
+                
+                // Solicita permiso
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    showToast('Permiso de notificaciones denegado.', true);
+                    return;
+                }
 
-        const messaging = getMessaging(app);
+                const VAPID_KEY = "BAgKWBzKi_Z4eyNNgGtprgPRQhPzU2MqU1vyrHf0iQSMxy1UMkin4E3GJ7KQLtChcDJHtEx8mMYau4jtzQvtjfw";
+                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
 
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            console.log('Unable to get permission to notify.');
-            return;
-        }
+                if (currentToken) {
+                    const collectorRef = doc(db, 'collectors', collectorId);
+                    await updateDoc(collectorRef, { fcmTokens: arrayUnion(currentToken) });
+                    console.log('Token de notificação obtido e salvo.');
+                } else {
+                    console.log('Não foi possível obter o token. Verifique a configuração do Service Worker.');
+                    showToast('Falha ao obter token de notificação.', true);
+                }
 
-        if (FCM_VAPID_KEY === "SUA_VAPID_KEY_AQUI") {
-             console.warn("Firebase VAPID key is not set. Push notifications will not work.");
-             return;
-        }
-
-        const currentToken = await getToken(messaging, { vapidKey: FCM_VAPID_KEY });
-        if (currentToken) {
-            const existingTokens = currentClient.fcmTokens || [];
-            if (!existingTokens.includes(currentToken)) {
-                const clientRef = doc(db, 'clients', currentClient.id);
-                await updateDoc(clientRef, { fcmTokens: arrayUnion(currentToken) });
-                console.log('FCM token salvo.');
-            }
-        }
-
-        onMessage(messaging, (payload) => {
-            console.log('Notificação recebida em primeiro plano:', payload);
-            // Aseguramos que lea desde payload.data como lo corregimos antes
-            showToast(`${payload.data.title}: ${payload.data.body}`);
-        });
-
-    } catch (err) {
-        // Este es el error que estabas viendo. Ahora no debería ocurrir.
-        console.error('Ocorreu um erro ao configurar as notificações push:', err);
-    }
-}
-
-                // ...
-onMessage(messaging, (payload) => {
-    console.log('Notificação recebida em primeiro plano:', payload);
-    // --- CORRECCIÓN ---
-    // Ahora lee el título y el cuerpo desde "payload.data", que es la estructura correcta.
-    showToast(`${payload.data.title}: ${payload.data.body}`);
-    updateNotifications();
-});
-// ...
+                onMessage(messaging, (payload) => {
+                    console.log('Notificação recebida em primeiro plano:', payload);
+                    showToast(`${payload.notification.title}: ${payload.notification.body}`);
+                    updateNotifications();
+                });
 
             } catch (err) {
                 console.error('Ocorreu um erro ao configurar as notificações push:', err);
@@ -3413,5 +3389,6 @@ onMessage(messaging, (payload) => {
     </script>
 </body>
 </html>
+
 
 
