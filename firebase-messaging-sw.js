@@ -21,59 +21,57 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// [SIN CAMBIOS] - Este manejador se activa cuando llega una notificación con la app en segundo plano.
-// Tu lógica original para mostrar la notificación se mantiene intacta.
+// [CÓDIGO MEJORADO] - Manejador para notificaciones en segundo plano.
 messaging.onBackgroundMessage((payload) => {
     console.log("[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ", payload);
 
-    // Extraemos la información del payload "data"
     const notificationTitle = payload.data.title;
     const notificationOptions = {
         body: payload.data.body,
-        icon: payload.data.icon || '/favicon.ico', // Un ícono por defecto
-        badge: '/badge-icon.png', // Ícono para la barra de notificaciones de Android
-        // Es importante pasar los datos a la notificación para usarlos en el 'click'
+        icon: payload.data.icon || '/favicon.ico',
+        badge: '/badge-icon.png',
+        // [CAMBIO CLAVE] - Hacemos la URL de destino explícita para evitar ambigüedades.
+        // Apuntamos directamente al archivo HTML principal con el hash de la vista.
         data: {
-            url: '/#notifications' // URL a la que queremos navegar
+            url: './app_cobrador.html#notifications'
         }
     };
 
-    // Mostramos la notificación
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 
-// [CÓDIGO ACTUALIZADO] - Este manejador se activa cuando el usuario hace clic en la notificación.
-// Esta es la sección que ha sido mejorada para abrir o enfocar la app.
+// [CÓDIGO DEFINITIVO] - Este manejador se activa cuando el usuario hace clic en la notificación.
+// Esta versión es más robusta para asegurar que la app se abra o se enfoque correctamente en todos los dispositivos.
 self.addEventListener('notificationclick', (event) => {
     console.log('[Service Worker] Notificación clickeada.');
-
-    // Cierra la notificación para que no se quede en la barra
     event.notification.close();
 
-    // La URL a la que queremos ir dentro de la app (la pestaña de notificaciones).
+    // Construimos la URL completa y absoluta a la que queremos navegar.
     const targetUrl = new URL(event.notification.data.url, self.location.origin).href;
 
-    // event.waitUntil() asegura que el navegador no termine el service worker
-    // antes de que nuestra operación de abrir la ventana se complete.
+    // event.waitUntil() asegura que el Service Worker no se termine antes de que la operación se complete.
     event.waitUntil(
         clients.matchAll({
             type: 'window',
-            includeUncontrolled: true // Asegura que busquemos en todas las pestañas
+            includeUncontrolled: true
         }).then((clientList) => {
-            // Revisa si alguna de las pestañas abiertas ya corresponde a nuestra app
+            // 1. Buscamos si ya hay una ventana de nuestra app abierta.
             for (const client of clientList) {
-                // Si encontramos una pestaña abierta de nuestra app y se puede "enfocar"
+                // Verificamos si la ventana es del mismo origen (nuestro sitio) y puede ser enfocada.
                 if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
-                    // ¡La app ya está abierta!
-                    // Primero, la dirigimos a la sección de notificaciones
+                    console.log('App ya está abierta, navegando a la sección y enfocando.');
+                    // Si la encontramos, la dirigimos a la URL correcta (la pestaña de notificaciones).
                     client.navigate(targetUrl);
-                    // Y luego la traemos al frente para que el usuario la vea.
+                    // Y lo más importante, la traemos al frente para que el usuario la vea.
                     return client.focus();
                 }
             }
-            // Si el bucle termina sin encontrar una pestaña abierta, abrimos una nueva.
+            
+            // 2. Si el bucle termina y no encontró ninguna ventana, significa que la app está cerrada.
             if (clients.openWindow) {
+                console.log('App está cerrada, abriendo una nueva ventana.');
+                // Abrimos una nueva ventana directamente en la URL de destino.
                 return clients.openWindow(targetUrl);
             }
         })
