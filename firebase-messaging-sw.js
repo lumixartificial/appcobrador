@@ -20,74 +20,61 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// [CÓDIGO REFORZADO FINAL] - Manejador para notificaciones en segundo plano.
-messaging.onBackgroundMessage(async (payload) => {
-    console.log("[SW Final] Mensaje recibido:", payload);
+// Manejador para notificaciones en segundo plano.
+messaging.onBackgroundMessage((payload) => {
+    console.log("[firebase-messaging-sw.js] Mensaje recibido en segundo plano: ", payload);
 
-    const notificationTitle = payload.data?.title || 'Nova Notificação';
-    const notificationBody = payload.data?.body || 'Você recebeu uma nova notificação.';
-    const targetUrl = new URL('#notifications', self.registration.scope).href;
-
+    const notificationTitle = payload.data.title;
     const notificationOptions = {
-        body: notificationBody,
-        // Usamos URLs absolutas para los íconos para máxima compatibilidad
-        icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
-        badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
-        
-        // [FIX DUPLICADOS] - La 'tag' asegura que solo haya una notificación de este tipo a la vez.
-        // Si el sistema muestra una y luego nuestro código muestra otra, esta la reemplazará.
-        tag: 'lumix-cobrador-notification',
-        renotify: true, // Permite que el dispositivo vibre o suene de nuevo al reemplazar.
-
+        body: payload.data.body,
+        icon: payload.data.icon || '/favicon.ico',
+        badge: '/badge-icon.png',
+        // [CAMBIO CLAVE #1] - Almacenamos una ruta relativa simple, sin './'.
+        // Esto es más limpio y menos propenso a errores de interpretación.
         data: {
-            url: targetUrl // Guardamos la URL completa para el evento 'notificationclick'
+            url: 'app_cobrador.html#notifications'
         }
     };
 
-    console.log('[SW Final] Mostrando notificación controlada:', notificationTitle);
-    await self.registration.showNotification(notificationTitle, notificationOptions);
+    return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 
-// [SOLUCIÓN DEFINITIVA PARA EL CLIC] - Manejador de clic en la notificación.
+// [CÓDIGO FINAL Y DEFINITIVO] - Manejador de clic en la notificación.
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW Final] Notificación clickeada:', event.notification.data);
+    console.log('[Service Worker] Notificación clickeada.');
     event.notification.close();
 
-    const targetUrl = event.notification.data.url;
-    if (!targetUrl) {
-        console.error('[SW Final] URL no encontrada en los datos de la notificación.');
-        return;
-    }
+    // [CAMBIO CLAVE #2] - Construimos la URL de destino de la forma más robusta posible.
+    // `self.registration.scope` es la URL base de la PWA, garantizando que siempre apuntemos al lugar correcto.
+    const targetUrl = new URL(event.notification.data.url, self.registration.scope).href;
 
-    // `waitUntil` asegura que el Service Worker se mantenga activo hasta que la acción se complete.
+    // event.waitUntil() asegura que el Service Worker no se termine antes de que la operación se complete.
     event.waitUntil(
-        (async () => {
-            const clientList = await clients.matchAll({
-                type: "window",
-                includeUncontrolled: true
-            });
-
-            // 1. Revisa si la app ya está abierta en alguna pestaña.
+        clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        }).then((clientList) => {
+            // 1. Buscamos si ya hay una ventana de nuestra app abierta.
             for (const client of clientList) {
-                if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
-                    console.log('[SW Final] App ya está abierta. Navegando y enfocando.');
-                    // La trae al frente y la navega a la sección correcta.
-                    await client.navigate(targetUrl);
+                // Verificamos si la ventana es del mismo origen (nuestro sitio) y puede ser enfocada.
+                if (new URL(client.url).origin === new URL(self.registration.scope).origin && 'focus' in client) {
+                    console.log('App ya está abierta, navegando a la sección y enfocando.', targetUrl);
+                    // Si la encontramos, la dirigimos a la URL correcta (la pestaña de notificaciones).
+                    client.navigate(targetUrl);
+                    // Y lo más importante, la traemos al frente para que el usuario la vea.
                     return client.focus();
                 }
             }
-
-            // 2. Si no hay ninguna pestaña abierta, abre una nueva.
+            
+            // 2. Si el bucle termina y no encontró ninguna ventana, significa que la app está cerrada.
             if (clients.openWindow) {
-                console.log('[SW Final] App no encontrada. Abriendo una nueva ventana.');
-                // Este método es el más robusto para Android: abre la app y LUEGO navega.
-                const windowClient = await clients.openWindow(self.registration.scope);
-                if (windowClient) {
-                    return windowClient.navigate(targetUrl);
-                }
+                console.log('App está cerrada, abriendo una nueva ventana.', targetUrl);
+                // Abrimos una nueva ventana directamente en la URL de destino.
+                return clients.openWindow(targetUrl);
             }
-        })()
+        })
     );
 });
+
 
