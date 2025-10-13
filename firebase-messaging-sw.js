@@ -21,7 +21,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-const SW_VERSION = "v1.9-stable";
+const SW_VERSION = "v2.0-final";
 console.log(`Service Worker ${SW_VERSION} cargado.`);
 
 self.addEventListener('install', (event) => {
@@ -34,34 +34,45 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// SE HA ELIMINADO EL CÓDIGO 'onBackgroundMessage' POR COMPLETO.
-// Esto evita la duplicación. El navegador mostrará la notificación enviada desde el servidor.
+// --- CORREÇÃO DEFINITIVA: Restaurar onBackgroundMessage ---
+// Este código recebe os DADOS do servidor e é RESPONSÁVEL por MOSTRAR a notificação.
+messaging.onBackgroundMessage((payload) => {
+    console.log(`[SW ${SW_VERSION}] Mensaje de fondo recibido:`, payload);
+
+    const notificationTitle = payload.data.title;
+    const notificationOptions = {
+        body: payload.data.body,
+        icon: payload.data.icon,
+        tag: `notif-${Date.now()}`,
+        data: { // Passamos a URL para o evento de clique
+            url: payload.data.url 
+        }
+    };
+
+    return self.registration.showNotification(notificationTitle, notificationOptions);
+});
 
 self.addEventListener('notificationclick', (event) => {
     console.log(`[SW ${SW_VERSION}] Evento 'notificationclick' DETECTADO.`);
     event.notification.close();
 
-    // Lee la URL del objeto 'data' enviado desde la Cloud Function.
+    // Agora 'targetUrl' terá o valor correto porque o passamos em 'showNotification'.
     const targetUrl = event.notification.data.url;
     if (!targetUrl) {
-        console.error(`[SW ${SW_VERSION}] No se encontró URL en los datos de la notificación.`);
-        return;
+        console.error(`[SW ${SW_VERSION}] No se encontró URL. Abriendo página principal.`);
+        return event.waitUntil(clients.openWindow(self.location.origin));
     }
 
-    const promiseChain = clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-    }).then((windowClients) => {
+    const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((windowClients) => {
         for (const client of windowClients) {
-            // Si encuentra una pestaña de la app, la enfoca.
             if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
-                console.log(`[SW ${SW_VERSION}] Se encontró una ventana abierta. Navegando y enfocando.`);
+                console.log(`[SW ${SW_VERSION}] Ventana encontrada. Navegando y enfocando: ${targetUrl}`);
                 return client.navigate(targetUrl).then(c => c.focus());
             }
         }
-        // Si no hay ninguna pestaña abierta, abre una nueva en la URL correcta.
         if (clients.openWindow) {
-            console.log(`[SW ${SW_VERSION}] No se encontraron ventanas. Abriendo una nueva en: ${targetUrl}`);
+            console.log(`[SW ${SW_VERSION}] Abriendo nueva ventana en: ${targetUrl}`);
             return clients.openWindow(targetUrl);
         }
     });
