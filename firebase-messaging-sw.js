@@ -21,9 +21,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-const SW_VERSION = "v1.4-actions"; // Para verificar qué versión está activa
-console.log(`Service Worker ${SW_VERSION} loaded.`);
-
+const SW_VERSION = "v1.5-direct-open"; // Nueva versión para depuración
+console.log(`Service Worker ${SW_VERSION} cargado.`);
 
 messaging.onBackgroundMessage((payload) => {
     console.log(`[SW ${SW_VERSION}] Mensaje de fondo recibido:`, payload);
@@ -37,13 +36,11 @@ messaging.onBackgroundMessage((payload) => {
         body: notificationBody,
         icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
         badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
-        tag: 'lumix-notification-tag',
+        // --- CAMBIO #1: Etiqueta única para cada notificación ---
+        tag: `lumix-notification-${Date.now()}`,
         data: {
             url: targetUrl.href
         },
-        // --- LA SOLUCIÓN CLAVE ---
-        // Agregar 'actions' fuerza al navegador a tratar la notificación como interactiva,
-        // lo que hace que el evento 'notificationclick' sea mucho más confiable.
         actions: [
             { action: 'open_app', title: 'Abrir Aplicativo' }
         ]
@@ -52,39 +49,33 @@ messaging.onBackgroundMessage((payload) => {
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
+// --- CAMBIO #2: Lógica de clic simplificada y más robusta ---
 self.addEventListener('notificationclick', (event) => {
-    console.log(`[SW ${SW_VERSION}] Notificación clickeada. Acción:`, event.action);
-    event.notification.close(); // Cierra la notificación
+    console.log(`[SW ${SW_VERSION}] Evento 'notificationclick' DETECTADO.`);
+    event.notification.close();
 
     const targetUrl = event.notification.data.url;
     if (!targetUrl) {
-        console.error(`[SW ${SW_VERSION}] No se encontró URL en los datos de la notificación.`);
+        console.error(`[SW ${SW_VERSION}] No se encontró URL en los datos. No se puede abrir la ventana.`);
         return;
     }
 
-    // Lógica para encontrar y enfocar la ventana existente o abrir una nueva.
-    const promiseChain = clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-    }).then((windowClients) => {
-        for (let i = 0; i < windowClients.length; i++) {
-            const windowClient = windowClients[i];
-            if (new URL(windowClient.url).origin === new URL(targetUrl).origin && 'focus' in windowClient) {
-                console.log(`[SW ${SW_VERSION}] App ya abierta. Navegando y enfocando.`);
-                return windowClient.navigate(targetUrl).then(client => client.focus());
-            }
-        }
-
-        if (clients.openWindow) {
-            console.log(`[SW ${SW_VERSION}] App no encontrada. Abriendo nueva ventana.`);
-            return clients.openWindow(targetUrl);
+    // En lugar de buscar ventanas existentes, abrimos una nueva directamente.
+    // Esto es más confiable en todos los navegadores.
+    const promiseChain = clients.openWindow(targetUrl).then(windowClient => {
+        if (windowClient) {
+            console.log(`[SW ${SW_VERSION}] Ventana abierta o enfocada con éxito.`);
+            return windowClient.focus();
+        } else {
+            console.log(`[SW ${SW_VERSION}] No se pudo abrir la ventana.`);
         }
     }).catch(err => {
-        console.error(`[SW ${SW_VERSION}] Error al manejar el clic en la notificación:`, err);
+        console.error(`[SW ${SW_VERSION}] Error al intentar abrir la ventana:`, err);
     });
 
     event.waitUntil(promiseChain);
 });
+
 
 
 
