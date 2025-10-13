@@ -27,8 +27,9 @@ messaging.onBackgroundMessage((payload) => {
     const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
     const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
     
-    // La URL de la app que envió la notificación (cliente o cobrador)
-    const appOrigin = new URL(payload.data.origin || self.location.origin).origin;
+    // MODIFICACIÓN: Usar siempre el origen del Service Worker actual.
+    // Esto garantiza que la notificación siempre abra la aplicación correcta (cliente o cobrador).
+    const appOrigin = self.location.origin;
 
     const notificationOptions = {
         body: notificationBody,
@@ -72,3 +73,5 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(promiseChain);
 });
+
+
