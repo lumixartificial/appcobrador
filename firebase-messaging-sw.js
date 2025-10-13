@@ -21,66 +21,71 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
-    console.log("[SW] Mensaje de fondo recibido: ", payload);
+const SW_VERSION = "v1.4-actions"; // Para verificar qué versión está activa
+console.log(`Service Worker ${SW_VERSION} loaded.`);
 
-    const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
-    const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
-    
+
+messaging.onBackgroundMessage((payload) => {
+    console.log(`[SW ${SW_VERSION}] Mensaje de fondo recibido:`, payload);
+
+    const notificationTitle = payload.data?.title || 'Nova Notificação';
+    const notificationBody = payload.data?.body || 'Você tem uma nova atividade.';
     const appOrigin = self.location.origin;
+    const targetUrl = new URL('/#notifications', appOrigin);
 
     const notificationOptions = {
         body: notificationBody,
         icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
         badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
-        tag: 'lumix-notification',
+        tag: 'lumix-notification-tag',
         data: {
-            url: new URL('/#notifications', appOrigin).href
-        }
+            url: targetUrl.href
+        },
+        // --- LA SOLUCIÓN CLAVE ---
+        // Agregar 'actions' fuerza al navegador a tratar la notificación como interactiva,
+        // lo que hace que el evento 'notificationclick' sea mucho más confiable.
+        actions: [
+            { action: 'open_app', title: 'Abrir Aplicativo' }
+        ]
     };
+
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// [NUEVA LÓGICA DE CLIC - MÁS ROBUSTA Y CON LOGS]
-self.addEventListener('notificationclick', function(event) {
-    console.log('[SW] Evento notificationclick DETECTADO.');
-    event.notification.close();
+self.addEventListener('notificationclick', (event) => {
+    console.log(`[SW ${SW_VERSION}] Notificación clickeada. Acción:`, event.action);
+    event.notification.close(); // Cierra la notificación
 
-    let targetUrl = event.notification.data.url;
-    console.log('[SW] URL de destino extraída:', targetUrl);
-
+    const targetUrl = event.notification.data.url;
     if (!targetUrl) {
-        console.warn('[SW] No se encontró URL en los datos, usando el origen como fallback.');
-        targetUrl = self.location.origin;
+        console.error(`[SW ${SW_VERSION}] No se encontró URL en los datos de la notificación.`);
+        return;
     }
 
+    // Lógica para encontrar y enfocar la ventana existente o abrir una nueva.
     const promiseChain = clients.matchAll({
         type: 'window',
         includeUncontrolled: true
-    }).then(function(windowClients) {
-        console.log('[SW] Buscando ventanas de cliente abiertas. Encontradas:', windowClients.length);
-        let matchingClient = null;
+    }).then((windowClients) => {
         for (let i = 0; i < windowClients.length; i++) {
             const windowClient = windowClients[i];
-            if (new URL(windowClient.url).origin === new URL(targetUrl).origin) {
-                matchingClient = windowClient;
-                console.log('[SW] Se encontró una ventana compatible:', windowClient.url);
-                break;
+            if (new URL(windowClient.url).origin === new URL(targetUrl).origin && 'focus' in windowClient) {
+                console.log(`[SW ${SW_VERSION}] App ya abierta. Navegando y enfocando.`);
+                return windowClient.navigate(targetUrl).then(client => client.focus());
             }
         }
 
-        if (matchingClient) {
-            console.log('[SW] Enfocando y navegando ventana existente.');
-            return matchingClient.navigate(targetUrl).then(client => client.focus());
-        } else {
-            console.log('[SW] No se encontró ventana, abriendo una nueva.');
+        if (clients.openWindow) {
+            console.log(`[SW ${SW_VERSION}] App no encontrada. Abriendo nueva ventana.`);
             return clients.openWindow(targetUrl);
         }
-    }).catch(function(err) {
-        console.error('[SW] Error en la cadena de promesas de notificationclick:', err);
+    }).catch(err => {
+        console.error(`[SW ${SW_VERSION}] Error al manejar el clic en la notificación:`, err);
     });
 
     event.waitUntil(promiseChain);
 });
+
+
 
 
