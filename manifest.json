@@ -1,5 +1,4 @@
-// v2
-
+// Importamos los scripts de Firebase necesarios
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
 
@@ -63,4 +62,3 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(promiseChain);
 });
-
