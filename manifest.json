@@ -1,64 +1,23 @@
-// Importamos los scripts de Firebase necesarios
-importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
-
-// Usa la misma configuración de Firebase de tu app
-const firebaseConfig = {
-    apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
-    authDomain: "lumix-financas-app.firebaseapp.com",
-    projectId: "lumix-financas-app",
-    storageBucket: "lumix-financas-app.appspot.com",
-    messagingSenderId: "463777495321",
-    appId: "1:463777495321:web:106118f56abd206ed88"
-};
-
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
-    console.log("[SW CORREGIDO FINAL] Mensaje recibido: ", payload);
-
-    const notificationTitle = payload.data?.title || payload.notification?.title || 'Nova Notificação';
-    const notificationBody = payload.data?.body || payload.notification?.body || 'Você recebeu uma nova notificação.';
-    
-    // [LA CORRECCIÓN DEFINITIVA A PRUEBA DE FALLOS]
-    // Usamos 'optional chaining' (?.) para evitar que el script se rompa si 'payload.data' no existe.
-    const appOrigin = new URL(payload.data?.origin || self.location.origin).origin;
-
-    const notificationOptions = {
-        body: notificationBody,
-        icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
-        badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
-        tag: 'lumix-notification',
-        data: {
-            url: new URL('/#notifications', appOrigin).href
-        }
-    };
-    return self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// [LÓGICA DE CLIC FINAL Y ROBUSTA]
-self.addEventListener('notificationclick', (event) => {
-    console.log('[SW CORREGIDO FINAL] Notificación clickeada:', event.notification);
-    event.notification.close();
-
-    const targetUrl = event.notification.data.url;
-
-    const promiseChain = clients.matchAll({
-        type: "window",
-        includeUncontrolled: true
-    }).then((clientList) => {
-        for (const client of clientList) {
-            if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
-                console.log("[SW CORREGIDO FINAL] App ya está abierta. Navegando y enfocando.");
-                return client.navigate(targetUrl).then(c => c.focus());
-            }
-        }
-        if (clients.openWindow) {
-            console.log("[SW CORREGIDO FINAL] App no encontrada. Abriendo nueva ventana.");
-            return clients.openWindow(targetUrl);
-        }
-    });
-
-    event.waitUntil(promiseChain);
-});
+{
+  "name": "Portal Cobrador",
+  "short_name": "Portal Cobrador",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#6f42c1",
+  "description": "Portal do Cobrador da LUMIX Finanças.",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
