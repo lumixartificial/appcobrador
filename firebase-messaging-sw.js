@@ -21,73 +21,74 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-const SW_VERSION = "v1.6-final-attempt"; // Final version for debugging
+const SW_VERSION = "v1.7-claim-clients";
 console.log(`Service Worker ${SW_VERSION} cargado.`);
 
-messaging.onBackgroundMessage((payload) => {
-    console.log(`[SW ${SW_VERSION}] Mensaje de fondo recibido. Payload completo:`, payload);
+// --- CAMBIO #1: Forzar la activación inmediata del nuevo Service Worker ---
+self.addEventListener('install', (event) => {
+  console.log(`[SW ${SW_VERSION}] Instalando nueva versión...`);
+  event.waitUntil(self.skipWaiting());
+});
 
-    // Priorizamos los datos enviados en el 'data' payload, que nos da control total.
+// --- CAMBIO #2: El nuevo Service Worker toma control de todas las pestañas ---
+self.addEventListener('activate', (event) => {
+  console.log(`[SW ${SW_VERSION}] Activado y tomando control.`);
+  event.waitUntil(self.clients.claim());
+});
+
+
+messaging.onBackgroundMessage((payload) => {
+    console.log(`[SW ${SW_VERSION}] Mensaje de fondo recibido:`, payload);
+
     const notificationData = payload.data || {};
     const notificationTitle = notificationData.title || 'Nova Notificação';
     const notificationBody = notificationData.body || 'Você tem uma nova atividade.';
+    const notificationIcon = notificationData.profilePictureUrl || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png';
     
-    const targetUrl = self.location.origin + '/#notifications';
+    const targetUrl = self.location.origin;
 
     const notificationOptions = {
         body: notificationBody,
-        icon: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
+        icon: notificationIcon,
         badge: 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png',
-        tag: `lumix-notification-${Date.now()}`, // Tag única para evitar problemas de agrupamiento
+        tag: `lumix-notification-${Date.now()}`,
         data: {
             url: targetUrl
         },
-        // --- CAMBIOS CLAVE PARA FORZAR LA INTERACTIVIDAD ---
-        actions: [
-            { action: 'open_app', title: 'Abrir Aplicativo' }
-        ],
-        requireInteraction: true // Mantiene la notificación visible hasta que el usuario interactúe
+        actions: [ { action: 'open_app', title: 'Abrir Aplicativo' } ],
+        requireInteraction: true
     };
     
-    console.log(`[SW ${SW_VERSION}] Mostrando notificación con título: "${notificationTitle}" y opciones:`, notificationOptions);
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 self.addEventListener('notificationclick', (event) => {
-    console.log(`[SW ${SW_VERSION}] EVENTO 'notificationclick' ¡¡¡DETECTADO!!!`);
-    console.log(`[SW ${SW_VERSION}] Acción: ${event.action}`);
-    
-    // Cerramos la notificación inmediatamente
+    console.log(`[SW ${SW_VERSION}] Evento 'notificationclick' DETECTADO.`);
     event.notification.close();
 
     const targetUrl = event.notification.data.url;
-    console.log(`[SW ${SW_VERSION}] URL de destino: ${targetUrl}`);
-
     if (!targetUrl) {
-        console.error(`[SW ${SW_VERSION}] No se encontró URL en los datos. No se puede abrir la ventana.`);
+        console.error(`[SW ${SW_VERSION}] No se encontró URL en los datos.`);
         return;
     }
 
-    // Lógica para abrir la ventana. Buscamos una ventana existente para enfocarla.
+    // Esta lógica ahora funcionará porque el SW tiene el control
     const promiseChain = clients.matchAll({
         type: 'window',
         includeUncontrolled: true
     }).then((windowClients) => {
-        
         for (const client of windowClients) {
-            // Compara el origen (https://app.com) en lugar de la URL completa
+            // Si encuentra una pestaña de la app, la enfoca.
             if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
-                console.log(`[SW ${SW_VERSION}] Se encontró una ventana abierta. Navegando y enfocando.`);
-                return client.navigate(targetUrl).then(c => c.focus());
+                console.log(`[SW ${SW_VERSION}] Se encontró una ventana abierta. Enfocando.`);
+                return client.focus();
             }
         }
-        
-        // Si no se encontró ninguna ventana, abrimos una nueva.
-        console.log(`[SW ${SW_VERSION}] No se encontraron ventanas abiertas. Abriendo una nueva.`);
-        return clients.openWindow(targetUrl);
-
-    }).catch(err => {
-        console.error(`[SW ${SW_VERSION}] Error al manejar el clic en la notificación:`, err);
+        // Si no hay ninguna pestaña abierta, abre una nueva.
+        if (clients.openWindow) {
+            console.log(`[SW ${SW_VERSION}] No se encontraron ventanas. Abriendo una nueva.`);
+            return clients.openWindow(targetUrl);
+        }
     });
 
     event.waitUntil(promiseChain);
