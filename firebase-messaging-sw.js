@@ -21,16 +21,14 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-const SW_VERSION = "v1.7-claim-clients";
+const SW_VERSION = "v1.8-sync-icon";
 console.log(`Service Worker ${SW_VERSION} cargado.`);
 
-// --- CAMBIO #1: Forzar la activación inmediata del nuevo Service Worker ---
 self.addEventListener('install', (event) => {
   console.log(`[SW ${SW_VERSION}] Instalando nueva versión...`);
   event.waitUntil(self.skipWaiting());
 });
 
-// --- CAMBIO #2: El nuevo Service Worker toma control de todas las pestañas ---
 self.addEventListener('activate', (event) => {
   console.log(`[SW ${SW_VERSION}] Activado y tomando control.`);
   event.waitUntil(self.clients.claim());
@@ -40,10 +38,16 @@ self.addEventListener('activate', (event) => {
 messaging.onBackgroundMessage((payload) => {
     console.log(`[SW ${SW_VERSION}] Mensaje de fondo recibido:`, payload);
 
+    // --- CORRECCIÓN CLAVE PARA USAR LA FOTO DEL CLIENTE ---
+    const notificationPayload = payload.notification || {};
     const notificationData = payload.data || {};
-    const notificationTitle = notificationData.title || 'Nova Notificação';
-    const notificationBody = notificationData.body || 'Você tem uma nova atividade.';
-    const notificationIcon = notificationData.profilePictureUrl || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png';
+    
+    const notificationTitle = notificationData.title || notificationPayload.title || 'Nova Notificação';
+    const notificationBody = notificationData.body || notificationPayload.body || 'Você tem uma nova atividade.';
+    
+    // Priorizamos el icono que envía el servidor en el payload 'notification'.
+    // Esto asegura que nuestra notificación funcional use la foto del cliente.
+    const notificationIcon = notificationPayload.icon || notificationData.profilePictureUrl || 'https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png';
     
     const targetUrl = self.location.origin;
 
@@ -72,19 +76,16 @@ self.addEventListener('notificationclick', (event) => {
         return;
     }
 
-    // Esta lógica ahora funcionará porque el SW tiene el control
     const promiseChain = clients.matchAll({
         type: 'window',
         includeUncontrolled: true
     }).then((windowClients) => {
         for (const client of windowClients) {
-            // Si encuentra una pestaña de la app, la enfoca.
             if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
                 console.log(`[SW ${SW_VERSION}] Se encontró una ventana abierta. Enfocando.`);
                 return client.focus();
             }
         }
-        // Si no hay ninguna pestaña abierta, abre una nueva.
         if (clients.openWindow) {
             console.log(`[SW ${SW_VERSION}] No se encontraron ventanas. Abriendo una nueva.`);
             return clients.openWindow(targetUrl);
