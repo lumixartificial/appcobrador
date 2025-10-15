@@ -3353,6 +3353,14 @@
                     }
                 });
             }
+
+            const closeInstallBtn = document.getElementById('close-install-banner');
+if (closeInstallBtn) {
+    closeInstallBtn.addEventListener('click', () => {
+        const installBanner = document.getElementById('install-banner');
+        if (installBanner) installBanner.style.display = 'none';
+    });
+}
             
             onSnapshot(doc(db, 'config', 'global'), (docSnap) => {
                 if (docSnap.exists()) {
