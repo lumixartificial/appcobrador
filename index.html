@@ -1297,36 +1297,40 @@
             document.getElementById('closeVerificationModal').addEventListener('click', () => window.history.back());
 
             document.getElementById('approve-payment-btn').addEventListener('click', async () => {
-                const clientRef = doc(db, 'clients', clientId);
-                
-                try {
-                    // CORRECCIÓN: Ahora el cobrador añade el pago al historial.
-                    const newPayment = {
-                        amount: payment.paymentData.amount,
-                        date: new Date(),
-                        receiptUrl: payment.paymentData.receiptUrl,
-                        status: 'approved'
-                    };
+    const clientRef = doc(db, 'clients', clientId);
 
-                    const currentPaidAmount = client.paid || 0;
-                    const newPaidAmount = currentPaidAmount + newPayment.amount;
+    // Creamos una copia del historial para modificarlo de forma segura.
+    const updatedHistory = [...client.history];
 
-                    await updateDoc(clientRef, {
-                        history: arrayUnion(newPayment),
-                        paid: newPaidAmount
-                    });
+    // Verificamos que el pago exista en el índice y actualizamos su estado a 'approved'.
+    if (updatedHistory[historyIndex]) {
+        updatedHistory[historyIndex].status = 'approved';
+    } else {
+        console.error("Índice de historial de pago no válido:", historyIndex);
+        showToast('Erro: Pagamento não encontrado para aprovar.', true);
+        return;
+    }
 
-                    // Elimina el "ticket" de notificación después de ser procesado
-                    const notifRef = doc(db, 'collectors', collectorId, 'notifications', payment.id);
-                    await deleteDoc(notifRef);
+    // Para mayor seguridad, recalculamos el total pagado sumando solo los pagos aprobados.
+    const newPaidAmount = updatedHistory
+        .filter(p => p.status === 'approved')
+        .reduce((sum, p) => sum + p.amount, 0);
 
-                    showToast(translations[currentLang].paymentApproved);
-                    window.history.back();
-                } catch (error) {
-                    console.error("Error approving payment:", error);
-                    showToast('Erro ao aprovar pagamento.', true);
-                }
-            });
+    try {
+        // Actualizamos el documento del cliente con el historial modificado y el nuevo total pagado.
+        await updateDoc(clientRef, {
+            history: updatedHistory,
+            paid: newPaidAmount
+        });
+
+        showToast(translations[currentLang].paymentApproved);
+        window.history.back(); // Cierra el modal de verificación.
+
+    } catch (error) {
+        console.error("Error approving payment:", error);
+        showToast('Erro ao aprovar pagamento.', true);
+    }
+});
 
             document.getElementById('reject-payment-btn').addEventListener('click', async () => {
                 const clientRef = doc(db, 'clients', clientId);
