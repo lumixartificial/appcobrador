@@ -7,7 +7,7 @@
 // Importamos los scripts de Firebase necesarios
 
 // VERSIÓN CORREGIDA Y DEFINITIVA
-const SW_VERSION = "v3.0-final-fix";
+const SW_VERSION = "v4.0-diagnostico";
 
 // Importa los scripts de Firebase. Esto debe hacerse primero.
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
@@ -36,29 +36,40 @@ console.log(`Service Worker ${SW_VERSION} cargado y listo.`);
  * Esto se ejecuta cuando llega un mensaje y la app está cerrada o en segundo plano.
  */
 messaging.onBackgroundMessage((payload) => {
-  console.log(`[SW ${SW_VERSION}] Mensaje en segundo plano recibido:`, payload);
+  const LOG_PREFIX = `[LOG-DIAGNOSTICO-SW ${SW_VERSION}]`;
+  console.log(`${LOG_PREFIX} >>> ¡MENSAJE EN SEGUNDO PLANO RECIBIDO! <<<`, payload);
 
-  // Asegúrate de que los datos existen.
-  if (!payload.data) {
-    console.error(`[SW ${SW_VERSION}] El payload no contiene la sección 'data'.`);
-    return;
-  }
-
-  // Extraemos los datos que enviamos desde la Cloud Function.
-  const notificationTitle = payload.data.title;
-  const notificationOptions = {
-    body: payload.data.body,
-    icon: payload.data.icon,
-    // Agregamos un tag para evitar notificaciones duplicadas si llegan muy rápido.
-    tag: 'lumix-cobrador-notification', 
-    // Pasamos la URL al evento de clic.
-    data: {
-      url: payload.data.url 
+  try {
+    if (!payload.data) {
+      console.error(`${LOG_PREFIX} ERROR FATAL: El payload no contiene la sección 'data'. No se puede mostrar la notificación.`);
+      return;
     }
-  };
+    console.log(`${LOG_PREFIX} Payload 'data' validado.`, payload.data);
 
-  // Mostramos la notificación en el dispositivo.
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+    const notificationTitle = payload.data.title;
+    const notificationOptions = {
+      body: payload.data.body,
+      icon: payload.data.icon,
+      tag: 'lumix-cobrador-notification', 
+      data: {
+        url: payload.data.url 
+      }
+    };
+    console.log(`${LOG_PREFIX} Opciones de notificación preparadas:`, notificationOptions);
+
+    console.log(`${LOG_PREFIX} Intentando mostrar la notificación AHORA...`);
+    // self.registration.showNotification devuelve una "Promise", la retornamos para que el SW sepa que debe esperar.
+    return self.registration.showNotification(notificationTitle, notificationOptions)
+      .then(() => {
+        console.log(`${LOG_PREFIX} ¡ÉXITO! showNotification() se completó.`);
+      })
+      .catch(err => {
+        console.error(`${LOG_PREFIX} ERROR DENTRO de showNotification():`, err);
+      });
+
+  } catch (error) {
+    console.error(`${LOG_PREFIX} ERROR CATASTRÓFICO DENTRO DE onBackgroundMessage:`, error);
+  }
 });
 
 self.addEventListener('install', (event) => {
@@ -96,6 +107,7 @@ self.addEventListener('notificationclick', (event) => {
     });
     event.waitUntil(promiseChain);
 });
+
 
 
 
