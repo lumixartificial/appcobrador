@@ -307,8 +307,37 @@
         .payment-date { color: var(--text-secondary); font-size: 0.9em; }
         .payment-history-amount { font-weight: 600; color: var(--accent-green); }
         .no-history, .no-items { color: var(--text-secondary); text-align: center; padding: 20px; }
-        .action-buttons { background-color: var(--surface); border-top: 1px solid var(--border-color); padding: 15px 20px; display: flex; gap: 15px; margin-top: auto; position: sticky; bottom: 0; flex-shrink: 0; }
-        .action-buttons button, .action-buttons a { flex-grow: 1; padding: 15px; font-size: 1em; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s; text-decoration: none; }
+        
+        .action-buttons {
+    background-color: var(--surface);
+    border-top: 1px solid var(--border-color);
+    padding: 15px 20px;
+    padding-bottom: calc(15px + env(safe-area-inset-bottom));
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.action-buttons button, .action-buttons a {
+    flex-grow: 1;
+    flex-basis: 160px;
+    padding: 15px;
+    font-size: 1em;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    text-decoration: none;
+}
+
         .btn-primary { background-color: var(--accent-purple); color: white; }
         .btn-secondary { background-color: transparent; color: var(--accent-purple); border: 2px solid var(--accent-purple); }
         .btn-danger { background-color: var(--danger-color); color: white; }
