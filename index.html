@@ -448,15 +448,20 @@
     </style>
 </head>
 <body>
-    <div id="install-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 500px; background-color: var(--surface); color: var(--text-primary); padding: 16px; border-radius: 12px; z-index: 5000; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid var(--border-color);">
-    <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
-        <img src="https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png" alt="App Icon" style="width: 48px; height: 48px; flex-shrink: 0;">
-        <div style="flex-grow: 1;">
-            <p style="margin: 0; font-weight: 600; font-size: 0.95em;" data-lang-key="installAppTitle">Instale nosso aplicativo</p>
-            <p style="margin: 4px 0 0; font-size: 0.85em; color: var(--text-secondary);" data-lang-key="installAppMsg">Uma experiência mais rápida e completa.</p>
-        </div>
-        <button id="install-btn" style="background-color: var(--accent-purple); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;" data-lang-key="installBtn">Instalar</button>
+    <div id="install-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 550px; background-color: var(--surface); color: var(--text-primary); padding: 16px; border-radius: 12px; z-index: 5000; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
+
+    <img src="https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png" alt="App Icon" style="width: 48px; height: 48px; flex-shrink: 0;">
+
+    <div style="flex-grow: 1; text-align: left;">
+        <p style="margin: 0; font-weight: 600; font-size: 0.95em;" data-lang-key="installAppTitle">Instale nosso aplicativo</p>
+        <p style="margin: 4px 0 0; font-size: 0.85em; color: var(--text-secondary);" data-lang-key="installAppMsg">Uma experiência mais rápida e completa.</p>
     </div>
+
+    <button id="install-btn" style="background-color: var(--accent-purple); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;" data-lang-key="installBtn">Instalar</button>
+
+    <button id="close-install-banner" style="background: transparent; border: none; color: var(--text-secondary); font-size: 28px; cursor: pointer; line-height: 1; padding: 0 5px; flex-shrink: 0;">&times;</button>
+
+</div>
     <button id="close-install-banner" style="position: absolute; top: 8px; right: 8px; background: color-mix(in srgb, var(--text-secondary) 15%, transparent); border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; line-height: 1; padding: 0; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">&times;</button>
 </div>
     <div id="splash-screen">
