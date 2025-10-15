@@ -1039,7 +1039,7 @@
 
                 const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
 const notifBody = translations[currentLang].refinanceApprovedClientBody;
-sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved');
+sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
             });
 
             document.getElementById('reject-refinance-btn').addEventListener('click', async () => {
@@ -1055,10 +1055,8 @@ sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved');
                     showToast('Erro ao rejeitar solicitação.', true);
                 }
 
-                const notifTitle = translations[currentLang].refinanceRejectedClientTitle;
-const notifBody = translations[currentLang].refinanceRejectedClientBody;
-sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected');
 
+                
             });
         }
 
@@ -1363,7 +1361,7 @@ sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected');
 
         const notifTitle = translations[currentLang].paymentApprovedClientTitle;
 const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', money(payment.amount));
-sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved');
+sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-circle');
 
         showToast(translations[currentLang].paymentApproved);
         window.history.back(); // Cierra el modal de verificación.
@@ -1387,9 +1385,9 @@ sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved');
                     showToast('Erro ao rejeitar pagamento.', true);
                 }
 
-                const notifTitle = translations[currentLang].paymentRejectedClientTitle;
-const notifBody = translations[currentLang].paymentRejectedClientBody;
-sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_rejected');
+                const notifTitle = translations[currentLang].refinanceRejectedClientTitle;
+const notifBody = translations[currentLang].refinanceRejectedClientBody;
+sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected', 'trending-down');
             });
         }
         
@@ -3442,19 +3440,34 @@ if (isEditMode && client.documentNumber) {
     applyLanguage(currentLang);
 }
 
-async function sendNotificationToClient(clientId, title, body, type) {
+async function sendNotificationToClient(clientId, title, body, type, icon = 'info') {
     if (!clientId) return;
     try {
-        const notificationsCollectionRef = collection(db, 'clients', clientId, 'pushNotificationTickets');
-        await addDoc(notificationsCollectionRef, {
+        const clientRef = doc(db, 'clients', clientId);
+
+        // 1. Crea la notificación INTERNA que se muestra dentro de la app del cliente
+        const internalNotif = {
             title: title,
             body: body,
+            icon: icon,
+            read: false,
             timestamp: serverTimestamp(),
+            id: `${type}_${Date.now()}`
+        };
+        // Usamos { merge: true } para no sobrescribir otros campos del cliente por accidente
+        await setDoc(clientRef, { notifications: arrayUnion(internalNotif) }, { merge: true });
+        console.log(`Notificación INTERNA para cliente [${clientId}] creada.`);
+
+        // 2. Crea el "ticket" para que el servidor envíe la notificación PUSH
+        const ticketsCollectionRef = collection(db, 'clients', clientId, 'pushNotificationTickets');
+        await addDoc(ticketsCollectionRef, {
+            title: title,
+            body: body,
             type: type,
         });
-        console.log(`Ticket de notificação PUSH para cliente [${clientId}] enviado.`);
+        console.log(`Ticket PUSH para cliente [${clientId}] enviado.`);
     } catch (error) {
-        console.error(`Error al enviar el ticket de notificación al cliente [${clientId}]:`, error);
+        console.error(`Error al enviar notificación/ticket al cliente [${clientId}]:`, error);
     }
 }
 
