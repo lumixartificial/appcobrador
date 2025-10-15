@@ -20,6 +20,23 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
+// Este bloque escucha los mensajes en segundo plano y muestra la notificación.
+messaging.onBackgroundMessage((payload) => {
+  console.log(`[SW ${SW_VERSION}] Mensaje en segundo plano recibido:`, payload);
+
+  // Extraemos los datos que enviamos desde la Cloud Function.
+  const notificationTitle = payload.data.title;
+  const notificationOptions = {
+    body: payload.data.body,
+    icon: payload.data.icon,
+    data: {
+      url: payload.data.url // Pasamos la URL al evento de clic
+    }
+  };
+
+  // Mostramos la notificación en el dispositivo.
+  return self.registration.showNotification(notificationTitle, notificationOptions);
+});
 
 const SW_VERSION = "v2.1-hybrid-fix";
 console.log(`Service Worker ${SW_VERSION} cargado.`);
@@ -61,6 +78,7 @@ self.addEventListener('notificationclick', (event) => {
     });
     event.waitUntil(promiseChain);
 });
+
 
 
 
