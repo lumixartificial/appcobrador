@@ -3451,11 +3451,14 @@ async function sendNotificationToClient(clientId, title, body, type, icon = 'inf
             body: body,
             icon: icon,
             read: false,
-            timestamp: serverTimestamp(),
+            timestamp: new Date(), // CORRECCIÓN: Usamos new Date() en lugar de serverTimestamp()
             id: `${type}_${Date.now()}`
         };
-        // Usamos { merge: true } para no sobrescribir otros campos del cliente por accidente
-        await setDoc(clientRef, { notifications: arrayUnion(internalNotif) }, { merge: true });
+
+        // Usamos updateDoc que es más seguro para añadir a un array existente
+        await updateDoc(clientRef, { 
+            notifications: arrayUnion(internalNotif) 
+        });
         console.log(`Notificación INTERNA para cliente [${clientId}] creada.`);
 
         // 2. Crea el "ticket" para que el servidor envíe la notificación PUSH
