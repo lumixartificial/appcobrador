@@ -3509,8 +3509,6 @@ function triggerSystemVerification(editingClientId = null) {
 }
 
         function init() {
-            document.body.classList.add('dark-mode');
-
             // --- Service Worker Registration with Environment Check ---
             if ('serviceWorker' in navigator) {
                 // Service Workers não podem ser registrados a partir de uma URL 'blob:', usada por ambientes de pré-visualização.
@@ -3554,6 +3552,8 @@ function triggerSystemVerification(editingClientId = null) {
                 }
             }
             
+            document.body.classList.add('dark-mode');
+
             // Lógica del Banner de Instalación PWA
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
