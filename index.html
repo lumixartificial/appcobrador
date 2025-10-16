@@ -3452,18 +3452,20 @@ async function sendNotificationToClient(clientId, title, body, type, icon = 'inf
             timestamp: new Date(),
             id: `${type}_${Date.now()}`
         };
-        // Usamos { merge: true } para no sobrescribir otros campos del cliente por accidente
         await setDoc(clientRef, { notifications: arrayUnion(internalNotif) }, { merge: true });
         console.log(`Notificación INTERNA para cliente [${clientId}] creada.`);
 
-        // 2. Crea el "ticket" para que el servidor envíe la notificación PUSH
-        const ticketsCollectionRef = collection(db, 'clients', clientId, 'pushNotificationTickets');
-        await addDoc(ticketsCollectionRef, {
+        // 2. [CORRECCIÓN CLAVE] Escribe en la cola global de notificaciones PUSH
+        const queueRef = collection(db, 'pushNotificationQueue');
+        await addDoc(queueRef, {
+            target: 'client', // Indica que el objetivo es un cliente
+            userId: clientId,  // El ID del cliente a notificar
             title: title,
             body: body,
             type: type,
+            createdAt: serverTimestamp() // Añadimos timestamp para posible depuración futura
         });
-        console.log(`Ticket PUSH para cliente [${clientId}] enviado.`);
+        console.log(`Ticket PUSH para cliente [${clientId}] enviado a la cola global.`);
     } catch (error) {
         console.error(`Error al enviar notificación/ticket al cliente [${clientId}]:`, error);
     }
