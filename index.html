@@ -3458,7 +3458,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon = 'inf
             body: body,
             icon: icon,
             read: false,
-            timestamp: serverTimestamp(),
+            timestamp: new Date(),
             id: `${type}_${Date.now()}`
         };
         // Usamos { merge: true } para no sobrescribir otros campos del cliente por accidente
@@ -3616,4 +3616,3 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
-
