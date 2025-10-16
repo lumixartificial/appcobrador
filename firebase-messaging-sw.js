@@ -1,12 +1,3 @@
-// firebase-messaging-sw.js
-
-// Version: 1.8 (Incrementa este número para forzar actualizaciones)
-
-// Importa los scripts de Firebase
-
-// Importamos los scripts de Firebase necesarios
-
-// VERSIÓN CORREGIDA Y DEFINITIVA
 const SW_VERSION = "v4.0-diagnostico";
 
 // Importa los scripts de Firebase. Esto debe hacerse primero.
