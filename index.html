@@ -3193,7 +3193,14 @@ if (isEditMode && client.documentNumber) {
 
             if (user === 'cobrador1' && pass === '0000') {
                 sessionStorage.setItem('isLoggedIn', 'true');
-                showMainApp();
+                if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(registration => {
+        console.log('Login exitoso y Service Worker listo. Configurando FCM ahora.');
+        setupFCM(collectorId); // collectorId ya está definido globalmente
+    }).catch(err => {
+        console.error('Service Worker no estuvo listo a tiempo para el login, no se pudo configurar FCM.', err);
+    });
+}
             } else {
                 showToast('Usuário ou senha inválidos.', true);
             }
@@ -3533,12 +3540,11 @@ function triggerSystemVerification(editingClientId = null) {
 
                         return navigator.serviceWorker.ready;
                     })
+                    
                     .then(registration => {
-                        console.log('Service Worker: Ativo e pronto.');
-                        if (sessionStorage.getItem('isLoggedIn') === 'true') {
-                            setupFCM(collectorId);
-                        }
-                    })
+    console.log('Service Worker: Ativo e pronto para ser usado após o login.');
+})
+
                     .catch(error => {
                         console.error('Service Worker: Falha no registro ou na ativação.', error);
                     });
@@ -3610,3 +3616,4 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
+
