@@ -1021,25 +1021,18 @@
                 
                 try {
                     await updateDoc(clientRef, {
-                        totalLoan: newTotalLoan,
-                        amount: newInstallmentValue,
-                        installments: `0/${newInstallments}`,
-                        paid: 0,
-                        history: [],
-                        startDate: serverTimestamp(),
-                        status: 'pending',
                         refinanceRequest: null 
                     });
                     showToast('Refinanciamento aprovado!');
                     window.history.back();
+
+                    const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
+                    const notifBody = translations[currentLang].refinanceApprovedClientBody;
+                    sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
                 } catch (error) {
                     console.error("Error approving refinance:", error);
                     showToast('Erro ao aprovar refinanciamento.', true);
                 }
-
-                const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
-const notifBody = translations[currentLang].refinanceApprovedClientBody;
-sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
             });
 
             document.getElementById('reject-refinance-btn').addEventListener('click', async () => {
@@ -1049,14 +1042,17 @@ sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 
                         refinanceRequest: null
                     });
                     showToast('Solicitação rejeitada.');
+                    
+                    // [BUG CORREGIDO] Notificación de rechazo de refinanciamiento AÑADIDA
+                    const notifTitle = translations[currentLang].refinanceRejectedClientTitle;
+                    const notifBody = translations[currentLang].refinanceRejectedClientBody;
+                    sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected', 'trending-down');
+                    
                     window.history.back();
                 } catch (error) {
                     console.error("Error rejecting refinance:", error);
                     showToast('Erro ao rejeitar solicitação.', true);
                 }
-
-
-                
             });
         }
 
@@ -1360,12 +1356,11 @@ sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 
         });
 
         const notifTitle = translations[currentLang].paymentApprovedClientTitle;
-const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', money(payment.amount));
-sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-circle');
+        const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', money(payment.amount));
+        sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-circle');
 
         showToast(translations[currentLang].paymentApproved);
         window.history.back(); // Cierra el modal de verificación.
-
     } catch (error) {
         console.error("Error approving payment:", error);
         showToast('Erro ao aprovar pagamento.', true);
@@ -1378,16 +1373,18 @@ sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'c
 
                 try {
                     await updateDoc(clientRef, { history: updatedHistory });
+                    
+                    // [BUG CORREGIDO] Notificación de rechazo de pago ahora usa el texto y tipo correctos.
+                    const notifTitle = translations[currentLang].paymentRejectedClientTitle;
+                    const notifBody = translations[currentLang].paymentRejectedClientBody;
+                    sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_rejected', 'x-circle');
+
                     showToast(translations[currentLang].paymentRejected);
                     window.history.back();
                 } catch (error) {
                     console.error("Error rejecting payment:", error);
                     showToast('Erro ao rejeitar pagamento.', true);
                 }
-
-                const notifTitle = translations[currentLang].refinanceRejectedClientTitle;
-const notifBody = translations[currentLang].refinanceRejectedClientBody;
-sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected', 'trending-down');
             });
         }
         
@@ -3193,14 +3190,8 @@ if (isEditMode && client.documentNumber) {
 
             if (user === 'cobrador1' && pass === '0000') {
                 sessionStorage.setItem('isLoggedIn', 'true');
-                if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.ready.then(registration => {
-        console.log('Login exitoso y Service Worker listo. Configurando FCM ahora.');
-        setupFCM(collectorId); // collectorId ya está definido globalmente
-    }).catch(err => {
-        console.error('Service Worker no estuvo listo a tiempo para el login, no se pudo configurar FCM.', err);
-    });
-}
+                // CORRECCIÓN: Eliminamos location.reload() y mostramos la app directamente.
+                showMainApp();
             } else {
                 showToast('Usuário ou senha inválidos.', true);
             }
