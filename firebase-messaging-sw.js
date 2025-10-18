@@ -1,4 +1,4 @@
-const SW_VERSION = "v5.9-robusto-definitivo"; // Versión actualizada
+const SW_VERSION = "v6.0-enfoque-definitivo"; // Versión actualizada para forzar la actualización
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
@@ -17,22 +17,18 @@ const messaging = firebase.messaging();
 
 console.log(`[SW-COBRADOR] Service Worker ${SW_VERSION} cargado.`);
 
-// [SOLUCIÓN DEFINITIVA] onBackgroundMessage ahora siempre recibe el payload 'data'
-// y es responsable de mostrar la notificación.
 messaging.onBackgroundMessage((payload) => {
   const LOG_PREFIX = `[SW-COBRADOR-DIAGNOSTICO ${SW_VERSION}]`;
   console.log(`${LOG_PREFIX} Mensaje en segundo plano recibido.`, payload);
 
-  // Se asegura de leer siempre desde payload.data, que es donde la Cloud Function envía la información.
   const notificationTitle = payload.data.title;
   const notificationOptions = {
     body: payload.data.body,
     icon: payload.data.icon,
     tag: 'lumix-cobrador-notification', 
-    data: { url: payload.data.url } // Guardamos la URL de destino en la propiedad 'data'
+    data: { url: payload.data.url }
   };
   
-  // El Service Worker ahora crea y muestra la notificación.
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
@@ -46,39 +42,46 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// [SOLUCIÓN DEFINITIVA] Esta lógica de 'notificationclick' es ahora 100% fiable
-// porque siempre se aplica a notificaciones creadas por nuestro propio código.
+// --- SOLUCIÓN VERDADERA Y DEFINITIVA ---
 self.addEventListener('notificationclick', (event) => {
-    const targetUrl = event.notification.data.url || self.location.origin;
+    const LOG_PREFIX = `[SW-COBRADOR-CLICK ${SW_VERSION}]`;
+    console.log(`${LOG_PREFIX} Clic en notificación recibido.`, event.notification);
+    
+    // Cierra la notificación visualmente.
     event.notification.close();
 
-    // Esta lógica maneja los tres escenarios posibles:
-    // 1. La app ya está abierta y en la pestaña correcta.
-    // 2. La app está abierta en otra pestaña o en segundo plano.
-    // 3. La app está completamente cerrada.
+    // Obtiene la URL de destino desde los datos de la notificación. Si no existe, usa la raíz de la app.
+    const targetUrl = event.notification.data.url || new URL('/', self.location.origin).href;
+    console.log(`${LOG_PREFIX} URL de destino: ${targetUrl}`);
+
+    // La lógica robusta para encontrar y enfocar una ventana existente o abrir una nueva.
     const promiseChain = clients.matchAll({
-        type: "window",
+        type: 'window',
         includeUncontrolled: true
     }).then((windowClients) => {
-        // Busca si ya hay una ventana abierta con la misma URL.
-        const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
+        console.log(`${LOG_PREFIX} Ventanas encontradas: ${windowClients.length}`);
+        
+        // Busca una ventana que ya esté visible para el usuario.
+        let clientToFocus = windowClients.find(client => client.visibilityState === 'visible');
 
-        if (existingClient) {
-            console.log('[SW-COBRADOR] Ventana existente encontrada. Enfocando...');
-            return existingClient.focus();
+        // Si no hay ninguna visible, toma la primera de la lista (si existe).
+        if (!clientToFocus && windowClients.length > 0) {
+            clientToFocus = windowClients[0];
         }
 
-        // Si no, busca cualquier otra ventana de la app para reutilizarla.
-        if (windowClients.length > 0) {
-            console.log('[SW-COBRADOR] Otra ventana de la app está abierta. Navegando y enfocando...');
-            // La navega a la URL correcta y luego la enfoca, trayéndola al frente.
-            return windowClients[0].navigate(targetUrl).then(client => client.focus());
+        // Si se encontró una ventana para reutilizar...
+        if (clientToFocus) {
+            console.log(`${LOG_PREFIX} Ventana existente encontrada. Navegando a ${targetUrl} y enfocando.`);
+            // Le ordena navegar a la URL correcta y luego la trae al primer plano.
+            return clientToFocus.navigate(targetUrl).then(client => client.focus());
         }
         
-        // Si no hay ninguna ventana abierta, abre una nueva.
-        console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
+        // Si no hay ninguna ventana abierta de la app...
+        console.log(`${LOG_PREFIX} Ninguna ventana de la app está abierta. Abriendo una nueva en ${targetUrl}.`);
+        // Abre una nueva ventana en la URL de destino.
         return clients.openWindow(targetUrl);
     });
 
+    // Espera a que la promesa de abrir/enfocar la ventana se complete.
     event.waitUntil(promiseChain);
 });
