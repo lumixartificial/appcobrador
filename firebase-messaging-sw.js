@@ -1,9 +1,9 @@
-const SW_VERSION = "v5.8-estable"; // Versión final y estable
+const SW_VERSION = "v6.0-definitivo"; // Versión final y estable
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
 
-// Configuración de Firebase verificada para ser idéntica a index.html
+// [CORRECCIÓN FINAL] Configuración de Firebase verificada para ser 100% idéntica a la de app_cobrador/index.html
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
@@ -43,30 +43,35 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// Lógica de clic final, idéntica a la que funciona en la app del cliente.
+// [LÓGICA FINAL Y FUNCIONAL] Exactamente la misma lógica que funciona en la app del cliente.
 self.addEventListener('notificationclick', (event) => {
     const targetUrl = event.notification.data.url || self.location.origin;
+    console.log(`[SW-COBRADOR ${SW_VERSION}] Clic detectado. URL de destino: ${targetUrl}`);
     event.notification.close();
 
     const promiseChain = clients.matchAll({
         type: "window",
         includeUncontrolled: true
     }).then((windowClients) => {
+        // 1. Busca si ya hay una ventana abierta y visible con la misma URL.
         const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
 
         if (existingClient) {
-            console.log('[SW-COBRADOR] Ventana existente encontrada. Enfocando...');
+            console.log(`[SW-COBRADOR ${SW_VERSION}] Ventana existente encontrada. Enfocando...`);
             return existingClient.focus();
         }
 
+        // 2. Si no, busca cualquier otra ventana de la app (incluso en segundo plano) para reutilizarla.
         if (windowClients.length > 0) {
-            console.log('[SW-COBRADOR] Otra ventana de la app está abierta. Navegando y enfocando...');
+            console.log(`[SW-COBRADOR ${SW_VERSION}] Ventana en segundo plano encontrada. Navegando y enfocando...`);
             return windowClients[0].navigate(targetUrl).then(client => client.focus());
         }
         
-        console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
+        // 3. Si no hay ninguna ventana abierta, abre una nueva.
+        console.log(`[SW-COBRADOR ${SW_VERSION}] Ninguna ventana abierta. Abriendo una nueva.`);
         return clients.openWindow(targetUrl);
     });
 
     event.waitUntil(promiseChain);
 });
+
