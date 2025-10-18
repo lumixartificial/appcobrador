@@ -2441,17 +2441,14 @@
 
             lucide.createIcons({ nodes: clientFormModal.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
-            
-            // [CORRECCIÓN] Se restaura la llamada a la función triggerSystemVerification
-            // y se añade la llave de cierre '}' que faltaba en la función showClientFormModal.
-            // Esto soluciona el error de sintaxis "Unexpected end of input".
             const docInput = document.getElementById('client-document');
-            if (docInput) {
-                docInput.addEventListener('blur', () => triggerSystemVerification(clientId));
-            }
-            if (isEditMode && client.documentNumber) {
-                triggerSystemVerification(clientId);
-            }
+if (docInput) {
+    docInput.addEventListener('blur', () => triggerSystemVerification(clientId));
+}
+// Si estamos editando un cliente que ya tiene documento, ejecuta la verificación al cargar
+if (isEditMode && client.documentNumber) {
+    triggerSystemVerification(clientId);
+}
         }
 
         function showShareCredentialsModal(clientData, isEditMode) {
@@ -3524,17 +3521,42 @@ function triggerSystemVerification(editingClientId = null) {
         function init() {
             // --- Service Worker Registration with Environment Check ---
             if ('serviceWorker' in navigator) {
-                // [SOLUCIÓN] Se reemplaza el código de registro agresivo por uno simple y estable,
-                // idéntico al que funciona en la app del cliente. Esto elimina el bucle de recarga
-                // y la inestabilidad que impedía que la app se abriera desde segundo plano.
+                // Service Workers não podem ser registrados a partir de uma URL 'blob:', usada por ambientes de pré-visualização.
+                // Esta verificação evita a tentativa de registro e o erro resultante nesses ambientes.
                 if (window.location.protocol === 'blob:') {
-                    console.warn("Service Worker: Registro ignorado. El ambiente de pré-visualização ('blob:') no soporta Service Workers.");
+                    console.warn("Service Worker: Registro ignorado. O ambiente de pré-visualização ('blob:') não suporta Service Workers. As notificações e o rastreamento em tempo real funcionarão corretamente online.");
                 } else {
                     navigator.serviceWorker.register('firebase-messaging-sw.js')
+                    .then(reg => {
+                        console.log('Service Worker: Registro iniciado.');
+                        
+                        reg.addEventListener('updatefound', () => {
+                            const newWorker = reg.installing;
+                            console.log('Service Worker: Nova versão encontrada.');
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('Service Worker: Nova versão instalada, recarregando a página.');
+                                    location.reload();
+                                }
+                            });
+                        });
+
+                        return navigator.serviceWorker.ready;
+                    })
+                    
                     .then(registration => {
-                        console.log('Service Worker: Registrado con éxito. Alcance:', registration.scope);
-                    }).catch(error => {
-                        console.error('Service Worker: Falha no registro.', error);
+    console.log('Service Worker: Ativo e pronto para ser usado após o login.');
+})
+
+                    .catch(error => {
+                        console.error('Service Worker: Falha no registro ou na ativação.', error);
+                    });
+
+                    let refreshing;
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        if (refreshing) return;
+                        window.location.reload();
+                        refreshing = true;
                     });
                 }
             }
