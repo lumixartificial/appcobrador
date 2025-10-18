@@ -1,9 +1,10 @@
-const SW_VERSION = "v5.6-config-final"; // Versión actualizada
+const SW_VERSION = "v5.7-config-corregido"; // Versión actualizada y corregida
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
 
-// [CORRECCIÓN DEFINITIVA] Esta configuración ahora es idéntica a la de tu index.html
+// [SOLUCIÓN DEFINITIVA] Esta configuración AHORA es una copia exacta de la que
+// se encuentra en tu archivo app_cobrador/index.html, garantizando la consistencia.
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
@@ -75,3 +76,4 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(promiseChain);
 });
+
