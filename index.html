@@ -3524,64 +3524,59 @@ function triggerSystemVerification(editingClientId = null) {
         function init() {
             // --- Service Worker Registration with Environment Check ---
             if ('serviceWorker' in navigator) {
-                // [SOLUCIÓN DEFINITIVA] Se reemplaza el código de registro por uno simple y estable,
-                // idéntico al que funciona en la app del cliente. Esto elimina la inestabilidad
-                // que impedía que la app se abriera desde segundo plano.
+                // [SOLUCIÓN] Se reemplaza el código de registro agresivo por uno simple y estable,
+                // idéntico al que funciona en la app del cliente. Esto elimina el bucle de recarga
+                // y la inestabilidad que impedía que la app se abriera desde segundo plano.
                 if (window.location.protocol === 'blob:') {
                     console.warn("Service Worker: Registro ignorado. El ambiente de pré-visualização ('blob:') no soporta Service Workers.");
                 } else {
                     navigator.serviceWorker.register('firebase-messaging-sw.js')
                     .then(registration => {
                         console.log('Service Worker: Registrado con éxito. Alcance:', registration.scope);
-                        // Una vez que el SW está listo, configuramos FCM.
-                        // Este es el patrón robusto que usa la app del cliente.
-                        return navigator.serviceWorker.ready;
-                    })
-                    .then(registration => {
-                         console.log('Service Worker: Listo y activo. Iniciando setupFCM.');
-                         setupFCM(collectorId);
-                    })
-                    .catch(error => {
-                        console.error('Service Worker: Falha no registro ou ativação.', error);
+                    }).catch(error => {
+                        console.error('Service Worker: Falha no registro.', error);
                     });
                 }
             }
             
             document.body.classList.add('dark-mode');
 
-            // [SOLUCIÓN DE SINTAXIS] El código a continuación restaura la parte final de la función init()
-            // y el final del script, que fueron eliminados por error en la actualización anterior,
-            // corrigiendo el error "Unexpected end of input".
+            // Lógica del Banner de Instalación PWA
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
                 deferredPrompt = e;
                 const installBanner = document.getElementById('install-banner');
-                if(installBanner) installBanner.style.display = 'block';
+                if (installBanner) installBanner.style.display = 'block';
             });
 
             const installBtn = document.getElementById('install-btn');
-            if(installBtn) {
+            if (installBtn) {
                 installBtn.addEventListener('click', async () => {
                     const installBanner = document.getElementById('install-banner');
-                    if(installBanner) installBanner.style.display = 'none';
+                    if (installBanner) installBanner.style.display = 'none';
                     if (deferredPrompt) {
                         deferredPrompt.prompt();
-                        await deferredPrompt.userChoice;
+                        const { outcome } = await deferredPrompt.userChoice;
+                        console.log(`User response to the install prompt: ${outcome}`);
                         deferredPrompt = null;
                     }
                 });
             }
 
             const closeInstallBtn = document.getElementById('close-install-banner');
-            if(closeInstallBtn) {
-                closeInstallBtn.addEventListener('click', () => {
-                    const installBanner = document.getElementById('install-banner');
-                    if(installBanner) installBanner.style.display = 'none';
-                });
-            }
-
+if (closeInstallBtn) {
+    closeInstallBtn.addEventListener('click', () => {
+        const installBanner = document.getElementById('install-banner');
+        if (installBanner) installBanner.style.display = 'none';
+    });
+}
+            
             onSnapshot(doc(db, 'config', 'global'), (docSnap) => {
-                loadGlobalSettings(docSnap.exists() ? docSnap.data() : {});
+                if (docSnap.exists()) {
+                    loadGlobalSettings(docSnap.data());
+                } else {
+                    loadGlobalSettings({});
+                }
             });
 
             setTimeout(() => {
@@ -3589,8 +3584,7 @@ function triggerSystemVerification(editingClientId = null) {
                 splash.style.opacity = '0';
                 setTimeout(() => {
                     splash.style.display = 'none';
-                    const isLoggedIn = sessionStorage.getItem('isLoggedIn');
-                    if (isLoggedIn) {
+                    if (sessionStorage.getItem('isLoggedIn') === 'true') {
                         showMainApp();
                     } else {
                         document.getElementById('login-view').style.display = 'flex';
