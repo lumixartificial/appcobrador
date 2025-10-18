@@ -591,10 +591,19 @@
         }
 
         onMessage(messaging, (payload) => {
-            console.log(`${LOG_PREFIX} Notificación recibida en PRIMER PLANO:`, payload);
-            showToast(`${payload.notification.title}: ${payload.notification.body}`);
-            updateNotifications();
-        });
+    const LOG_PREFIX = `[COBRADOR-FCM-DIAGNOSTICO]`;
+    console.log(`${LOG_PREFIX} Notificación recibida en PRIMER PLANO:`, payload);
+
+    // [CORRECCIÓN] Leemos desde payload.data para consistencia
+    if (payload.data && payload.data.title && payload.data.body) {
+        showToast(`${payload.data.title}: ${payload.data.body}`);
+        updateNotifications(); // Esta función ya existe y es correcta aquí
+    } else {
+        console.warn(`${LOG_PREFIX} El payload en primer plano no tiene el formato esperado.`, payload);
+        showToast('Você recebeu uma nova notificação.');
+        updateNotifications();
+    }
+});
 
     } catch (err) {
         console.error(`${LOG_PREFIX} ERROR CATASTRÓFICO en setupFCM:`, err);
