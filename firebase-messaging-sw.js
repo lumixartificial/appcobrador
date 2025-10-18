@@ -1,15 +1,16 @@
-const SW_VERSION = "v5.5-definitivo"; // Versión actualizada
+const SW_VERSION = "v5.6-config-final"; // Versión actualizada
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
 
+// [CORRECCIÓN DEFINITIVA] Esta configuración ahora es idéntica a la de tu index.html
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
     projectId: "lumix-financas-app",
     storageBucket: "lumix-financas-app.appspot.com",
     messagingSenderId: "463777495321",
-    appId: "1:463777495321:web:106118f56abd206ed88"
+    appId: "1:463777495321:web:106118f53f56abd206ed88"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -42,7 +43,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// [SOLUCIÓN FINAL - Lógica Exacta del Cliente]
+// [Lógica Final - Replicada de la App de Cliente funcional]
 self.addEventListener('notificationclick', (event) => {
     const targetUrl = event.notification.data.url || self.location.origin;
     event.notification.close();
@@ -74,6 +75,3 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(promiseChain);
 });
-
-
-
