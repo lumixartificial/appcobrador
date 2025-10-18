@@ -65,25 +65,31 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('notificationclick', (event) => {
-    console.log(`[SW-COBRADOR ${SW_VERSION}] Clic en notificación detectado.`);
+    const targetUrl = event.notification.data.url || self.location.origin;
+    console.log(`[SW-COBRADOR] Clic en notificación. URL de destino: ${targetUrl}`);
     event.notification.close();
 
-    const targetUrl = event.notification.data.url || self.location.origin;
-    
-    const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
-    .then((windowClients) => {
-        for (const client of windowClients) {
-            if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
-                return client.navigate(targetUrl).then(c => c.focus());
-            }
+    // Esta es la forma más robusta de manejar el clic.
+    // Primero busca CUALQUIER ventana abierta de esta app.
+    const promiseChain = clients.matchAll({
+        type: "window",
+        includeUncontrolled: true
+    }).then((clientList) => {
+        // Si encuentra una ventana (incluso si está en segundo plano), la usa.
+        if (clientList.length > 0) {
+            const client = clientList[0];
+            console.log('[SW-COBRADOR] Ventana existente encontrada. Navegando y enfocando.');
+            // Le ordena navegar a la URL correcta y luego la trae al frente (focus).
+            return client.navigate(targetUrl).then(c => c.focus());
         }
-        if (clients.openWindow) {
-            return clients.openWindow(targetUrl);
-        }
+
+        // Si no encuentra ninguna ventana abierta, abre una nueva.
+        console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
+        return clients.openWindow(targetUrl);
     });
+
     event.waitUntil(promiseChain);
 });
-
 
 
 
