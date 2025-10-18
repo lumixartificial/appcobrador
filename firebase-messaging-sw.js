@@ -1,10 +1,9 @@
-const SW_VERSION = "v5.7-config-corregido"; // Versión actualizada y corregida
+const SW_VERSION = "v5.8-estable"; // Versión final y estable
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
 
-// [SOLUCIÓN DEFINITIVA] Esta configuración AHORA es una copia exacta de la que
-// se encuentra en tu archivo app_cobrador/index.html, garantizando la consistencia.
+// Configuración de Firebase verificada para ser idéntica a index.html
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
@@ -28,7 +27,7 @@ messaging.onBackgroundMessage((payload) => {
     body: payload.data.body,
     icon: payload.data.icon,
     tag: 'lumix-cobrador-notification', 
-    data: { url: payload.data.url }
+    data: { url: payload.data.url || self.location.origin }
   };
   
   return self.registration.showNotification(notificationTitle, notificationOptions);
@@ -44,17 +43,15 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// [Lógica Final - Replicada de la App de Cliente funcional]
+// Lógica de clic final, idéntica a la que funciona en la app del cliente.
 self.addEventListener('notificationclick', (event) => {
     const targetUrl = event.notification.data.url || self.location.origin;
     event.notification.close();
 
-    // Esta es la lógica más fiable, replicada de la app del cliente.
     const promiseChain = clients.matchAll({
         type: "window",
         includeUncontrolled: true
     }).then((windowClients) => {
-        // 1. Busca si ya hay una ventana abierta con la misma URL.
         const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
 
         if (existingClient) {
@@ -62,18 +59,14 @@ self.addEventListener('notificationclick', (event) => {
             return existingClient.focus();
         }
 
-        // 2. Si no, busca cualquier otra ventana de la app para reutilizarla.
         if (windowClients.length > 0) {
             console.log('[SW-COBRADOR] Otra ventana de la app está abierta. Navegando y enfocando...');
-            // La navega a la URL correcta y luego la enfoca, trayéndola al frente.
             return windowClients[0].navigate(targetUrl).then(client => client.focus());
         }
         
-        // 3. Si no hay ninguna ventana abierta, abre una nueva.
         console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
         return clients.openWindow(targetUrl);
     });
 
     event.waitUntil(promiseChain);
 });
-
