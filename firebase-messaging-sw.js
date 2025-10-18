@@ -1,4 +1,4 @@
-const SW_VERSION = "v5.1-robusto"; // Versión actualizada
+const SW_VERSION = "v5.2-final"; // Versión actualizada
 
 // Importa los scripts de Firebase.
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
@@ -55,44 +55,74 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 self.addEventListener('install', (event) => {
-  console.log(`[SW-COBRADOR ${SW_VERSION}] Instalando y forzando activación.`);
-  event.waitUntil(self.skipWaiting());
+  console.log(`[SW-COBRADOR ${SW_VERSION}] Instalando y forzando espera de activación.`);
+  // [CORRECCIÓN]: Eliminamos self.skipWaiting() aquí. Dejamos que el navegador lo gestione.
+  // Esto previene un bucle de recarga en algunos casos.
 });
 
 self.addEventListener('activate', (event) => {
   console.log(`[SW-COBRADOR ${SW_VERSION}] Activado y tomando control.`);
+  // [CORRECCIÓN]: Se mantiene clients.claim() para tomar control de páginas existentes.
+  // Pero la combinación con skipWaiting() debe manejarse con cuidado en el frontend.
   event.waitUntil(self.clients.claim());
 });
 
-// [SOLUCIÓN DEFINITIVA] Lógica de clic de notificación mejorada y robusta.
+// [SOLUCIÓN FINAL] Lógica de clic de notificación mejorada y robusta.
 self.addEventListener('notificationclick', (event) => {
     const targetUrl = event.notification.data.url || self.location.origin;
     console.log(`[SW-COBRADOR] Clic en notificación. URL de destino: ${targetUrl}`);
     event.notification.close();
 
-    // Esta lógica busca una ventana existente, la navega a la URL correcta y la enfoca.
-    // Si no encuentra ninguna, abre una nueva. Es el método más fiable.
-    const promiseChain = clients.matchAll({
-        type: "window",
-        includeUncontrolled: true
-    }).then((clientList) => {
-        // Busca una ventana que ya esté visible para priorizarla.
-        for (const client of clientList) {
-            if (client.url === targetUrl && 'focus' in client) {
-                return client.focus();
-            }
-        }
-        // Si no hay una ventana visible en la URL correcta, o ninguna es visible,
-        // toma la primera disponible y la navega/enfoca.
-        if (clientList.length > 0) {
-            console.log('[SW-COBRADOR] Ventana en segundo plano encontrada. Navegando y enfocando.');
-            return clientList[0].navigate(targetUrl).then(client => client.focus());
-        }
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((windowClients) => {
+                let clientToFocus = null;
 
-        // Si no hay ninguna ventana abierta de la app, abre una nueva.
-        console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
-        return clients.openWindow(targetUrl);
-    });
+                // 1. Busca una ventana que ya esté abierta en la URL de destino y enfócala.
+                for (let i = 0; i < windowClients.length; i++) {
+                    const client = windowClients[i];
+                    if (client.url === targetUrl && 'focus' in client) {
+                        clientToFocus = client;
+                        break;
+                    }
+                }
 
-    event.waitUntil(promiseChain);
+                if (clientToFocus) {
+                    console.log('[SW-COBRADOR] Ventana en URL de destino encontrada y enfocada.');
+                    return clientToFocus.focus();
+                }
+
+                // 2. Si no encontró una ventana en la URL exacta, busca cualquier ventana de la misma app
+                //    que el Service Worker esté controlando (o pueda controlar).
+                for (let i = 0; i < windowClients.length; i++) {
+                    const client = windowClients[i];
+                    // Si el cliente ya está bajo el control de este SW, intentamos navegarlo.
+                    if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+                        console.log('[SW-COBRADOR] Ventana de la misma app encontrada. Navegando y enfocando.');
+                        return client.navigate(targetUrl).then(c => c.focus());
+                    }
+                }
+
+                // 3. Si no hay ninguna ventana existente que pueda ser reutilizada/enfocada, abre una nueva.
+                console.log('[SW-COBRADOR] No hay ventanas existentes para reutilizar. Abriendo una nueva.');
+                if (clients.openWindow) {
+                    return clients.openWindow(targetUrl);
+                } else {
+                    console.error('[SW-COBRADOR] clients.openWindow no soportado. No se puede abrir nueva ventana.');
+                    return null; // No se puede hacer nada más
+                }
+            })
+            // [CORRECCIÓN]: Capturar el error TypeError específico.
+            .catch(error => {
+                if (error instanceof TypeError && error.message.includes("is not the client's active service worker")) {
+                    console.warn(`[SW-COBRADOR] Reintento de apertura por error de Service Worker inactivo. Abriendo nueva ventana.`);
+                    return clients.openWindow(targetUrl); // Forzar apertura de nueva ventana si hay este error.
+                }
+                console.error('[SW-COBRADOR] Error en notificationclick:', error);
+                // Si clients.openWindow está disponible y no se ha usado ya, inténtalo como fallback.
+                if (clients.openWindow) {
+                    return clients.openWindow(targetUrl);
+                }
+            })
+    );
 });
