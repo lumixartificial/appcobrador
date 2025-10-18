@@ -1,7 +1,6 @@
-importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
+importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js');
+importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js');
 
-// La configuración es una copia exacta de la del index.html para asegurar consistencia.
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
@@ -11,19 +10,19 @@ const firebaseConfig = {
     appId: "1:463777495321:web:106118f53f56abd206ed88"
 };
 
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
+// Se inicializa Firebase con la sintaxis MODERNA.
+const app = firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging.getMessaging(app);
 
-const LOG_PREFIX = `[SW-COBRADOR-RESTAURADO v11.0]`;
-console.log(`${LOG_PREFIX} Service Worker iniciado. Este es el código de restauración.`);
+const LOG_PREFIX = `[SW-COBRADOR-MODULAR v12.0]`;
+console.log(`${LOG_PREFIX} Service Worker reconstruido y sincronizado.`);
 
-// Handler para recibir mensajes cuando la app está en segundo plano.
-// Este es el núcleo del sistema de notificaciones push.
-messaging.onBackgroundMessage((payload) => {
-    console.log(`${LOG_PREFIX} Mensaje PUSH recibido en segundo plano:`, payload);
+// Handler para recibir mensajes push. AHORA es compatible.
+firebase.messaging.onBackgroundMessage(messaging, (payload) => {
+    console.log(`${LOG_PREFIX} Mensaje PUSH recibido:`, payload);
 
     if (!payload.data || !payload.data.title) {
-        console.error(`${LOG_PREFIX} El payload del mensaje no tiene el formato esperado (data.title).`, payload);
+        console.error(`${LOG_PREFIX} El payload del mensaje es inválido.`, payload);
         return;
     }
 
@@ -31,22 +30,22 @@ messaging.onBackgroundMessage((payload) => {
     const notificationOptions = {
         body: payload.data.body,
         icon: payload.data.icon,
-        // La URL a la que se debe navegar se guarda en el campo 'data'.
-        data: { url: payload.data.url } 
+        tag: 'lumix-cobrador-notification', // Ayuda a agrupar notificaciones
+        data: { url: payload.data.url }
     };
   
     console.log(`${LOG_PREFIX} Mostrando notificación: "${notificationTitle}"`);
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Listener para el evento 'notificationclick'. Lógica blindada para abrir la app.
+// Listener para el evento 'notificationclick'. Lógica robusta y validada.
 self.addEventListener('notificationclick', (event) => {
     console.log(`${LOG_PREFIX} Clic en notificación detectado.`);
     event.notification.close();
 
     const targetUrl = event.notification.data.url || self.location.origin;
 
-    const promiseChain = clients.matchAll({
+    event.waitUntil(clients.matchAll({
         type: "window",
         includeUncontrolled: true
     }).then((windowClients) => {
@@ -57,7 +56,7 @@ self.addEventListener('notificationclick', (event) => {
             return existingClient.focus();
         }
 
-        // 2. Si no, reutiliza cualquier ventana abierta de la app.
+        // 2. Si no, reutiliza cualquier ventana abierta de la app, navegándola a la URL correcta.
         if (windowClients.length > 0) {
             console.log(`${LOG_PREFIX} Otra ventana de la app está abierta. Navegando y enfocando...`);
             return windowClients[0].navigate(targetUrl).then(client => client.focus());
@@ -66,19 +65,16 @@ self.addEventListener('notificationclick', (event) => {
         // 3. Si no hay ninguna, abre una nueva.
         console.log(`${LOG_PREFIX} Ninguna ventana de la app encontrada. Abriendo una nueva.`);
         return clients.openWindow(targetUrl);
-    });
-
-    event.waitUntil(promiseChain);
+    }));
 });
 
-
-// Se asegura de que esta nueva versión se active inmediatamente.
+// Forza la activación inmediata de esta nueva versión.
 self.addEventListener('install', (event) => {
-  console.log(`${LOG_PREFIX} Instalando la versión de restauración...`);
+  console.log(`${LOG_PREFIX} Instalando la versión final...`);
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  console.log(`${LOG_PREFIX} Activado y tomando el control.`);
+  console.log(`${LOG_PREFIX} Activado y tomando control.`);
   event.waitUntil(self.clients.claim());
 });
