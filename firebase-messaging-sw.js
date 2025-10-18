@@ -45,23 +45,29 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('notificationclick', (event) => {
-    const targetUrl = event.notification.data.url || self.location.origin;
+    console.log(`[SW ${SW_VERSION}] Evento 'notificationclick' DETECTADO.`);
     event.notification.close();
 
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((windowClients) => {
-            // 1. Busca una ventana visible y la enfoca.
-            for (const client of windowClients) {
-                if (client.url === targetUrl && 'focus' in client) {
-                    return client.focus();
-                }
+    const targetUrl = event.notification.data.url;
+    if (!targetUrl) {
+        console.error(`[SW ${SW_VERSION}] No se encontró URL. Abriendo página principal.`);
+        return event.waitUntil(clients.openWindow(self.location.origin));
+    }
+
+    const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((windowClients) => {
+        for (const client of windowClients) {
+            if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
+                console.log(`[SW ${SW_VERSION}] Ventana encontrada. Navegando y enfocando: ${targetUrl}`);
+                return client.navigate(targetUrl).then(c => c.focus());
             }
-            // 2. Si no hay ventanas visibles, abre una nueva.
-            if (clients.openWindow) {
-                return clients.openWindow(targetUrl);
-            }
-        })
-    );
+        }
+        if (clients.openWindow) {
+            console.log(`[SW ${SW_VERSION}] Abriendo nueva ventana en: ${targetUrl}`);
+            return clients.openWindow(targetUrl);
+        }
+    });
+    event.waitUntil(promiseChain);
 });
+
 
