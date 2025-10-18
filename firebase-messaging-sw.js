@@ -1,4 +1,4 @@
-const SW_VERSION = "v5.4-robusto"; // Versión actualizada
+const SW_VERSION = "v5.5-definitivo"; // Versión actualizada
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
@@ -42,15 +42,17 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// [SOLUCIÓN ROBUSTA Y DEFINITIVA]
+// [SOLUCIÓN FINAL - Lógica Exacta del Cliente]
 self.addEventListener('notificationclick', (event) => {
     const targetUrl = event.notification.data.url || self.location.origin;
     event.notification.close();
 
+    // Esta es la lógica más fiable, replicada de la app del cliente.
     const promiseChain = clients.matchAll({
         type: "window",
         includeUncontrolled: true
     }).then((windowClients) => {
+        // 1. Busca si ya hay una ventana abierta con la misma URL.
         const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
 
         if (existingClient) {
@@ -58,16 +60,20 @@ self.addEventListener('notificationclick', (event) => {
             return existingClient.focus();
         }
 
+        // 2. Si no, busca cualquier otra ventana de la app para reutilizarla.
         if (windowClients.length > 0) {
             console.log('[SW-COBRADOR] Otra ventana de la app está abierta. Navegando y enfocando...');
+            // La navega a la URL correcta y luego la enfoca, trayéndola al frente.
             return windowClients[0].navigate(targetUrl).then(client => client.focus());
         }
         
+        // 3. Si no hay ninguna ventana abierta, abre una nueva.
         console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
         return clients.openWindow(targetUrl);
     });
 
     event.waitUntil(promiseChain);
 });
+
 
 
