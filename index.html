@@ -3443,7 +3443,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon = 'inf
     try {
         const clientRef = doc(db, 'clients', clientId);
 
-        // 1. Crea la notificación INTERNA que se muestra dentro de la app del cliente
+        // 1. La notificación interna (para ver dentro de la app) sigue igual, es correcta.
         const internalNotif = {
             title: title,
             body: body,
@@ -3455,17 +3455,18 @@ async function sendNotificationToClient(clientId, title, body, type, icon = 'inf
         await setDoc(clientRef, { notifications: arrayUnion(internalNotif) }, { merge: true });
         console.log(`Notificación INTERNA para cliente [${clientId}] creada.`);
 
-        // 2. [CORRECCIÓN CLAVE] Escribe en la cola global de notificaciones PUSH
-        const queueRef = collection(db, 'pushNotificationQueue');
-        await addDoc(queueRef, {
-            target: 'client', // Indica que el objetivo es un cliente
-            userId: clientId,  // El ID del cliente a notificar
+        // 2. [CORRECCIÓN APLICADA] Ahora se escribe el ticket en la sub-colección
+        //    correcta ('clients/{id}/pushNotificationTickets'), que es donde la
+        //    Cloud Function 'sendPushNotificationToClient' está escuchando.
+        const ticketRef = collection(db, 'clients', clientId, 'pushNotificationTickets');
+        await addDoc(ticketRef, {
+            // Ya no necesitamos 'target' ni 'userId' porque la ruta los define.
             title: title,
             body: body,
             type: type,
-            createdAt: serverTimestamp() // Añadimos timestamp para posible depuración futura
+            createdAt: serverTimestamp()
         });
-        console.log(`Ticket PUSH para cliente [${clientId}] enviado a la cola global.`);
+        console.log(`Ticket PUSH para cliente [${clientId}] enviado a su cola específica.`);
     } catch (error) {
         console.error(`Error al enviar notificación/ticket al cliente [${clientId}]:`, error);
     }
