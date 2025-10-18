@@ -66,36 +66,29 @@ self.addEventListener('activate', (event) => {
 
 // [SOLUCIÓN DEFINITIVA] Lógica de clic de notificación mejorada y robusta.
 self.addEventListener('notificationclick', (event) => {
-    const targetUrl = event.notification.data.url || self.location.origin;
-    console.log(`[SW-COBRADOR] Clic en notificación. URL de destino: ${targetUrl}`);
+    console.log(`[SW-CLIENTE ${SW_VERSION}] El usuario hizo clic en la notificación.`);
     event.notification.close();
 
-    // Esta lógica busca una ventana existente, la navega a la URL correcta y la enfoca.
-    // Si no encuentra ninguna, abre una nueva. Es el método más fiable.
-    const promiseChain = clients.matchAll({
-        type: "window",
-        includeUncontrolled: true
-    }).then((clientList) => {
-        // Busca una ventana que ya esté visible para priorizarla.
-        for (const client of clientList) {
-            if (client.url === targetUrl && 'focus' in client) {
-                return client.focus();
+    const targetUrl = event.notification.data.url || self.location.origin;
+
+    // Busca si la app ya está abierta para enfocarla; si no, abre una nueva ventana.
+    const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((windowClients) => {
+        // Revisa si hay una ventana de la app abierta
+        for (const client of windowClients) {
+            if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
+                // Si la encuentra, la enfoca y navega a la URL correcta.
+                return client.navigate(targetUrl).then(c => c.focus());
             }
         }
-        // Si no hay una ventana visible en la URL correcta, o ninguna es visible,
-        // toma la primera disponible y la navega/enfoca.
-        if (clientList.length > 0) {
-            console.log('[SW-COBRADOR] Ventana en segundo plano encontrada. Navegando y enfocando.');
-            return clientList[0].navigate(targetUrl).then(client => client.focus());
+        // Si no hay ninguna ventana abierta, abre una nueva.
+        if (clients.openWindow) {
+            return clients.openWindow(targetUrl);
         }
-
-        // Si no hay ninguna ventana abierta de la app, abre una nueva.
-        console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
-        return clients.openWindow(targetUrl);
     });
-
     event.waitUntil(promiseChain);
 });
+
 
 
 
