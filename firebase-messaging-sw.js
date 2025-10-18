@@ -1,6 +1,10 @@
-importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js');
+const SW_VERSION = "v5.7-config-corregido"; // Versión actualizada y corregida
 
+importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
+
+// [SOLUCIÓN DEFINITIVA] Esta configuración AHORA es una copia exacta de la que
+// se encuentra en tu archivo app_cobrador/index.html, garantizando la consistencia.
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
@@ -10,79 +14,65 @@ const firebaseConfig = {
     appId: "1:463777495321:web:106118f53f56abd206ed88"
 };
 
-// Se inicializa Firebase con la sintaxis CORRECTA para un Service Worker.
-const app = firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging.getMessaging(app);
+firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging();
 
-console.log('[SW-COBRADOR v10.0] Service Worker inicializado y listo.');
+console.log(`[SW-COBRADOR] Service Worker ${SW_VERSION} cargado.`);
 
-// Handler para mensajes recibidos cuando la app está en segundo plano o cerrada.
-// ESTA ES LA FUNCIÓN CLAVE PARA RECIBIR NOTIFICACIONES PUSH.
-firebase.messaging.onBackgroundMessage(messaging, (payload) => {
-    console.log('[SW-COBRADOR v10.0] ¡Mensaje Push recibido en segundo plano!', payload);
+messaging.onBackgroundMessage((payload) => {
+  const LOG_PREFIX = `[SW-COBRADOR-DIAGNOSTICO ${SW_VERSION}]`;
+  console.log(`${LOG_PREFIX} Mensaje en segundo plano recibido.`, payload);
 
-    if (!payload.data || !payload.data.title) {
-        console.error('[SW-COBRADOR v10.0] El payload recibido no tiene el formato esperado (payload.data.title).', payload);
-        return;
-    }
-
-    const notificationTitle = payload.data.title;
-    const notificationOptions = {
-        body: payload.data.body,
-        icon: payload.data.icon,
-        data: {
-            url: payload.data.url || '/'
-        }
-    };
-
-    console.log(`[SW-COBRADOR v10.0] Mostrando notificación: "${notificationTitle}"`);
-    return self.registration.showNotification(notificationTitle, notificationOptions);
+  const notificationTitle = payload.data.title;
+  const notificationOptions = {
+    body: payload.data.body,
+    icon: payload.data.icon,
+    tag: 'lumix-cobrador-notification', 
+    data: { url: payload.data.url }
+  };
+  
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Listener para el evento 'notificationclick'. ESTA ES LA LÓGICA MÁS IMPORTANTE.
+self.addEventListener('install', (event) => {
+  console.log(`[SW-COBRADOR ${SW_VERSION}] Instalando y forzando activación inmediata.`);
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  console.log(`[SW-COBRADOR ${SW_VERSION}] Activado y tomando control.`);
+  event.waitUntil(self.clients.claim());
+});
+
+// [Lógica Final - Replicada de la App de Cliente funcional]
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW-COBRADOR v10.0] Clic en notificación detectado.', event.notification);
+    const targetUrl = event.notification.data.url || self.location.origin;
     event.notification.close();
 
-    const targetUrl = event.notification.data.url;
-    console.log(`[SW-COBRADOR v10.0] URL de destino: ${targetUrl}`);
-
+    // Esta es la lógica más fiable, replicada de la app del cliente.
     const promiseChain = clients.matchAll({
-        type: 'window',
+        type: "window",
         includeUncontrolled: true
     }).then((windowClients) => {
-        let matchingClient = null;
-        for (const client of windowClients) {
-            if (client.url === targetUrl && 'focus' in client) {
-                matchingClient = client;
-                break;
-            }
+        // 1. Busca si ya hay una ventana abierta con la misma URL.
+        const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
+
+        if (existingClient) {
+            console.log('[SW-COBRADOR] Ventana existente encontrada. Enfocando...');
+            return existingClient.focus();
         }
 
-        if (matchingClient) {
-            console.log('[SW-COBRADOR v10.0] Ventana existente encontrada en la URL correcta. Enfocando...');
-            return matchingClient.focus();
-        }
-
+        // 2. Si no, busca cualquier otra ventana de la app para reutilizarla.
         if (windowClients.length > 0) {
-            console.log('[SW-COBRADOR v10.0] Otra ventana de la app está abierta. Navegando y enfocando...');
+            console.log('[SW-COBRADOR] Otra ventana de la app está abierta. Navegando y enfocando...');
+            // La navega a la URL correcta y luego la enfoca, trayéndola al frente.
             return windowClients[0].navigate(targetUrl).then(client => client.focus());
         }
         
-        console.log('[SW-COBRADOR v10.0] Ninguna ventana de la app encontrada. Abriendo una nueva.');
+        // 3. Si no hay ninguna ventana abierta, abre una nueva.
+        console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
         return clients.openWindow(targetUrl);
     });
 
     event.waitUntil(promiseChain);
 });
-
-self.addEventListener('install', (event) => {
-  console.log('[SW-COBRADOR v10.0] Instalando la versión definitiva...');
-  event.waitUntil(self.skipWaiting()); 
-});
-
-self.addEventListener('activate', (event) => {
-  console.log('[SW-COBRADOR v10.0] Activando y tomando el control de la página...');
-  event.waitUntil(self.clients.claim());
-});
-
