@@ -1,4 +1,4 @@
-const SW_VERSION = "v5.3-definitivo"; // Versión actualizada
+const SW_VERSION = "v5.4-robusto"; // Versión actualizada
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
@@ -32,42 +32,40 @@ messaging.onBackgroundMessage((payload) => {
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// [SOLUCIÓN DEFINITIVA] Combinamos skipWaiting con una activación controlada.
 self.addEventListener('install', (event) => {
   console.log(`[SW-COBRADOR ${SW_VERSION}] Instalando y forzando activación inmediata.`);
-  event.waitUntil(self.skipWaiting()); // Fuerza al nuevo SW a activarse tan pronto como se instale.
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
   console.log(`[SW-COBRADOR ${SW_VERSION}] Activado y tomando control.`);
-  // Tomará el control de todas las páginas abiertas.
   event.waitUntil(self.clients.claim());
 });
 
+// [SOLUCIÓN ROBUSTA Y DEFINITIVA]
 self.addEventListener('notificationclick', (event) => {
-    console.log(`[SW ${SW_VERSION}] Evento 'notificationclick' DETECTADO.`);
+    const targetUrl = event.notification.data.url || self.location.origin;
     event.notification.close();
 
-    const targetUrl = event.notification.data.url;
-    if (!targetUrl) {
-        console.error(`[SW ${SW_VERSION}] No se encontró URL. Abriendo página principal.`);
-        return event.waitUntil(clients.openWindow(self.location.origin));
-    }
+    const promiseChain = clients.matchAll({
+        type: "window",
+        includeUncontrolled: true
+    }).then((windowClients) => {
+        const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
 
-    const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
-    .then((windowClients) => {
-        for (const client of windowClients) {
-            if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
-                console.log(`[SW ${SW_VERSION}] Ventana encontrada. Navegando y enfocando: ${targetUrl}`);
-                return client.navigate(targetUrl).then(c => c.focus());
-            }
+        if (existingClient) {
+            console.log('[SW-COBRADOR] Ventana existente encontrada. Enfocando...');
+            return existingClient.focus();
         }
-        if (clients.openWindow) {
-            console.log(`[SW ${SW_VERSION}] Abriendo nueva ventana en: ${targetUrl}`);
-            return clients.openWindow(targetUrl);
+
+        if (windowClients.length > 0) {
+            console.log('[SW-COBRADOR] Otra ventana de la app está abierta. Navegando y enfocando...');
+            return windowClients[0].navigate(targetUrl).then(client => client.focus());
         }
+        
+        console.log('[SW-COBRADOR] Ninguna ventana abierta. Abriendo una nueva.');
+        return clients.openWindow(targetUrl);
     });
+
     event.waitUntil(promiseChain);
 });
-
-
