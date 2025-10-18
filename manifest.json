@@ -1,11 +1,12 @@
 {
-  "name": "Portal Cobrador",
-  "short_name": "Portal Cobrador",
-  "start_url": "/",
+  "name": "Portal Cobrador Lumix",
+  "short_name": "Cobrador",
+  "start_url": ".",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#6f42c1",
-  "description": "Portal do Cobrador da LUMIX Finanças.",
+  "description": "Painel de gerenciamento para cobradores.",
   "icons": [
     {
       "src": "https://res.cloudinary.com/dc6as14p0/image/upload/v1759873183/LOGO_LUMIX_REDUCI_czkw4p.png",
@@ -21,3 +22,4 @@
     }
   ]
 }
+
