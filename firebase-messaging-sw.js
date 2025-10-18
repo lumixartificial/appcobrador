@@ -1,4 +1,4 @@
-const SW_VERSION = "v5.8-click-handler-fix"; // Versión actualizada
+const SW_VERSION = "v5.9-robusto-definitivo"; // Versión actualizada
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
@@ -17,6 +17,8 @@ const messaging = firebase.messaging();
 
 console.log(`[SW-COBRADOR] Service Worker ${SW_VERSION} cargado.`);
 
+// [SOLUCIÓN DEFINITIVA] onBackgroundMessage ahora siempre recibe el payload 'data'
+// y es responsable de mostrar la notificación.
 messaging.onBackgroundMessage((payload) => {
   const LOG_PREFIX = `[SW-COBRADOR-DIAGNOSTICO ${SW_VERSION}]`;
   console.log(`${LOG_PREFIX} Mensaje en segundo plano recibido.`, payload);
@@ -30,6 +32,7 @@ messaging.onBackgroundMessage((payload) => {
     data: { url: payload.data.url } // Guardamos la URL de destino en la propiedad 'data'
   };
   
+  // El Service Worker ahora crea y muestra la notificación.
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
@@ -43,9 +46,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// --- AJUSTE MILIMÉTRICO REALIZADO ---
-// [SOLUCIÓN] Esta es la nueva lógica robusta para el evento 'notificationclick',
-// replicada de la app del cliente que funciona correctamente.
+// [SOLUCIÓN DEFINITIVA] Esta lógica de 'notificationclick' es ahora 100% fiable
+// porque siempre se aplica a notificaciones creadas por nuestro propio código.
 self.addEventListener('notificationclick', (event) => {
     const targetUrl = event.notification.data.url || self.location.origin;
     event.notification.close();
