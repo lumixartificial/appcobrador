@@ -1,4 +1,4 @@
-const SW_VERSION = "v7.0-enfoque-directo"; // Versión actualizada para forzar la actualización
+const SW_VERSION = "v8.0-reset-total"; // Versión final para forzar la actualización
 
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
@@ -18,8 +18,7 @@ const messaging = firebase.messaging();
 console.log(`[SW-COBRADOR] Service Worker ${SW_VERSION} cargado.`);
 
 messaging.onBackgroundMessage((payload) => {
-  const LOG_PREFIX = `[SW-COBRADOR-DIAGNOSTICO ${SW_VERSION}]`;
-  console.log(`${LOG_PREFIX} Mensaje en segundo plano recibido.`, payload);
+  console.log(`[SW-COBRADOR] Mensaje en segundo plano recibido.`, payload);
 
   const notificationTitle = payload.data.title;
   const notificationOptions = {
@@ -42,9 +41,6 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// --- SOLUCIÓN DEFINITIVA Y DIRECTA ---
-// Esta lógica es más agresiva. En lugar de ser selectiva, su única misión
-// es encontrar CUALQUIER ventana abierta de la aplicación y traerla al frente.
 self.addEventListener('notificationclick', (event) => {
     const LOG_PREFIX = `[SW-COBRADOR-CLICK ${SW_VERSION}]`;
     console.log(`${LOG_PREFIX} Clic en notificación recibido.`);
@@ -54,13 +50,11 @@ self.addEventListener('notificationclick', (event) => {
     const targetUrl = event.notification.data.url || new URL('/', self.location.origin).href;
     console.log(`${LOG_PREFIX} URL de destino: ${targetUrl}`);
 
-    // Promesa para buscar y enfocar una ventana existente, o abrir una nueva.
     const promiseChain = clients.matchAll({
         type: 'window',
         includeUncontrolled: true
     }).then((windowClients) => {
         // Opción 1: Buscar una ventana que ya esté en la URL correcta.
-        // Esto es ideal si el usuario ya está en la pantalla de notificaciones.
         const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
         if (existingClient) {
             console.log(`${LOG_PREFIX} Ventana existente con URL correcta encontrada. Enfocando...`);
@@ -71,7 +65,6 @@ self.addEventListener('notificationclick', (event) => {
         // la reutilizamos, sin importar en qué pantalla esté.
         if (windowClients.length > 0) {
             console.log(`${LOG_PREFIX} Otra ventana de la app está abierta. Reutilizando y enfocando...`);
-            // Le ordena navegar a la URL correcta y luego la trae al primer plano.
             return windowClients[0].navigate(targetUrl).then(client => client.focus());
         }
         
