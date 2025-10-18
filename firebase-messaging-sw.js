@@ -1,6 +1,6 @@
-const SW_VERSION = "v4.0-diagnostico";
+const SW_VERSION = "v5.0-revisado"; // Versión actualizada
 
-// Importa los scripts de Firebase. Esto debe hacerse primero.
+// Importa los scripts de Firebase.
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
 
@@ -16,23 +16,17 @@ const firebaseConfig = {
 
 // Inicializa Firebase.
 firebase.initializeApp(firebaseConfig);
-
-// Obtén la instancia de Messaging DESPUÉS de inicializar Firebase.
 const messaging = firebase.messaging();
 
-console.log(`Service Worker ${SW_VERSION} cargado y listo.`);
+console.log(`[SW-COBRADOR] Service Worker ${SW_VERSION} cargado y listo.`);
 
-/**
- * [LÓGICA CLAVE PARA MOSTRAR NOTIFICACIONES]
- * Esto se ejecuta cuando llega un mensaje y la app está cerrada o en segundo plano.
- */
 messaging.onBackgroundMessage((payload) => {
-  const LOG_PREFIX = `[LOG-DIAGNOSTICO-SW ${SW_VERSION}]`;
-  console.log(`${LOG_PREFIX} >>> ¡MENSAJE EN SEGUNDO PLANO RECIBIDO! <<<`, payload);
+  const LOG_PREFIX = `[SW-COBRADOR-DIAGNOSTICO ${SW_VERSION}]`;
+  console.log(`${LOG_PREFIX} >>> MENSAJE EN SEGUNDO PLANO RECIBIDO <<<`, payload);
 
   try {
     if (!payload.data) {
-      console.error(`${LOG_PREFIX} ERROR FATAL: El payload no contiene la sección 'data'. No se puede mostrar la notificación.`);
+      console.error(`${LOG_PREFIX} ERROR: El payload no contiene la sección 'data'.`);
       return;
     }
     console.log(`${LOG_PREFIX} Payload 'data' validado.`, payload.data);
@@ -42,52 +36,43 @@ messaging.onBackgroundMessage((payload) => {
       body: payload.data.body,
       icon: payload.data.icon,
       tag: 'lumix-cobrador-notification', 
-      data: {
-        url: payload.data.url 
-      }
+      data: { url: payload.data.url }
     };
     console.log(`${LOG_PREFIX} Opciones de notificación preparadas:`, notificationOptions);
 
-    console.log(`${LOG_PREFIX} Intentando mostrar la notificación AHORA...`);
-    // self.registration.showNotification devuelve una "Promise", la retornamos para que el SW sepa que debe esperar.
+    console.log(`${LOG_PREFIX} Intentando mostrar la notificación...`);
     return self.registration.showNotification(notificationTitle, notificationOptions)
       .then(() => {
-        console.log(`${LOG_PREFIX} ¡ÉXITO! showNotification() se completó.`);
+        console.log(`${LOG_PREFIX} ¡ÉXITO! Notificación mostrada.`);
       })
       .catch(err => {
-        console.error(`${LOG_PREFIX} ERROR DENTRO de showNotification():`, err);
+        console.error(`${LOG_PREFIX} ERROR al mostrar notificación:`, err);
       });
 
   } catch (error) {
-    console.error(`${LOG_PREFIX} ERROR CATASTRÓFICO DENTRO DE onBackgroundMessage:`, error);
+    console.error(`${LOG_PREFIX} ERROR CATASTRÓFICO en onBackgroundMessage:`, error);
   }
 });
 
 self.addEventListener('install', (event) => {
-  console.log(`[SW ${SW_VERSION}] Instalando...`);
+  console.log(`[SW-COBRADOR ${SW_VERSION}] Instalando y forzando activación.`);
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  console.log(`[SW ${SW_VERSION}] Activado y tomando control.`);
+  console.log(`[SW-COBRADOR ${SW_VERSION}] Activado y tomando control.`);
   event.waitUntil(self.clients.claim());
 });
 
-/**
- * [LÓGICA PARA EL CLIC]
- * Esto se ejecuta cuando el usuario toca la notificación.
- */
 self.addEventListener('notificationclick', (event) => {
-    console.log(`[SW ${SW_VERSION}] El usuario hizo clic en la notificación.`);
+    console.log(`[SW-COBRADOR ${SW_VERSION}] Clic en notificación detectado.`);
     event.notification.close();
 
     const targetUrl = event.notification.data.url || self.location.origin;
-
-    // Busca si la app ya está abierta para enfocarla, si no, abre una nueva ventana.
+    
     const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
     .then((windowClients) => {
         for (const client of windowClients) {
-            // Compara el origen para asegurarse de que es la misma app.
             if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
                 return client.navigate(targetUrl).then(c => c.focus());
             }
@@ -98,6 +83,8 @@ self.addEventListener('notificationclick', (event) => {
     });
     event.waitUntil(promiseChain);
 });
+
+
 
 
 
