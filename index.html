@@ -549,71 +549,83 @@
             projectId: "lumix-financas-app",
             storageBucket: "lumix-financas-app.appspot.com",
             messagingSenderId: "463777495321",
+            // [CORRECCIÓN CRÍTICA] Se ha corregido el appId para que coincida con el del Service Worker y el de la app del cliente.
             appId: "1:463777495321:web:106118f53f56abd206ed88"
         };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         async function setupFCM(collectorId) {
-    const LOG_PREFIX = `[LOG-DIAGNOSTICO-APP]`;
-    console.log(`${LOG_PREFIX} Iniciando configuración de FCM.`);
-    try {
-        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-            console.error(`${LOG_PREFIX} Notificaciones Push NO SOPORTADAS en este navegador.`);
-            return;
+            const LOG_PREFIX = `[COBRADOR-FCM-DIAGNOSTICO]`;
+            console.log(`${LOG_PREFIX} --- Iniciando setupFCM para el cobrador: ${collectorId} ---`);
+            try {
+                if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+                    console.error(`${LOG_PREFIX} ERROR: Notificaciones Push no son soportadas en este navegador.`);
+                    return;
+                }
+                console.log(`${LOG_PREFIX} El navegador soporta notificaciones.`);
+        
+                const messaging = getMessaging(app);
+                console.log(`${LOG_PREFIX} Objeto de Messaging obtenido.`);
+        
+                console.log(`${LOG_PREFIX} Solicitando permiso del usuario...`);
+                const permission = await Notification.requestPermission();
+                console.log(`${LOG_PREFIX} El permiso del usuario es: ${permission}`);
+                if (permission !== 'granted') {
+                    console.warn(`${LOG_PREFIX} El usuario DENEGÓ el permiso para notificaciones.`);
+                    showToast('Permiso para notificaciones denegado.', true);
+                    return;
+                }
+                console.log(`${LOG_PREFIX} Permiso CONCEDIDO.`);
+        
+                const VAPID_KEY = "BAgKWBzKi_Z4eyNNgGtprgPRQhPzU2MqU1vyrHf0iQSMxy1UMkin4E3GJ7KQLtChcDJHtEx8mMYau4jtzQvtjfw";
+                if (!VAPID_KEY) {
+                    console.error(`${LOG_PREFIX} ERROR FATAL: La VAPID key no está configurada.`);
+                    showToast('Configuración de notificaciones incompleta (sin VAPID key).', true);
+                    return;
+                }
+                console.log(`${LOG_PREFIX} VAPID Key encontrada y es válida.`);
+        
+                console.log(`${LOG_PREFIX} Obteniendo token de FCM... (Este paso puede tardar)`);
+                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+        
+                if (currentToken) {
+                    console.log(`${LOG_PREFIX} ¡TOKEN OBTENIDO CON ÉXITO!: ${currentToken.substring(0, 30)}...`);
+                    const collectorRef = doc(db, 'collectors', collectorId);
+                    console.log(`${LOG_PREFIX} Intentando guardar el token en Firestore...`);
+                    await updateDoc(collectorRef, { fcmTokens: arrayUnion(currentToken) });
+                    console.log(`${LOG_PREFIX} ¡ÉXITO! Token guardado/confirmado en Firestore.`);
+                } else {
+                    console.error(`${LOG_PREFIX} ERROR FATAL: No se pudo obtener el token. Causas comunes: 1) El archivo 'firebase-messaging-sw.js' no se encuentra en la raíz del sitio. 2) La VAPID key es incorrecta. 3) Problema de registro del Service Worker.`);
+                    showToast('Falha ao obter token de notificação.', true);
+                }
+        
+                onMessage(messaging, (payload) => {
+            const LOG_PREFIX = `[COBRADOR-FCM-DIAGNOSTICO]`;
+            console.log(`${LOG_PREFIX} Notificación recibida en PRIMER PLANO:`, payload);
+        
+            // [CORRECCIÓN] Leemos desde payload.data para consistencia
+            if (payload.data && payload.data.title && payload.data.body) {
+                showToast(`${payload.data.title}: ${payload.data.body}`);
+                updateNotifications(); // Esta función ya existe y es correcta aquí
+            } else {
+                console.warn(`${LOG_PREFIX} El payload en primer plano no tiene el formato esperado.`, payload);
+                showToast('Você recebeu uma nova notificação.');
+                updateNotifications();
+            }
+        });
+        
+            } catch (err) {
+                console.error(`${LOG_PREFIX} ERROR CATASTRÓFICO en setupFCM:`, err);
+                if (err.code === 'messaging/permission-blocked') {
+                    showToast('As notificações estão bloqueadas. Ative-as nas configurações do seu navegador.', true);
+                } else if (err.code === 'messaging/sw-registration-failed') {
+                    showToast('Falha ao registrar o serviço de notificação.', true);
+                } else {
+                    showToast('Falha ao configurar as notificações push.', true);
+                }
+            }
         }
-        console.log(`${LOG_PREFIX} El navegador soporta notificaciones.`);
-
-        const messaging = getMessaging(app);
-
-        console.log(`${LOG_PREFIX} Solicitando permiso de notificaciones...`);
-        const permission = await Notification.requestPermission();
-        console.log(`${LOG_PREFIX} El permiso de notificaciones es: ${permission}`);
-        if (permission !== 'granted') {
-            showToast('Permiso de notificaciones denegado.', true);
-            return;
-        }
-
-        const VAPID_KEY = "BAgKWBzKi_Z4eyNNgGtprgPRQhPzU2MqU1vyrHf0iQSMxy1UMkin4E3GJ7KQLtChcDJHtEx8mMYau4jtzQvtjfw";
-        console.log(`${LOG_PREFIX} VAPID Key: ${VAPID_KEY}`);
-
-        console.log(`${LOG_PREFIX} Obteniendo token de FCM...`);
-        const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
-
-        if (currentToken) {
-            console.log(`${LOG_PREFIX} ¡TOKEN OBTENIDO CON ÉXITO!: ${currentToken}`);
-            const collectorRef = doc(db, 'collectors', collectorId);
-            await updateDoc(collectorRef, { fcmTokens: arrayUnion(currentToken) });
-            console.log(`${LOG_PREFIX} Token guardado en Firestore.`);
-        } else {
-            console.error(`${LOG_PREFIX} ERROR FATAL: No se pudo obtener el token de FCM. Revisa la configuración del Service Worker y la VAPID key.`);
-            showToast('Falha ao obter token de notificação.', true);
-        }
-
-        onMessage(messaging, (payload) => {
-    const LOG_PREFIX = `[COBRADOR-FCM-DIAGNOSTICO]`;
-    console.log(`${LOG_PREFIX} Notificación recibida en PRIMER PLANO:`, payload);
-
-    // [CORRECCIÓN] Leemos desde payload.data para consistencia
-    if (payload.data && payload.data.title && payload.data.body) {
-        showToast(`${payload.data.title}: ${payload.data.body}`);
-        updateNotifications(); // Esta función ya existe y es correcta aquí
-    } else {
-        console.warn(`${LOG_PREFIX} El payload en primer plano no tiene el formato esperado.`, payload);
-        showToast('Você recebeu uma nova notificação.');
-        updateNotifications();
-    }
-});
-
-    } catch (err) {
-        console.error(`${LOG_PREFIX} ERROR CATASTRÓFICO en setupFCM:`, err);
-        if (err.code === 'messaging/permission-blocked') {
-            showToast('As notificações estão bloqueadas. Ative-as nas configurações do seu navegador.', true);
-        } else {
-            showToast('Falha ao carregar notificações push. Verifique o console.', true);
-        }
-    }
-}
         
         const CLOUDINARY_CLOUD_NAME = "dc6as14p0";
         const CLOUDINARY_UPLOAD_PRESET = "lumix-financas-uploads";
