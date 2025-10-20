@@ -555,7 +555,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        async function setupFCM(collectorId) {
+        async function setupFCM(collectorId, swRegistration) {
             const LOG_PREFIX = `[COBRADOR-FCM-DIAGNOSTICO]`;
             console.log(`${LOG_PREFIX} --- Iniciando setupFCM para el cobrador: ${collectorId} ---`);
             try {
@@ -587,7 +587,7 @@
                 console.log(`${LOG_PREFIX} VAPID Key encontrada y es válida.`);
         
                 console.log(`${LOG_PREFIX} Obteniendo token de FCM... (Este paso puede tardar)`);
-                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swRegistration });
         
                 if (currentToken) {
                     console.log(`${LOG_PREFIX} ¡TOKEN OBTENIDO CON ÉXITO!: ${currentToken.substring(0, 30)}...`);
@@ -3157,7 +3157,7 @@ if (isEditMode && client.documentNumber) {
                             navigator.serviceWorker.ready.then(registration => {
                                 console.log('[COBRADOR-APP] Service Worker está activo y listo. Procediendo a configurar FCM.');
                                 // Llama a la función para obtener y guardar el token en Firestore.
-                                setupFCM(collectorId);
+                                setupFCM(collectorId, registration);
                             }).catch(err => {
                                 console.error('[COBRADOR-APP] ERROR CRÍTICO: El Service Worker no estuvo listo.', err);
                             });
@@ -3649,3 +3649,5 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
+
+
