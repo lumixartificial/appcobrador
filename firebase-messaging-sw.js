@@ -1,4 +1,4 @@
-const SW_VERSION = "v4.0-diagnostico";
+const SW_VERSION = "v5.0-correccion-appId"; // Versión actualizada para forzar la actualización
 
 // Importa los scripts de Firebase. Esto debe hacerse primero.
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
@@ -11,7 +11,8 @@ const firebaseConfig = {
     projectId: "lumix-financas-app",
     storageBucket: "lumix-financas-app.appspot.com",
     messagingSenderId: "463777495321",
-    appId: "1:463777495321:web:106118f56abd206ed88"
+    // [CORRECCIÓN CRÍTICA] Se ha corregido el appId. Ahora es idéntico al de la aplicación principal.
+    appId: "1:463777495321:web:106118f53f56abd206ed88"
 };
 
 // Inicializa Firebase.
@@ -20,14 +21,14 @@ firebase.initializeApp(firebaseConfig);
 // Obtén la instancia de Messaging DESPUÉS de inicializar Firebase.
 const messaging = firebase.messaging();
 
-console.log(`Service Worker ${SW_VERSION} cargado y listo.`);
+console.log(`[SW-COBRADOR] Service Worker ${SW_VERSION} cargado y listo.`);
 
 /**
  * [LÓGICA CLAVE PARA MOSTRAR NOTIFICACIONES]
  * Esto se ejecuta cuando llega un mensaje y la app está cerrada o en segundo plano.
  */
 messaging.onBackgroundMessage((payload) => {
-  const LOG_PREFIX = `[LOG-DIAGNOSTICO-SW ${SW_VERSION}]`;
+  const LOG_PREFIX = `[SW-COBRADOR-DIAGNOSTICO ${SW_VERSION}]`;
   console.log(`${LOG_PREFIX} >>> ¡MENSAJE EN SEGUNDO PLANO RECIBIDO! <<<`, payload);
 
   try {
@@ -64,7 +65,7 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 self.addEventListener('install', (event) => {
-  console.log(`[SW ${SW_VERSION}] Instalando...`);
+  console.log(`[SW ${SW_VERSION}] Instalando y forzando activación inmediata.`);
   event.waitUntil(self.skipWaiting());
 });
 
@@ -98,3 +99,5 @@ self.addEventListener('notificationclick', (event) => {
     });
     event.waitUntil(promiseChain);
 });
+
+
