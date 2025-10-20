@@ -3123,7 +3123,7 @@ if (isEditMode && client.documentNumber) {
             const initialView = location.hash.substring(1) || 'home';
             showView(initialView);
 
-                   
+            let isFirstLoad = true; // Flag para ejecutar la configuración solo una vez
             let collectorData = null;
 
             onSnapshot(doc(db, 'collectors', collectorId), (docSnap) => {
@@ -3147,6 +3147,24 @@ if (isEditMode && client.documentNumber) {
                     if (collectorData.isRealtimeTrackingActive) {
                         startRealtimeGeolocation();
                     }
+
+                    // --- INICIO DE LA CORRECCIÓN DE NOTIFICACIONES ---
+                    // Esta lógica se ejecuta solo una vez cuando la app carga los datos.
+                    if (isFirstLoad) {
+                        console.log('[COBRADOR-APP] Carga inicial completa. Configurando FCM...');
+                        if ('serviceWorker' in navigator) {
+                            // Espera a que el Service Worker esté 100% activo antes de pedir el token.
+                            navigator.serviceWorker.ready.then(registration => {
+                                console.log('[COBRADOR-APP] Service Worker está activo y listo. Procediendo a configurar FCM.');
+                                // Llama a la función para obtener y guardar el token en Firestore.
+                                setupFCM(collectorId);
+                            }).catch(err => {
+                                console.error('[COBRADOR-APP] ERROR CRÍTICO: El Service Worker no estuvo listo.', err);
+                            });
+                        }
+                        isFirstLoad = false; // Desactiva el flag para no volver a ejecutar.
+                    }
+                    // --- FIN DE LA CORRECCIÓN DE NOTIFICACIONES ---
 
                 } else {
                     setDoc(doc(db, 'collectors', collectorId), { 
