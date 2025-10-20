@@ -1,4 +1,4 @@
-const SW_VERSION = "v5.0-correccion-appId"; // Versión actualizada para forzar la actualización
+const SW_VERSION = "v5.1-loop-fix"; // Versión actualizada para forzar la actualización
 
 // Importa los scripts de Firebase. Esto debe hacerse primero.
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
@@ -64,15 +64,12 @@ messaging.onBackgroundMessage((payload) => {
   }
 });
 
-self.addEventListener('install', (event) => {
-  console.log(`[SW ${SW_VERSION}] Instalando y forzando activación inmediata.`);
-  event.waitUntil(self.skipWaiting());
-});
+// [CORRECCIÓN DEL BUCLE INFINITO]
+// Se han eliminado los listeners 'install' y 'activate' que contenían self.skipWaiting() y self.clients.claim().
+// Esto puede causar un bucle de recarga si la página principal tiene un script que fuerza la recarga cuando se activa un nuevo SW.
+// Al eliminarlos, el SW se actualizará de forma segura en segundo plano, y se activará cuando el usuario cierre todas las pestañas de la app.
+// Este es el comportamiento estándar y más seguro.
 
-self.addEventListener('activate', (event) => {
-  console.log(`[SW ${SW_VERSION}] Activado y tomando control.`);
-  event.waitUntil(self.clients.claim());
-});
 
 /**
  * [LÓGICA PARA EL CLIC]
@@ -99,5 +96,3 @@ self.addEventListener('notificationclick', (event) => {
     });
     event.waitUntil(promiseChain);
 });
-
-
