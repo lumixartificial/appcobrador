@@ -1,80 +1,100 @@
-importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js');
+const SW_VERSION = "v4.0-diagnostico";
 
+// Importa los scripts de Firebase. Esto debe hacerse primero.
+importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js");
+
+// Configuración de Firebase.
 const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
     projectId: "lumix-financas-app",
     storageBucket: "lumix-financas-app.appspot.com",
     messagingSenderId: "463777495321",
-    appId: "1:463777495321:web:106118f53f56abd206ed88"
+    appId: "1:463777495321:web:106118f56abd206ed88"
 };
 
-// Se inicializa Firebase con la sintaxis MODERNA.
-const app = firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging.getMessaging(app);
+// Inicializa Firebase.
+firebase.initializeApp(firebaseConfig);
 
-const LOG_PREFIX = `[SW-COBRADOR-MODULAR v12.0]`;
-console.log(`${LOG_PREFIX} Service Worker reconstruido y sincronizado.`);
+// Obtén la instancia de Messaging DESPUÉS de inicializar Firebase.
+const messaging = firebase.messaging();
 
-// Handler para recibir mensajes push. AHORA es compatible.
-firebase.messaging.onBackgroundMessage(messaging, (payload) => {
-    console.log(`${LOG_PREFIX} Mensaje PUSH recibido:`, payload);
+console.log(`Service Worker ${SW_VERSION} cargado y listo.`);
 
-    if (!payload.data || !payload.data.title) {
-        console.error(`${LOG_PREFIX} El payload del mensaje es inválido.`, payload);
-        return;
+/**
+ * [LÓGICA CLAVE PARA MOSTRAR NOTIFICACIONES]
+ * Esto se ejecuta cuando llega un mensaje y la app está cerrada o en segundo plano.
+ */
+messaging.onBackgroundMessage((payload) => {
+  const LOG_PREFIX = `[LOG-DIAGNOSTICO-SW ${SW_VERSION}]`;
+  console.log(`${LOG_PREFIX} >>> ¡MENSAJE EN SEGUNDO PLANO RECIBIDO! <<<`, payload);
+
+  try {
+    if (!payload.data) {
+      console.error(`${LOG_PREFIX} ERROR FATAL: El payload no contiene la sección 'data'. No se puede mostrar la notificación.`);
+      return;
     }
+    console.log(`${LOG_PREFIX} Payload 'data' validado.`, payload.data);
 
     const notificationTitle = payload.data.title;
     const notificationOptions = {
-        body: payload.data.body,
-        icon: payload.data.icon,
-        tag: 'lumix-cobrador-notification', // Ayuda a agrupar notificaciones
-        data: { url: payload.data.url }
+      body: payload.data.body,
+      icon: payload.data.icon,
+      tag: 'lumix-cobrador-notification', 
+      data: {
+        url: payload.data.url 
+      }
     };
-  
-    console.log(`${LOG_PREFIX} Mostrando notificación: "${notificationTitle}"`);
-    return self.registration.showNotification(notificationTitle, notificationOptions);
+    console.log(`${LOG_PREFIX} Opciones de notificación preparadas:`, notificationOptions);
+
+    console.log(`${LOG_PREFIX} Intentando mostrar la notificación AHORA...`);
+    // self.registration.showNotification devuelve una "Promise", la retornamos para que el SW sepa que debe esperar.
+    return self.registration.showNotification(notificationTitle, notificationOptions)
+      .then(() => {
+        console.log(`${LOG_PREFIX} ¡ÉXITO! showNotification() se completó.`);
+      })
+      .catch(err => {
+        console.error(`${LOG_PREFIX} ERROR DENTRO de showNotification():`, err);
+      });
+
+  } catch (error) {
+    console.error(`${LOG_PREFIX} ERROR CATASTRÓFICO DENTRO DE onBackgroundMessage:`, error);
+  }
 });
 
-// Listener para el evento 'notificationclick'. Lógica robusta y validada.
-self.addEventListener('notificationclick', (event) => {
-    console.log(`${LOG_PREFIX} Clic en notificación detectado.`);
-    event.notification.close();
-
-    const targetUrl = event.notification.data.url || self.location.origin;
-
-    event.waitUntil(clients.matchAll({
-        type: "window",
-        includeUncontrolled: true
-    }).then((windowClients) => {
-        // 1. Busca una ventana que ya esté en la URL correcta.
-        const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
-        if (existingClient) {
-            console.log(`${LOG_PREFIX} Ventana existente encontrada. Enfocando...`);
-            return existingClient.focus();
-        }
-
-        // 2. Si no, reutiliza cualquier ventana abierta de la app, navegándola a la URL correcta.
-        if (windowClients.length > 0) {
-            console.log(`${LOG_PREFIX} Otra ventana de la app está abierta. Navegando y enfocando...`);
-            return windowClients[0].navigate(targetUrl).then(client => client.focus());
-        }
-        
-        // 3. Si no hay ninguna, abre una nueva.
-        console.log(`${LOG_PREFIX} Ninguna ventana de la app encontrada. Abriendo una nueva.`);
-        return clients.openWindow(targetUrl);
-    }));
-});
-
-// Forza la activación inmediata de esta nueva versión.
 self.addEventListener('install', (event) => {
-  console.log(`${LOG_PREFIX} Instalando la versión final...`);
+  console.log(`[SW ${SW_VERSION}] Instalando...`);
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  console.log(`${LOG_PREFIX} Activado y tomando control.`);
+  console.log(`[SW ${SW_VERSION}] Activado y tomando control.`);
   event.waitUntil(self.clients.claim());
+});
+
+/**
+ * [LÓGICA PARA EL CLIC]
+ * Esto se ejecuta cuando el usuario toca la notificación.
+ */
+self.addEventListener('notificationclick', (event) => {
+    console.log(`[SW ${SW_VERSION}] El usuario hizo clic en la notificación.`);
+    event.notification.close();
+
+    const targetUrl = event.notification.data.url || self.location.origin;
+
+    // Busca si la app ya está abierta para enfocarla, si no, abre una nueva ventana.
+    const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then((windowClients) => {
+        for (const client of windowClients) {
+            // Compara el origen para asegurarse de que es la misma app.
+            if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
+                return client.navigate(targetUrl).then(c => c.focus());
+            }
+        }
+        if (clients.openWindow) {
+            return clients.openWindow(targetUrl);
+        }
+    });
+    event.waitUntil(promiseChain);
 });
