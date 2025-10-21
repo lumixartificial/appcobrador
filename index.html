@@ -544,6 +544,14 @@
                 box-shadow: 0 0 0 0 rgba(111, 66, 193, 0);
             }
         }
+        .collector-marker-icon {
+            background: none;
+            border: none;
+            box-shadow: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -708,6 +716,7 @@
         let currentLang = localStorage.getItem('language') || 'pt';
         let mapInstance = null;
         let mapMarkers = [];
+        let collectorMarker = null; // Marker para la moto del cobrador
         let deferredPrompt; // Para la instalación de PWA
         const collectorId = 'joao_silva'; 
         let collectorCurrentLocation = null; // Guardará tu ubicación en tiempo real
@@ -3232,8 +3241,31 @@ if (isEditMode && client.documentNumber) {
             mapMarkers.forEach(marker => marker.remove());
             mapMarkers = [];
 
+            // --- INICIO: LÓGICA DEL MARCADOR DEL COBRADOR ---
+            const collectorIcon = L.divIcon({
+                className: 'collector-marker-icon',
+                html: `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.5));"><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/><path d="M12 6V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v1"/><path d="m6.5 15-1-10h13l-1 10H6.5Z"/><path d="M12 6h3.5"/><path d="M9 10h6"/></svg>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+
+            const collectorPosition = collectorCurrentLocation 
+                ? [collectorCurrentLocation.lat, collectorCurrentLocation.lng]
+                : [-16.68, -49.25]; // Posición por defecto: Goiânia
+
+            if (!collectorMarker) {
+                collectorMarker = L.marker(collectorPosition, { icon: collectorIcon, zIndexOffset: 1000 }).addTo(mapInstance);
+                collectorMarker.bindPopup("Sua Posição Atual");
+            } else {
+                collectorMarker.setLatLng(collectorPosition);
+            }
+            // --- FIN: LÓGICA DEL MARCADOR DEL COBRADOR ---
+
             const clientsToPlot = getTodaysRouteClients();
             const locations = [];
+            
+            // Añade la posición del cobrador para el auto-zoom del mapa
+            locations.push(collectorPosition);
 
             const nextClientIcon = L.divIcon({
                 className: 'next-client-marker',
@@ -3895,6 +3927,19 @@ if (isEditMode && client.documentNumber) {
                             lng: position.coords.longitude
                         };
                         console.log('Ubicación actualizada:', collectorCurrentLocation);
+                        
+                        // --- INICIO: Actualización en tiempo real del marcador del cobrador ---
+                        if (mapInstance && collectorMarker) {
+                            const newLatLng = [collectorCurrentLocation.lat, collectorCurrentLocation.lng];
+                            collectorMarker.setLatLng(newLatLng);
+                            
+                            // Si la vista del mapa está activa, centra el mapa en la nueva ubicación
+                            if (document.getElementById('map-view').classList.contains('active')) {
+                                mapInstance.panTo(newLatLng);
+                            }
+                        }
+                        // --- FIN: Actualización en tiempo real del marcador ---
+
                         updateTodaysRouteList();
                     },
                     (error) => {
