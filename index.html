@@ -1350,43 +1350,46 @@
             document.getElementById('closeVerificationModal').addEventListener('click', () => window.history.back());
 
             document.getElementById('approve-payment-btn').addEventListener('click', async () => {
-    const clientRef = doc(db, 'clients', clientId);
+                const clientRef = doc(db, 'clients', clientId);
+                const updatedHistory = [...client.history];
+                const paymentBeingApproved = updatedHistory[historyIndex];
 
-    // Creamos una copia del historial para modificarlo de forma segura.
-    const updatedHistory = [...client.history];
+                if (!paymentBeingApproved) {
+                    console.error("Índice de historial de pago no válido:", historyIndex);
+                    showToast('Error: Pago no encontrado para aprobar.', true);
+                    return;
+                }
+                paymentBeingApproved.status = 'approved';
 
-    // Verificamos que el pago exista en el índice y actualizamos su estado a 'approved'.
-    if (updatedHistory[historyIndex]) {
-        updatedHistory[historyIndex].status = 'approved';
-    } else {
-        console.error("Índice de historial de pago no válido:", historyIndex);
-        showToast('Erro: Pagamento não encontrado para aprovar.', true);
-        return;
-    }
+                // --- INICIO DE LA NUEVA LÓGICA FINANCIERA ---
+                const approvedAmount = paymentBeingApproved.amount;
+                const dueAmountForThisPayment = paymentBeingApproved.dueAmount || client.amount; // Fallback para pagos antiguos
+                const newTotalPaidAmount = (client.paid || 0) + approvedAmount;
 
-    // Para mayor seguridad, recalculamos el total pagado sumando solo los pagos aprobados.
-    const newPaidAmount = updatedHistory
-        .filter(p => p.status === 'approved')
-        .reduce((sum, p) => sum + p.amount, 0);
+                const originalInstallmentValue = client.originalInstallmentAmount || dueAmountForThisPayment;
+                const amountDifference = approvedAmount - dueAmountForThisPayment;
+                const newNextInstallmentValue = Math.max(0, originalInstallmentValue - amountDifference);
+                // --- FIN DE LA NUEVA LÓGICA FINANCIERA ---
 
-    try {
-        // Actualizamos el documento del cliente con el historial modificado y el nuevo total pagado.
-        await updateDoc(clientRef, {
-            history: updatedHistory,
-            paid: newPaidAmount
-        });
+                try {
+                    // Actualizamos el documento del cliente con el historial modificado, el nuevo total pagado y el valor de la próxima cuota.
+                    await updateDoc(clientRef, {
+                        history: updatedHistory,
+                        paid: newTotalPaidAmount,
+                        amount: newNextInstallmentValue
+                    });
 
-        const notifTitle = translations[currentLang].paymentApprovedClientTitle;
-        const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', money(payment.amount));
-        sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-circle');
+                    const notifTitle = translations[currentLang].paymentApprovedClientTitle;
+                    const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', money(payment.amount));
+                    sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-circle');
 
-        showToast(translations[currentLang].paymentApproved);
-        window.history.back(); // Cierra el modal de verificación.
-    } catch (error) {
-        console.error("Error approving payment:", error);
-        showToast('Erro ao aprovar pagamento.', true);
-    }
-});
+                    showToast(translations[currentLang].paymentApproved);
+                    window.history.back(); // Cierra el modal de verificación.
+                } catch (error) {
+                    console.error("Error approving payment:", error);
+                    showToast('Erro ao aprovar pagamento.', true);
+                }
+            });
 
             document.getElementById('reject-payment-btn').addEventListener('click', async () => {
                 const clientRef = doc(db, 'clients', clientId);
@@ -1986,14 +1989,24 @@
                 }
 
                 const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
-                if (isNaN(actualPaidAmount) || actualPaidAmount <= 0) {
+                if (isNaN(actualPaidAmount) || actualPaidAmount < 0) {
                     showToast('Por favor, insira um valor de pagamento válido.', true);
+                    confirmBtn.disabled = false;
+                    confirmBtn.innerHTML = originalBtnHTML;
+                    lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
                     return;
                 }
 
                 const clientRef = doc(db, "clients", clientId);
+                const newTotalPaidAmount = (client.paid || 0) + actualPaidAmount;
+                
+                const dueAmountForThisPayment = client.amount;
+                const originalInstallmentValue = client.originalInstallmentAmount || dueAmountForThisPayment;
+                const amountDifference = actualPaidAmount - dueAmountForThisPayment;
+                const newNextInstallmentValue = Math.max(0, originalInstallmentValue - amountDifference);
+
                 const newPayment = {
-                    amount: actualPaidAmount, // Usamos o valor real pago
+                    amount: actualPaidAmount,
                     date: new Date(),
                     status: 'approved',
                     method: selectedMethod
@@ -2002,24 +2015,12 @@
                 if(receiptUrl) {
                     newPayment.receiptUrl = receiptUrl;
                 }
-
-                const newTotalPaidAmount = (client.paid || 0) + actualPaidAmount;
-                const currentInstallmentDue = client.amount || 0;
-
-                const updateData = {
+                
+                await updateDoc(clientRef, {
                     history: arrayUnion(newPayment),
-                    paid: newTotalPaidAmount
-                };
-
-                if (actualPaidAmount < currentInstallmentDue) {
-                    updateData.amount = currentInstallmentDue - actualPaidAmount;
-                } else {
-                    const totalInstallments = parseInt((client.installments || '0/1').split('/')[1]);
-                    const fallbackOriginalAmount = totalInstallments > 0 ? client.totalLoan / totalInstallments : client.amount;
-                    updateData.amount = client.originalInstallmentAmount || fallbackOriginalAmount;
-                }
-
-                await updateDoc(clientRef, updateData);
+                    paid: newTotalPaidAmount,
+                    amount: newNextInstallmentValue
+                });
 
                 window.history.back();
                 setTimeout(() => window.history.back(), 50);
@@ -2415,6 +2416,7 @@
                         Object.assign(clientData, {
                             totalLoan: totalToPay,
                             amount: installmentValue,
+                            originalInstallmentAmount: installmentValue,
                             installments: `${(client.installments || '0/0').split('/')[0]}/${installments}`,
                             paid: client.paid || 0,
                             status: client.status || 'pending',
@@ -3649,5 +3651,6 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
+
 
 
