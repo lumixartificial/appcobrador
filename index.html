@@ -308,6 +308,30 @@
         .payment-history-amount { font-weight: 600; color: var(--accent-green); }
         .no-history, .no-items { color: var(--text-secondary); text-align: center; padding: 20px; }
         
+        .loan-tabs-container {
+            display: flex;
+            gap: 5px;
+            padding: 10px 20px;
+            background-color: var(--bg);
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+        .loan-tab {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            background-color: var(--surface);
+            color: var(--text-secondary);
+            border-radius: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .loan-tab.active {
+            background-color: var(--accent-purple);
+            color: white;
+            border-color: var(--accent-purple);
+        }
+
         .action-buttons {
     background-color: var(--surface);
     border-top: 1px solid var(--border-color);
@@ -1031,20 +1055,40 @@
 
             document.getElementById('approve-refinance-btn').addEventListener('click', async () => {
                 const clientRef = doc(db, 'clients', clientId);
-                
-                const remainingBalance = (client.totalLoan || 0) - (client.paid || 0);
-                const newPrincipal = request.amount;
-                const totalPrincipal = remainingBalance + newPrincipal;
+                const requestData = client.refinanceRequest;
+                if (!requestData) {
+                    showToast('Solicitud no encontrada.', true);
+                    return;
+                }
+
+                // Lógica para crear el nuevo préstamo a partir de la solicitud
                 const interestRate = client.interestRate || 20;
-                const newTotalLoan = totalPrincipal * (1 + (interestRate / 100));
-                const newInstallments = request.installments;
-                const newInstallmentValue = newInstallments > 0 ? newTotalLoan / newInstallments : 0;
+                const totalToPay = requestData.amount * (1 + (interestRate / 100));
+                const installmentValue = requestData.installments > 0 ? totalToPay / requestData.installments : 0;
                 
+                const newLoanData = {
+                    totalLoan: totalToPay,
+                    amount: installmentValue,
+                    originalInstallmentAmount: installmentValue,
+                    installments: `0/${requestData.installments}`,
+                    paid: 0,
+                    paymentBalance: 0,
+                    status: 'active',
+                    startDate: new Date(),
+                    history: [],
+                    // Se heredan estos valores del préstamo principal para consistencia
+                    paymentFrequency: client.loans[0].paymentFrequency, 
+                    paymentDays: client.loans[0].paymentDays,
+                    collectionTime: client.loans[0].collectionTime,
+                };
+
                 try {
                     await updateDoc(clientRef, {
-                        refinanceRequest: null 
+                        refinanceRequest: null, // Elimina la solicitud pendiente
+                        loans: arrayUnion(newLoanData) // Añade el nuevo préstamo a la lista
                     });
-                    showToast('Refinanciamento aprovado!');
+
+                    showToast('Refinanciamento aprovado e novo empréstimo criado!');
                     window.history.back();
 
                     const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
@@ -1363,20 +1407,16 @@
 
                 // --- INICIO DE LA NUEVA LÓGICA FINANCIERA ---
                 const approvedAmount = paymentBeingApproved.amount;
-                const dueAmountForThisPayment = paymentBeingApproved.dueAmount || client.amount; // Fallback para pagos antiguos
                 const newTotalPaidAmount = (client.paid || 0) + approvedAmount;
-
-                const originalInstallmentValue = client.originalInstallmentAmount || dueAmountForThisPayment;
-                const amountDifference = approvedAmount - dueAmountForThisPayment;
-                const newNextInstallmentValue = Math.max(0, originalInstallmentValue - amountDifference);
+                const newBalance = (client.paymentBalance || 0) + approvedAmount - client.originalInstallmentAmount;
                 // --- FIN DE LA NUEVA LÓGICA FINANCIERA ---
 
                 try {
-                    // Actualizamos el documento del cliente con el historial modificado, el nuevo total pagado y el valor de la próxima cuota.
+                    // Actualizamos el documento del cliente con el historial modificado, el nuevo total pagado y el nuevo saldo.
                     await updateDoc(clientRef, {
                         history: updatedHistory,
                         paid: newTotalPaidAmount,
-                        amount: newNextInstallmentValue
+                        paymentBalance: newBalance
                     });
 
                     const notifTitle = translations[currentLang].paymentApprovedClientTitle;
@@ -1528,61 +1568,51 @@
                     .filter(h => h.date?.seconds && h.status !== 'pending_verification')
                     .sort((a, b) => b.date.seconds - a.date.seconds);
                 if (sortedHistory.length > 0) lastRelevantDate = new Date(sortedHistory[0].date.seconds * 1000);
-            }
+            } 
             if (!lastRelevantDate) {
                 if (client.startDate?.seconds) {
                     lastRelevantDate = new Date(client.startDate.seconds * 1000);
                 } else {
-                    return 0; // Si no hay fecha de inicio, no podemos calcular.
+                     return 0; // No hay fecha de inicio, no se pueden calcular atrasos.
                 }
             }
             
             lastRelevantDate.setHours(0, 0, 0, 0);
-            if (lastRelevantDate >= today) return 0;
 
-            let workingDaysToPay = 0;
+            let lateDays = 0;
             let checkDate = new Date(lastRelevantDate);
-            const frequency = client.paymentFrequency || 'daily';
+            checkDate.setDate(checkDate.getDate() + 1); // Empezamos a contar desde el día siguiente al último pago/inicio
 
-            while (checkDate < today) {
+            while (checkDate <= today) {
+                const dayOfWeek = checkDate.getDay(); // 0=Domingo, 6=Sábado
+                const dateString = ('0' + checkDate.getDate()).slice(-2) + '/' + ('0' + (checkDate.getMonth() + 1)).slice(-2);
+                
+                // Solo cuenta como día de atraso si NO es domingo y NO es feriado
+                if (dayOfWeek !== 0 && !nationalHolidays.includes(dateString)) {
+                    lateDays++;
+                }
                 checkDate.setDate(checkDate.getDate() + 1);
-                
-                const dayOfWeek = checkDate.getDay();
-                const dayOfMonth = checkDate.getDate();
-                const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
-                const isHoliday = nationalHolidays.includes(formattedDate);
-                
-                let isPaymentDay = false;
-                if (frequency === 'daily') {
-                    isPaymentDay = (client.paymentDays || []).includes(dayOfWeek);
-                } else if (frequency === 'weekly') {
-                    isPaymentDay = (client.paymentDays || [])[0] === dayOfWeek;
-                } else if (frequency === 'monthly') {
-                    isPaymentDay = (client.paymentDays || [])[0] === dayOfMonth;
-                }
-
-                if (!isHoliday && isPaymentDay) {
-                    workingDaysToPay++;
-                }
             }
-            return workingDaysToPay > 0 ? workingDaysToPay : 0;
+            return lateDays;
         }
 
-        function renderClientCards(container, clients) {
+        function renderClientCards(container, clientsWithLoans) {
             if (!container) return;
-            if (clients.length === 0) {
+            if (clientsWithLoans.length === 0) {
                 container.innerHTML = `<div class="no-items">Nenhum cliente encontrado.</div>`;
                 return;
             }
             container.innerHTML = ''; 
-            clients.forEach(client => {
+            clientsWithLoans.forEach(item => {
+                const { client, loan, loanIndex } = item;
                 const card = document.createElement('div');
                 card.className = 'client-card';
                 card.dataset.clientId = client.id;
-                const statusClass = `status-${client.status}`;
-                const statusText = (translations[currentLang] && translations[currentLang][client.status]) || client.status;
+                card.dataset.loanIndex = loanIndex;
+                const statusClass = `status-${loan.status}`;
+                const statusText = (translations[currentLang] && translations[currentLang][loan.status]) || loan.status;
                 
-                const lateDays = calculateLatePaymentDays(client);
+                const lateDays = calculateLatePaymentDays(loan);
                 const reputationScore = Math.max(0, 10 - lateDays);
                 let repClass = 'rep-bad';
                 if (reputationScore === 10) repClass = 'rep-perfect';
@@ -1592,15 +1622,17 @@
                 const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
                 const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
                 const photoUrl = client.profilePictureUrl || placeholderUrl;
+                
+                const loanLabel = clientsWithLoans.filter(c => c.client.id === client.id).length > 1 ? ` - Préstamo ${loanIndex + 1}` : '';
 
                 card.innerHTML = `
                     <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar">
                     <div class="client-info">
-                        <h4 class="client-name">${client.name}</h4>
+                        <h4 class="client-name">${client.name}${loanLabel}</h4>
                         <p class="client-address"><i data-lucide="map-pin" style="width: 14px; height: 14px; stroke-width: 2.5;"></i>${client.address}</p>
                     </div>
                     <div class="payment-info">
-                        <span class="payment-amount">${money(client.amount)}</span>
+                        <span class="payment-amount">${money(loan.amount)}</span>
                         <div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;">
                            <span class="reputation-score ${repClass}"><i data-lucide="star" style="width: 12px; height: 12px;"></i> ${reputationScore}/10</span>
                            <span class="payment-status ${statusClass}">${statusText}</span>
@@ -1609,14 +1641,50 @@
                 container.appendChild(card);
             });
             lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
-            container.querySelectorAll('.client-card').forEach(card => card.addEventListener('click', (e) => showClientDetails(e.currentTarget.dataset.clientId)));
+            container.querySelectorAll('.client-card').forEach(card => card.addEventListener('click', (e) => {
+                const clientId = e.currentTarget.dataset.clientId;
+                const loanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10);
+                showClientDetails(clientId, loanIndex);
+            }));
+        }
+
+        function getClientsWithActiveLoans() {
+            const result = [];
+            allClients.forEach(client => {
+                (client.loans || []).forEach((loan, index) => {
+                    if (loan.status === 'active') {
+                        result.push({ client, loan, loanIndex: index });
+                    }
+                });
+            });
+            return result;
         }
 
         function updateTodaysRouteList() {
-            const todaysRouteClients = getTodaysRouteClients();
-            const optimizedClients = optimizeRoute(todaysRouteClients, collectorCurrentLocation);
+            const clientsForRoute = [];
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const dayOfMonth = today.getDate();
+
+            allClients.forEach(client => {
+                (client.loans || []).forEach((loan, index) => {
+                    if (loan.status !== 'active') return;
+                    
+                    let isPaymentDay = false;
+                    const frequency = loan.paymentFrequency || 'daily';
+                    if (frequency === 'daily') isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
+                    else if (frequency === 'weekly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
+                    else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
+
+                    if (isPaymentDay) {
+                        clientsForRoute.push({ client, loan, loanIndex: index });
+                    }
+                });
+            });
+
+            const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
             renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
-            updateDashboard(todaysRouteClients); // El dashboard no necesita estar ordenado
+            updateDashboard(clientsForRoute.map(item => item.loan));
         }
 
         function updateAllClientsList() {
@@ -1628,33 +1696,38 @@
             const searchTerm = searchInput.value.toLowerCase();
             const filter = activeFilter.dataset.filter;
 
-            let filteredClients = allClients;
-
-            if (filter !== 'all') {
-                filteredClients = filteredClients.filter(c => c.status === filter);
-            }
-
-            if (searchTerm) {
-                filteredClients = filteredClients.filter(c => 
-                    c.name.toLowerCase().includes(searchTerm) || 
-                    (c.address && c.address.toLowerCase().includes(searchTerm))
-                );
-            }
+            let clientsWithLoans = [];
+            allClients.forEach(client => {
+                (client.loans || []).forEach((loan, loanIndex) => {
+                    let passesFilter = true;
+                    if (filter !== 'all' && loan.status !== filter) {
+                        passesFilter = false;
+                    }
+                    if (searchTerm && !(client.name.toLowerCase().includes(searchTerm) || (client.address && client.address.toLowerCase().includes(searchTerm)))) {
+                        passesFilter = false;
+                    }
+                    if(passesFilter) {
+                        clientsWithLoans.push({ client, loan, loanIndex });
+                    }
+                });
+            });
             
             // Ordena a lista de clientes em ordem alfabética pelo nome
-            filteredClients.sort((a, b) => a.name.localeCompare(b.name));
+            clientsWithLoans.sort((a, b) => a.client.name.localeCompare(b.client.name));
             
-            renderClientCards(container, filteredClients);
+            renderClientCards(container, clientsWithLoans);
         }
         
-        function showClientDetails(clientId) {
+        function showClientDetails(clientId, loanIndex = 0) {
             const clientDetailView = document.getElementById('clientDetailView');
             const client = allClients.find(c => c.id == clientId);
-            if (!client) return;
+            if (!client || !client.loans || !client.loans[loanIndex]) return;
+
+            const loan = client.loans[loanIndex];
             
             let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
-            if (client.history && client.history.length > 0) {
-                historyHtml = client.history
+            if (loan.history && loan.history.length > 0) {
+                historyHtml = loan.history
                     .map((p, index) => ({ ...p, originalIndex: index })) // Preserva o índice original
                     .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
                     .map(p => {
@@ -1673,7 +1746,7 @@
                     }).join('');
             }
 
-            const lateDays = calculateLatePaymentDays(client);
+            const lateDays = calculateLatePaymentDays(loan);
             const score = Math.max(0, 10 - lateDays);
             let reputationStatusKey = 'reputationBad';
             if (score === 10) reputationStatusKey = 'reputationPerfect';
@@ -1684,6 +1757,9 @@
             if (score === 10) barStatusClass = 'status-perfect';
             else if (score >= 7) barStatusClass = 'status-good';
             else if (score >= 3) barStatusClass = 'status-regular';
+
+            const activeLoans = client.loans.filter(l => l.status === 'active');
+            const hasMultipleLoans = activeLoans.length > 1;
 
             clientDetailView.innerHTML = `
                 <header class="modal-header" style="justify-content: space-between;">
@@ -1698,6 +1774,14 @@
 
                     <button id="editClientBtn" class="header-btn" title="Editar Cliente"><i data-lucide="edit"></i></button>
                 </header>
+                ${hasMultipleLoans ? `
+                <div class="loan-tabs-container" id="loan-tabs-container">
+                    ${activeLoans.map((l, index) => `
+                        <button class="loan-tab ${index === loanIndex ? 'active' : ''}" data-loan-index="${index}">
+                            Préstamo ${index + 1}
+                        </button>
+                    `).join('')}
+                </div>` : ''}
                 <div class="modal-content-wrapper">
                   <div class="container">
                     <div class="kpi-card progress-card" style="margin-bottom: 20px;">
@@ -1708,9 +1792,9 @@
                         </div>
                     </div>
                     <section class="kpi-grid-profile" style="margin-bottom: 30px;">
-                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(client.totalLoan)}</p></div>
-                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(client.amount)}</p></div>
-                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(client.paid)}</p></div>
+                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
+                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.amount)}</p></div>
+                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(loan.paid)}</p></div>
                     </section>
                     
                     <section>
@@ -1734,21 +1818,22 @@
                   </div>
                 </div>
                 <div class="action-buttons">
-                    ${client.status === 'finished' ? `
+                    ${loan.status === 'finished' ? `
                         <button class="btn-secondary" id="updateClientDataBtn"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
-                        <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
+                        <button class="btn-primary" id="createNewLoanBtn" ${activeLoans.length >= 4 ? 'disabled' : ''}><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
                     ` : `
                         <button class="btn-secondary" id="viewMapBtn"><i data-lucide="map"></i> <span data-lang-key="viewOnMap"></span></button>
                         <button class="btn-secondary" id="postponePaymentBtn"><i data-lucide="calendar-plus"></i> <span data-lang-key="postponePayment"></span></button>
+                        <button class="btn-secondary" id="createNewLoanBtn" ${activeLoans.length >= 4 ? 'disabled' : ''}><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
                         <button class="btn-primary" id="registerPaymentBtn"><i data-lucide="dollar-sign"></i> Registrar Pagamento</button>
                     `}
                 </div>`;
             
-            history.pushState({ modal: 'clientDetailView', clientId: clientId }, `Details for ${client.name}`, `#client/${clientId}`);
+            history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: loanIndex }, `Details for ${client.name}`, `#client/${clientId}/${loanIndex}`);
             clientDetailView.classList.add('active');
 
-            const paidInstallments = (client.history || []).filter(p => p.status !== 'pending_verification').length;
-            const totalInstallmentsString = (client.installments || "0/0").split('/')[1];
+            const paidInstallments = (loan.history || []).filter(p => p.status !== 'pending_verification').length;
+            const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
             const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
             const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
             const circleCircumference = 2 * Math.PI * 54;
@@ -1762,16 +1847,26 @@
                 progressText.textContent = `${paidInstallments}/${totalInstallments}`;
             }
 
+            if (hasMultipleLoans) {
+                clientDetailView.querySelectorAll('.loan-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        const newLoanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10);
+                        showClientDetails(clientId, newLoanIndex);
+                    });
+                });
+            }
+
             lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
             document.getElementById('closeDetailView').addEventListener('click', () => window.history.back());
-            document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId));
+            document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, loanIndex));
             
-            if (client.status === 'finished') {
+            if (loan.status === 'finished') {
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
-                document.getElementById('updateClientDataBtn').addEventListener('click', () => showClientFormModal(clientId, false));
+                document.getElementById('updateClientDataBtn').addEventListener('click', () => showClientFormModal(clientId, false, loanIndex));
             } else {
-                document.getElementById('registerPaymentBtn').addEventListener('click', () => showPaymentModal(clientId));
+                document.getElementById('registerPaymentBtn').addEventListener('click', () => showPaymentModal(clientId, loanIndex));
+                document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
                 document.getElementById('postponePaymentBtn').addEventListener('click', () => {
                     showConfirmationModal(
                         translations[currentLang].postponeConfirmTitle,
@@ -1779,9 +1874,9 @@
                         async () => {
                             const clientRef = doc(db, 'clients', clientId);
                             try {
-                                await updateDoc(clientRef, { 
-                                    history: arrayUnion({ amount: 0, date: new Date(), status: 'postponed' }) 
-                                });
+                                const updatedLoans = [...client.loans];
+                                updatedLoans[loanIndex].history.push({ amount: 0, date: new Date(), status: 'postponed' });
+                                await updateDoc(clientRef, { loans: updatedLoans });
                                 window.history.back(); 
                                 setTimeout(() => window.history.back(), 50);
                                 showToast('Pagamento adiado com sucesso!');
@@ -1881,24 +1976,24 @@
                 initializeMap([-16.68, -49.25]); // Fallback para navegadores antiguos
             }
         }
-
-        function showPaymentModal(clientId) {
+        function showPaymentModal(clientId, loanIndex) {
             const paymentModal = document.getElementById('paymentModal');
             const client = allClients.find(c => c.id === clientId);
+            const loan = client.loans[loanIndex];
 
             paymentModal.innerHTML = `
                 <header class="modal-header">
                     <button id="closePaymentModal"><i data-lucide="arrow-left"></i></button>
-                    <span class="modal-title">Registrar Pagamento para ${client.name}</span>
+                    <span class="modal-title">Registrar Pagamento para ${client.name} (Préstamo ${loanIndex + 1})</span>
                 </header>
                 <div class="modal-content-wrapper container">
                     <div class="kpi-card" style="text-align:center;">
                         <h3 class="kpi-title" style="justify-content:center;" data-lang-key="installmentValue"></h3>
-                        <p class="kpi-value green">${money(client.amount)}</p>
+                        <p class="kpi-value green">${money(loan.amount)}</p>
                     </div>
                     <div class="form-group" style="margin-top: 20px;">
                     <label for="payment-amount-input" data-lang-key="amountPaid"></label>
-                    <input type="number" id="payment-amount-input" step="0.01" value="${client.amount.toFixed(2)}" style="font-size: 1.2em; text-align: center; font-weight: 600;">
+                    <input type="number" id="payment-amount-input" step="0.01" value="${loan.amount.toFixed(2)}" style="font-size: 1.2em; text-align: center; font-weight: 600;">
                 </div>
                     <h3 class="section-title" style="margin-top: 30px;">Método de Pagamento</h3>
                     <div class="radio-group" id="payment-method-selector">
@@ -1998,12 +2093,14 @@
                 }
 
                 const clientRef = doc(db, "clients", clientId);
-                const newTotalPaidAmount = (client.paid || 0) + actualPaidAmount;
                 
-                const dueAmountForThisPayment = client.amount;
-                const originalInstallmentValue = client.originalInstallmentAmount || dueAmountForThisPayment;
-                const amountDifference = actualPaidAmount - dueAmountForThisPayment;
-                const newNextInstallmentValue = Math.max(0, originalInstallmentValue - amountDifference);
+                // --- INICIO DE LA NUEVA LÓGICA FINANCIERA ---
+                const updatedLoans = [...client.loans];
+                const currentLoan = updatedLoans[loanIndex];
+                
+                currentLoan.paid = (currentLoan.paid || 0) + actualPaidAmount;
+                currentLoan.paymentBalance = (currentLoan.paymentBalance || 0) + actualPaidAmount - currentLoan.originalInstallmentAmount;
+                // --- FIN DE LA NUEVA LÓGICA FINANCIERA ---
 
                 const newPayment = {
                     amount: actualPaidAmount,
@@ -2016,10 +2113,11 @@
                     newPayment.receiptUrl = receiptUrl;
                 }
                 
+                if (!currentLoan.history) currentLoan.history = [];
+                currentLoan.history.push(newPayment);
+
                 await updateDoc(clientRef, {
-                    history: arrayUnion(newPayment),
-                    paid: newTotalPaidAmount,
-                    amount: newNextInstallmentValue
+                    loans: updatedLoans
                 });
 
                 window.history.back();
@@ -2037,12 +2135,13 @@
         });
         }
         
-        function showClientFormModal(clientId = null, isRenewal = false) {
-            const isEditMode = clientId !== null;
-            const client = isEditMode ? allClients.find(c => c.id === clientId) : {};
+        function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0) {
+            const isEditMode = clientId !== null && !isNewLoan;
+            const client = isEditMode ? allClients.find(c => c.id === clientId) : (clientId ? allClients.find(c => c.id === clientId) : {});
+            const loan = isEditMode ? client.loans[loanIndex] : {};
 
             let filesToUpload = [];
-            let existingDocs = isEditMode ? [...(client.documents || [])] : [];
+            let existingDocs = isEditMode ? [...(client.documents || [])] : (client.documents || []);
 
             const clientFormModal = document.getElementById('clientFormModal');
             
@@ -2057,8 +2156,8 @@
                 <div class="modal-content-wrapper">
                   <div class="container">
                     <form id="client-form">
-                        <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}"></div>
-                        <div class="form-group"><label data-lang-key="documentNumber"></label><input type="text" id="client-document" value="${client.documentNumber || ''}"></div>
+                        <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        <div class="form-group"><label data-lang-key="documentNumber"></label><input type="text" id="client-document" value="${client.documentNumber || ''}" ${isNewLoan ? 'readonly' : ''}></div>
                         <div id="system-verification-results" style="margin-bottom: 20px;"></div>
                         <div class="form-group"><label data-lang-key="address"></label><input type="text" id="client-address" required value="${client.address || ''}"></div>
                         <div class="form-group"><label data-lang-key="city"></label><input type="text" id="client-city" required value="${client.city || ''}"></div>
@@ -2075,7 +2174,7 @@
                         <h3 class="section-title" data-lang-key="clientAccess" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px;"></h3>
                         <div class="form-group">
                             <label data-lang-key="username"></label>
-                            <input type="text" id="client-username" required value="${client.username || ''}">
+                            <input type="text" id="client-username" required value="${client.username || ''}" ${(isEditMode || isNewLoan) ? 'readonly' : ''}>
                             <div id="username-validation-msg"></div>
                         </div>
                         <div class="form-group">
@@ -2085,12 +2184,12 @@
 
                         <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Detalhes do Empréstimo</h3>
                         <div class="form-group grid-2">
-                            <div><label data-lang-key="totalLoan"></label><input type="number" id="client-loan-amount" required value="${(isEditMode && !isRenewal && client.totalLoan && client.interestRate) ? (client.totalLoan / (1 + client.interestRate/100)) : ''}"></div>
-                            <div><label data-lang-key="interest"></label><input type="number" id="client-interest" required value="${client.interestRate || '20'}"></div>
+                            <div><label data-lang-key="totalLoan"></label><input type="number" id="client-loan-amount" required value="${isEditMode ? (loan.totalLoan / (1 + client.interestRate/100)) : ''}"></div>
+                            <div><label data-lang-key="interest"></label><input type="number" id="client-interest" required value="${client.interestRate || '20'}" ${isEditMode ? 'readonly' : ''}></div>
                         </div>
                         <div class="form-group"><label data-lang-key="totalToPay"></label><input type="text" id="client-total-to-pay" readonly></div>
                         <div class="form-group grid-2">
-                            <div><label data-lang-key="numInstallments"></label><input type="number" id="client-installments" required value="${(isEditMode && !isRenewal) ? (client.installments || '').split('/')[1] : ''}"></div>
+                            <div><label data-lang-key="numInstallments"></label><input type="number" id="client-installments" required value="${isEditMode ? (loan.installments || '').split('/')[1] : ''}"></div>
                             <div><label data-lang-key="installmentValue"></label><input type="text" id="client-installment-value" readonly></div>
                         </div>
                         <div class="form-group">
@@ -2172,30 +2271,31 @@
 
             paymentFrequencySelect.addEventListener('change', (e) => handleFrequencyChange(e.target.value));
 
-            if (isEditMode && client.paymentFrequency) {
-                paymentFrequencySelect.value = client.paymentFrequency;
-                handleFrequencyChange(client.paymentFrequency);
+            if (isEditMode) {
+                paymentFrequencySelect.value = loan.paymentFrequency || 'daily';
+                handleFrequencyChange(loan.paymentFrequency || 'daily');
 
-                if (client.paymentFrequency === 'daily') {
-                    (client.paymentDays || []).forEach(day => {
+                if ((loan.paymentFrequency || 'daily') === 'daily') {
+                    (loan.paymentDays || []).forEach(day => {
                         const checkbox = document.getElementById(`form-day-${day}`);
                         if (checkbox) checkbox.checked = true;
                     });
-                } else if (client.paymentFrequency === 'weekly') {
-                    document.getElementById('weekly-day-select').value = (client.paymentDays || [1])[0];
-                } else if (client.paymentFrequency === 'monthly') {
-                    document.getElementById('monthly-day-input').value = (client.paymentDays || [1])[0];
+                } else if (loan.paymentFrequency === 'weekly') {
+                    document.getElementById('weekly-day-select').value = (loan.paymentDays || [1])[0];
+                } else if (loan.paymentFrequency === 'monthly') {
+                    document.getElementById('monthly-day-input').value = (loan.paymentDays || [1])[0];
                 }
             } else {
                 paymentFrequencySelect.value = 'daily';
                 handleFrequencyChange('daily');
-                (client.paymentDays || [1,2,3,4,5,6]).forEach(day => {
+                // Default days for new client or new loan
+                [1,2,3,4,5,6].forEach(day => { 
                     const checkbox = document.getElementById(`form-day-${day}`);
                     if (checkbox) checkbox.checked = true;
                 });
             }
 
-            let isUsernameAvailable = isEditMode; 
+            let isUsernameAvailable = (isEditMode || isNewLoan); 
             const usernameInput = document.getElementById('client-username');
             const validationMsg = document.getElementById('username-validation-msg');
 
@@ -2205,6 +2305,11 @@
                     validationMsg.textContent = '';
                     isUsernameAvailable = false;
                     return;
+                }
+                if ((isEditMode || isNewLoan) && username === client.username) {
+                     validationMsg.textContent = '';
+                     isUsernameAvailable = true;
+                     return;
                 }
                 
                 validationMsg.textContent = 'Verificando...';
@@ -2384,7 +2489,7 @@
                         }
                     }
 
-                    const clientData = {
+                    const clientGeneralData = {
                         name: document.getElementById('client-name').value,
                         documentNumber: document.getElementById('client-document').value,
                         address: document.getElementById('client-address').value,
@@ -2394,62 +2499,76 @@
                         username: document.getElementById('client-username').value.trim(),
                         password: document.getElementById('client-password').value,
                         documents: finalDocuments,
-                        paymentFrequency: paymentFrequency,
-                        paymentDays: paymentDaysValue,
-                        collectionTime: document.getElementById('client-collection-time').value,
                         collectorId: collectorId,
                         interestRate: interest
                     };
 
-                    if (isRenewal || !isEditMode) {
-                        Object.assign(clientData, {
-                            totalLoan: totalToPay,
-                            amount: installmentValue,
-                            originalInstallmentAmount: installmentValue,
-                            installments: `0/${installments}`,
-                            paid: 0,
-                            status: 'pending',
-                            history: [],
-                            startDate: serverTimestamp()
-                        });
-                    } else { // Standard edit
-                        Object.assign(clientData, {
-                            totalLoan: totalToPay,
-                            amount: installmentValue,
-                            originalInstallmentAmount: installmentValue,
-                            installments: `${(client.installments || '0/0').split('/')[0]}/${installments}`,
-                            paid: client.paid || 0,
-                            status: client.status || 'pending',
-                            history: client.history || [],
-                            startDate: client.startDate || serverTimestamp()
-                        });
-                    }
+                    const loanSpecificData = {
+                        totalLoan: totalToPay,
+                        amount: installmentValue,
+                        originalInstallmentAmount: installmentValue,
+                        installments: `0/${installments}`,
+                        paid: 0,
+                        paymentBalance: 0,
+                        status: 'active',
+                        startDate: new Date(),
+                        history: [],
+                        paymentFrequency: paymentFrequency,
+                        paymentDays: paymentDaysValue,
+                        collectionTime: document.getElementById('client-collection-time').value,
+                    };
 
-                    if (isEditMode) {
-                        await updateDoc(doc(db, 'clients', clientId), clientData);
-                    } else {
-                        await addDoc(collection(db, "clients"), clientData);
+                    if (isNewLoan) {
+                        const clientRef = doc(db, 'clients', clientId);
+                        await updateDoc(clientRef, {
+                            loans: arrayUnion(loanSpecificData),
+                             // Actualiza también los datos generales por si cambiaron
+                            ...clientGeneralData
+                        });
+                    } else if (isEditMode) {
+                         const clientRef = doc(db, 'clients', clientId);
+                         const updatedLoans = [...client.loans];
+                         updatedLoans[loanIndex] = {
+                             ...updatedLoans[loanIndex], // Mantén datos antiguos como historial, paid, etc.
+                             totalLoan: totalToPay,
+                             amount: installmentValue,
+                             originalInstallmentAmount: installmentValue,
+                             installments: `${(loan.installments || '0/0').split('/')[0]}/${installments}`,
+                             paymentFrequency: paymentFrequency,
+                             paymentDays: paymentDaysValue,
+                             collectionTime: document.getElementById('client-collection-time').value,
+                         };
+                         await updateDoc(clientRef, {
+                             loans: updatedLoans,
+                             ...clientGeneralData
+                         });
+                    } else { // Creando cliente nuevo
+                        const newClientData = {
+                            ...clientGeneralData,
+                            loans: [loanSpecificData]
+                        };
+                        await addDoc(collection(db, "clients"), newClientData);
                     }
                     
                     window.history.back(); // Cierra el modal de formulario
-                    if (isEditMode) {
-                        setTimeout(() => window.history.back(), 100); // Cierra el modal de detalles
-                    }
-                    setTimeout(() => showShareCredentialsModal(clientData, isEditMode), isEditMode ? 250 : 150);
                     
+                    const successToastMessage = isEditMode ? translations[currentLang].clientUpdatedSuccess : translations[currentLang].clientRegisteredSuccess;
+                    showToast(successToastMessage);
 
-                } catch (err) {
-                    console.error("Falha ao salvar cliente:", err);
-                    showToast('Falha ao salvar. Verifique o console para detalhes.', true);
-                    
-                    saveButton.innerHTML = `<i data-lucide="alert-circle"></i> <span>Erro!</span>`;
+                    // Para clientes nuevos o si se está creando un nuevo préstamo, muestra el modal para compartir credenciales.
+                    if (!isEditMode || isNewLoan) { 
+                        setTimeout(() => {
+                           showShareCredentialsModal(clientGeneralData, isEditMode);
+                        }, 400); // Pequeño retraso para permitir que el modal anterior se cierre.
+                    }
+
+                } catch (error) {
+                    console.error("Error al guardar cliente:", error);
+                    showToast(error.message || 'Ocurrió un error al guardar los datos.', true);
+                } finally {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = originalButtonHTML;
                     lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
-                    
-                    setTimeout(() => {
-                        saveButton.disabled = false;
-                        saveButton.innerHTML = originalButtonHTML;
-                        lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
-                    }, 3000);
                 }
             });
 
@@ -3181,7 +3300,30 @@ if (isEditMode && client.documentNumber) {
                 allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 allClients.forEach(client => {
-                    client.status = calculateClientStatus(client);
+                    // Capa de compatibilidad
+                    if (!client.loans && client.totalLoan) {
+                        client.loans = [{
+                            totalLoan: client.totalLoan,
+                            paid: client.paid || 0,
+                            installments: client.installments,
+                            originalInstallmentAmount: client.amount,
+                            totalInstallments: (client.installments || "0/0").split('/').map(Number)[1] || 0,
+                            startDate: client.startDate,
+                            history: client.history || [],
+                            paymentBalance: client.paymentBalance || 0,
+                            status: 'active', // Asumimos activo si no está finalizado
+                            paymentFrequency: client.paymentFrequency,
+                            paymentDays: client.paymentDays,
+                            collectionTime: client.collectionTime,
+                            amount: client.amount
+                        }];
+                    } else if (!client.loans) {
+                        client.loans = [];
+                    }
+
+                    client.loans.forEach(loan => {
+                        loan.status = calculateClientStatus(loan);
+                    });
                 });
 
                 updateTodaysRouteList();
@@ -3651,6 +3793,3 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
-
-
-
