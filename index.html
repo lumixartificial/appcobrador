@@ -3218,6 +3218,12 @@ if (isEditMode && client.documentNumber) {
 
         function plotClientsOnMap() {
             if (!mapInstance) return;
+            
+            // [REPARACIÓN] Forzar una revalidación del tamaño del mapa cada vez que se intenta dibujar.
+            // Esto resuelve problemas de renderizado en vistas que cambian de visibilidad, 
+            // especialmente en la app instalada (PWA), asegurando que los pines se muestren correctamente.
+            mapInstance.invalidateSize();
+
             mapMarkers.forEach(marker => marker.remove());
             mapMarkers = [];
 
