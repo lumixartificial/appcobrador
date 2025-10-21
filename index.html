@@ -1668,7 +1668,7 @@
 
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
-                    if (loan.status !== 'active') return;
+                    if (loan.status === 'finished') return; // [CORRECCIÓN] Se cambió la condición para incluir correctamente a todos los clientes del día (pendientes, atrasados, etc.) y excluir únicamente los préstamos ya finalizados.
                     
                     let isPaymentDay = false;
                     const frequency = loan.paymentFrequency || 'daily';
@@ -1677,7 +1677,10 @@
                     else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
 
                     if (isPaymentDay) {
-                        clientsForRoute.push({ client, loan, loanIndex: index });
+                        // [CORRECCIÓN 2] Se añaden a la ruta solo los clientes cuyo pago de hoy está pendiente o atrasado.
+                        if (loan.status === 'pending' || loan.status === 'late') {
+                            clientsForRoute.push({ client, loan, loanIndex: index });
+                        }
                     }
                 });
             });
@@ -3415,16 +3418,19 @@ if (isEditMode && client.documentNumber) {
             // Si no tenemos la ubicación del cobrador, ordena por hora y luego alfabéticamente
             if (!startCoords) {
                 return clients.sort((a, b) => {
-                    if (a.collectionTime && b.collectionTime) return a.collectionTime.localeCompare(b.collectionTime);
-                    if (a.collectionTime) return -1;
-                    if (b.collectionTime) return 1;
-                    return a.name.localeCompare(b.name);
+                    // [CORRECCIÓN] Se accede a las propiedades correctas 'loan' y 'client' dentro del objeto.
+                    const timeA = a.loan.collectionTime;
+                    const timeB = b.loan.collectionTime;
+                    if (timeA && timeB) return timeA.localeCompare(timeB);
+                    if (timeA) return -1;
+                    if (timeB) return 1;
+                    return a.client.name.localeCompare(b.client.name);
                 });
             }
 
-            clients.forEach(c => c.coords = parseCoordinates(c.location));
-            const clientsWithTime = clients.filter(c => c.collectionTime).sort((a, b) => a.collectionTime.localeCompare(b.collectionTime));
-            let clientsWithoutTime = clients.filter(c => !c.collectionTime);
+            clients.forEach(item => item.coords = parseCoordinates(item.client.location));
+            const clientsWithTime = clients.filter(item => item.loan.collectionTime).sort((a, b) => a.loan.collectionTime.localeCompare(b.loan.collectionTime));
+            let clientsWithoutTime = clients.filter(item => !item.loan.collectionTime);
 
             let optimizedRoute = [];
             let lastCoords = startCoords;
@@ -3434,12 +3440,12 @@ if (isEditMode && client.documentNumber) {
                 let minDistance = Infinity;
                 let nearestIndex = -1;
 
-                clientList.forEach((client, index) => {
-                    if (client.coords) {
-                        const distance = getDistance(fromCoords, client.coords);
+                clientList.forEach((clientItem, index) => {
+                    if (clientItem.coords) {
+                        const distance = getDistance(fromCoords, clientItem.coords);
                         if (distance < minDistance) {
                             minDistance = distance;
-                            nearestClient = client;
+                            nearestClient = clientItem;
                             nearestIndex = index;
                         }
                     }
