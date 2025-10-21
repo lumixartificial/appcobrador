@@ -3242,11 +3242,11 @@ if (isEditMode && client.documentNumber) {
             mapMarkers = [];
 
             // --- INICIO: LÓGICA DEL MARCADOR DEL COBRADOR ---
-            const collectorIcon = L.divIcon({
-                className: 'collector-marker-icon',
-                html: `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.5));"><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/><path d="M12 6V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v1"/><path d="m6.5 15-1-10h13l-1 10H6.5Z"/><path d="M12 6h3.5"/><path d="M9 10h6"/></svg>`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
+            const collectorIcon = L.icon({
+                iconUrl: 'https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/MotoIcono.png?alt=media&token=e8add7cd-e8d3-424d-8f05-5d04e0d10ec1',
+                iconSize: [40, 40], // Tamaño del icono [ancho, alto]
+                iconAnchor: [20, 20], // Punto del icono que corresponderá a la ubicación del marcador
+                popupAnchor: [0, -20] // Punto desde donde se abrirá el popup, relativo al iconAnchor
             });
 
             const collectorPosition = collectorCurrentLocation 
