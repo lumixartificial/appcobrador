@@ -1560,7 +1560,8 @@
             
             const todayStr = new Date().toLocaleDateString('pt-BR');
             const receivedToday = allClients
-                .flatMap(c => c.history || [])
+                .flatMap(c => c.loans || []) // Búsqueda corregida para múltiples préstamos
+                .flatMap(l => l.history || []) // Extrae el historial de cada préstamo
                 .filter(h => h?.date?.seconds && new Date(h.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr && h.status !== 'pending_verification')
                 .reduce((sum, h) => sum + h.amount, 0);
             kpiReceived.textContent = money(receivedToday);
@@ -1580,25 +1581,29 @@
             let dailyTotalCash = 0, dailyTotalDigital = 0;
 
             allClients.forEach(client => {
-                if (client.totalLoan && client.interestRate) {
-                    const principal = client.totalLoan / (1 + client.interestRate / 100);
-                    totalLoansMade += principal;
-                }
-                (client.history || []).forEach(h => {
-                    if (h.date?.seconds && h.status !== 'pending_verification') {
-                        const paymentDate = new Date(h.date.seconds * 1000);
-                        const amount = h.amount || 0;
-                        totalPaymentsReceived += amount;
+                (client.loans || []).forEach(loan => {
+                    // Calcula el capital prestado (principal) para cada préstamo individual
+                    if (loan.totalLoan && client.interestRate) {
+                        const principal = loan.totalLoan / (1 + (client.interestRate / 100));
+                        totalLoansMade += principal;
+                    }
+                    // Itera sobre el historial de cada préstamo para sumar los pagos
+                    (loan.history || []).forEach(h => {
+                        if (h.date?.seconds && h.status !== 'pending_verification') {
+                            const paymentDate = new Date(h.date.seconds * 1000);
+                            const amount = h.amount || 0;
+                            totalPaymentsReceived += amount;
 
-                        if (paymentDate.toLocaleDateString('pt-BR') === todayStr) { 
-                            dailyTotal += amount; 
-                            if (h.method === 'dinheiro') {
-                                dailyTotalCash += amount;
-                            } else if (h.method === 'pix' || h.method === 'cartao') {
-                                dailyTotalDigital += amount;
+                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) { 
+                                dailyTotal += amount; 
+                                if (h.method === 'dinheiro') {
+                                    dailyTotalCash += amount;
+                                } else if (h.method === 'pix' || h.method === 'cartao') {
+                                    dailyTotalDigital += amount;
+                                }
                             }
                         }
-                    }
+                    });
                 });
             });
             
