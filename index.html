@@ -3948,7 +3948,10 @@ if (isEditMode && client.documentNumber) {
                         showToast('Não foi possível obter a localização. Permissão negada ou GPS indisponível.', true);
                         stopRealtimeGeolocation(); 
                     },
-                    { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+                    // [CORRECCIÓN] Se aumentó el timeout a 20 segundos (20000ms) para dar más tiempo al dispositivo
+                    // para obtener una señal de GPS, especialmente en el primer intento. El valor anterior de 5 segundos
+                    // era muy bajo y podía causar que la función fallara prematuramente, desactivando el interruptor.
+                    { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
                 );
 
             } catch (error) {
