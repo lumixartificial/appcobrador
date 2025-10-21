@@ -502,6 +502,48 @@
         .switch label:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         .switch input:checked + label { background-color: var(--accent-purple); }
         .switch input:checked + label:before { transform: translateX(20px); }
+
+        .leaflet-marker-icon.next-client-marker {
+            background: none;
+            border: none;
+        }
+        .next-client-pin {
+            width: 30px;
+            height: 30px;
+            border-radius: 50% 50% 50% 0;
+            background: var(--accent-purple);
+            position: absolute;
+            transform: rotate(-45deg);
+            left: 50%;
+            top: 50%;
+            margin: -15px 0 0 -15px;
+            animation: pulse-purple 2s infinite;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .next-client-pin::after {
+            content: '';
+            width: 14px;
+            height: 14px;
+            margin: 8px 0 0 8px;
+            background: #fff;
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        @keyframes pulse-purple {
+            0% {
+                transform: rotate(-45deg) scale(0.95);
+                box-shadow: 0 0 0 0 rgba(111, 66, 193, 0.7);
+            }
+            70% {
+                transform: rotate(-45deg) scale(1);
+                box-shadow: 0 0 0 10px rgba(111, 66, 193, 0);
+            }
+            100% {
+                transform: rotate(-45deg) scale(0.95);
+                box-shadow: 0 0 0 0 rgba(111, 66, 193, 0);
+            }
+        }
     </style>
 </head>
 <body>
@@ -3178,9 +3220,20 @@ if (isEditMode && client.documentNumber) {
             if (!mapInstance) return;
             mapMarkers.forEach(marker => marker.remove());
             mapMarkers = [];
+
             const clientsToPlot = getTodaysRouteClients();
             const locations = [];
-            clientsToPlot.forEach(client => {
+
+            const nextClientIcon = L.divIcon({
+                className: 'next-client-marker',
+                html: '<div class="next-client-pin"></div>',
+                iconSize: [30, 42],
+                iconAnchor: [15, 42],
+                popupAnchor: [0, -42]
+            });
+
+            clientsToPlot.forEach((item, index) => {
+                const { client, loan, loanIndex } = item;
                 if (client.location) {
                     const match = client.location.match(/query=([\d.-]+),([\d.-]+)/);
                     if (match) {
@@ -3190,17 +3243,38 @@ if (isEditMode && client.documentNumber) {
                         
                         const popupContent = `
                             <div class="popup-client-name">${client.name}</div>
-                            <div class="popup-client-amount">${money(client.amount)}</div>
-                            <button class="btn-primary popup-navigate-btn" onclick="window.open('${client.location}', '_blank')">
-                                <i data-lucide="navigation" style="width:14px; height:14px;"></i> ${translations[currentLang].navigate || 'Navigate'}
+                            <div class="popup-client-amount">${money(loan.amount)}</div>
+                            <button class="btn-primary popup-details-btn" data-client-id="${client.id}" data-loan-index="${loanIndex}" style="width: 100%; margin-top: 10px;">
+                                Ver Detalhes
                             </button>
                         `;
-                        const marker = L.marker([lat, lng]).addTo(mapInstance).bindPopup(popupContent);
-                        marker.on('popupopen', () => { lucide.createIcons(); });
+
+                        let marker;
+                        if (index === 0) { // Si es el primer cliente de la ruta
+                            marker = L.marker([lat, lng], { icon: nextClientIcon }).addTo(mapInstance).bindPopup(popupContent);
+                        } else {
+                            marker = L.marker([lat, lng]).addTo(mapInstance).bindPopup(popupContent);
+                        }
+                        
+                        marker.on('popupopen', (e) => {
+                            const btn = e.popup.getElement().querySelector('.popup-details-btn');
+                            if (btn) {
+                                btn.onclick = () => {
+                                    // Primero, cambia la vista para cerrar el mapa
+                                    location.hash = 'home';
+                                    // Después de un breve retraso, muestra los detalles del cliente
+                                    setTimeout(() => {
+                                        showClientDetails(btn.dataset.clientId, parseInt(btn.dataset.loanIndex, 10));
+                                    }, 100); 
+                                };
+                            }
+                        });
+
                         mapMarkers.push(marker);
                     }
                 }
             });
+            
             if (locations.length > 0) {
                 mapInstance.fitBounds(locations, { padding: [50, 50] });
             }
@@ -3208,7 +3282,6 @@ if (isEditMode && client.documentNumber) {
 
         function exportDailyReport() {
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
             const todayStr = new Date().toLocaleDateString('pt-BR');
             const lang = currentLang;
 
