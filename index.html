@@ -704,31 +704,37 @@
         }
 
         function getAllTodaysClients() {
+            const clientsForToday = [];
             const today = new Date();
-            const dayOfWeek = today.getDay(); // Sunday - Saturday : 0 - 6
-            const dayOfMonth = today.getDate(); // 1 - 31
+            const dayOfWeek = today.getDay();
+            const dayOfMonth = today.getDate();
 
-            return allClients.filter(client => {
-                if (client.status === 'finished') return false;
+            allClients.forEach(client => {
+                (client.loans || []).forEach((loan, index) => {
+                    if (loan.status === 'finished') return;
 
-                let isPaymentDay = false;
-                const frequency = client.paymentFrequency || 'daily';
+                    let isPaymentDay = false;
+                    const frequency = loan.paymentFrequency || 'daily';
 
-                if (frequency === 'daily') {
-                    isPaymentDay = (client.paymentDays || []).includes(dayOfWeek);
-                } else if (frequency === 'weekly') {
-                    isPaymentDay = (client.paymentDays || [])[0] === dayOfWeek;
-                } else if (frequency === 'monthly') {
-                    isPaymentDay = (client.paymentDays || [])[0] === dayOfMonth;
-                }
-                
-                return isPaymentDay;
+                    if (frequency === 'daily') {
+                        isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
+                    } else if (frequency === 'weekly') {
+                        isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
+                    } else if (frequency === 'monthly') {
+                        isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
+                    }
+                    
+                    if (isPaymentDay) {
+                        clientsForToday.push({ client, loan, loanIndex: index });
+                    }
+                });
             });
+            return clientsForToday;
         }
 
         function getTodaysRouteClients() {
             const todaysClients = getAllTodaysClients();
-            return todaysClients.filter(client => client.status === 'pending' || client.status === 'late');
+            return todaysClients.filter(item => item.loan.status === 'pending' || item.loan.status === 'late');
         }
 
         function renderMainLayout() {
@@ -827,7 +833,10 @@
                                  <p class="kpi-value" id="kpi-daily-cash"></p>
                              </div>
                              <div class="kpi-card" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface));">
-                                 <h3 class="kpi-title" data-lang-key="receivedInDigital"><i data-lucide="smartphone" style="color: var(--accent-purple);"></i></h3>
+                             <h3 class="kpi-title" data-lang-key="receivedInDigital"><i data-lucide="smartphone" style="color: var(--accent-purple);"></i></h3>
+                             <p class="kpi-value" id="kpi-daily-digital"></p>
+                         </div>
+                        </section>
                          <section>
                             <h2 class="section-title" data-lang-key="accountSettings"></h2>
                             <div class="client-list">
@@ -1477,7 +1486,7 @@
         function updateRouteProgress() {
             const todaysTotalClientsList = getAllTodaysClients();
             const totalClients = todaysTotalClientsList.length;
-            const paidClients = todaysTotalClientsList.filter(c => c.status === 'paid').length;
+            const paidClients = todaysTotalClientsList.filter(c => c.loan.status === 'paid').length;
 
             const progressPercentage = totalClients > 0 ? (paidClients / totalClients) * 100 : 0;
 
@@ -1655,27 +1664,27 @@
 
         const PAYMENT_CONFIGS = {
             // Suramérica
-            "BRL": { name: "Real Brasileiro", methods: [ { id: 'brl_pix', label: 'Chave PIX', type: 'text', placeholder: 'CPF, e-mail, telefone...' }, { id: 'brl_qrcode_text', label: 'PIX Copia e Cola', type: 'textarea', placeholder: 'Cole o código BR...' }, { id: 'brl_qrcode_image', label: 'Imagem QR Code PIX', type: 'image' } ]},
-            "ARS": { name: "Peso Argentino", methods: [ { id: 'ars_mercadopago', label: 'Mercado Pago (CVU/Alias)', type: 'text', placeholder: 'CVU ou Alias da conta' }, { id: 'ars_transferencia', label: 'Transferencia Bancaria (CBU)', type: 'text', placeholder: 'CBU da conta bancária' } ]},
-            "BOB": { name: "Boliviano", methods: [ { id: 'bob_qr', label: 'QR Simple', type: 'image' }, { id: 'bob_tigomoney', label: 'Tigo Money', type: 'tel', placeholder: 'Número de Teléfono' } ]},
-            "CLP": { name: "Peso Chileno", methods: [ { id: 'clp_transferencia', label: 'Transferencia (Cuenta RUT)', type: 'text', placeholder: 'RUT o datos de la cuenta' } ]},
-            "COP": { name: "Peso Colombiano", methods: [ { id: 'cop_nequi', label: 'Nequi', type: 'tel', placeholder: 'Número de telefone Nequi' }, { id: 'cop_daviplata', label: 'Daviplata', type: 'tel', placeholder: 'Número de telefone Daviplata' }, { id: 'cop_bancolombia', label: 'Bancolombia A la Mano', type: 'text', placeholder: 'Número de cuenta o teléfono' }, { id: 'cop_qrcode_image', label: 'Imagem QR Code Genérico', type: 'image' } ]},
-            "USD_EC": { name: "Dólar (Ecuador)", methods: [ { id: 'ec_transferencia_pichincha', label: 'Transferencia Banco Pichincha', type: 'text', placeholder: 'Datos de la cuenta' }, { id: 'ec_transferencia_guayaquil', label: 'Transferencia Banco Guayaquil', type: 'text', placeholder: 'Datos de la cuenta' } ]},
-            "PYG": { name: "Guaraní Paraguayo", methods: [ { id: 'pyg_giros', label: 'Giros Tigo / Personal', type: 'tel', placeholder: 'Número de Teléfono' }, { id: 'pyg_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
-            "PEN": { name: "Sol Peruano", methods: [ { id: 'pen_yape', label: 'Yape', type: 'tel', placeholder: 'Número de Celular o QR' }, { id: 'pen_plin', label: 'Plin', type: 'tel', placeholder: 'Número de Celular' } ]},
-            "UYU": { name: "Peso Uruguayo", methods: [ { id: 'uyu_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
-            "VES": { name: "Bolívar Venezuelano", methods: [ { id: 'ves_pagomovil', label: 'Pago Móvil', type: 'text', placeholder: 'C.I, Banco, Teléfono' } ]},
+            "BRL": { name: "Real Brasileiro", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'brl_pix', label: 'Chave PIX', type: 'text', placeholder: 'CPF, e-mail, telefone...' }, { id: 'brl_qrcode_text', label: 'PIX Copia e Cola', type: 'textarea', placeholder: 'Cole o código BR...' }, { id: 'brl_qrcode_image', label: 'Imagem QR Code PIX', type: 'image' } ]},
+            "ARS": { name: "Peso Argentino", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'ars_mercadopago', label: 'Mercado Pago (CVU/Alias)', type: 'text', placeholder: 'CVU ou Alias da conta' }, { id: 'ars_transferencia', label: 'Transferencia Bancaria (CBU)', type: 'text', placeholder: 'CBU da conta bancária' } ]},
+            "BOB": { name: "Boliviano", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'bob_qr', label: 'QR Simple', type: 'image' }, { id: 'bob_tigomoney', label: 'Tigo Money', type: 'tel', placeholder: 'Número de Teléfono' } ]},
+            "CLP": { name: "Peso Chileno", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'clp_transferencia', label: 'Transferencia (Cuenta RUT)', type: 'text', placeholder: 'RUT o datos de la cuenta' } ]},
+            "COP": { name: "Peso Colombiano", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'cop_nequi', label: 'Nequi', type: 'tel', placeholder: 'Número de telefone Nequi' }, { id: 'cop_daviplata', label: 'Daviplata', type: 'tel', placeholder: 'Número de telefone Daviplata' }, { id: 'cop_bancolombia', label: 'Bancolombia A la Mano', type: 'text', placeholder: 'Número de cuenta o teléfono' }, { id: 'cop_qrcode_image', label: 'Imagem QR Code Genérico', type: 'image' } ]},
+            "USD_EC": { name: "Dólar (Ecuador)", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'ec_transferencia_pichincha', label: 'Transferencia Banco Pichincha', type: 'text', placeholder: 'Datos de la cuenta' }, { id: 'ec_transferencia_guayaquil', label: 'Transferencia Banco Guayaquil', type: 'text', placeholder: 'Datos de la cuenta' } ]},
+            "PYG": { name: "Guaraní Paraguayo", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'pyg_giros', label: 'Giros Tigo / Personal', type: 'tel', placeholder: 'Número de Teléfono' }, { id: 'pyg_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
+            "PEN": { name: "Sol Peruano", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'pen_yape', label: 'Yape', type: 'tel', placeholder: 'Número de Celular o QR' }, { id: 'pen_plin', label: 'Plin', type: 'tel', placeholder: 'Número de Celular' } ]},
+            "UYU": { name: "Peso Uruguayo", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'uyu_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
+            "VES": { name: "Bolívar Venezuelano", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'ves_pagomovil', label: 'Pago Móvil', type: 'text', placeholder: 'C.I, Banco, Teléfono' } ]},
             // Centroamérica
-            "CRC": { name: "Colón Costarricense", methods: [ { id: 'crc_sinpe', label: 'SINPE Móvil', type: 'tel', placeholder: 'Número de Teléfono' } ]},
-            "GTQ": { name: "Quetzal Guatemalteco", methods: [ { id: 'gtq_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta (BAC, BI, etc.)' } ]},
-            "HNL": { name: "Lempira Hondureña", methods: [ { id: 'hnl_tigomoney', label: 'Tigo Money', type: 'tel', placeholder: 'Número de Teléfono' }, { id: 'hnl_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
-            "NIO": { name: "Córdoba Nicaragüense", methods: [ { id: 'nio_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta (Lafise, BAC)' } ]},
-            "PAB": { name: "Balboa Panameño / USD", methods: [ { id: 'pab_yappy', label: 'Yappy (Banco General)', type: 'tel', placeholder: 'Número de Teléfono' }, { id: 'pab_nequi', label: 'Nequi Panamá', type: 'tel', placeholder: 'Número de Teléfono' } ]},
-            "USD_SV": { name: "Dólar (El Salvador)", methods: [ { id: 'sv_chivo', label: 'Chivo Wallet', type: 'text', placeholder: 'Número de DUI o Teléfono' }, { id: 'sv_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
+            "CRC": { name: "Colón Costarricense", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'crc_sinpe', label: 'SINPE Móvil', type: 'tel', placeholder: 'Número de Teléfono' } ]},
+            "GTQ": { name: "Quetzal Guatemalteco", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'gtq_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta (BAC, BI, etc.)' } ]},
+            "HNL": { name: "Lempira Hondureña", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'hnl_tigomoney', label: 'Tigo Money', type: 'tel', placeholder: 'Número de Teléfono' }, { id: 'hnl_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
+            "NIO": { name: "Córdoba Nicaragüense", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'nio_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta (Lafise, BAC)' } ]},
+            "PAB": { name: "Balboa Panameño / USD", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'pab_yappy', label: 'Yappy (Banco General)', type: 'tel', placeholder: 'Número de Teléfono' }, { id: 'pab_nequi', label: 'Nequi Panamá', type: 'tel', placeholder: 'Número de Teléfono' } ]},
+            "USD_SV": { name: "Dólar (El Salvador)", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'sv_chivo', label: 'Chivo Wallet', type: 'text', placeholder: 'Número de DUI o Teléfono' }, { id: 'sv_transferencia', label: 'Transferencia Bancaria', type: 'text', placeholder: 'Datos de la cuenta' } ]},
             // Norteamérica y General
-            "USD": { name: "Dólar Americano (General)", methods: [ { id: 'usd_zelle', label: 'Zelle', type: 'email', placeholder: 'E-mail ou telefone Zelle' }, { id: 'usd_cashapp', label: 'Cash App', type: 'text', placeholder: '$Cashtag' }, { id: 'usd_paypal', label: 'PayPal', type: 'email', placeholder: 'E-mail do PayPal.me' } ]},
-            "MXN": { name: "Peso Mexicano", methods: [ { id: 'mxn_spei', label: 'Transferencia SPEI (CLABE)', type: 'text', placeholder: 'CLABE Interbancaria' }, { id: 'mxn_oxxo', label: 'Pago en OXXO', type: 'text', placeholder: 'Número de referência para OXXO Pay' } ]},
-            "CAD": { name: "Dólar Canadiense", methods: [ { id: 'cad_interac', label: 'Interac e-Transfer', type: 'email', placeholder: 'Email para transferencia' } ]}
+            "USD": { name: "Dólar Americano (General)", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'usd_zelle', label: 'Zelle', type: 'email', placeholder: 'E-mail ou telefone Zelle' }, { id: 'usd_cashapp', label: 'Cash App', type: 'text', placeholder: '$Cashtag' }, { id: 'usd_paypal', label: 'PayPal', type: 'email', placeholder: 'E-mail do PayPal.me' } ]},
+            "MXN": { name: "Peso Mexicano", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'mxn_spei', label: 'Transferencia SPEI (CLABE)', type: 'text', placeholder: 'CLABE Interbancaria' }, { id: 'mxn_oxxo', label: 'Pago en OXXO', type: 'text', placeholder: 'Número de referência para OXXO Pay' } ]},
+            "CAD": { name: "Dólar Canadiense", methods: [ { id: 'cash', label: 'Dinheiro em Espécie', type: 'cash' }, { id: 'cad_interac', label: 'Interac e-Transfer', type: 'email', placeholder: 'Email para transferencia' } ]}
         };
 
         function showPaymentSettingsModal(collectorData) {
@@ -1722,7 +1731,18 @@
                     const methodSettings = currentSettings.methods[method.id] || { active: false, data: '' };
                     const isChecked = methodSettings.active;
                     
-                    if (method.type === 'image') {
+                    if (method.type === 'cash') {
+                        return `
+                        <div class="kpi-card" style="margin-bottom: 15px; opacity: 0.7;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="font-weight: 600; flex-grow: 1;">${method.label}</label>
+                                <div class="switch">
+                                    <input type="checkbox" id="toggle-${method.id}" data-method-id="${method.id}" checked disabled>
+                                    <label for="toggle-${method.id}"></label>
+                                </div>
+                            </div>
+                        </div>`;
+                    } else if (method.type === 'image') {
                         return `
                         <div class="kpi-card" style="margin-bottom: 15px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -1794,12 +1814,16 @@
                 try {
                     const newSettings = {
                         currency: currencySelector.value,
-                        methods: {}
+                        methods: {
+                            'cash': { active: true, data: '' } // Siempre se guarda el efectivo como activo
+                        }
                     };
                     
                     const methodToggles = methodsContainer.querySelectorAll('input[type="checkbox"]');
                     for (const toggle of methodToggles) {
                         const methodId = toggle.dataset.methodId;
+                        if (methodId === 'cash') continue; // Ya lo manejamos, saltar
+
                         const isActive = toggle.checked;
                         const inputEl = document.getElementById(`input-${methodId}`);
                         let data = '';
