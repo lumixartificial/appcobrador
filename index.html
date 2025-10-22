@@ -721,6 +721,7 @@
         const collectorId = 'joao_silva'; 
         let collectorCurrentLocation = null; // Guardará tu ubicación en tiempo real
         let locationWatchId = null; // ID para controlar el rastreador de GPS
+        let lastLocationUpdateTime = 0; // Controla la frecuencia de actualización en Firestore
         
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         const translations = {
@@ -3928,6 +3929,24 @@ if (isEditMode && client.documentNumber) {
                         };
                         console.log('Ubicación actualizada:', collectorCurrentLocation);
                         
+                        // [REPARACIÓN] Envía la ubicación a Firestore periódicamente.
+                        const now = Date.now();
+                        if (now - lastLocationUpdateTime > 30000) { // Actualiza cada 30 segundos
+                            lastLocationUpdateTime = now;
+                            const collectorRef = doc(db, 'collectors', collectorId);
+                            updateDoc(collectorRef, {
+                                lastLocation: {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude
+                                },
+                                lastLocationUpdate: serverTimestamp()
+                            }).then(() => {
+                                console.log("Localización enviada a Firestore.");
+                            }).catch(error => {
+                                console.error("Error al enviar localización a Firestore:", error);
+                            });
+                        }
+
                         // --- INICIO: Actualización en tiempo real del marcador del cobrador ---
                         if (mapInstance && collectorMarker) {
                             const newLatLng = [collectorCurrentLocation.lat, collectorCurrentLocation.lng];
