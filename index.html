@@ -612,6 +612,7 @@
     <div id="paymentDetailModal" class="modal-view"></div>
     <div id="confirmationModal" class="modal-view"></div>
     <div id="mapPinModal" class="modal-view"></div>
+    <div id="settlementFormModal" class="modal-view"></div>
     <div id="toast-container"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -3341,6 +3342,145 @@ if (startDate || endDate) { // Si hay al menos una fecha
           showSettlementFormModal(); // Llama al nuevo modal de liquidación (que crearemos ahora)
      });
 }
+
+        // Pega esta NUEVA función aquí
+function showSettlementFormModal() {
+    const modal = document.getElementById('settlementFormModal'); // Necesitarás añadir <div id="settlementFormModal" class="modal-view"></div> al HTML principal (línea 330 aprox)
+    if (!modal) {
+         console.error("Modal #settlementFormModal no encontrado!");
+         showToast('Erro: Modal de liquidação não encontrado.', true); // Informa al usuario
+         return; 
+    }
+    let receiptFile = null; // Variable para guardar el archivo adjunto
+
+    modal.innerHTML = `
+        <header class="modal-header">
+            <button id="closeSettlementFormModal"><i data-lucide="arrow-left"></i></button>
+            <span class="modal-title">Registrar Liquidação</span> 
+        </header>
+        <div class="modal-content-wrapper container">
+            <div class="form-group">
+                <label for="settlement-form-amount">Valor Entregue ao Admin:</label>
+                <input type="number" id="settlement-form-amount" step="0.01" placeholder="0.00" required style="font-size: 1.5em; text-align: center; padding: 15px;">
+            </div>
+            <div class="form-group">
+                <label for="settlement-form-notes">Observações (Opcional):</label>
+                <textarea id="settlement-form-notes" rows="2" placeholder="Ex: Entrega do dia..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Comprovante (Opcional):</label>
+                <div id="settlement-receipt-preview-container" style="margin-bottom: 15px;">
+                    <!-- La vista previa de la imagen aparecerá aquí -->
+                </div>
+                <button type="button" class="btn-secondary" id="upload-settlement-receipt-btn" style="width: 100%;">
+                    <i data-lucide="camera"></i> Anexar Comprovante
+                </button>
+                <input type="file" id="settlement-receipt-file-input" accept="image/*" style="display: none;">
+            </div>
+        </div>
+        <div class="action-buttons">
+            <button class="btn-primary" id="saveSettlementBtn"><i data-lucide="send"></i> Enviar para Aprovação</button>
+        </div>
+    `;
+    // Navegación y activación del modal
+    history.pushState({ modal: 'settlementFormModal' }, 'Settlement Form', '#settlement-form');
+    modal.classList.add('active');
+    lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
+
+    // Event listener para cerrar el modal
+    modal.querySelector('#closeSettlementFormModal').addEventListener('click', () => window.history.back());
+
+    // Event listener para el botón de subir archivo
+    modal.querySelector('#upload-settlement-receipt-btn').addEventListener('click', () => {
+        document.getElementById('settlement-receipt-file-input').click();
+    });
+
+    // Event listener para cuando se selecciona un archivo
+    modal.querySelector('#settlement-receipt-file-input').addEventListener('change', e => {
+        receiptFile = e.target.files[0];
+        if (receiptFile) {
+            const previewContainer = document.getElementById('settlement-receipt-preview-container');
+            // Mostramos nombre y una pequeña vista previa
+            previewContainer.innerHTML = `
+                <div class="preview-item" style="display: flex; align-items: center; justify-content: space-between; background-color: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 0.9em;">
+                    <span>${receiptFile.name}</span>
+                    <img id="settlement-receipt-preview" style="max-height: 40px; border-radius: 4px; margin-left: 10px;">
+                </div>`;
+            const previewImg = document.getElementById('settlement-receipt-preview');
+            previewImg.src = URL.createObjectURL(receiptFile); // Muestra la imagen seleccionada
+        } else {
+             document.getElementById('settlement-receipt-preview-container').innerHTML = ''; // Limpia si no hay archivo
+        }
+    });
+
+    // Event listener para el botón de guardar/enviar
+    modal.querySelector('#saveSettlementBtn').addEventListener('click', async (e) => {
+         const saveButton = e.currentTarget;
+         const amountInput = document.getElementById('settlement-form-amount');
+         const amount = parseFloat(amountInput.value);
+
+         // Validación simple del monto
+         if (isNaN(amount) || amount <= 0) {
+             showToast('Por favor, insira um valor válido para a liquidação.', true);
+             amountInput.style.borderColor = 'var(--danger-color)';
+             setTimeout(() => { amountInput.style.borderColor = ''; }, 2500);
+             return;
+         }
+
+         // Deshabilitar botón y mostrar carga
+         saveButton.disabled = true;
+         saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Enviando...`;
+         lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+
+         try {
+            let receiptUrl = '';
+            // Sube la imagen a Cloudinary si existe
+            if (receiptFile) {
+                 const formData = new FormData();
+                formData.append('file', receiptFile);
+                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET); // Asegúrate que esta constante existe
+                const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData }); // Asegúrate que CLOUDINARY_URL existe
+                if (!response.ok) throw new Error('Cloudinary upload falhou');
+                const data = await response.json();
+                receiptUrl = data.secure_url;
+            }
+
+            // Obtenemos el nombre del cobrador (puedes ajustarlo si lo guardas diferente)
+            const collectorName = document.querySelector('.profile-name')?.textContent || collectorId; 
+
+            // Datos a guardar en Firestore
+            const settlementData = {
+                type: 'settlement', // Identifica este registro como liquidación
+                collectorId: collectorId, // Asegúrate que collectorId está disponible globalmente
+                collectorName: collectorName, 
+                amount: amount,
+                notes: document.getElementById('settlement-form-notes').value.trim(),
+                receiptUrl: receiptUrl, // URL de Cloudinary si se subió imagen
+                date: serverTimestamp(), // Fecha del servidor
+                status: 'pending_verification' // Estado inicial PENDIENTE
+            };
+
+            // Guardamos en la colección 'settlements'
+            await addDoc(collection(db, 'settlements'), settlementData); 
+
+            window.history.back(); // Cierra el modal
+            showToast('Liquidação enviada para aprovação!');
+
+            // Aquí podríamos añadir lógica para enviar una notificación al admin
+
+         } catch (err) {
+             console.error("Falha ao enviar liquidação:", err);
+             showToast('Falha ao enviar a liquidação.', true);
+         } finally {
+             // Rehabilita el botón
+             saveButton.disabled = false;
+             saveButton.innerHTML = `<i data-lucide="send"></i> Enviar para Aprovação`;
+             lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+         }
+    });
+} // Fin de showSettlementFormModal
+
+
 
         function showExpenseFormModal() {
             const expenseFormModal = document.getElementById('expenseFormModal');
