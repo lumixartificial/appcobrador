@@ -333,29 +333,56 @@
         .payment-history-amount { font-weight: 600; color: var(--accent-green); }
         .no-history, .no-items { color: var(--text-secondary); text-align: center; padding: 20px; }
         
-        .loan-tabs-container {
-            display: flex;
-            gap: 5px;
-            padding: 10px 20px;
-            background-color: var(--bg);
-            border-bottom: 1px solid var(--border-color);
-            overflow-x: auto;
-        }
-        .loan-tab {
-            padding: 8px 16px;
-            border: 1px solid var(--border-color);
-            background-color: var(--surface);
-            color: var(--text-secondary);
-            border-radius: 20px;
-            font-weight: 500;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .loan-tab.active {
-            background-color: var(--accent-purple);
-            color: white;
-            border-color: var(--accent-purple);
-        }
+        /* Contenedor principal de las pestañas */
+.loan-tabs-container {
+    display: flex; /* Mantiene la disposición horizontal */
+    gap: 8px; /* Aumenta un poco el espacio entre pestañas */
+    padding: 12px 20px; /* Ajusta el padding vertical y horizontal */
+    background-color: var(--surface); /* Fondo coherente con la cabecera */
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto; /* Permite scroll horizontal si las pestañas no caben */
+    scrollbar-width: none; /* Oculta la barra de scroll en Firefox */
+    -ms-overflow-style: none; /* Oculta la barra de scroll en IE/Edge */
+}
+/* Oculta la barra de scroll en Chrome/Safari/Opera */
+.loan-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+
+/* Estilo base de cada pestaña */
+.loan-tab {
+    padding: 10px 20px; /* Reducimos padding vertical, mantenemos horizontal */
+    border: 2px solid transparent; 
+    background-color: var(--bg); 
+    color: var(--text-secondary); 
+    border-radius: 20px; 
+    font-weight: 600; 
+    font-size: 0.9em; 
+    cursor: pointer;
+    white-space: nowrap; 
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s; 
+    flex-shrink: 0; 
+    /* --- LÍNEAS AÑADIDAS/MODIFICADAS --- */
+    display: inline-flex; /* Actúa como contenedor flex */
+    align-items: center; /* Centra el texto verticalmente */
+    justify-content: center; /* Centra el texto horizontalmente */
+    /* line-height: 1.2; /* Ya no es necesario con flex */
+    /* --- FIN LÍNEAS AÑADIDAS/MODIFICADAS --- */
+}
+
+/* Estilo de la pestaña activa */
+.loan-tab.active {
+    background-color: var(--accent-purple); /* Color de fondo activo */
+    color: white; /* Texto blanco */
+    border-color: var(--accent-purple); /* Borde del mismo color */
+    font-weight: 700; /* Texto más grueso para la activa */
+}
+
+/* Estilo hover para pestañas inactivas */
+.loan-tab:not(.active):hover {
+    background-color: var(--border-color); /* Ligero cambio de fondo al pasar el mouse */
+    color: var(--text-primary);
+}
 
         .action-buttons {
     background-color: var(--surface);
@@ -1850,58 +1877,88 @@ function calculateLoanDetails(loan) {
     return details;
 }
 
-        function renderClientCards(container, clientsWithLoans) {
-            if (!container) return;
-            if (clientsWithLoans.length === 0) {
-                container.innerHTML = `<div class="no-items">Nenhum cliente encontrado.</div>`;
-                return;
-            }
-            container.innerHTML = ''; 
-            clientsWithLoans.forEach(item => {
-                const { client, loan, loanIndex } = item;
-                const card = document.createElement('div');
-                card.className = 'client-card';
-                card.dataset.clientId = client.id;
-                card.dataset.loanIndex = loanIndex;
-                const statusClass = `status-${loan.status}`;
-                const statusText = (translations[currentLang] && translations[currentLang][loan.status]) || loan.status;
-                
-                const loanDetails = calculateLoanDetails(loan); // Llama a la nueva función
-const           lateDays = loanDetails.lateDays;         // Obtiene los días de atraso del resultado
-                const reputationScore = Math.max(0, 10 - lateDays);
-                let repClass = 'rep-bad';
-                if (reputationScore === 10) repClass = 'rep-perfect';
-                else if (reputationScore >= 7) repClass = 'rep-good';
-                else if (reputationScore >= 3) repClass = 'rep-regular';
+        function renderClientCards(container, clientsData) { // Cambia el nombre del parámetro
+    if (!container) return;
+    if (clientsData.length === 0) { // Usa el nuevo parámetro
+        container.innerHTML = `<div class="no-items">Nenhum cliente encontrado.</div>`;
+        return;
+    }
+    container.innerHTML = ''; 
 
-                const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
-                const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
-                const photoUrl = client.profilePictureUrl || placeholderUrl;
-                
-                const loanLabel = clientsWithLoans.filter(c => c.client.id === client.id).length > 1 ? ` - Préstamo ${loanIndex + 1}` : '';
-
-                card.innerHTML = `
-                    <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar">
-                    <div class="client-info">
-                        <h4 class="client-name">${client.name}${loanLabel}</h4>
-                        <p class="client-address"><i data-lucide="map-pin" style="width: 14px; height: 14px; stroke-width: 2.5;"></i>${client.address}</p>
-                    </div>
-                    <div class="payment-info">
-                        <span class="payment-amount">${money(loan.amount)}</span>
-                        <div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;">
-                           <span class="reputation-score ${repClass}"><i data-lucide="star" style="width: 12px; height: 12px;"></i> ${reputationScore}/10</span>
-                           <span class="payment-status ${statusClass}">${statusText}</span>
-                        </div>
-                    </div>`;
-                container.appendChild(card);
-            });
-            lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
-            container.querySelectorAll('.client-card').forEach(card => card.addEventListener('click', (e) => {
-                const clientId = e.currentTarget.dataset.clientId;
-                const loanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10);
-                showClientDetails(clientId, loanIndex);
-            }));
+    // Agrupa los préstamos por cliente ID
+    const clientsMap = new Map();
+    clientsData.forEach(item => {
+        const { client, loan, loanIndex } = item;
+        if (!clientsMap.has(client.id)) {
+            clientsMap.set(client.id, { client: client, loans: [] });
         }
+        clientsMap.get(client.id).loans.push({ ...loan, loanIndex }); // Guarda el préstamo con su índice original
+    });
+
+    // Ahora itera sobre el mapa de clientes únicos
+    clientsMap.forEach(({ client, loans }) => { 
+        // Encuentra el préstamo más relevante para mostrar (Late > Pending > Paid > Finished)
+        let displayLoan = loans.find(l => l.status === 'late') || 
+                          loans.find(l => l.status === 'pending') || 
+                          loans.find(l => l.status === 'paid') || 
+                          loans[0]; // Fallback al primero
+
+        const displayLoanIndex = displayLoan.loanIndex; // Índice original del préstamo a mostrar
+
+        const activeLoansCount = loans.filter(l => l.status !== 'finished').length; // Cuenta préstamos activos
+        const hasMultipleActive = activeLoansCount > 1;
+
+        const card = document.createElement('div');
+        card.className = 'client-card';
+        card.dataset.clientId = client.id;
+        // Guardamos el índice del préstamo MÁS RELEVANTE para abrir detalles inicialmente
+        card.dataset.loanIndex = displayLoanIndex; 
+
+        const statusClass = `status-${displayLoan.status}`;
+        const statusText = (translations[currentLang] && translations[currentLang][displayLoan.status]) || displayLoan.status;
+
+        const loanDetails = calculateLoanDetails(displayLoan); 
+        const lateDays = loanDetails.lateDays;         
+        const reputationScore = Math.max(0, 10 - lateDays);
+        let repClass = 'rep-bad';
+        if (reputationScore === 10) repClass = 'rep-perfect';
+        else if (reputationScore >= 7) repClass = 'rep-good';
+        else if (reputationScore >= 3) repClass = 'rep-regular';
+
+        const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
+        const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+        const photoUrl = client.profilePictureUrl || placeholderUrl;
+
+        // Añade indicador de múltiples préstamos si es necesario
+        const multipleLoansIndicator = hasMultipleActive 
+            ? `<span style="font-size: 0.75em; color: var(--accent-purple); font-weight: 600; margin-left: 5px;">(${activeLoansCount} Préstamos)</span>` 
+            : '';
+
+        // Construye el HTML de la tarjeta (similar a antes, pero usando displayLoan y el indicador)
+        card.innerHTML = `
+            <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar">
+            <div class="client-info">
+                <h4 class="client-name">${client.name}${multipleLoansIndicator}</h4> 
+                <p class="client-address"><i data-lucide="map-pin" style="width: 14px; height: 14px; stroke-width: 2.5;"></i>${client.address}</p>
+            </div>
+            <div class="payment-info">
+                <span class="payment-amount">${money(displayLoan.amount)}</span> 
+                <div style="display: flex; gap: 8px; align-items: center; margin-top: 5px;">
+                   <span class="reputation-score ${repClass}"><i data-lucide="star" style="width: 12px; height: 12px;"></i> ${reputationScore}/10</span>
+                   <span class="payment-status ${statusClass}">${statusText}</span> 
+                </div>
+            </div>`;
+        container.appendChild(card);
+    }); // Fin del forEach sobre clientsMap
+
+    lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
+    container.querySelectorAll('.client-card').forEach(card => card.addEventListener('click', (e) => {
+        const clientId = e.currentTarget.dataset.clientId;
+        // Abre los detalles usando el loanIndex del préstamo más relevante que guardamos
+        const loanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10); 
+        showClientDetails(clientId, loanIndex); 
+    }));
+} // Fin de renderClientCards
 
         const PAYMENT_CONFIGS = {
             // Suramérica
@@ -2186,274 +2243,361 @@ const           lateDays = loanDetails.lateDays;         // Obtiene los días de
             renderClientCards(container, clientsWithLoans);
         }
         
+        
         function showClientDetails(clientId, loanIndex = 0) {
-            const clientDetailView = document.getElementById('clientDetailView');
-            const client = allClients.find(c => c.id == clientId);
-            if (!client || !client.loans || !client.loans[loanIndex]) return;
+    const clientDetailView = document.getElementById('clientDetailView');
+    const client = allClients.find(c => c.id == clientId);
 
-            const loan = client.loans[loanIndex];
+    // Encuentra todos los préstamos activos (o finalizados si no hay activos)
+    const displayableLoans = (client.loans || []).filter(l => l.status !== 'finished');
+    // Si no hay préstamos activos, muestra el último finalizado (o un objeto vacío si no hay ninguno)
+    const activeOrLastFinishedLoans = displayableLoans.length > 0 ? displayableLoans : (client.loans && client.loans.length > 0 ? [client.loans[client.loans.length - 1]] : []);
 
-            // --- INICIO CÁLCULO DEL TOTAL PAGADO (PARA MOSTRAR) ---
-            const displayTotalPaid = (loan.history || [])
-                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
-                .reduce((sum, h) => sum + (h.amount || 0), 0);
-            // --- FIN CÁLCULO ---
-            
-            let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
-            if (loan.history && loan.history.length > 0) {
-                let paidAmountCounter = 0;
-                // [CORRECCIÓN 1] Procesar el historial en orden cronológico (del más antiguo al más nuevo) para que el cálculo sea correcto.
-                const sortedHistory = loan.history
-                    .filter(p => p.status !== 'pending_verification') // Ignora los pagos pendientes para el cálculo
-                    .map((p, index) => ({ ...p, originalIndex: index }))
-                    .sort((a, b) => (a.date?.seconds || 0) - (b.date?.seconds || 0));
+    // Valida el loanIndex o selecciona el primero activo/relevante
+    const currentLoanIndex = (loanIndex >= 0 && client.loans && loanIndex < client.loans.length && (client.loans[loanIndex].status !== 'finished' || activeOrLastFinishedLoans.some(l => client.loans[loanIndex] === l)))
+                           ? loanIndex
+                           : (activeOrLastFinishedLoans.length > 0 ? client.loans.findIndex(l => l === activeOrLastFinishedLoans[0]) : 0);
 
-                // Se mapea en orden cronológico y luego se invierte el resultado final para mostrar el más nuevo primero.
-                historyHtml = sortedHistory.map(p => {
-                    if (p.status === 'pending_verification') {
-                         // Lógica para pagos pendientes, que no afectan el cálculo.
-                    } else {
-                        // Lógica para pagos aprobados, que sí afectan.
-                        const paymentAmount = p.amount;
-                        // [CORRECCIÓN 2] Usar siempre el valor original y fijo de la cuota para los cálculos.
-                        const installmentValue = loan.originalInstallmentAmount;
-                        
-                        let title = '';
-                        let description = '';
+    if (!client || !client.loans || !client.loans[currentLoanIndex]) {
+         console.error(`Cliente o préstamo con índice ${currentLoanIndex} no encontrado para ${clientId}`);
+         showToast("Erro ao carregar detalhes do empréstimo.", true);
+         // Intenta cerrar el modal si ya estaba abierto
+         if(clientDetailView.classList.contains('active')) window.history.back();
+         return; // Salir si no se encuentra
+    }
 
-                        if (installmentValue > 0) {
-                            const startInstallment = Math.floor(paidAmountCounter / installmentValue) + 1;
-                            const endInstallment = Math.floor((paidAmountCounter + paymentAmount - 0.01) / installmentValue) + 1;
-                            
-                            if (startInstallment === endInstallment) {
-                                title = translations[currentLang].paymentTitle.replace('{start}', startInstallment);
-                                const percentage = Math.round((paymentAmount / installmentValue) * 100);
-                                if (percentage >= 100) {
-                                    const overpay = paymentAmount - installmentValue;
-                                    if (overpay > 0.01) {
-                                        description = translations[currentLang].paymentDescOverpay.replace('{start}', startInstallment).replace('{overpayAmount}', money(overpay));
-                                    } else {
-                                        description = translations[currentLang].paymentDescFull.replace('{start}', startInstallment);
-                                    }
-                                } else {
-                                    description = translations[currentLang].paymentDescPartial.replace('{percent}', percentage);
-                                }
+    // El préstamo que mostraremos ahora se basa en currentLoanIndex
+    const loan = client.loans[currentLoanIndex];
+    const hasMultipleDisplayable = activeOrLastFinishedLoans.length > 1; // ¿Hay más de un préstamo activo/relevante?
+
+    // --- INICIO CÁLCULO DEL TOTAL PAGADO (PARA MOSTRAR) ---
+    const displayTotalPaid = (loan.history || [])
+        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+        .reduce((sum, h) => sum + (h.amount || 0), 0);
+    // --- FIN CÁLCULO ---
+
+    let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
+    if (loan.history && loan.history.length > 0) {
+        let paidAmountCounter = 0;
+        // Procesar el historial en orden cronológico (del más antiguo al más nuevo)
+        const sortedHistory = loan.history
+            .map((p, index) => ({ ...p, originalIndex: index })) // Guarda índice original
+            .sort((a, b) => (a.date?.seconds || 0) - (b.date?.seconds || 0));
+
+        // Mapea en orden cronológico y luego invierte el resultado final para mostrar el más nuevo primero.
+        historyHtml = sortedHistory.map(p => {
+            let title = '';
+            let description = '';
+            let dateString = 'Data inválida';
+            let timeString = '';
+            let hasReceipt = p.receiptUrl ? '<i data-lucide="file-text" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>' : '';
+            let statusStyle = '';
+            let statusText = '';
+            let amountDisplay = money(p.amount || 0);
+
+            if (p?.date?.seconds) {
+                const d = new Date(p.date.seconds * 1000);
+                dateString = d.toLocaleDateString('pt-BR');
+                timeString = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            // Define texto y estilo según el estado del registro de historial
+            if (p.status === 'pending_verification') {
+                 statusText = 'Pendente';
+                 statusStyle = 'color: var(--warning-color); font-weight: bold;';
+                 title = 'Pagamento Enviado';
+                 description = `Aguardando aprovação do admin`;
+                 amountDisplay = money(p.amount || 0);
+            } else if (p.status === 'rejected') {
+                 statusText = 'Rejeitado';
+                 statusStyle = 'color: var(--danger-color); font-weight: bold;';
+                 title = 'Pagamento Rejeitado';
+                 description = `Comprovante não aceito pelo admin`;
+                 amountDisplay = `<span style="text-decoration: line-through;">${money(p.amount || 0)}</span>`;
+            } else if (p.status === 'postponed') {
+                 statusText = 'Adiado';
+                 statusStyle = 'color: var(--text-secondary); font-style: italic;';
+                 title = 'Pagamento Adiado';
+                 description = `Data de vencimento movida`;
+                 amountDisplay = ''; // No mostrar monto para aplazamiento
+                 hasReceipt = ''; // No hay recibo para aplazamiento
+            } else { // Presume 'approved' o estado válido para cálculo
+                const paymentAmount = p.amount || 0;
+                const installmentValue = loan.originalInstallmentAmount || 0;
+
+                statusText = 'Aprovado';
+                statusStyle = 'color: var(--accent-green);';
+
+                if (installmentValue > 0) {
+                    // Calcula cuotas cubiertas *antes* de sumar este pago
+                    const startInstallment = Math.floor(paidAmountCounter / installmentValue) + 1;
+                    // Calcula cuotas cubiertas *después* de sumar este pago
+                    const endInstallment = Math.floor((paidAmountCounter + paymentAmount - 0.01) / installmentValue) + 1;
+
+                    if (startInstallment === endInstallment && startInstallment <= (parseInt((loan.installments || '0/0').split('/')[1]) || 0) ) { // Evita mostrar cuota 21/20
+                        title = translations[currentLang].paymentTitle.replace('{start}', startInstallment);
+                        const percentage = Math.round((paymentAmount / installmentValue) * 100);
+                        if (percentage >= 100) {
+                            const overpay = paymentAmount - installmentValue;
+                            if (overpay > 0.01) {
+                                description = translations[currentLang].paymentDescOverpay.replace('{start}', startInstallment).replace('{overpayAmount}', money(overpay));
                             } else {
-                                title = translations[currentLang].paymentTitleRange.replace('{start}', startInstallment).replace('{end}', endInstallment);
-                                const fullInstallmentsPaid = endInstallment - startInstallment;
-                                const remainingAmountForNext = (paidAmountCounter + paymentAmount) % installmentValue;
-                                const percentageOfNext = Math.round((remainingAmountForNext / installmentValue) * 100);
-                                description = translations[currentLang].paymentDescMultiple.replace('{fullInstallments}', fullInstallmentsPaid).replace('{percent}', percentageOfNext);
+                                description = translations[currentLang].paymentDescFull.replace('{start}', startInstallment);
                             }
+                        } else {
+                            description = translations[currentLang].paymentDescPartial.replace('{percent}', percentage);
                         }
-                        
-                        paidAmountCounter += paymentAmount;
-                        
-                        let dateString = 'Data inválida';
-                        let timeString = '';
-                        if (p?.date?.seconds) { 
-                            const d = new Date(p.date.seconds * 1000);
-                            dateString = d.toLocaleDateString('pt-BR'); 
-                            timeString = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                        }
-                        const hasReceipt = p.receiptUrl ? '<i data-lucide="file-text" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>' : '';
-
-                        return `<div class="payment-history-item" data-history-index="${p.originalIndex}" style="cursor: pointer;">
-                                    <div class="payment-history-details">
-                                        <h4 class="payment-history-title">${title}</h4>
-                                        <p class="payment-history-description">${description}</p>
-                                    </div>
-                                    <div class="payment-history-info">
-                                        <span class="payment-date">${dateString} - ${timeString}</span>
-                                        <span class="payment-history-amount">${money(p.amount)}</span>
-                                        ${hasReceipt}
-                                    </div>
-                                </div>`;
+                    } else if (endInstallment > startInstallment) {
+                        title = translations[currentLang].paymentTitleRange.replace('{start}', startInstallment).replace('{end}', endInstallment);
+                        const fullInstallmentsPaid = endInstallment - startInstallment;
+                        const remainingAmountForNext = (paidAmountCounter + paymentAmount) % installmentValue;
+                        const percentageOfNext = Math.round((remainingAmountForNext / installmentValue) * 100);
+                        description = translations[currentLang].paymentDescMultiple.replace('{fullInstallments}', fullInstallmentsPaid).replace('{percent}', percentageOfNext);
+                    } else {
+                         title = "Pagamento Adicional"; // O algún texto genérico si cubre cuotas ya pagadas
+                         description = "Valor creditado ao saldo.";
                     }
-                }).reverse().join(''); // Se invierte el array de HTML aquí
-            }
-
-            const loanDetails = calculateLoanDetails(loan); // Llama a la nueva función
-            const lateDays = loanDetails.lateDays;         // Obtiene los días de atraso del resultado
-            const score = Math.max(0, 10 - lateDays);
-            let reputationStatusKey = 'reputationBad';
-            if (score === 10) reputationStatusKey = 'reputationPerfect';
-            else if (score >= 7) reputationStatusKey = 'reputationGood';
-            else if (score >= 3) reputationStatusKey = 'reputationRegular';
-
-            let barStatusClass = 'status-bad';
-            if (score === 10) barStatusClass = 'status-perfect';
-            else if (score >= 7) barStatusClass = 'status-good';
-            else if (score >= 3) barStatusClass = 'status-regular';
-
-            const activeLoans = client.loans.filter(l => l.status === 'active');
-            const hasMultipleLoans = activeLoans.length > 1;
-
-            clientDetailView.innerHTML = `
-                <header class="modal-header" style="justify-content: space-between;">
-                    
-                    <div style="display: flex; align-items: center;">
-    <button id="closeDetailView" class="header-btn" style="margin-right: 10px;"><i data-lucide="arrow-left"></i></button>
-    <div>
-        <span class="modal-title">${client.name}</span>
-        ${client.documentNumber ? `<span style="font-size: 0.8em; color: var(--text-secondary); display: block;">Doc: ${client.documentNumber}</span>` : ''}
-    </div>
-</div>
-
-                    <button id="editClientBtn" class="header-btn" title="Editar Cliente"><i data-lucide="edit"></i></button>
-                </header>
-                ${hasMultipleLoans ? `
-                <div class="loan-tabs-container" id="loan-tabs-container">
-                    ${activeLoans.map((l, index) => `
-                        <button class="loan-tab ${index === loanIndex ? 'active' : ''}" data-loan-index="${index}">
-                            Préstamo ${index + 1}
-                        </button>
-                    `).join('')}
-                </div>` : ''}
-                <div class="modal-content-wrapper">
-                  <div class="container">
-                    <div class="kpi-card progress-card" style="margin-bottom: 20px;">
-                        <h3 class="kpi-title" style="justify-content: center;">Progresso do Empréstimo</h3>
-                        <div class="progress-circle">
-                            <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="client-detail-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292; stroke: var(--accent-purple);"></circle></svg>
-                            <div class="progress-text" id="client-detail-progress-text"></div>
-                        </div>
-                    </div>
-                    <section class="kpi-grid-profile" style="margin-bottom: 30px;">
-                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
-                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
-                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
-                    
-                        <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
-                            <h3 class="kpi-title"><i data-lucide="alert-triangle" style="color: var(--danger-color);"></i> Mora Acumulada</h3>
-                            <p class="kpi-value" style="color: var(--danger-color);">${money(loan.lateFeesAccumulated || 0)}</p>
-                   </div>
-
-                   <div class="kpi-card" style="border-color: var(--danger-color);">
-                       <h3 class="kpi-title"><i data-lucide="receipt-text"></i> Total Devido Agora</h3>
-                       <p class="kpi-value" style="...">${money((loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0))}</p>
-                   </div>
-                    
-                    </section>
-                    
-                    <section>
-                         <h2 class="section-title" data-lang-key="reputationScore"></h2>
-                         <div class="kpi-card">
-                             <div class="reputation-bar-container">
-                                 <div class="reputation-bar ${barStatusClass}" style="width: ${score * 10}%"></div>
-                             </div>
-                             <div class="reputation-status">
-                                 <span class="reputation-value">${score} / 10</span>
-                                 <span class="reputation-text ${barStatusClass}" data-lang-key="${reputationStatusKey}"></span>
-                             </div>
-                         </div>
-                    </section>
-
-                    
-                    <section style="margin-top: 30px;">
-                        <h2 class="section-title">Histórico de Pagamentos</h2>
-                        <div class="client-list">${historyHtml}</div>
-                    </section>
-                  </div>
-                </div>
-                <div class="action-buttons">
-                    ${loan.status === 'finished' ? `
-                        <button class="btn-secondary" id="updateClientDataBtn"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
-                        <button class="btn-primary" id="createNewLoanBtn" ${activeLoans.length >= 4 ? 'disabled' : ''}><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
-                    ` : `
-                        <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
-                        <button class="btn-secondary" id="postponePaymentBtn"><i data-lucide="calendar-plus"></i> <span data-lang-key="postponePayment"></span></button>
-                        <button class="btn-secondary" id="createNewLoanBtn" ${activeLoans.length >= 4 ? 'disabled' : ''}><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
-                        <button class="btn-primary" id="registerPaymentBtn"><i data-lucide="dollar-sign"></i> Registrar Pagamento</button>
-                    `}
-                </div>`;
-            
-            history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: loanIndex }, `Details for ${client.name}`, `#client/${clientId}/${loanIndex}`);
-            clientDetailView.classList.add('active');
-
-            const paidInstallments = loan.originalInstallmentAmount > 0 ? Math.floor(displayTotalPaid / loan.originalInstallmentAmount) : 0;
-            const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
-            const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
-            const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
-            const circleCircumference = 2 * Math.PI * 54;
-            const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
-            
-            const progressBar = document.getElementById('client-detail-progress-bar');
-            const progressText = document.getElementById('client-detail-progress-text');
-
-            if(progressBar && progressText) {
-                progressBar.style.strokeDashoffset = strokeDashoffset;
-                progressText.textContent = `${paidInstallments}/${totalInstallments}`;
-            }
-
-            if (hasMultipleLoans) {
-                clientDetailView.querySelectorAll('.loan-tab').forEach(tab => {
-                    tab.addEventListener('click', (e) => {
-                        const newLoanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10);
-                        showClientDetails(clientId, newLoanIndex);
-                    });
-                });
-            }
-
-            lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
-            applyLanguage(currentLang);
-            document.getElementById('closeDetailView').addEventListener('click', () => window.history.back());
-            document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, loanIndex));
-            
-            if (loan.status === 'finished') {
-                document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
-                document.getElementById('updateClientDataBtn').addEventListener('click', () => showClientFormModal(clientId, false, loanIndex));
-            } else {
-                document.getElementById('registerPaymentBtn').addEventListener('click', () => showPaymentModal(clientId, loanIndex));
-                document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
-                document.getElementById('postponePaymentBtn').addEventListener('click', () => {
-                    showConfirmationModal(
-                        translations[currentLang].postponeConfirmTitle,
-                        translations[currentLang].postponeConfirmMsg,
-                        async () => {
-                            const clientRef = doc(db, 'clients', clientId);
-                            try {
-                                const updatedLoans = [...client.loans];
-                                updatedLoans[loanIndex].history.push({ amount: 0, date: new Date(), status: 'postponed' });
-                                await updateDoc(clientRef, { loans: updatedLoans });
-                                window.history.back(); 
-                                setTimeout(() => window.history.back(), 50);
-                                showToast('Pagamento adiado com sucesso!');
-                            } catch(error) {
-                                console.error("Error postponing payment: ", error);
-                                showToast('Falha ao adiar pagamento.', true);
-                            }
-                        }
-                    );
-                });
-            
-                const startRouteBtn = document.getElementById('startRouteBtn');
-                if (client.location) {
-                    startRouteBtn.addEventListener('click', () => {
-                        // 1. Enviar notificación al cliente
-                        const notifTitle = translations[currentLang].collectorOnTheWayTitle;
-                        const notifBody = translations[currentLang].collectorOnTheWayBody;
-                        sendNotificationToClient(clientId, notifTitle, notifBody, 'on_the_way', 'navigation');
-                        showToast('Notificação enviada ao cliente!');
-
-                        // 2. Abrir el mapa para la navegación
-                        window.open(client.location, '_blank');
-                    });
                 } else {
-                    startRouteBtn.disabled = true;
-                    startRouteBtn.style.opacity = '0.5';
+                    title = "Pagamento Recebido";
+                    description = "Valor creditado ao saldo.";
                 }
+                // Suma el monto solo si es un pago válido para el cálculo
+                paidAmountCounter += paymentAmount;
             }
-            
-            clientDetailView.querySelectorAll('.payment-history-item').forEach(item => {
-                item.addEventListener('click', (e) => {
-                    const historyIndex = e.currentTarget.dataset.historyIndex;
-                    showPaymentDetailModal(clientId, parseInt(historyIndex, 10));
-                });
-            });
 
-            
-        }
+            // El índice original se usa para abrir el detalle correcto
+            return `<div class="payment-history-item" data-history-index="${p.originalIndex}" style="cursor: ${p.status !== 'postponed' ? 'pointer' : 'default'};">
+                        <div class="payment-history-details">
+                            <h4 class="payment-history-title">${title}</h4>
+                            <p class="payment-history-description">${description}</p>
+                            <p class="payment-history-description" style="${statusStyle}; font-size: 0.8em; margin-top: 5px;">${statusText}</p>
+                        </div>
+                        <div class="payment-history-info">
+                            <span class="payment-date">${dateString} - ${timeString}</span>
+                            <span class="payment-history-amount" style="${p.status === 'rejected' ? 'color: var(--danger-color);' : ''}">${amountDisplay}</span>
+                            ${hasReceipt}
+                        </div>
+                    </div>`;
+        }).reverse().join(''); // Invierte el HTML final
+    }
+
+    const loanDetails = calculateLoanDetails(loan); // Llama a la nueva función
+    const lateDays = loanDetails.lateDays;         // Obtiene los días de atraso del resultado
+    const score = Math.max(0, 10 - lateDays);
+    let reputationStatusKey = 'reputationBad';
+    if (score === 10) reputationStatusKey = 'reputationPerfect';
+    else if (score >= 7) reputationStatusKey = 'reputationGood';
+    else if (score >= 3) reputationStatusKey = 'reputationRegular';
+
+    let barStatusClass = 'status-bad';
+    if (score === 10) barStatusClass = 'status-perfect';
+    else if (score >= 7) barStatusClass = 'status-good';
+    else if (score >= 3) barStatusClass = 'status-regular';
+
+    // --- INICIO HTML PRINCIPAL ---
+    clientDetailView.innerHTML = `
+        <header class="modal-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center;">
+                <button id="closeDetailView" class="header-btn" style="margin-right: 10px;"><i data-lucide="arrow-left"></i></button>
+                <div>
+                    <span class="modal-title">${client.name}</span>
+                    ${client.documentNumber ? `<span style="font-size: 0.8em; color: var(--text-secondary); display: block;">Doc: ${client.documentNumber}</span>` : ''}
+                </div>
+            </div>
+            <!-- Botón Editar ahora edita DATOS del cliente + ESTE préstamo -->
+            <button id="editClientBtn" class="header-btn" title="Editar Cliente e Préstamo Atual"><i data-lucide="edit"></i></button>
+        </header>
+
+        <!-- CONTENEDOR DE PESTAÑAS (se muestra solo si hay múltiples) -->
+        ${hasMultipleDisplayable ? `
+        <div class="loan-tabs-container" id="loan-tabs-container">
+            ${client.loans.map((l, index) => {
+                // Muestra pestaña solo para préstamos activos/último finalizado O el que estamos viendo
+                const isRelevant = activeOrLastFinishedLoans.some(relevantLoan => client.loans[index] === relevantLoan);
+                if (isRelevant || index === currentLoanIndex) {
+                    return `<button class="loan-tab ${index === currentLoanIndex ? 'active' : ''}" data-loan-index="${index}">
+                                Préstamo ${index + 1} ${l.status === 'finished' ? '(Finalizado)' : ''}
+                            </button>`;
+                }
+                return '';
+            }).join('')}
+        </div>` : ''}
+
+        <div class="modal-content-wrapper">
+          <div class="container">
+            <!-- El resto del contenido (KPIs, Historial, etc.) se genera usando el objeto 'loan' seleccionado -->
+
+            <div class="kpi-card progress-card" style="margin-bottom: 20px;">
+                <h3 class="kpi-title" style="justify-content: center;">Progresso do Empréstamo ${currentLoanIndex + 1}</h3>
+                <div class="progress-circle">
+                    <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="client-detail-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292; stroke: var(--accent-purple);"></circle></svg>
+                    <div class="progress-text" id="client-detail-progress-text"></div>
+                </div>
+            </div>
+            <section class="kpi-grid-profile" style="margin-bottom: 30px;">
+                <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
+                <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
+                <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
+
+                <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
+                   <h3 class="kpi-title"><i data-lucide="alert-triangle" style="color: var(--danger-color);"></i> Mora Acumulada</h3>
+                   <p class="kpi-value" style="color: var(--danger-color);">${money(loan.lateFeesAccumulated || 0)}</p>
+               </div>
+
+               <div class="kpi-card" style="border-color: var(--danger-color);">
+                   <h3 class="kpi-title"><i data-lucide="receipt-text"></i> Total Devido Agora</h3>
+                   <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0)))}</p>
+               </div>
+            </section>
+
+            <section>
+                 <h2 class="section-title" data-lang-key="reputationScore"></h2>
+                 <div class="kpi-card">
+                     <div class="reputation-bar-container">
+                         <div class="reputation-bar ${barStatusClass}" style="width: ${score * 10}%"></div>
+                     </div>
+                     <div class="reputation-status">
+                         <span class="reputation-value">${score} / 10</span>
+                         <span class="reputation-text ${barStatusClass}" data-lang-key="${reputationStatusKey}"></span>
+                     </div>
+                 </div>
+            </section>
+
+            <section style="margin-top: 30px;">
+                <h2 class="section-title">Histórico de Pagamentos (Préstamo ${currentLoanIndex + 1})</h2>
+                <div class="client-list">${historyHtml}</div> <!-- Usa historyHtml generado para 'loan' -->
+            </section>
+          </div>
+        </div>
+        <div class="action-buttons">
+            <!-- Los botones ahora necesitan saber el loanIndex actual -->
+            ${loan.status === 'finished' ? `
+                <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
+                <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
+            ` : `
+                <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
+                <button class="btn-secondary" id="postponePaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="calendar-plus"></i> <span data-lang-key="postponePayment"></span></button>
+                <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
+                <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> Registrar Pagamento</button>
+            `}
+        </div>`;
+    // --- FIN HTML PRINCIPAL ---
+
+    // Añade el estado al historial del navegador
+    history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: currentLoanIndex }, `Details for ${client.name}`, `#client/${clientId}/${currentLoanIndex}`);
+    clientDetailView.classList.add('active');
+
+    // Cálculo y actualización del círculo de progreso
+    const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
+    const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
+    // Calcula cuotas pagas basado en monto pagado y valor de cuota
+    const paidInstallments = loan.originalInstallmentAmount > 0 ? Math.floor(displayTotalPaid / loan.originalInstallmentAmount) : 0;
+    const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
+    const circleCircumference = 2 * Math.PI * 54; // Radio 54
+    const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
+
+    const progressBar = document.getElementById('client-detail-progress-bar');
+    const progressText = document.getElementById('client-detail-progress-text');
+
+    if(progressBar && progressText) {
+        progressBar.style.strokeDashoffset = strokeDashoffset;
+        progressText.textContent = `${paidInstallments}/${totalInstallments}`;
+    }
+
+    // --- AÑADIR LISTENERS PARA LAS PESTAÑAS (si existen) ---
+    if (hasMultipleDisplayable) {
+        clientDetailView.querySelectorAll('.loan-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const newLoanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10);
+                // Llama a la misma función pero con el nuevo índice
+                showClientDetails(clientId, newLoanIndex);
+            });
+        });
+    }
+    // --- FIN LISTENERS PESTAÑAS ---
+
+    // Crear íconos y aplicar idioma
+    lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
+    applyLanguage(currentLang);
+
+    // Listener para cerrar
+    document.getElementById('closeDetailView').addEventListener('click', () => window.history.back());
+
+    // --- ACTUALIZAR LISTENERS DE BOTONES DE ACCIÓN ---
+    // Asegúrate de que los listeners obtengan el loanIndex correcto del botón
+
+    // Botón Editar: ahora edita cliente + préstamo actual
+    document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
+
+    if (loan.status === 'finished') {
+        document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true)); // Crear nuevo préstamo siempre es posible desde aquí
+        // El botón updateClientDataBtn ahora pasa el índice del préstamo finalizado que se está viendo
+        document.getElementById('updateClientDataBtn').addEventListener('click', (e) => showClientFormModal(clientId, false, parseInt(e.currentTarget.dataset.loanIndex, 10)));
+    } else {
+        // Registrar Pago: Obtiene el índice del botón
+        document.getElementById('registerPaymentBtn').addEventListener('click', (e) => showPaymentModal(clientId, parseInt(e.currentTarget.dataset.loanIndex, 10)));
+        // Crear Nuevo Préstamo: Pasa 'true' para indicar que es nuevo
+        document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
+        // Aplazar Pago: Obtiene el índice del botón y lo pasa a la lógica de confirmación
+        document.getElementById('postponePaymentBtn').addEventListener('click', (e) => {
+             const indexToPostpone = parseInt(e.currentTarget.dataset.loanIndex, 10); // Índice del préstamo a aplazar
+             showConfirmationModal(
+                translations[currentLang].postponeConfirmTitle,
+                translations[currentLang].postponeConfirmMsg,
+                async () => {
+                    const clientRef = doc(db, 'clients', clientId);
+                    try {
+                        // Obtenemos una copia actualizada del cliente por si acaso
+                        const currentClientData = allClients.find(c => c.id === clientId);
+                        if (!currentClientData || !currentClientData.loans || !currentClientData.loans[indexToPostpone]) throw new Error("Loan not found");
+                        
+                        const updatedLoans = [...currentClientData.loans];
+                        // Asegúrate de añadir al historial del préstamo correcto
+                        if (!updatedLoans[indexToPostpone].history) updatedLoans[indexToPostpone].history = [];
+                        updatedLoans[indexToPostpone].history.push({ amount: 0, date: new Date(), status: 'postponed' });
+                        await updateDoc(clientRef, { loans: updatedLoans });
+                        window.history.back(); // Cierra confirmación
+                        // setTimeout(() => window.history.back(), 50); // Cierra detalles (Puede ser redundante si onSnapshot actualiza)
+                        showToast('Pagamento adiado com sucesso!');
+                    } catch(error) {
+                        console.error("Error postponing payment: ", error);
+                        showToast('Falha ao adiar pagamento.', true);
+                         window.history.back(); // Cierra confirmación incluso si hay error
+                    }
+                }
+            );
+        });
+        // Botón Navegar (Start Route): Sin cambios, depende solo del cliente
+        const startRouteBtn = document.getElementById('startRouteBtn');
+        if (client.location) {
+             startRouteBtn.addEventListener('click', () => {
+                 // 1. Enviar notificación al cliente
+                 const notifTitle = translations[currentLang].collectorOnTheWayTitle;
+                 const notifBody = translations[currentLang].collectorOnTheWayBody;
+                 sendNotificationToClient(clientId, notifTitle, notifBody, 'on_the_way', 'navigation');
+                 showToast('Notificação enviada ao cliente!');
+
+                 // 2. Abrir el mapa para la navegación
+                 window.open(client.location, '_blank');
+             });
+         } else {
+             startRouteBtn.disabled = true;
+             startRouteBtn.style.opacity = '0.5';
+             startRouteBtn.title = 'Localização GPS não disponível';
+         }
+    }
+
+    // Listener para ver detalles del pago (usa índice original del historial)
+    clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const historyIndex = e.currentTarget.dataset.historyIndex;
+            showPaymentDetailModal(clientId, parseInt(historyIndex, 10), currentLoanIndex); // Pasa loanIndex actual
+        });
+    });
+
+} // Fin showClientDetails
+
+
 
         function showMapPinModal() {
             const mapPinModal = document.getElementById('mapPinModal');
@@ -4678,4 +4822,5 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
+
 
