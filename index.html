@@ -3313,7 +3313,10 @@ if (startDate || endDate) { // Si hay al menos una fecha
          console.error("Modal #reportOptionsModal não encontrado para seleção de tipo de saída!");
          return;
      }
+
+     console.log("Intentando activar modal (añadir clase 'active')... Estado display ANTES:", window.getComputedStyle(modal).display);
      modal.classList.add('active');
+     console.log("Clase 'active' añadida. Estado display DESPUÉS:", window.getComputedStyle(modal).display);
 
      modal.innerHTML = `
         <div class="modal-content" style="max-width: 350px;">
@@ -3329,18 +3332,32 @@ if (startDate || endDate) { // Si hay al menos una fecha
             </div>
         </div>
      `;
-     lucide.createIcons({nodes: modal.querySelectorAll('[data-lucide]')});
+
+     console.log("innerHTML asignado al modal.");
+
+     try { // Añadimos try/catch alrededor de lucide
+         lucide.createIcons({nodes: modal.querySelectorAll('[data-lucide]')}); 
+         console.log("Íconos Lucide creados."); // <-- NUEVO LOG
+     } catch (lucideError) {
+         console.error("ERROR al crear íconos Lucide:", lucideError); // <-- NUEVO LOG DE ERROR
+     }
 
      const closeModal = () => modal.classList.remove('active');
-     modal.querySelector('.close-modal-btn').addEventListener('click', closeModal);
-     modal.querySelector('#add-expense-option-btn').addEventListener('click', () => {
-         closeModal();
-         showExpenseFormModal(); // Llama al modal de gastos existente
-     });
-     modal.querySelector('#add-settlement-option-btn').addEventListener('click', () => {
-          closeModal();
-          showSettlementFormModal(); // Llama al nuevo modal de liquidación (que crearemos ahora)
-     });
+
+     try { // Añadimos try/catch alrededor de los listeners
+         modal.querySelector('.close-modal-btn').addEventListener('click', closeModal);
+         modal.querySelector('#add-expense-option-btn').addEventListener('click', () => {
+             closeModal();
+             showExpenseFormModal(); 
+         });
+         modal.querySelector('#add-settlement-option-btn').addEventListener('click', () => {
+              closeModal();
+              showSettlementFormModal(); 
+         });
+         console.log("Event listeners añadidos a los botones del modal."); // <-- NUEVO LOG
+     } catch (listenerError) {
+          console.error("ERROR al añadir event listeners:", listenerError); // <-- NUEVO LOG DE ERROR
+     }
 }
 
         // Pega esta NUEVA función aquí
