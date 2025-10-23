@@ -668,8 +668,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- Añadido al final
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
@@ -682,6 +683,29 @@
         };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const storage = getStorage(app);
+        
+        // --- INICIO CÓDIGO PARA HABILITAR MODO OFFLINE ---
+try {
+    enableIndexedDbPersistence(db)
+        .then(() => {
+            console.log("Persistencia offline de Firestore HABILITADA.");
+        })
+        .catch((err) => {
+            if (err.code == 'failed-precondition') {
+                // Posiblemente múltiples pestañas abiertas, eso desactiva la persistencia.
+                console.warn("Falha ao habilitar persistencia offline: Múltiplas abas abertas?");
+            } else if (err.code == 'unimplemented') {
+                // Navegador no compatible (muy raro hoy en día).
+                console.error("Falha ao habilitar persistencia offline: Navegador não suportado.");
+            } else {
+                console.error("Erro desconhecido ao habilitar persistencia offline:", err);
+            }
+        });
+} catch (e) {
+     console.error("Erro geral ao tentar habilitar persistencia:", e);
+}
+// --- FIN CÓDIGO PARA HABILITAR MODO OFFLINE ---
 
         async function setupFCM(collectorId, swRegistration) {
             const LOG_PREFIX = `[COBRADOR-FCM-DIAGNOSTICO]`;
@@ -3144,15 +3168,24 @@ function calculateLoanDetails(loan) {
                     let newUploadedDocuments = [];
                     if (filesToUpload.length > 0) {
                         const uploadPromises = filesToUpload.map(async (file) => {
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                            const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-                            if (!response.ok) { throw new Error(`Cloudinary upload failed: ${response.statusText}`); }
-                            const data = await response.json();
-                            return { name: file.name, url: data.secure_url };
-                        });
-                        newUploadedDocuments = await Promise.all(uploadPromises);
+    // Necesitamos el ID del cliente. Si es nuevo, se genera DESPUÉS.
+    // Usaremos un nombre de archivo único por ahora.
+    const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+    // Obtén el ID del cliente SI estamos editando, si no, usa el username (que será el ID después)
+    const targetClientId = isEditMode ? clientId : document.getElementById('client-username').value.trim();
+
+    // 1. Crear referencia (clients/ID_CLIENTE/docs/nombre_archivo.ext)
+    const storageRef = ref(storage, `clients/${targetClientId}/docs/${uniqueFileName}`);
+
+    // 2. Subir archivo
+    await uploadBytes(storageRef, file);
+
+    // 3. Obtener URL
+    const downloadURL = await getDownloadURL(storageRef);
+
+    return { name: file.name, url: downloadURL }; // Devuelve el objeto esperado
+});
+newUploadedDocuments = await Promise.all(uploadPromises);
                     }
 
                     const finalDocuments = [...existingDocs, ...newUploadedDocuments];
@@ -3629,17 +3662,19 @@ function showSettlementFormModal() {
          lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
 
          try {
-            let receiptUrl = '';
-            // Sube la imagen a Cloudinary si existe
-            if (receiptFile) {
-                 const formData = new FormData();
-                formData.append('file', receiptFile);
-                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET); // Asegúrate que esta constante existe
-                const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData }); // Asegúrate que CLOUDINARY_URL existe
-                if (!response.ok) throw new Error('Cloudinary upload falhou');
-                const data = await response.json();
-                receiptUrl = data.secure_url;
-            }
+            let receiptUrl = ''; // Inicializa receiptUrl
+if (receiptFile) {
+     // Usaremos un ID temporal para la ruta
+     const tempSettlementId = `settlement_${Date.now()}`;
+     // 1. Crear referencia (settlements/ID_COBRADOR/ID_LIQUIDACION/receipt.ext)
+     const storageRef = ref(storage, `settlements/${collectorId}/${tempSettlementId}/${receiptFile.name.replace(/\s+/g, '_')}`);
+
+     // 2. Subir archivo
+     await uploadBytes(storageRef, receiptFile);
+
+     // 3. Obtener URL
+     receiptUrl = await getDownloadURL(storageRef); // Asigna la URL
+}
 
             // Obtenemos el nombre del cobrador (puedes ajustarlo si lo guardas diferente)
             const collectorName = document.querySelector('.profile-name')?.textContent || collectorId; 
@@ -3754,25 +3789,32 @@ function showSettlementFormModal() {
                 lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
 
                 try {
-                    let receiptUrl = '';
-                    if (receiptFile) {
-                         const formData = new FormData();
-                        formData.append('file', receiptFile);
-                        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                        const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-                        if (!response.ok) throw new Error('Cloudinary upload failed');
-                        const data = await response.json();
-                        receiptUrl = data.secure_url;
-                    }
+                    
+                    let receiptUrl = ''; // Inicializa receiptUrl
+if (receiptFile) {
+     // Usaremos un ID temporal para la ruta, Firestore generará el ID real después
+     const tempExpenseId = `expense_${Date.now()}`;
+     // 1. Crear referencia (expenses/ID_COBRADOR/ID_GASTO/receipt.ext)
+     const storageRef = ref(storage, `expenses/${collectorId}/${tempExpenseId}/${receiptFile.name.replace(/\s+/g, '_')}`);
 
-                    const expenseData = {
-                        collectorId,
-                        category: document.getElementById('expense-category').value,
-                        value: parseFloat(valueInput.value),
-                        observations: document.getElementById('expense-obs').value,
-                        receiptUrl,
-                        date: serverTimestamp()
-                    };
+     // 2. Subir archivo
+     await uploadBytes(storageRef, receiptFile);
+
+     // 3. Obtener URL
+     receiptUrl = await getDownloadURL(storageRef); // Asigna la URL
+}
+
+const expenseData = {
+    type: 'expense', // Asegúrate que este campo exista
+    collectorId,
+    category: document.getElementById('expense-category').value,
+    value: parseFloat(valueInput.value),
+    observations: document.getElementById('expense-obs').value,
+    receiptUrl, // Aquí ya va la URL de Firebase
+    date: serverTimestamp()
+};
+// Guardar en Firestore (igual que antes)
+await addDoc(collection(db, 'expenses'), expenseData);
 
                     await addDoc(collection(db, 'expenses'), expenseData);
                     window.history.back();
@@ -4054,23 +4096,25 @@ function showSettlementFormModal() {
             profileImageView.classList.add('loading');
             
             try {
-                const formData = new FormData();
-                formData.append('file', blob);
-                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-                if (!response.ok) throw new Error('Cloudinary profile picture upload failed');
-                const data = await response.json();
-                const downloadURL = data.secure_url;
-                
-                const collectorRef = doc(db, 'collectors', collectorId);
-                await setDoc(collectorRef, { profilePictureUrl: downloadURL }, { merge: true });
-                showToast('Foto de perfil atualizada!');
-            } catch (error) {
-                console.error("Error al actualizar foto de perfil: ", error);
-                showToast('Falha ao atualizar a foto de perfil.', true);
-            } finally {
-                profileImageView.classList.remove('loading');
-            }
+    // 1. Crear referencia en Firebase Storage
+    const storageRef = ref(storage, `collectors/${collectorId}/profile.jpg`); // Ruta: collectors/ID_COBRADOR/profile.jpg
+
+    // 2. Subir el archivo (blob ya viene recortado)
+    await uploadBytes(storageRef, blob);
+
+    // 3. Obtener la URL de descarga
+    const downloadURL = await getDownloadURL(storageRef);
+
+    // 4. Guardar la URL en Firestore (igual que antes)
+    const collectorRef = doc(db, 'collectors', collectorId);
+    await setDoc(collectorRef, { profilePictureUrl: downloadURL }, { merge: true });
+    showToast('Foto de perfil atualizada!');
+} catch (error) {
+    console.error("Error al actualizar foto de perfil con Firebase Storage: ", error);
+    showToast('Falha ao atualizar a foto de perfil.', true);
+} finally {
+    profileImageView.classList.remove('loading');
+}
         }
 
         function showView(viewName) {
@@ -4822,5 +4866,3 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
-
-
