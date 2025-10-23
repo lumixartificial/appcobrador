@@ -603,6 +603,7 @@
     <div id="paymentModal" class="modal-view"></div>
     <div id="clientFormModal" class="modal-view"></div>
     <div id="expenseFormModal" class="modal-view"></div>
+    <div id="reportOptionsModal" class="modal-overlay"></div>
     <div id="cropperModal" class="modal-view"></div>
     <div id="shareCredentialsModal" class="modal-view"></div>
     <div id="locationPermissionModal" class="modal-view" style="--bg: rgba(10, 14, 26, 0.8); backdrop-filter: blur(5px); z-index: 9999;"></div>
@@ -857,6 +858,14 @@
                              <button class="filter-btn" data-category="other" data-lang-key="other"></button>
                          </div>
                          <div class="expense-list" id="expenses-list-container"></div>
+                         <!-- --- INICIO SECCIÓN LIQUIDACIONES --- -->
+                 <section style="margin-top: 30px;">
+                     <h2 class="section-title">Histórico de Liquidações</h2>
+                     <div class="item-list" id="settlements-list-container">
+                         <p class="loading">Carregando liquidações...</p>
+                     </div>
+                 </section>
+                 <!-- --- FIN SECCIÓN LIQUIDACIONES --- -->
                      </div>
                     <div id="map-view" class="view container">
                         <div id="map-container"></div>
@@ -3194,42 +3203,144 @@ if (isEditMode && client.documentNumber) {
                 }).join('');
         }
 
+        // Pega la copia de renderExpensesList aquí y modifica como sigue:
+function renderSettlementsList(settlements) { // Cambia el parámetro
+    const container = document.getElementById('settlements-list-container'); // Cambia el ID del contenedor
+    if (!container) return;
+    if (settlements.length === 0) {
+        container.innerHTML = `<div class="no-items">Nenhuma liquidação encontrada.</div>`;
+        return;
+    }
+    container.innerHTML = settlements // Usa el parámetro settlements
+        .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)) // Ordena por fecha descendente
+        .map(settlement => { // Cambia la variable
+            const dateText = settlement.date?.seconds ? new Date(settlement.date.seconds * 1000).toLocaleDateString('pt-BR') : 'N/A';
+            const timeText = settlement.date?.seconds ? new Date(settlement.date.seconds * 1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+
+            // Define el texto y estilo del status de la liquidación
+            let statusText = 'Pendente';
+            let statusStyle = 'color: var(--warning-color); font-weight: bold;';
+            if (settlement.status === 'approved') {
+                statusText = 'Aprovada';
+                statusStyle = 'color: var(--accent-green);';
+            } else if (settlement.status === 'rejected') {
+                statusText = 'Rejeitada';
+                statusStyle = 'color: var(--danger-color);';
+            }
+
+            return `
+                <div class="payment-history-item" data-settlement-id="${settlement.id}" style="cursor: default;"> <!-- Reutilizamos clase payment-history-item -->
+                     <div class="payment-history-details">
+                        <h4 class="payment-history-title">${dateText} - ${timeText}</h4>
+                        <p class="payment-history-description" style="${statusStyle}">${statusText}</p>
+                        ${settlement.notes ? `<p class="payment-history-description" style="font-style: italic;">${settlement.notes}</p>` : ''}
+                    </div>
+                    <div class="payment-history-info">
+                        <span class="payment-history-amount" style="color: var(--danger-color); font-size: 1.1em;">-${money(settlement.amount)}</span>
+                        ${settlement.receiptUrl ? '<i data-lucide="camera" style="color: var(--text-secondary); width: 18px; height: 18px;"></i>' : ''}
+                    </div>
+                </div>`;
+        }).join('');
+     lucide.createIcons({nodes: container.querySelectorAll('[data-lucide]')}); // Actualiza los íconos
+}
+
         function updateExpensesView() {
-            const container = document.getElementById('expenses-list-container');
-            const periodFilter = document.querySelector('#expenses-view [data-period].active');
-            const categoryFilter = document.querySelector('#expenses-view [data-category].active');
-            if (!container || !periodFilter || !categoryFilter) return;
+    const expensesContainer = document.getElementById('expenses-list-container'); // Renombrado para claridad
+    const periodFilter = document.querySelector('#expenses-view [data-period].active');
+    const categoryFilter = document.querySelector('#expenses-view [data-category].active');
+    // Asegúrate que el contenedor de liquidaciones también exista
+    const settlementsContainer = document.getElementById('settlements-list-container');
 
-            const period = periodFilter.dataset.period;
-            const category = categoryFilter.dataset.category;
-            
-            let filteredExpenses = [...allExpenses];
+    if (!expensesContainer || !periodFilter || !categoryFilter || !settlementsContainer) return;
 
-            // Filter by period
-            const now = new Date();
-            if (period !== 'all') {
-                let startDate;
-                if (period === 'today') {
-                    startDate = new Date(now.setHours(0, 0, 0, 0));
-                } else if (period === 'week') {
-                    startDate = new Date(now.setDate(now.getDate() - now.getDay()));
-                    startDate.setHours(0,0,0,0);
-                } else if (period === 'month') {
-                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-                }
-                
-                if(startDate) {
-                    filteredExpenses = filteredExpenses.filter(e => e.date?.seconds && new Date(e.date.seconds * 1000) >= startDate);
-                }
-            }
+    const period = periodFilter.dataset.period;
+    const category = categoryFilter.dataset.category;
 
-            // Filter by category
-            if (category !== 'all') {
-                filteredExpenses = filteredExpenses.filter(e => e.category === category);
-            }
+    // --- Filtra solo los gastos ---
+    let filteredExpenses = [...allExpenses]; // Usa allExpenses (que ahora solo contendrá type: 'expense')
 
-            renderExpensesList(filteredExpenses);
-        }
+    // Filter by period (la lógica existente está bien)
+    const now = new Date();
+    
+    let startDate;
+let endDate; // <-- AÑADE ESTA LÍNEA
+if (period !== 'all') {
+    endDate = new Date(now); // Por defecto, el fin es ahora
+    endDate.setHours(23, 59, 59, 999); // Fin del día actual
+
+    if (period === 'today') {
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+    } else if (period === 'week') {
+        startDate = new Date(now); // Usa una copia para no modificar 'now'
+        startDate.setDate(startDate.getDate() - startDate.getDay()); // Inicio semana (Domingo)
+        startDate.setHours(0, 0, 0, 0);
+    } else if (period === 'month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+}
+
+// Modifica la lógica de filtrado para usar startDate Y endDate
+if (startDate || endDate) { // Si hay al menos una fecha
+    filteredExpenses = filteredExpenses.filter(e => {
+        if (!e.date?.seconds) return false; // Ignora gastos sin fecha
+        const expenseDate = new Date(e.date.seconds * 1000);
+        // Comprueba si está DESPUÉS O IGUAL a startDate (si existe)
+        const afterStart = startDate ? expenseDate >= startDate : true;
+        // Comprueba si está ANTES O IGUAL a endDate (si existe)
+        const beforeEnd = endDate ? expenseDate <= endDate : true;
+        return afterStart && beforeEnd; // Debe cumplir ambas condiciones
+    });
+}
+
+    // Filter by category (la lógica existente está bien)
+    if (category !== 'all') {
+        filteredExpenses = filteredExpenses.filter(e => e.category === category);
+    }
+
+    // --- Renderiza las dos listas ---
+    renderExpensesList(filteredExpenses);
+    renderSettlementsList(allSettlements); // allSettlements ya está filtrado por cobrador por el onSnapshot
+}
+
+
+        function showOutflowTypeModal() {
+    console.log("Función showOutflowTypeModal iniciada."); // <-- AÑADE ESTA LÍNEA
+    // Reutilizamos el modal genérico...
+     const modal = document.getElementById('reportOptionsModal');
+     console.log("Modal #reportOptionsModal encontrado:", modal ? 'Sí' : 'No');
+     if (!modal) {
+         console.error("Modal #reportOptionsModal não encontrado para seleção de tipo de saída!");
+         return;
+     }
+     modal.classList.add('active');
+
+     modal.innerHTML = `
+        <div class="modal-content" style="max-width: 350px;">
+            <button class="close-modal-btn" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; color: var(--text-secondary);">&times;</button>
+            <h3 style="margin-bottom: 25px; text-align: center;">Que tipo de saída deseja registrar?</h3>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <button class="btn-primary" id="add-expense-option-btn" style="padding: 20px;">
+                    <i data-lucide="receipt"></i> Adicionar Gasto
+                </button>
+                <button class="btn-secondary" id="add-settlement-option-btn" style="padding: 20px;">
+                    <i data-lucide="arrow-down-circle"></i> Registrar Liquidação
+                </button>
+            </div>
+        </div>
+     `;
+     lucide.createIcons({nodes: modal.querySelectorAll('[data-lucide]')});
+
+     const closeModal = () => modal.classList.remove('active');
+     modal.querySelector('.close-modal-btn').addEventListener('click', closeModal);
+     modal.querySelector('#add-expense-option-btn').addEventListener('click', () => {
+         closeModal();
+         showExpenseFormModal(); // Llama al modal de gastos existente
+     });
+     modal.querySelector('#add-settlement-option-btn').addEventListener('click', () => {
+          closeModal();
+          showSettlementFormModal(); // Llama al nuevo modal de liquidación (que crearemos ahora)
+     });
+}
 
         function showExpenseFormModal() {
             const expenseFormModal = document.getElementById('expenseFormModal');
@@ -3680,7 +3791,10 @@ if (isEditMode && client.documentNumber) {
                     applyLanguage(newLang);
                 }
                 if(target.closest('#addClientBtn')) showClientFormModal();
-                if(target.closest('#addExpenseBtn')) showExpenseFormModal();
+                if(target.closest('#addExpenseBtn')) {
+    console.log("Botón + (Gastos/Liquidación) clicado. Llamando a showOutflowTypeModal..."); // <-- AÑADE ESTA LÍNEA
+    showOutflowTypeModal(); // Llama al modal de selección
+}
                 if (target.closest('#logout-btn')) {
                     stopRealtimeGeolocation(); // <-- AÑADE ESTA LÍNEA
                     sessionStorage.removeItem('isLoggedIn');
