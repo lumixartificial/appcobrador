@@ -1628,44 +1628,135 @@
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
         }
         
-        function calculateLatePaymentDays(client) {
-            if (!client || (client.paid >= client.totalLoan)) return 0;
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+        // Nueva función mejorada que calcula días de atraso Y mora
+function calculateLoanDetails(loan) {
+    let details = {
+        lateDays: 0,
+        lateFeesAccumulated: 0,
+        status: 'pending', // Estado por defecto
+        nextDueDate: null, // Fecha del próximo vencimiento
+        amountDueToday: 0 // Cuánto debería pagar HOY si es día de pago
+    };
 
-            let lastRelevantDate;
-            if (client.history && client.history.length > 0) {
-                const sortedHistory = [...client.history]
-                    .filter(h => h.date?.seconds && h.status !== 'pending_verification')
-                    .sort((a, b) => b.date.seconds - a.date.seconds);
-                if (sortedHistory.length > 0) lastRelevantDate = new Date(sortedHistory[0].date.seconds * 1000);
-            } 
-            if (!lastRelevantDate) {
-                if (client.startDate?.seconds) {
-                    lastRelevantDate = new Date(client.startDate.seconds * 1000);
-                } else {
-                     return 0; // No hay fecha de inicio, no se pueden calcular atrasos.
-                }
-            }
-            
-            lastRelevantDate.setHours(0, 0, 0, 0);
+    // Si no hay préstamo o ya está finalizado, no hay nada que calcular.
+    if (!loan || !loan.totalLoan || loan.status === 'finished' || (loan.paid >= loan.totalLoan)) {
+        details.status = 'finished';
+        return details;
+    }
 
-            let lateDays = 0;
-            let checkDate = new Date(lastRelevantDate);
-            checkDate.setDate(checkDate.getDate() + 1); // Empezamos a contar desde el día siguiente al último pago/inicio
+    const today = new Date(); 
+    today.setHours(0, 0, 0, 0);
 
-            while (checkDate <= today) {
-                const dayOfWeek = checkDate.getDay(); // 0=Domingo, 6=Sábado
-                const dateString = ('0' + checkDate.getDate()).slice(-2) + '/' + ('0' + (checkDate.getMonth() + 1)).slice(-2);
-                
-                // Solo cuenta como día de atraso si NO es domingo y NO es feriado
-                if (dayOfWeek !== 0 && !nationalHolidays.includes(dateString)) {
-                    lateDays++;
-                }
-                checkDate.setDate(checkDate.getDate() + 1);
-            }
-            return lateDays;
+    // Determinar la fecha de inicio relevante (inicio del préstamo o último pago)
+    let lastRelevantDate;
+    if (loan.history && loan.history.length > 0) {
+        const sortedHistory = [...loan.history]
+            .filter(h => h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'postponed') // Ignorar pendientes y aplazados
+            .sort((a, b) => b.date.seconds - a.date.seconds);
+        if (sortedHistory.length > 0) {
+            lastRelevantDate = new Date(sortedHistory[0].date.seconds * 1000);
         }
+    }
+    if (!lastRelevantDate && loan.startDate?.seconds) {
+        lastRelevantDate = new Date(loan.startDate.seconds * 1000);
+    }
+
+    if (!lastRelevantDate) {
+        console.warn("No se puede calcular el estado: falta fecha de inicio o historial.");
+        return details; // No podemos calcular sin una fecha base
+    }
+    lastRelevantDate.setHours(0, 0, 0, 0);
+
+    // --- Lógica Principal de Cálculo ---
+    let checkDate = new Date(lastRelevantDate);
+    let accumulatedLateDays = 0;
+    let accumulatedLateFees = 0;
+    const dailyLateRate = (loan.lateFeeRate || 0) / 100; // Tasa diaria como decimal
+    const installmentAmount = loan.originalInstallmentAmount || 0;
+    let installmentsDueCount = 0; // Cuántas cuotas deberían haberse pagado hasta hoy
+    let nextDueDateFound = false;
+
+    // Bucle para calcular cuotas vencidas, días de atraso y mora
+    while (checkDate <= today) {
+        const dayOfWeek = checkDate.getDay();
+        const dayOfMonth = checkDate.getDate();
+        const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
+        const isHoliday = nationalHolidays.includes(formattedDate);
+        const frequency = loan.paymentFrequency || 'daily';
+        let isPaymentDay = false;
+
+        if (frequency === 'daily') isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
+        else if (frequency === 'weekly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
+        else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
+
+        // Es un día de pago válido (no feriado, no domingo si es diario/semanal)
+        // [CORRECCIÓN] Domingo (0) SÍ cuenta como día de pago si está explícitamente seleccionado.
+        // Solo se excluyen feriados.
+        if (!isHoliday && isPaymentDay) {
+
+            // Si la fecha es ANTERIOR a hoy, cuenta como cuota vencida
+            if (checkDate < today) {
+                installmentsDueCount++;
+
+                // Calcular mora SOLO si la tasa es mayor a 0
+                if (dailyLateRate > 0) {
+                     // Calcula cuánto DEBERÍA haberse pagado hasta esta fecha
+                    const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
+                    // Calcula cuánto falta por pagar de lo vencido
+                    const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - (loan.paid || 0));
+
+                    // Si hay monto vencido pendiente, calcula la mora diaria sobre ESE monto
+                    if (outstandingDueAmount > 0) {
+                        const dailyFee = outstandingDueAmount * dailyLateRate;
+                        accumulatedLateFees += dailyFee;
+                        accumulatedLateDays++; // Solo contamos días de mora si había saldo pendiente ESE día
+                    }
+                } else {
+                     // Si no hay tasa de mora, solo contamos días de atraso si la cuota está pendiente
+                     const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
+                     if ((loan.paid || 0) < expectedPaidByThisDate) {
+                         accumulatedLateDays++;
+                     }
+                }
+            }
+
+            // Si la fecha es HOY, marca cuánto se debe pagar hoy
+            if (checkDate.getTime() === today.getTime()) {
+                details.amountDueToday = installmentAmount;
+            }
+
+            // Guarda la próxima fecha de vencimiento (la primera que encuentre a partir de hoy)
+            if (checkDate >= today && !nextDueDateFound) {
+                details.nextDueDate = new Date(checkDate);
+                nextDueDateFound = true;
+            }
+        }
+
+        // Avanza al siguiente día (importante: hacerlo fuera del if de isPaymentDay)
+        checkDate.setDate(checkDate.getDate() + 1);
+    }
+
+    // --- Determinar Estado Final ---
+    details.lateDays = accumulatedLateDays;
+    details.lateFeesAccumulated = accumulatedLateFees;
+
+    const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
+    const paidInstallmentsCalculated = Math.floor((loan.paid || 0) / installmentAmount);
+
+    if (paidInstallmentsCalculated >= totalInstallments || (loan.paid || 0) >= loan.totalLoan) {
+         details.status = 'finished';
+    } else if (accumulatedLateDays > 1) { // Más de 1 día de atraso (considerando mora o no)
+        details.status = 'late';
+    } else if (details.amountDueToday > 0 && (loan.paid || 0) < installmentsDueCount * installmentAmount) { // Si hoy es día de pago y no está cubierto
+         details.status = 'pending';
+    } else if (accumulatedLateDays === 1) { // Exactamente 1 día de atraso
+         details.status = 'pending'; // Consideramos 'pending' el primer día, 'late' a partir del segundo
+    } else {
+        details.status = 'paid'; // Si no está terminado, ni atrasado, ni pendiente hoy, está al día.
+    }
+
+    return details;
+}
 
         function renderClientCards(container, clientsWithLoans) {
             if (!container) return;
@@ -1683,7 +1774,8 @@
                 const statusClass = `status-${loan.status}`;
                 const statusText = (translations[currentLang] && translations[currentLang][loan.status]) || loan.status;
                 
-                const lateDays = calculateLatePaymentDays(loan);
+                const loanDetails = calculateLoanDetails(loan); // Llama a la nueva función
+const           lateDays = loanDetails.lateDays;         // Obtiene los días de atraso del resultado
                 const reputationScore = Math.max(0, 10 - lateDays);
                 let repClass = 'rep-bad';
                 if (reputationScore === 10) repClass = 'rep-perfect';
@@ -2083,7 +2175,8 @@
                 }).reverse().join(''); // Se invierte el array de HTML aquí
             }
 
-            const lateDays = calculateLatePaymentDays(loan);
+            const loanDetails = calculateLoanDetails(loan); // Llama a la nueva función
+            const lateDays = loanDetails.lateDays;         // Obtiene los días de atraso del resultado
             const score = Math.max(0, 10 - lateDays);
             let reputationStatusKey = 'reputationBad';
             if (score === 10) reputationStatusKey = 'reputationPerfect';
@@ -2130,9 +2223,19 @@
                     </div>
                     <section class="kpi-grid-profile" style="margin-bottom: 30px;">
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
-                        <!-- [CORRECCIÓN 3] Mostrar siempre el valor original y fijo de la cuota. -->
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(loan.paid)}</p></div>
+                    
+                        <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
+                            <h3 class="kpi-title"><i data-lucide="alert-triangle" style="color: var(--danger-color);"></i> Mora Acumulada</h3>
+                            <p class="kpi-value" style="color: var(--danger-color);">${money(loan.lateFeesAccumulated || 0)}</p>
+                   </div>
+
+                   <div class="kpi-card" style="border-color: var(--danger-color);">
+                       <h3 class="kpi-title"><i data-lucide="receipt-text"></i> Total Devido Agora</h3>
+                       <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money((loan.totalLoan - loan.paid) + (loan.lateFeesAccumulated || 0))}</p>
+                   </div>
+                    
                     </section>
                     
                     <section>
@@ -2530,10 +2633,17 @@
                         </div>
 
                         <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Detalhes do Empréstimo</h3>
+                        
                         <div class="form-group grid-2">
                             <div><label data-lang-key="totalLoan"></label><input type="number" id="client-loan-amount" required value="${isEditMode ? (loan.totalLoan / (1 + client.interestRate/100)) : ''}"></div>
                             <div><label data-lang-key="interest"></label><input type="number" id="client-interest" required value="${client.interestRate || '20'}" ${isEditMode ? 'readonly' : ''}></div>
                         </div>
+
+                        <div class="form-group">
+                        <label for="client-late-fee">Tasa de Mora Diaria (%)</label>
+                        <input type="number" id="client-late-fee" step="0.1" value="${loan.lateFeeRate !== undefined ? loan.lateFeeRate : '0'}" placeholder="0.0">
+                        </div>
+
                         <div class="form-group"><label data-lang-key="totalToPay"></label><input type="text" id="client-total-to-pay" readonly></div>
                         <div class="form-group grid-2">
                             <div><label data-lang-key="numInstallments"></label><input type="number" id="client-installments" required value="${isEditMode ? (loan.installments || '').split('/')[1] : ''}"></div>
@@ -2779,6 +2889,7 @@
                 const passwordInputVal = document.getElementById('client-password');
                 const whatsappInputVal = document.getElementById('client-whatsapp');
                 
+                
                 if (!clientNameInput.value || !loanAmountInputVal.value || !usernameInputVal.value || !passwordInputVal.value || !whatsappInputVal.value) {
                     showToast('Nome, WhatsApp, Valor do Empréstimo, Usuário e Senha são obrigatórios.', true);
                     return;
@@ -2814,6 +2925,7 @@
                     const installments = parseInt(document.getElementById('client-installments').value);
                     const totalToPay = loanAmount * (1 + (interest / 100));
                     const installmentValue = installments > 0 ? totalToPay / installments : 0;
+                    const principalAmount = loanAmount;
                    
 
                     const paymentFrequency = document.getElementById('payment-frequency').value;
@@ -2851,6 +2963,8 @@
                     };
 
                     const loanSpecificData = {
+                        principalAmount: principalAmount,
+                        lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
                         totalLoan: totalToPay,
                         amount: installmentValue,
                         originalInstallmentAmount: installmentValue,
@@ -2877,6 +2991,7 @@
                          const updatedLoans = [...client.loans];
                          updatedLoans[loanIndex] = {
                              ...updatedLoans[loanIndex], // Mantén datos antiguos como historial, paid, etc.
+                             lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
                              totalLoan: totalToPay,
                              amount: installmentValue,
                              originalInstallmentAmount: installmentValue,
@@ -2989,56 +3104,7 @@ if (isEditMode && client.documentNumber) {
             });
         }
 
-        function calculateClientStatus(client) {
-            // Corregido: Identificar primero a los clientes que ya pagaron todo.
-            if (client.totalLoan && client.totalLoan > 0 && client.paid >= client.totalLoan) {
-                return 'finished';
-            }
-            
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            
-            let lastPaymentDate;
-            if (client.history && client.history.length > 0) {
-                const sortedHistory = [...client.history].filter(h => h.date?.seconds).sort((a, b) => b.date.seconds - a.date.seconds);
-                if (sortedHistory.length > 0) lastPaymentDate = new Date(sortedHistory[0].date.seconds * 1000);
-            } 
-            if (!lastPaymentDate && client.startDate?.seconds) {
-                lastPaymentDate = new Date(client.startDate.seconds * 1000);
-            }
-
-            if (!lastPaymentDate) return 'pending';
-            lastPaymentDate.setHours(0, 0, 0, 0);
-            
-            let workingDaysToPay = 0;
-            let checkDate = new Date(lastPaymentDate);
-
-            if (checkDate >= today) return 'paid';
-
-            const frequency = client.paymentFrequency || 'daily';
-
-            while(checkDate < today) {
-                checkDate.setDate(checkDate.getDate() + 1);
-                const dayOfWeek = checkDate.getDay();
-                const dayOfMonth = checkDate.getDate();
-                const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
-                const isHoliday = nationalHolidays.includes(formattedDate);
-                
-                let isPaymentDay = false;
-                if (frequency === 'daily') {
-                    isPaymentDay = (client.paymentDays || []).includes(dayOfWeek);
-                } else if (frequency === 'weekly') {
-                    isPaymentDay = (client.paymentDays || [])[0] === dayOfWeek;
-                } else if (frequency === 'monthly') {
-                    isPaymentDay = (client.paymentDays || [])[0] === dayOfMonth;
-                }
-                
-                if (!isHoliday && isPaymentDay) workingDaysToPay++;
-            }
-            
-            if (workingDaysToPay > 1) return 'late';
-            if (workingDaysToPay === 1) return 'pending';
-            return 'paid';
-        }
+        
 
         // --- MÓDULO DE GASTOS ---
         function renderExpensesList(expenses) {
@@ -3721,7 +3787,10 @@ if (isEditMode && client.documentNumber) {
                     }
 
                     client.loans.forEach(loan => {
-                        loan.status = calculateClientStatus(loan);
+                        const loanDetails = calculateLoanDetails(loan);
+                        loan.status = loanDetails.status;
+                        loan.lateFeesAccumulated = loanDetails.lateFeesAccumulated; // Guardamos la mora calculada
+                        // Podríamos guardar también loan.lateDays = loanDetails.lateDays si quisiéramos mostrarlo
                     });
                 });
 
