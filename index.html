@@ -298,6 +298,27 @@
         
         .modal-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg); z-index: 200; transform: translateX(100%); transition: transform 0.3s ease-in-out; display: flex; flex-direction: column; }
         .modal-view.active { transform: translateX(0); }
+        /* --- REGLAS AÑADIDAS PARA OVERLAYS --- */
+.modal-overlay { 
+    position: fixed; /* Posición fija para cubrir todo */
+    top: 0; left: 0; width: 100%; height: 100%; 
+    background-color: rgba(0,0,0,0.6); /* Fondo oscuro semitransparente */
+    backdrop-filter: blur(4px); /* Efecto blur */
+    display: none; /* OCULTO por defecto */ 
+    justify-content: center; /* Centrar contenido horizontalmente */
+    align-items: center; /* Centrar contenido verticalmente */
+    z-index: 200; /* Asegura que esté por encima de otros elementos */
+    opacity: 0; /* Empieza invisible para la transición */
+    transition: opacity 0.2s ease-in-out; /* Transición suave */
+}
+/* --- FIN REGLAS AÑADIDAS --- */
+
+/* --- REGLA AÑADIDA PARA MOSTRAR OVERLAY ACTIVO --- */
+.modal-overlay.active { 
+    display: flex; /* CAMBIA a flex para mostrar y centrar */ 
+    opacity: 1; /* Lo hace visible */
+}
+/* --- FIN REGLA AÑADIDA --- */
         .modal-header { display: flex; align-items: center; padding: 15px 20px; background-color: var(--surface); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 210; flex-shrink: 0; }
         .modal-header button { background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 0; margin-right: 15px; }
         .modal-title { font-size: 1.2em; font-weight: 600; }
@@ -3319,19 +3340,33 @@ if (startDate || endDate) { // Si hay al menos una fecha
      console.log("Clase 'active' añadida. Estado display DESPUÉS:", window.getComputedStyle(modal).display);
 
      modal.innerHTML = `
-        <div class="modal-content" style="max-width: 350px;">
-            <button class="close-modal-btn" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; color: var(--text-secondary);">&times;</button>
-            <h3 style="margin-bottom: 25px; text-align: center;">Que tipo de saída deseja registrar?</h3>
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <button class="btn-primary" id="add-expense-option-btn" style="padding: 20px;">
-                    <i data-lucide="receipt"></i> Adicionar Gasto
-                </button>
-                <button class="btn-secondary" id="add-settlement-option-btn" style="padding: 20px;">
-                    <i data-lucide="arrow-down-circle"></i> Registrar Liquidação
-                </button>
+<div class="modal-content" style="max-width: 380px; padding: 25px; background-color: var(--surface); border-radius: 16px;"> 
+    <button class="close-modal-btn" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 28px; color: var(--text-secondary); cursor: pointer; line-height: 1;">&times;</button>
+
+    <h3 style="margin: 0 0 20px; text-align: center; font-size: 1.3em; font-weight: 600; color: var(--text-primary);">Registrar Nova Saída</h3>
+    <p style="text-align: center; color: var(--text-secondary); margin: -10px 0 30px; font-size: 0.95em;">Selecione o tipo de registro que deseja criar:</p>
+
+    <div style="display: grid; grid-template-columns: 1fr; gap: 15px;"> 
+
+        <button class="btn-primary" id="add-expense-option-btn" style="padding: 18px 15px; text-align: left; display: flex; align-items: center; gap: 12px; font-size: 1em; background-color: color-mix(in srgb, var(--accent-purple) 90%, black);"> 
+            <i data-lucide="receipt" style="width: 28px; height: 28px; flex-shrink: 0;"></i> 
+            <div>
+                <span style="font-weight: 600;">Adicionar Gasto</span>
+                <span style="display: block; font-size: 0.8em; opacity: 0.8;">Registrar combustível, alimentação, etc.</span>
             </div>
-        </div>
-     `;
+        </button>
+
+        <button class="btn-secondary" id="add-settlement-option-btn" style="padding: 18px 15px; text-align: left; display: flex; align-items: center; gap: 12px; font-size: 1em; border-width: 2px;"> 
+            <i data-lucide="arrow-down-circle" style="width: 28px; height: 28px; flex-shrink: 0;"></i> 
+            <div>
+                <span style="font-weight: 600;">Registrar Liquidação</span>
+                <span style="display: block; font-size: 0.8em; opacity: 0.8;">Enviar dinheiro entregue ao admin para aprovação.</span>
+            </div>
+        </button>
+
+    </div>
+</div>
+`;
 
      console.log("innerHTML asignado al modal.");
 
