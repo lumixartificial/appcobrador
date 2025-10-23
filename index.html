@@ -1587,35 +1587,41 @@
             const now = new Date();
             const todayStr = now.toLocaleDateString('pt-BR');
             
-            let dailyTotal = 0, totalPaymentsReceived = 0, totalLoansMade = 0;
+            let dailyTotal = 0, totalLoansMade = 0;
             let dailyTotalCash = 0, dailyTotalDigital = 0;
 
-            allClients.forEach(client => {
-                (client.loans || []).forEach(loan => {
-                    // Calcula el capital prestado (principal) para cada préstamo individual
-                    if (loan.totalLoan && client.interestRate) {
-                        const principal = loan.totalLoan / (1 + (client.interestRate / 100));
-                        totalLoansMade += principal;
-                    }
-                    // Itera sobre el historial de cada préstamo para sumar los pagos
-                    (loan.history || []).forEach(h => {
-                        if (h.date?.seconds && h.status !== 'pending_verification') {
-                            const paymentDate = new Date(h.date.seconds * 1000);
-                            const amount = h.amount || 0;
-                            totalPaymentsReceived += amount;
+            // --- INICIO NUEVO CÁLCULO DE PAGOS RECIBIDOS ---
+let totalPaymentsReceived = 0;
+allClients.forEach(client => {
+    (client.loans || []).forEach(loan => {
+        // Suma el principal de este préstamo al total prestado
+        if (loan.principalAmount) { // Usa el principal fijo que guardamos antes
+            totalLoansMade += loan.principalAmount;
+        } else if (loan.totalLoan && client.interestRate) { // Fallback para préstamos antiguos
+            totalLoansMade += (loan.totalLoan / (1 + (client.interestRate / 100)));
+        }
 
-                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) { 
-                                dailyTotal += amount; 
-                                if (h.method === 'dinheiro') {
-                                    dailyTotalCash += amount;
-                                } else if (h.method === 'pix' || h.method === 'cartao') {
-                                    dailyTotalDigital += amount;
-                                }
-                            }
-                        }
-                    });
-                });
-            });
+        // Suma los pagos aprobados del historial de este préstamo
+        (loan.history || []).forEach(h => {
+            if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') {
+                const paymentDate = new Date(h.date.seconds * 1000);
+                const amount = h.amount || 0;
+                totalPaymentsReceived += amount; // Suma al total general
+
+                // Suma a los totales diarios si corresponde
+                if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
+                    dailyTotal += amount;
+                    if (h.method === 'dinheiro') {
+                        dailyTotalCash += amount;
+                    } else if (h.method === 'pix' || h.method === 'cartao') {
+                        dailyTotalDigital += amount;
+                    }
+                }
+            }
+        });
+    });
+});
+// --- FIN NUEVO CÁLCULO ---
             
             const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
             
@@ -1637,6 +1643,12 @@ function calculateLoanDetails(loan) {
         nextDueDate: null, // Fecha del próximo vencimiento
         amountDueToday: 0 // Cuánto debería pagar HOY si es día de pago
     };
+
+    // --- INICIO CÁLCULO DEL TOTAL PAGADO DESDE HISTORIAL ---
+    const currentTotalPaid = (loan.history || [])
+        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') // Solo pagos aprobados/válidos
+        .reduce((sum, h) => sum + (h.amount || 0), 0);
+    // --- FIN CÁLCULO ---
 
     // Si no hay préstamo o ya está finalizado, no hay nada que calcular.
     if (!loan || !loan.totalLoan || loan.status === 'finished' || (loan.paid >= loan.totalLoan)) {
@@ -1703,7 +1715,7 @@ function calculateLoanDetails(loan) {
                      // Calcula cuánto DEBERÍA haberse pagado hasta esta fecha
                     const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
                     // Calcula cuánto falta por pagar de lo vencido
-                    const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - (loan.paid || 0));
+                    const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
 
                     // Si hay monto vencido pendiente, calcula la mora diaria sobre ESE monto
                     if (outstandingDueAmount > 0) {
@@ -1714,7 +1726,7 @@ function calculateLoanDetails(loan) {
                 } else {
                      // Si no hay tasa de mora, solo contamos días de atraso si la cuota está pendiente
                      const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                     if ((loan.paid || 0) < expectedPaidByThisDate) {
+                     if (currentTotalPaid < expectedPaidByThisDate) {
                          accumulatedLateDays++;
                      }
                 }
@@ -1741,13 +1753,13 @@ function calculateLoanDetails(loan) {
     details.lateFeesAccumulated = accumulatedLateFees;
 
     const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
-    const paidInstallmentsCalculated = Math.floor((loan.paid || 0) / installmentAmount);
+    const paidInstallmentsCalculated = Math.floor(currentTotalPaid / installmentAmount);
 
-    if (paidInstallmentsCalculated >= totalInstallments || (loan.paid || 0) >= loan.totalLoan) {
+    if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
          details.status = 'finished';
     } else if (accumulatedLateDays > 1) { // Más de 1 día de atraso (considerando mora o no)
         details.status = 'late';
-    } else if (details.amountDueToday > 0 && (loan.paid || 0) < installmentsDueCount * installmentAmount) { // Si hoy es día de pago y no está cubierto
+    } else if (details.amountDueToday > 0 && currentTotalPaid < installmentsDueCount * installmentAmount) { // Si hoy es día de pago y no está cubierto
          details.status = 'pending';
     } else if (accumulatedLateDays === 1) { // Exactamente 1 día de atraso
          details.status = 'pending'; // Consideramos 'pending' el primer día, 'late' a partir del segundo
@@ -2100,6 +2112,12 @@ const           lateDays = loanDetails.lateDays;         // Obtiene los días de
             if (!client || !client.loans || !client.loans[loanIndex]) return;
 
             const loan = client.loans[loanIndex];
+
+            // --- INICIO CÁLCULO DEL TOTAL PAGADO (PARA MOSTRAR) ---
+            const displayTotalPaid = (loan.history || [])
+                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+                .reduce((sum, h) => sum + (h.amount || 0), 0);
+            // --- FIN CÁLCULO ---
             
             let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
             if (loan.history && loan.history.length > 0) {
@@ -2224,7 +2242,7 @@ const           lateDays = loanDetails.lateDays;         // Obtiene los días de
                     <section class="kpi-grid-profile" style="margin-bottom: 30px;">
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
-                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(loan.paid)}</p></div>
+                        <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
                     
                         <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
                             <h3 class="kpi-title"><i data-lucide="alert-triangle" style="color: var(--danger-color);"></i> Mora Acumulada</h3>
@@ -2233,7 +2251,7 @@ const           lateDays = loanDetails.lateDays;         // Obtiene los días de
 
                    <div class="kpi-card" style="border-color: var(--danger-color);">
                        <h3 class="kpi-title"><i data-lucide="receipt-text"></i> Total Devido Agora</h3>
-                       <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money((loan.totalLoan - loan.paid) + (loan.lateFeesAccumulated || 0))}</p>
+                       <p class="kpi-value" style="...">${money((loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0))}</p>
                    </div>
                     
                     </section>
@@ -2273,7 +2291,7 @@ const           lateDays = loanDetails.lateDays;         // Obtiene los días de
             history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: loanIndex }, `Details for ${client.name}`, `#client/${clientId}/${loanIndex}`);
             clientDetailView.classList.add('active');
 
-            const paidInstallments = (loan.history || []).filter(p => p.status !== 'pending_verification').length;
+            const paidInstallments = loan.originalInstallmentAmount > 0 ? Math.floor(displayTotalPaid / loan.originalInstallmentAmount) : 0;
             const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
             const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
             const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
@@ -2544,13 +2562,7 @@ const           lateDays = loanDetails.lateDays;         // Obtiene los días de
 
                 const clientRef = doc(db, "clients", clientId);
                 
-                // --- INICIO DE LA NUEVA LÓGICA FINANCIERA ---
-                const updatedLoans = [...client.loans];
-                const currentLoan = updatedLoans[loanIndex];
                 
-                currentLoan.paid = (currentLoan.paid || 0) + actualPaidAmount;
-                currentLoan.paymentBalance = (currentLoan.paymentBalance || 0) + actualPaidAmount - currentLoan.originalInstallmentAmount;
-                // --- FIN DE LA NUEVA LÓGICA FINANCIERA ---
 
                 const newPayment = {
                     amount: actualPaidAmount,
@@ -4298,4 +4310,3 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
-
