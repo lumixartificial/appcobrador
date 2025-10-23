@@ -713,6 +713,7 @@
 
         let allClients = [];
         let allExpenses = [];
+        let allSettlements = [];
         let currentLang = localStorage.getItem('language') || 'pt';
         let mapInstance = null;
         let mapMarkers = [];
@@ -1626,12 +1627,18 @@ allClients.forEach(client => {
             const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
             
             const currentStartingCapital = (collectorData && collectorData.startingCapital) || 0;
-            const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses;
 
-            dailyTotalEl.textContent = money(dailyTotal);
-            capitalTotalEl.textContent = money(capitalTotal);
-            if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
-            if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
+// --- CÁLCULO AÑADIDO PARA LIQUIDACIONES (COBRADOR) ---
+const totalSettledByThisCollector = allSettlements.reduce((sum, s) => sum + (s.amount || 0), 0);
+// --- FIN CÁLCULO AÑADIDO ---
+
+// Ajusta la fórmula final de capitalTotal
+const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses - totalSettledByThisCollector; // <-- RESTA totalSettledByThisCollector
+
+dailyTotalEl.textContent = money(dailyTotal);
+capitalTotalEl.textContent = money(capitalTotal); // Usa el capitalTotal ajustado
+if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
+if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
         }
         
         // Nueva función mejorada que calcula días de atraso Y mora
@@ -3827,6 +3834,19 @@ if (isEditMode && client.documentNumber) {
                 console.error("Error al obtener gastos: ", error);
                 showToast('Falha ao carregar gastos.', true);
             });
+
+            // --- LISTENER AÑADIDO PARA LIQUIDACIONES (FILTRADO) ---
+            const settlementsQuery = query(collection(db, 'settlements'), where("collectorId", "==", collectorId));
+            onSnapshot(settlementsQuery, (snapshot) => {
+                allSettlements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Actualizamos la vista de perfil que muestra el capital en mano
+                updateProfileView(collectorData); 
+            }, (error) => {
+                console.error("Error al obtener liquidaciones: ", error);
+                showToast('Falha ao carregar dados de liquidação.', true);
+            });
+    // --- FIN DEL LISTENER AÑADIDO ---
+
         }
         
         function loadGlobalSettings(settings) {
@@ -4310,4 +4330,5 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
+
 
