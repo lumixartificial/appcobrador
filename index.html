@@ -2927,6 +2927,13 @@ function calculateLoanDetails(loan) {
                             <input type="text" id="client-username" required value="${client.username || ''}" ${ (isEditMode && client.username) || isNewLoan ? 'readonly' : '' }>
                             <div id="username-validation-msg"></div>
                         </div>
+
+                        <div class="form-group">
+                        <label for="client-email">Email (para login do cliente)</label>
+                        <input type="email" id="client-email" required autocomplete="off" value="${client.email || ''}" ${ (isEditMode && client.email) || isNewLoan ? 'readonly' : '' }>
+                        <p style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">Este será o email que o cliente usará para entrar na sua app.</p>
+                        </div>
+
                         <div class="form-group">
                             <label data-lang-key="password"></label>
                             <input type="password" id="client-password" required value="${client.password || ''}">
@@ -3313,13 +3320,79 @@ newUploadedDocuments = await Promise.all(uploadPromises);
                              loans: updatedLoans,
                              ...clientGeneralData
                          });
-                    } else { // Creando cliente nuevo
-                        const newClientData = {
-                            ...clientGeneralData,
-                            loans: [loanSpecificData]
-                        };
-                        await addDoc(collection(db, 'companies', currentCompanyId, "clients"), newClientData);
+                    
+                    } else { // **** INICIO BLOCO: Creando cliente nuevo ****
+                    console.log("[COBRADOR-APP] Iniciando processo de criação de novo cliente...");
+
+                    // --- PASSO 1: Obter Email e Senha do Formulário ---
+                    const clientEmailInput = document.getElementById('client-email');
+                    const clientPasswordInput = document.getElementById('client-password');
+                    const clientEmail = clientEmailInput?.value.trim();
+                    const clientPassword = clientPasswordInput?.value; // Não faz trim na senha
+
+                    // Validação extra (embora já haja validação geral antes)
+                    if (!clientEmail || !clientPassword || clientPassword.length < 6) {
+                         throw new Error("Email ou Senha inválidos ou faltantes para o acesso do cliente.");
                     }
+                    console.log("[COBRADOR-APP] Email e Senha para Auth obtidos:", clientEmail);
+
+                    // --- PASSO 2: Chamar a Cloud Function 'createClientAuthAndLink' ---
+                    let newClientAuthUid = null; // Variável para guardar o Auth UID
+                    try {
+                        console.log("[COBRADOR-APP] Chamando Cloud Function 'createClientAuthAndLink'...");
+                        if (!auth.currentUser) throw new Error("Cobrador não autenticado para chamar a função.");
+                        const idToken = await auth.currentUser.getIdToken(true); // Token do COBRADOR
+
+                        const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/createClientAuthAndLink"; // URL da nova função
+
+                        const response = await fetch(functionUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${idToken}` // Usa o token do COBRADOR
+                            },
+                            body: JSON.stringify({
+                                data: { // Envuelve em 'data' como as outras funções
+                                    clientEmail: clientEmail,
+                                    clientPassword: clientPassword
+                                }
+                            })
+                        });
+
+                        const result = await response.json(); // Lê a resposta
+
+                        if (!response.ok || !result.result?.success || !result.result?.clientUid) {
+                            // Se a resposta não for OK ou não tiver os dados esperados
+                            throw new Error(result.error?.message || `Falha ao criar conta de autenticação (HTTP ${response.status})`);
+                        }
+
+                        newClientAuthUid = result.result.clientUid; // Guarda o Auth UID retornado!
+                        console.log("[COBRADOR-APP] Cloud Function bem-sucedida. Novo Auth UID do cliente:", newClientAuthUid);
+
+                    } catch (authCreationError) {
+                         // Se a Cloud Function falhar (ex: email já existe), o erro será capturado aqui
+                         console.error("[COBRADOR-APP] ERRO ao chamar 'createClientAuthAndLink':", authCreationError);
+                         // Re-lança o erro para ser pego pelo catch principal e mostrado ao usuário
+                         throw authCreationError;
+                    }
+
+                    // --- PASSO 3: Preparar Dados FINAIS para Firestore (incluindo authUid) ---
+                    const newClientData = {
+                        ...clientGeneralData, // Dados gerais (nome, docs, etc.)
+                        authUid: newClientAuthUid, // <-- ADICIONA O AUTH UID OBTIDO!
+                        email: clientEmail, // <-- Guarda também o email em Firestore por conveniência
+                        // Não guardamos a senha em Firestore!
+                        loans: [loanSpecificData] // O primeiro empréstimo
+                    };
+                    console.log("[COBRADOR-APP] Dados preparados para Firestore:", newClientData);
+
+                    // --- PASSO 4: Salvar no Firestore (Rota já corrigida antes) ---
+                    console.log("[COBRADOR-APP] Salvando dados do cliente no Firestore...");
+                    // A rota collection(db, 'companies', currentCompanyId, "clients") está correta
+                    await addDoc(collection(db, 'companies', currentCompanyId, "clients"), newClientData);
+                    console.log("[COBRADOR-APP] Cliente salvo no Firestore com sucesso.");
+
+                }
                     
                     window.history.back(); // Cierra el modal de formulario
                     
