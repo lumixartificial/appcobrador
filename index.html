@@ -3318,7 +3318,7 @@ newUploadedDocuments = await Promise.all(uploadPromises);
                             ...clientGeneralData,
                             loans: [loanSpecificData]
                         };
-                        await addDoc(collection(db, "clients"), newClientData);
+                        await addDoc(collection(db, 'companies', currentCompanyId, "clients"), newClientData);
                     }
                     
                     window.history.back(); // Cierra el modal de formulario
@@ -5028,4 +5028,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
