@@ -3215,7 +3215,7 @@ function calculateLoanDetails(loan) {
     const targetClientId = isEditMode ? clientId : document.getElementById('client-username').value.trim();
 
     // 1. Crear referencia (clients/ID_CLIENTE/docs/nombre_archivo.ext)
-    const storageRef = ref(storage, `clients/${targetClientId}/docs/${uniqueFileName}`);
+    const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
 
     // 2. Subir archivo
     await uploadBytes(storageRef, file);
@@ -4929,26 +4929,7 @@ function triggerSystemVerification(editingClientId = null) {
         installBtn.addEventListener('click', async () => { /* ... (sem alterações) ... */ });
     }
     
-    console.log("[PWA Banner] Tentando adicionar listener ao botão Fechar..."); // Diagnóstico 1
-const closeInstallBtn = document.getElementById('close-install-banner');
-if (closeInstallBtn) {
-    console.log("[PWA Banner] Botão Fechar encontrado. Adicionando listener..."); // Diagnóstico 2
-    // Remove listener antigo para garantir que não haja duplicados (segurança extra)
-    closeInstallBtn.replaceWith(closeInstallBtn.cloneNode(true)); 
-    // Readiciona o listener ao botão clonado
-    document.getElementById('close-install-banner').addEventListener('click', () => {
-        console.log("[PWA Banner] CLIQUE no botão Fechar detectado!"); // Diagnóstico 3
-        const installBanner = document.getElementById('install-banner');
-        if (installBanner) {
-            installBanner.style.display = 'none';
-            console.log("[PWA Banner] Banner ocultado."); // Diagnóstico 4
-        } else {
-            console.warn("[PWA Banner] Elemento #install-banner não encontrado ao tentar ocultar.");
-        }
-    });
-} else {
-    console.warn("[PWA Banner] Botão #close-install-banner NÃO encontrado no DOM."); // Diagnóstico Erro
-}
+    
 
     // --- INÍCIO TAREFA C1: NOVA LÓGICA DE AUTENTICAÇÃO ---
     const splash = document.getElementById('splash-screen');
@@ -5047,3 +5028,4 @@ if (closeInstallBtn) {
     </script>
 </body>
 </html>
+
