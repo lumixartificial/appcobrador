@@ -4924,12 +4924,28 @@ function triggerSystemVerification(editingClientId = null) {
         const installBanner = document.getElementById('install-banner');
         if (installBanner) installBanner.style.display = 'block';
     });
+
     const installBtn = document.getElementById('install-btn');
     if (installBtn) {
-        installBtn.addEventListener('click', async () => { /* ... (sem alterações) ... */ });
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('Usuário aceitou a instalação');
+                }
+                deferredPrompt = null; // O prompt só pode ser usado uma vez
+                document.getElementById('install-banner').style.display = 'none';
+            }
+        });
     }
     
-    
+    const closeInstallBanner = document.getElementById('close-install-banner');
+    if (closeInstallBanner) {
+        closeInstallBanner.addEventListener('click', () => {
+            document.getElementById('install-banner').style.display = 'none';
+        });
+    }
 
     // --- INÍCIO TAREFA C1: NOVA LÓGICA DE AUTENTICAÇÃO ---
     const splash = document.getElementById('splash-screen');
