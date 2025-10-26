@@ -3378,13 +3378,15 @@ newUploadedDocuments = await Promise.all(uploadPromises);
 
                     // --- PASSO 3: Preparar Dados FINAIS para Firestore (incluindo authUid) ---
                     const newClientData = {
-                        ...clientGeneralData, // Dados gerais (nome, docs, etc.)
-                        authUid: newClientAuthUid, // <-- ADICIONA O AUTH UID OBTIDO!
-                        email: clientEmail, // <-- Guarda também o email em Firestore por conveniência
-                        // Não guardamos a senha em Firestore!
-                        loans: [loanSpecificData] // O primeiro empréstimo
-                    };
-                    console.log("[COBRADOR-APP] Dados preparados para Firestore:", newClientData);
+                    ...clientGeneralData, // Dados gerais (nome, docs, etc.)
+                    authUid: newClientAuthUid, // <-- ADICIONA O AUTH UID OBTIDO!
+                    email: clientEmail, // <-- Guarda también o email em Firestore por conveniência
+                    // Não guardamos a senha em Firestore!
+                    loans: [loanSpecificData], // O primeiro empréstimo
+                    fcmTokens: [], // <--- [NUEVA LÍNEA AÑADIDA] Inicializa tokens FCM
+                    notifications: [] // <--- [NUEVA LÍNEA AÑADIDA] Inicializa notificaciones internas
+                };
+                console.log("[COBRADOR-APP] Dados preparados para Firestore:", newClientData);
 
                     // --- PASSO 4: Salvar no Firestore (Rota já corrigida antes) ---
                     console.log("[COBRADOR-APP] Salvando dados do cliente no Firestore...");
@@ -5117,3 +5119,4 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
