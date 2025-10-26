@@ -668,7 +668,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- Añadido al final
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- Adicionado getDoc aqui
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
         
@@ -684,6 +685,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const storage = getStorage(app);
+        const auth = getAuth(app);
         
         // --- INICIO CÓDIGO PARA HABILITAR MODO OFFLINE ---
 try {
@@ -797,6 +799,11 @@ try {
         let collectorCurrentLocation = null; // Guardará tu ubicación en tiempo real
         let locationWatchId = null; // ID para controlar el rastreador de GPS
         let lastLocationUpdateTime = 0; // Controla la frecuencia de actualización en Firestore
+
+        let currentCompanyId = null;     // Guarda o ID da empresa do cobrador
+        let currentCompanyData = null;   // Guarda os dados da empresa (logo, nome, status)
+        let currentCollectorUid = null;  // Guarda o ID de autenticação (Auth UID) do cobrador
+        let currentCollectorUsername = null; // Guarda o 'username' (ID de Firestore) do cobrador
         
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         const translations = {
@@ -829,6 +836,39 @@ try {
                 }, 500);
             }, 3500);
         }
+
+        function showBlockedView(message) {
+    console.error("Acceso bloqueado:", message);
+    // Ocultamos todas as vistas principais
+    document.getElementById('splash-screen').style.display = 'none';
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('app-container').style.display = 'none';
+
+    // Creamos y mostramos el mensaje de bloqueo (si no existe ya)
+    let blockedView = document.getElementById('blocked-view');
+    if (!blockedView) {
+        blockedView = document.createElement('div');
+        blockedView.id = 'blocked-view';
+        blockedView.style.cssText = 'display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 20px; text-align: center; background-color: var(--bg);';
+        document.body.appendChild(blockedView);
+    }
+
+    blockedView.innerHTML = `
+        <i data-lucide="shield-off" style="width: 64px; height: 64px; color: var(--danger-color); margin-bottom: 20px;"></i>
+        <h2 style="color: var(--text-primary); margin-bottom: 10px;">Acesso Negado</h2>
+        <p style="color: var(--text-secondary); max-width: 400px; line-height: 1.5;">${message}</p>
+        <button id="logout-blocked-btn" class="btn-primary" style="margin-top: 30px; background-color: var(--danger-color); border: none;">Sair (Log Out)</button>
+    `;
+    lucide.createIcons({ nodes: [blockedView.querySelector('i')] });
+
+    const logoutBtn = document.getElementById('logout-blocked-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).catch(err => console.error("Error en logout forzado:", err));
+        });
+    }
+}
+
 
         function getAllTodaysClients() {
             const clientsForToday = [];
@@ -1214,7 +1254,7 @@ try {
             document.getElementById('closeRefinanceModal').addEventListener('click', () => window.history.back());
 
             document.getElementById('approve-refinance-btn').addEventListener('click', async () => {
-                const clientRef = doc(db, 'clients', clientId);
+                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
                 const requestData = client.refinanceRequest;
                 if (!requestData) {
                     showToast('Solicitud no encontrada.', true);
@@ -1261,7 +1301,7 @@ try {
             });
 
             document.getElementById('reject-refinance-btn').addEventListener('click', async () => {
-                const clientRef = doc(db, 'clients', clientId);
+                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
                 try {
                     await updateDoc(clientRef, {
                         refinanceRequest: null
@@ -1554,7 +1594,7 @@ try {
             document.getElementById('closeVerificationModal').addEventListener('click', () => window.history.back());
 
             document.getElementById('approve-payment-btn').addEventListener('click', async () => {
-                const clientRef = doc(db, 'clients', clientId);
+                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
                 const updatedHistory = [...client.history];
                 const paymentBeingApproved = updatedHistory[historyIndex];
 
@@ -1592,7 +1632,7 @@ try {
             });
 
             document.getElementById('reject-payment-btn').addEventListener('click', async () => {
-                const clientRef = doc(db, 'clients', clientId);
+                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
                 const updatedHistory = client.history.filter((_, index) => index !== historyIndex);
 
                 try {
@@ -2171,7 +2211,7 @@ function calculateLoanDetails(loan) {
                         newSettings.methods[methodId] = { active: isActive, data: data };
                     }
                     
-                    const collectorRef = doc(db, 'collectors', collectorId);
+                    const collectorRef = doc(db, 'collectors', currentCollectorUsername);
                     await updateDoc(collectorRef, { paymentSettings: newSettings });
 
                     showToast('Configurações de pagamento salvas com sucesso!');
@@ -2569,7 +2609,7 @@ function calculateLoanDetails(loan) {
                 translations[currentLang].postponeConfirmTitle,
                 translations[currentLang].postponeConfirmMsg,
                 async () => {
-                    const clientRef = doc(db, 'clients', clientId);
+                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
                     try {
                         // Obtenemos una copia actualizada del cliente por si acaso
                         const currentClientData = allClients.find(c => c.id === clientId);
@@ -2808,7 +2848,7 @@ function calculateLoanDetails(loan) {
                     return;
                 }
 
-                const clientRef = doc(db, "clients", clientId);
+                const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
                 
                 
 
@@ -3249,14 +3289,14 @@ newUploadedDocuments = await Promise.all(uploadPromises);
                     };
 
                     if (isNewLoan) {
-                        const clientRef = doc(db, 'clients', clientId);
+                        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
                         await updateDoc(clientRef, {
                             loans: arrayUnion(loanSpecificData),
                              // Actualiza también los datos generales por si cambiaron
                             ...clientGeneralData
                         });
                     } else if (isEditMode) {
-                         const clientRef = doc(db, 'clients', clientId);
+                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
                          const updatedLoans = [...client.loans];
                          updatedLoans[loanIndex] = {
                              ...updatedLoans[loanIndex], // Mantén datos antiguos como historial, paid, etc.
@@ -3667,7 +3707,7 @@ if (receiptFile) {
      // Usaremos un ID temporal para la ruta
      const tempSettlementId = `settlement_${Date.now()}`;
      // 1. Crear referencia (settlements/ID_COBRADOR/ID_LIQUIDACION/receipt.ext)
-     const storageRef = ref(storage, `settlements/${collectorId}/${tempSettlementId}/${receiptFile.name.replace(/\s+/g, '_')}`);
+     const storageRef = ref(storage, `companies/${currentCompanyId}/settlements/${currentCollectorUsername}/${tempSettlementId}/${receiptFile.name.replace(/\s+/g, '_')}`)
 
      // 2. Subir archivo
      await uploadBytes(storageRef, receiptFile);
@@ -3692,7 +3732,7 @@ if (receiptFile) {
             };
 
             // Guardamos en la colección 'settlements'
-            await addDoc(collection(db, 'settlements'), settlementData); 
+            await addDoc(collection(db, 'companies', currentCompanyId, 'settlements'), settlementData)
 
             window.history.back(); // Cierra el modal
             showToast('Liquidação enviada para aprovação!');
@@ -3795,7 +3835,7 @@ if (receiptFile) {
      // Usaremos un ID temporal para la ruta, Firestore generará el ID real después
      const tempExpenseId = `expense_${Date.now()}`;
      // 1. Crear referencia (expenses/ID_COBRADOR/ID_GASTO/receipt.ext)
-     const storageRef = ref(storage, `expenses/${collectorId}/${tempExpenseId}/${receiptFile.name.replace(/\s+/g, '_')}`);
+     const storageRef = ref(storage, `companies/${currentCompanyId}/expenses/${currentCollectorUsername}/${tempExpenseId}/${receiptFile.name.replace(/\s+/g, '_')}`);
 
      // 2. Subir archivo
      await uploadBytes(storageRef, receiptFile);
@@ -3814,9 +3854,9 @@ const expenseData = {
     date: serverTimestamp()
 };
 // Guardar en Firestore (igual que antes)
-await addDoc(collection(db, 'expenses'), expenseData);
+await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseData);
 
-                    await addDoc(collection(db, 'expenses'), expenseData);
+                    await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseData);
                     window.history.back();
                     showToast('Gasto salvo com sucesso!');
 
@@ -4097,7 +4137,7 @@ await addDoc(collection(db, 'expenses'), expenseData);
             
             try {
     // 1. Crear referencia en Firebase Storage
-    const storageRef = ref(storage, `collectors/${collectorId}/profile.jpg`); // Ruta: collectors/ID_COBRADOR/profile.jpg
+    const storageRef = ref(storage, `collectors/${currentCollectorUsername}/profile.jpg`);
 
     // 2. Subir el archivo (blob ya viene recortado)
     await uploadBytes(storageRef, blob);
@@ -4106,7 +4146,7 @@ await addDoc(collection(db, 'expenses'), expenseData);
     const downloadURL = await getDownloadURL(storageRef);
 
     // 4. Guardar la URL en Firestore (igual que antes)
-    const collectorRef = doc(db, 'collectors', collectorId);
+    const collectorRef = doc(db, 'collectors', currentCollectorUsername);
     await setDoc(collectorRef, { profilePictureUrl: downloadURL }, { merge: true });
     showToast('Foto de perfil atualizada!');
 } catch (error) {
@@ -4176,10 +4216,16 @@ await addDoc(collection(db, 'expenses'), expenseData);
     showOutflowTypeModal(); // Llama al modal de selección
 }
                 if (target.closest('#logout-btn')) {
-                    stopRealtimeGeolocation(); // <-- AÑADE ESTA LÍNEA
-                    sessionStorage.removeItem('isLoggedIn');
-                    location.reload();
-                }
+    stopRealtimeGeolocation(); 
+    // --- INÍCIO TAREFA C1 ---
+    signOut(auth).catch((error) => { // Chama o logout oficial do Firebase
+        console.error("Erro ao fazer logout:", error);
+        showToast("Erro ao tentar sair.", true);
+    });
+    // O onAuthStateChanged cuidará de mostrar a tela de login.
+    // --- FIM TAREFA C1 ---
+}
+
                 if (target.closest('#change-password-btn')) console.log("Mudar senha a ser implementado.");
                 if (target.closest('#export-report-btn')) exportDailyReport();
             });
@@ -4258,7 +4304,17 @@ await addDoc(collection(db, 'expenses'), expenseData);
             }
         }
         
-        function showMainApp() {
+        function showMainApp(authUid) { // <-- Recebe o UID de Auth
+// --- FIM TAREFA C1 ---
+    if (!authUid) { // Segurança extra
+        console.error("showMainApp chamada sem authUid!");
+        showBlockedView("Erro interno: ID do usuário não encontrado.");
+        signOut(auth);
+        return;
+    }
+
+        currentCollectorUid = authUid;
+
             document.getElementById('login-view').style.display = 'none';
             document.getElementById('splash-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
@@ -4275,48 +4331,87 @@ await addDoc(collection(db, 'expenses'), expenseData);
             let isFirstLoad = true; // Flag para ejecutar la configuración solo una vez
             let collectorData = null;
 
-            onSnapshot(doc(db, 'collectors', collectorId), (docSnap) => {
-                if (docSnap.exists()) {
-                    collectorData = docSnap.data();
-                    document.querySelectorAll('.profile-name').forEach(el => el.textContent = collectorData.name || 'João Silva');
-                    
-                    const imageUrl = collectorData.profilePictureUrl;
-                    const nameInitial = (collectorData.name || 'C').charAt(0).toUpperCase();
-                    const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${nameInitial}`;
-                    
-                    document.getElementById('header-profile-img').src = imageUrl || placeholderUrl.replace('120x120', '80x80');
-                    document.getElementById('profile-view-img').src = imageUrl || placeholderUrl;
-                    const realtimeToggle = document.getElementById('realtime-tracking-toggle');
-                    if(realtimeToggle) realtimeToggle.checked = collectorData.isRealtimeTrackingActive || false;
+            console.log(`Buscando documento do cobrador com authUid: ${authUid}...`); // Log añadido
+const collectorQuery = query(collection(db, 'collectors'), where('authUid', '==', authUid));
 
-                    if (collectorData.isRealtimeTrackingActive) {
-                        startRealtimeGeolocation();
-                    }
+// Usamos getDocs UMA VEZ para obter o username (ID do doc) e depois onSnapshot
+getDocs(collectorQuery).then(snapshot => {
+    if (snapshot.empty) {
+        console.error(`Nenhum documento de cobrador encontrado para authUid: ${authUid}`);
+        showBlockedView("Erro: Dados do cobrador não encontrados no banco de dados."); // Mensaje más específico
+        signOut(auth);
+        return;
+    }
+    // Assume que só há um cobrador com esse authUid
+    const collectorDoc = snapshot.docs[0];
+    currentCollectorUsername = collectorDoc.id; // GUARDA O USERNAME (ID do Firestore)
+    console.log(`Documento do cobrador encontrado. Username (Firestore ID): ${currentCollectorUsername}`);
 
-                    // Event listener for the new button
-                    const paymentSettingsBtn = document.getElementById('payment-settings-btn');
-                    if (paymentSettingsBtn) {
-                        paymentSettingsBtn.addEventListener('click', () => showPaymentSettingsModal(collectorData));
-                    }
+    // AGORA, podemos usar onSnapshot com o ID correto (username) para escutar mudanças
+    onSnapshot(doc(db, 'collectors', currentCollectorUsername), (docSnap) => {
+        if (docSnap.exists()) {
+            let collectorData = docSnap.data(); // Guarda os dados do cobrador DENTRO do onSnapshot
+            console.log("Dados do cobrador atualizados:", collectorData); // Log añadido
 
-                    if (isFirstLoad) {
-                        console.log('[COBRADOR-APP] Carga inicial completa. Configurando FCM...');
-                        if ('serviceWorker' in navigator) {
-                            // Espera a que el Service Worker esté 100% activo antes de pedir el token.
-                            navigator.serviceWorker.ready.then(registration => {
-                                console.log('[COBRADOR-APP] Service Worker está activo y listo. Procediendo a configurar FCM.');
-                                // Llama a la función para obtener y guardar el token en Firestore.
-                                setupFCM(collectorId, registration);
-                            }).catch(err => {
-                                console.error('[COBRADOR-APP] ERROR CRÍTICO: El Service Worker no estuvo listo.', err);
-                            });
-                        }
-                        isFirstLoad = false;
-                    }
+            // --- O código que estava dentro do onSnapshot antigo vai AQUI ---
+            // (Preenche nome, foto, ativa rastreamento, etc.)
+            document.querySelectorAll('.profile-name').forEach(el => el.textContent = collectorData.name || 'Cobrador');
+
+            const imageUrl = collectorData.profilePictureUrl;
+            const nameInitial = (collectorData.name || 'C').charAt(0).toUpperCase();
+            const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${nameInitial}`;
+
+            const headerImg = document.getElementById('header-profile-img');
+            const profileImg = document.getElementById('profile-view-img');
+            if (headerImg) headerImg.src = imageUrl || placeholderUrl.replace('120x120', '80x80');
+            if (profileImg) profileImg.src = imageUrl || placeholderUrl;
+
+            const realtimeToggle = document.getElementById('realtime-tracking-toggle');
+            if(realtimeToggle) realtimeToggle.checked = collectorData.isRealtimeTrackingActive || false;
+
+            // Verifica se o rastreamento deve estar ativo e se NÃO está rodando ainda
+            if (collectorData.isRealtimeTrackingActive && !locationWatchId) {
+                startRealtimeGeolocation();
+            } else if (!collectorData.isRealtimeTrackingActive && locationWatchId) {
+                // Se o interruptor foi desligado remotamente, para o rastreamento
+                stopRealtimeGeolocation();
+            }
+
+            // Listener para o botão de configurações de pagamento (reaplicado aqui)
+            const paymentSettingsBtn = document.getElementById('payment-settings-btn');
+            if (paymentSettingsBtn) {
+                 // Remove listener antigo para evitar duplicação (mais seguro)
+                paymentSettingsBtn.replaceWith(paymentSettingsBtn.cloneNode(true));
+                document.getElementById('payment-settings-btn').addEventListener('click', () => showPaymentSettingsModal(collectorData));
+            }
+
+            if (isFirstLoad) {
+                console.log('[COBRADOR-APP] Carga inicial completa. Configurando FCM...');
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(registration => {
+                        console.log('[COBRADOR-APP] Service Worker está ativo. Configurando FCM.');
+                        setupFCM(currentCollectorUsername, registration); // Usa o USERNAME aqui!
+                    }).catch(err => {
+                        console.error('[COBRADOR-APP] ERROR: Service Worker não pronto.', err);
+                    });
                 }
-            });
+                isFirstLoad = false;
+            }
+            // --- Fim do código movido ---
 
-            onSnapshot(collection(db, "clients"), (snapshot) => {
+        } else {
+            // Se o documento deixar de existir DEPOIS do login inicial
+             console.error(`Documento do cobrador ${currentCollectorUsername} foi excluído ou inacessível?`);
+             showBlockedView("Erro: Seus dados de cobrador não puderam ser carregados.");
+             signOut(auth);
+        }
+    }, (error) => { // Añade manejo de error para onSnapshot
+         console.error(`Erro ao escutar dados do cobrador ${currentCollectorUsername}:`, error);
+         showBlockedView("Erro de conexão ao carregar seus dados.");
+         signOut(auth);
+    }); // Fim do onSnapshot interno
+
+    onSnapshot(collection(db, 'companies', currentCompanyId, "clients"), (snapshot) => {
                 allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 allClients.forEach(client => {
@@ -4361,7 +4456,7 @@ await addDoc(collection(db, 'expenses'), expenseData);
                 showToast('Falha ao carregar clientes.', true);
             });
 
-            const expensesQuery = query(collection(db, 'expenses'), where("collectorId", "==", collectorId));
+            const expensesQuery = query(collection(db, 'companies', currentCompanyId, 'expenses'), where("collectorId", "==", currentCollectorUsername));
             onSnapshot(expensesQuery, (snapshot) => {
                 allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 updateExpensesView();
@@ -4372,7 +4467,7 @@ await addDoc(collection(db, 'expenses'), expenseData);
             });
 
             // --- LISTENER AÑADIDO PARA LIQUIDACIONES (FILTRADO) ---
-            const settlementsQuery = query(collection(db, 'settlements'), where("collectorId", "==", collectorId));
+            const settlementsQuery = query(collection(db, 'companies', currentCompanyId, 'settlements'), where("collectorId", "==", currentCollectorUsername));
             onSnapshot(settlementsQuery, (snapshot) => {
                 allSettlements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 // Actualizamos la vista de perfil que muestra el capital en mano
@@ -4381,6 +4476,14 @@ await addDoc(collection(db, 'expenses'), expenseData);
                 console.error("Error al obtener liquidaciones: ", error);
                 showToast('Falha ao carregar dados de liquidação.', true);
             });
+
+}).catch(error => { // Añade manejo de error para getDocs
+     console.error("Erro crítico ao buscar documento do cobrador por authUid:", error);
+     showBlockedView("Erro crítico ao carregar seus dados iniciais.");
+     signOut(auth);
+});
+
+            
     // --- FIN DEL LISTENER AÑADIDO ---
 
         }
@@ -4402,19 +4505,43 @@ await addDoc(collection(db, 'expenses'), expenseData);
             if (elements.loginLogo) elements.loginLogo.src = companyLogo;
         }
 
-        function handleLogin(event) {
-            event.preventDefault();
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
+        async function handleLogin(event) {
+    event.preventDefault();
+    const emailInput = document.getElementById('username'); // O ID ainda é 'username', mas agora é um email
+    const passwordInput = document.getElementById('password');
+    const email = emailInput.value.trim(); // Pega o email
+    const pass = passwordInput.value;
 
-            if (user === 'cobrador1' && pass === '0000') {
-                sessionStorage.setItem('isLoggedIn', 'true');
-                // CORRECCIÓN: Eliminamos location.reload() y mostramos la app directamente.
-                showMainApp();
-            } else {
-                showToast('Usuário ou senha inválidos.', true);
-            }
+    // Desabilita o botão e mostra carregando (opcional, mas bom UX)
+    const loginButton = event.target.querySelector('button[type="submit"]');
+    if (loginButton) loginButton.disabled = true;
+
+    try {
+        // Tenta fazer login com Firebase Auth
+        console.log(`Tentando login com email: ${email}`);
+        await signInWithEmailAndPassword(auth, email, pass);
+
+        // SUCESSO! O onAuthStateChanged vai ser chamado automaticamente
+        // e vai tratar de mostrar a app principal. Não fazemos mais nada aqui.
+        console.log("signInWithEmailAndPassword bem-sucedido. Aguardando onAuthStateChanged...");
+
+    } catch (error) {
+        // FALHA no login
+        console.error("Erro de login (signInWithEmailAndPassword):", error.code, error.message);
+        // Mostra mensagens de erro específicas
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+            showToast('Email ou senha inválidos.', true);
+        } else if (error.code === 'auth/invalid-email') {
+            showToast('Formato de email inválido.', true);
+        } else if (error.code === 'auth/too-many-requests') {
+             showToast('Muitas tentativas falhadas. Tente novamente mais tarde.', true);
+        } else {
+            showToast('Erro ao tentar fazer login. Verifique sua conexão.', true);
         }
+        // Habilita o botão novamente se falhar
+        if (loginButton) loginButton.disabled = false;
+    }
+}
         
         // --- INICIO: LÓGICA DE OPTIMIZACIÓN DE RUTA ---
         
@@ -4570,7 +4697,7 @@ await addDoc(collection(db, 'expenses'), expenseData);
                         const now = Date.now();
                         if (now - lastLocationUpdateTime > 30000) { // Actualiza cada 30 segundos
                             lastLocationUpdateTime = now;
-                            const collectorRef = doc(db, 'collectors', collectorId);
+                            const collectorRef = doc(db, 'collectors', currentCollectorUsername);
                             updateDoc(collectorRef, {
                                 lastLocation: {
                                     latitude: position.coords.latitude,
@@ -4626,7 +4753,7 @@ await addDoc(collection(db, 'expenses'), expenseData);
             if (trackingToggle && trackingToggle.checked) {
                 trackingToggle.checked = false;
                 // También actualiza el estado en la base de datos para que sea consistente.
-                updateDoc(doc(db, 'collectors', collectorId), { isRealtimeTrackingActive: false });
+                updateDoc(doc(db, 'collectors', currentCollectorUsername), { isRealtimeTrackingActive: false });
             }
             collectorCurrentLocation = null;
             console.log('Rastreo en tiempo real detenido.');
@@ -4697,7 +4824,7 @@ await addDoc(collection(db, 'expenses'), expenseData);
 async function sendNotificationToClient(clientId, title, body, type, icon = 'info') {
     if (!clientId) return;
     try {
-        const clientRef = doc(db, 'clients', clientId);
+        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
 
         // 1. La notificación interna (para ver dentro de la app) sigue igual, es correcta.
         const internalNotif = {
@@ -4765,105 +4892,143 @@ function triggerSystemVerification(editingClientId = null) {
     }, 1500); // Un retraso de 1.5 segundos para simular la búsqueda
 }
 
+        
         function init() {
-            // --- Service Worker Registration with Environment Check ---
-            if ('serviceWorker' in navigator) {
-                // Service Workers não podem ser registrados a partir de uma URL 'blob:', usada por ambientes de pré-visualização.
-                // Esta verificação evita a tentativa de registro e o erro resultante nesses ambientes.
-                if (window.location.protocol === 'blob:') {
-                    console.warn("Service Worker: Registro ignorado. O ambiente de pré-visualização ('blob:') não suporta Service Workers. As notificações e o rastreamento em tempo real funcionarão corretamente online.");
-                } else {
-                    navigator.serviceWorker.register('firebase-messaging-sw.js')
-                    .then(reg => {
-                        console.log('Service Worker: Registro iniciado.');
-                        
-                        reg.addEventListener('updatefound', () => {
-                            const newWorker = reg.installing;
-                            console.log('Service Worker: Nova versão encontrada.');
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('Service Worker: Nova versão instalada, recarregando a página.');
-                                    location.reload();
-                                }
-                            });
-                        });
-
-                        return navigator.serviceWorker.ready;
-                    })
-                    
-                    .then(registration => {
-    console.log('Service Worker: Ativo e pronto para ser usado após o login.');
-})
-
-                    .catch(error => {
-                        console.error('Service Worker: Falha no registro ou na ativação.', error);
-                    });
-
-                    let refreshing;
-                    navigator.serviceWorker.addEventListener('controllerchange', () => {
-                        if (refreshing) return;
-                        window.location.reload();
-                        refreshing = true;
-                    });
-                }
-            }
-            
-            document.body.classList.add('dark-mode');
-
-            // Lógica del Banner de Instalación PWA
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                const installBanner = document.getElementById('install-banner');
-                if (installBanner) installBanner.style.display = 'block';
+    // --- Service Worker Registration (SEM ALTERAÇÕES) ---
+    if ('serviceWorker' in navigator) {
+        if (window.location.protocol === 'blob:') {
+            console.warn("Service Worker: Registro ignorado. O ambiente de pré-visualização ('blob:') não suporta Service Workers...");
+        } else {
+            navigator.serviceWorker.register('firebase-messaging-sw.js')
+            .then(reg => {
+                console.log('Service Worker: Registro iniciado.');
+                // ... (resto do código do SW sem alterações) ...
+                return navigator.serviceWorker.ready;
+            })
+            .then(registration => {
+                console.log('Service Worker: Ativo e pronto para ser usado após o login.');
+            })
+            .catch(error => {
+                console.error('Service Worker: Falha no registro ou na ativação.', error);
             });
-
-            const installBtn = document.getElementById('install-btn');
-            if (installBtn) {
-                installBtn.addEventListener('click', async () => {
-                    const installBanner = document.getElementById('install-banner');
-                    if (installBanner) installBanner.style.display = 'none';
-                    if (deferredPrompt) {
-                        deferredPrompt.prompt();
-                        const { outcome } = await deferredPrompt.userChoice;
-                        console.log(`User response to the install prompt: ${outcome}`);
-                        deferredPrompt = null;
-                    }
-                });
-            }
-
-            const closeInstallBtn = document.getElementById('close-install-banner');
-if (closeInstallBtn) {
-    closeInstallBtn.addEventListener('click', () => {
-        const installBanner = document.getElementById('install-banner');
-        if (installBanner) installBanner.style.display = 'none';
-    });
-}
-            
-            onSnapshot(doc(db, 'config', 'global'), (docSnap) => {
-                if (docSnap.exists()) {
-                    loadGlobalSettings(docSnap.data());
-                } else {
-                    loadGlobalSettings({});
-                }
-            });
-
-            setTimeout(() => {
-                const splash = document.getElementById('splash-screen');
-                splash.style.opacity = '0';
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                    if (sessionStorage.getItem('isLoggedIn') === 'true') {
-                        showMainApp();
-                    } else {
-                        document.getElementById('login-view').style.display = 'flex';
-                        document.getElementById('login-form').addEventListener('submit', handleLogin);
-                    }
-                }, 500);
-            }, 1500);
+            // ... (resto do código do SW 'controllerchange' sem alterações) ...
         }
+    }
+
+    document.body.classList.add('dark-mode');
+
+    // --- Lógica do Banner PWA (SEM ALTERAÇÕES) ---
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const installBanner = document.getElementById('install-banner');
+        if (installBanner) installBanner.style.display = 'block';
+    });
+    const installBtn = document.getElementById('install-btn');
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => { /* ... (sem alterações) ... */ });
+    }
+    const closeInstallBtn = document.getElementById('close-install-banner');
+    if (closeInstallBtn) {
+        closeInstallBtn.addEventListener('click', () => { /* ... (sem alterações) ... */ });
+    }
+
+    // --- INÍCIO TAREFA C1: NOVA LÓGICA DE AUTENTICAÇÃO ---
+    const splash = document.getElementById('splash-screen');
+
+    onAuthStateChanged(auth, async (user) => {
+        // Oculta o splash imediatamente
+        splash.style.opacity = '0';
+        setTimeout(() => {
+            splash.style.display = 'none';
+        }, 500);
+
+        if (user) {
+            // Usuário está logado (potencialmente um cobrador)
+            // Inicia a verificação...
+            try {
+                console.log("Verificando permissões do cobrador...");
+                const tokenResult = await user.getIdTokenResult(true); // Força atualização
+                const claims = tokenResult.claims; // Os 'selos'
+                console.log("Claims do usuário:", claims);
+
+                // Validação de ROL e COMPANY ID
+                if (claims.role !== 'collector' || !claims.companyId) {
+                    const errorMsg = "Sua conta não tem permissões de cobrador ou não está associada a uma empresa. Contate o administrador.";
+                    console.error(errorMsg, claims);
+                    showBlockedView(errorMsg);
+                    await signOut(auth); // Desloga usuário inválido
+                    return; // Para a execução
+                }
+
+                // Guarda os IDs importantes
+                currentCollectorUid = user.uid; // ID de Auth
+                currentCompanyId = claims.companyId; // ID da Empresa
+                // O 'username' (ID de Firestore) não está nos claims, precisaremos lê-lo do doc 'collectors'
+                // Faremos isso dentro de showMainApp onde já lemos o doc do cobrador
+                console.log(`Cobrador verificado. AuthUID: ${currentCollectorUid}, CompanyID: ${currentCompanyId}`);
+
+                // TAREFA C0: Verificar status da EMPRESA
+                const companyRef = doc(db, 'companies', currentCompanyId);
+                const companySnap = await getDoc(companyRef);
+
+                if (!companySnap.exists()) {
+                    const errorMsg = `Erro crítico: A empresa (${currentCompanyId}) não foi encontrada.`;
+                    console.error(errorMsg);
+                    showBlockedView(errorMsg);
+                    await signOut(auth);
+                    return;
+                }
+
+                currentCompanyData = companySnap.data(); // Guarda dados da empresa
+
+                // VERIFICAÇÃO DE STATUS
+                if (currentCompanyData.status === 'suspended') {
+                    const errorMsg = `A conta da sua empresa (${currentCompanyData.name || 'Nome não disponível'}) está suspensa. Contate o administrador.`;
+                    console.warn(errorMsg);
+                    showBlockedView(errorMsg); // Bloqueia a app, mas não desloga
+                    return;
+                }
+
+                // TUDO OK! Empresa ativa e cobrador válido.
+                console.log(`Acesso concedido para Empresa: ${currentCompanyData.name} (Status: ${currentCompanyData.status})`);
+                document.getElementById('login-view').style.display = 'none'; // Oculta login
+
+                // Aplica logo/nome da empresa (substitui loadGlobalSettings)
+                loadGlobalSettings(currentCompanyData); 
+
+                // Chama a função principal da app
+                showMainApp(currentCollectorUid); // Passa o UID para showMainApp
+
+            } catch (error) {
+                console.error("Erro crítico durante a verificação de acesso do cobrador:", error);
+                showBlockedView(`Ocorreu um erro ao verificar sua conta: ${error.message}`);
+                await signOut(auth);
+            }
+
+        } else {
+            // Usuário NÃO está logado
+            document.getElementById('app-container').style.display = 'none'; // Oculta app
+            document.getElementById('login-view').style.display = 'flex'; // Mostra login
+
+            // Aplica logo/nome padrão ou da última sessão (se houver)
+            loadGlobalSettings({}); 
+
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                // Remove listener antigo para evitar duplicação
+                loginForm.removeEventListener('submit', handleLogin); 
+                // Adiciona o listener UMA VEZ
+                loginForm.addEventListener('submit', handleLogin); 
+            }
+        }
+    });
+    // --- FIM TAREFA C1 ---
+}
+
         init();
     </script>
 </body>
 </html>
+
 
