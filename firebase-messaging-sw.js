@@ -4929,9 +4929,12 @@ function triggerSystemVerification(editingClientId = null) {
         installBtn.addEventListener('click', async () => { /* ... (sem alterações) ... */ });
     }
     const closeInstallBtn = document.getElementById('close-install-banner');
-    if (closeInstallBtn) {
-        closeInstallBtn.addEventListener('click', () => { /* ... (sem alterações) ... */ });
-    }
+if (closeInstallBtn) {
+    closeInstallBtn.addEventListener('click', () => {
+        const installBanner = document.getElementById('install-banner');
+        if (installBanner) installBanner.style.display = 'none';
+    });
+}
 
     // --- INÍCIO TAREFA C1: NOVA LÓGICA DE AUTENTICAÇÃO ---
     const splash = document.getElementById('splash-screen');
