@@ -804,6 +804,8 @@ try {
         let currentCompanyData = null;   // Guarda os dados da empresa (logo, nome, status)
         let currentCollectorUid = null;  // Guarda o ID de autenticação (Auth UID) do cobrador
         let currentCollectorUsername = null; // Guarda o 'username' (ID de Firestore) do cobrador
+        let unsubscribeNotifications = null;
+
         
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         const translations = {
@@ -4292,6 +4294,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 }
                 if (target.closest('#logout-btn')) {
     stopRealtimeGeolocation(); 
+
+    if (unsubscribeNotifications) {
+         console.log("[COBRADOR-APP] Cancelando listener de notificações...");
+         unsubscribeNotifications();
+         unsubscribeNotifications = null;
+    }
+
+
     // --- INÍCIO TAREFA C1 ---
     signOut(auth).catch((error) => { // Chama o logout oficial do Firebase
         console.error("Erro ao fazer logout:", error);
@@ -4551,6 +4561,25 @@ getDocs(collectorQuery).then(snapshot => {
                 console.error("Error al obtener liquidaciones: ", error);
                 showToast('Falha ao carregar dados de liquidação.', true);
             });
+
+
+            console.log(`[COBRADOR-APP] Iniciando listener para notificações em: collectors/${currentCollectorUsername}/notifications`);
+    const notificationsQuery = collection(db, 'collectors', currentCollectorUsername, 'notifications');
+
+    // Guarda la función de cancelación para poder detenerla al hacer logout
+    if (typeof unsubscribeNotifications !== 'undefined' && unsubscribeNotifications) {
+        unsubscribeNotifications(); // Cancela listener anterior si existe
+    }
+    unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+        console.log("[COBRADOR-APP] Novas notificações recebidas do Firestore.");
+        // Llama a la función existente que actualiza el badge y la lista
+        updateNotifications();
+    }, (error) => {
+        console.error(`[COBRADOR-APP] Erro ao escutar notificações:`, error);
+        // Considera mostrar un toast si falla
+        // showToast('Erro ao carregar notificações.', true);
+    });
+
 
 }).catch(error => { // Añade manejo de error para getDocs
      console.error("Erro crítico ao buscar documento do cobrador por authUid:", error);
