@@ -1080,6 +1080,7 @@ try {
         }
         
         function updateNotifications() {
+            console.log("[COBRADOR-APP][DIAG] updateNotifications() iniciada. Buscando pagos pendientes...");
             const container = document.getElementById('notifications-list-container');
             const badge = document.getElementById('notification-badge');
             if (!container || !badge) return;
@@ -2632,13 +2633,37 @@ if (settlementsListContainer) {
          }
     }
 
-    // Listener para ver detalles del pago (usa índice original del historial)
-    clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
-        item.addEventListener('click', (e) => {
-            const historyIndex = e.currentTarget.dataset.historyIndex;
-            showPaymentDetailModal(clientId, parseInt(historyIndex, 10), currentLoanIndex); // Pasa loanIndex actual
-        });
-    });
+    // Listener para ver detalles/verificación del pago (usa índice original del historial)
+            clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
+                    // Encuentra el pago específico en los datos actuales del cliente y préstamo
+                    const clickedPayment = client.loans[currentLoanIndex]?.history[historyIndex];
+
+                    if (!clickedPayment) {
+                         console.error("No se pudo encontrar el pago clickeado en los datos:", {clientId, currentLoanIndex, historyIndex});
+                         showToast('Erro ao obter detalhes do pagamento.', true);
+                         return;
+                    }
+
+                    // *** LÓGICA CORREGIDA ***
+                    // Si el estado es 'pending_verification', muestra el modal de verificación.
+                    if (clickedPayment.status === 'pending_verification') {
+                        console.log(`Abriendo modal de VERIFICACIÓN para cliente ${clientId}, historial ${historyIndex}`);
+                        showVerificationModal(clientId, historyIndex);
+                    } 
+                    // Si es 'postponed', no hagas nada (ya está puesto `cursor: default` en el HTML).
+                    else if (clickedPayment.status === 'postponed') {
+                         console.log("Clic en pago aplazado, ninguna acción.");
+                         return; 
+                    }
+                    // Para cualquier otro estado (approved, rejected, etc.), muestra el modal de detalles.
+                    else {
+                        console.log(`Abriendo modal de DETALLES para cliente ${clientId}, historial ${historyIndex}`);
+                        showPaymentDetailModal(clientId, historyIndex); // No necesita loanIndex aquí
+                    }
+                });
+            });
 
 } // Fin showClientDetails
 
@@ -4520,6 +4545,8 @@ getDocs(collectorQuery).then(snapshot => {
     }); // Fim do onSnapshot interno
 
     onSnapshot(collection(db, 'companies', currentCompanyId, "clients"), (snapshot) => {
+
+                console.log("[COBRADOR-APP][DIAG] Client onSnapshot disparado! Processando clientes...");
                 allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 allClients.forEach(client => {
