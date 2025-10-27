@@ -1954,35 +1954,44 @@ if (settlementsListContainer) {
     console.log(`${LOG_PREFIX} Bucle finalizado. Resultados intermedios: LateDays=${accumulatedLateDays}, LateFees=${accumulatedLateFees}, AmountDueToday=${details.amountDueToday}, NextDueDate=${details.nextDueDate?.toLocaleDateString()}`); // <-- LOG AÑADIDO
 
     // --- Determinar Estado Final ---
-    details.lateDays = accumulatedLateDays;
-    details.lateFeesAccumulated = accumulatedLateFees;
+        details.lateDays = accumulatedLateDays;
+        details.lateFeesAccumulated = accumulatedLateFees;
 
-    const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
-    // Recalcula cuotas pagas aquí para la decisión final
-    const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
-    console.log(`${LOG_PREFIX} Cálculo final: TotalInst=${totalInstallments}, PaidInstCalc=${paidInstallmentsCalculated}, currentTotalPaid=${currentTotalPaid}, totalLoan=${loan.totalLoan}`); // <-- LOG AÑADIDO
+        const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
+        // Recalcula cuotas pagas aquí para la decisión final
+        const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
+        console.log(`${LOG_PREFIX} Cálculo final: TotalInst=${totalInstallments}, PaidInstCalc=${paidInstallmentsCalculated}, currentTotalPaid=${currentTotalPaid}, totalLoan=${loan.totalLoan}`); // <-- LOG SIN CAMBIOS
 
-    // Lógica de decisión del estado final (con logs)
-    if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
-         details.status = 'finished';
-         console.log(`${LOG_PREFIX} Decisión: Estado final = 'finished' (cuotas completas o monto total pagado).`);
-    } else if (accumulatedLateDays > 1) { // Más de 1 día de atraso
-        details.status = 'late';
-        console.log(`${LOG_PREFIX} Decisión: Estado final = 'late' (días de atraso > 1).`);
-    } else if (details.amountDueToday > 0 && currentTotalPaid < installmentsDueCount * installmentAmount) { // Hoy es día de pago y no está cubierto
-         details.status = 'pending';
-         console.log(`${LOG_PREFIX} Decisión: Estado final = 'pending' (hoy es día de pago y falta cubrir).`);
-    } else if (accumulatedLateDays === 1) { // Exactamente 1 día de atraso
-         details.status = 'pending'; // Consideramos 'pending' el primer día
-         console.log(`${LOG_PREFIX} Decisión: Estado final = 'pending' (exactamente 1 día de atraso).`);
-    } else {
-        details.status = 'paid'; // Si no, está al día (o adelantado)
-        console.log(`${LOG_PREFIX} Decisión: Estado final = 'paid' (ninguna de las condiciones anteriores).`);
+        // --- INICIO: Lógica de decisión CORREGIDA ---
+        if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
+            details.status = 'finished';
+            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'finished' (cuotas completas o monto total pagado).`);
+        } else if (accumulatedLateDays > 1) { // Más de 1 día de atraso sigue siendo 'late'
+            details.status = 'late';
+            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'late' (días de atraso > 1).`);
+        } else if (details.amountDueToday > 0) { // <-- ¡NUEVA CONDICIÓN PRIORITARIA! Si hoy vence una cuota...
+            // Verifica si el monto pagado HASTA AHORA es menor que el esperado INCLUYENDO la cuota de HOY.
+            const expectedInstallmentsIncludingToday = installmentsDueCount + 1; // Sumamos 1 por la cuota de hoy
+            const expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
+            if (currentTotalPaid < expectedTotalIncludingToday) {
+                 details.status = 'pending'; // ...y no se ha cubierto, está pendiente.
+                 console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'pending' (hoy vence y falta cubrir: esperado ${expectedTotalIncludingToday}, pagado ${currentTotalPaid}).`);
+            } else {
+                 details.status = 'paid'; // Si se debe pagar hoy PERO ya está cubierto (pago adelantado?), está 'paid'.
+                 console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'paid' (hoy vence pero ya está cubierto).`);
+            }
+        } else if (accumulatedLateDays === 1) { // 1 día de atraso (venció ayer y no pagó) también es 'pending'
+            details.status = 'pending';
+            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'pending' (exactamente 1 día de atraso).`);
+        } else { // Si no está terminado, ni atrasado, ni vence hoy...
+            details.status = 'paid'; // ...entonces está al día.
+            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'paid' (al día, sin vencimiento hoy).`);
+        }
+        // --- FIN: Lógica de decisión CORREGIDA ---
+
+        console.log(`${LOG_PREFIX} Cálculo finalizado. Retornando detalles:`, JSON.parse(JSON.stringify(details))); // Muestra el resultado final
+        return details;
     }
-
-    console.log(`${LOG_PREFIX} Cálculo finalizado. Retornando detalles:`, JSON.parse(JSON.stringify(details))); // Muestra el resultado final
-    return details;
-}
 
 
 
