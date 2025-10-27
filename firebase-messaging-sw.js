@@ -75,24 +75,53 @@ messaging.onBackgroundMessage((payload) => {
  * [LÓGICA PARA EL CLIC]
  * Esto se ejecuta cuando el usuario toca la notificación.
  */
+
 self.addEventListener('notificationclick', (event) => {
-    console.log(`[SW ${SW_VERSION}] El usuario hizo clic en la notificación.`);
+    const LOG_PREFIX = `[SW ${SW_VERSION}]`; // Añadido para claridad
+    console.log(`${LOG_PREFIX} El usuario hizo clic en la notificación.`);
     event.notification.close();
 
     const targetUrl = event.notification.data.url || self.location.origin;
+    console.log(`${LOG_PREFIX} URL de destino: ${targetUrl}`);
 
-    // Busca si la app ya está abierta para enfocarla, si no, abre una nueva ventana.
-    const promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
-    .then((windowClients) => {
-        for (const client of windowClients) {
-            // Compara el origen para asegurarse de que es la misma app.
-            if (new URL(client.url).origin === new URL(targetUrl).origin && 'focus' in client) {
-                return client.navigate(targetUrl).then(c => c.focus());
-            }
+    // Lógica robusta para encontrar/abrir ventana
+    const promiseChain = clients.matchAll({
+        type: "window",
+        includeUncontrolled: true // Incluye clientes que el SW no controla directamente aún
+    }).then((windowClients) => {
+        console.log(`${LOG_PREFIX} Clientes de ventana encontrados: ${windowClients.length}`);
+
+        // 1. Busca una ventana EXACTA ya abierta y enfócala
+        const exactClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
+        if (exactClient) {
+            console.log(`${LOG_PREFIX} Ventana EXACTA encontrada. Enfocando...`);
+            return exactClient.focus();
         }
+
+        // 2. Si no hay exacta, busca CUALQUIER ventana de la app, navega y enfoca
+        if (windowClients.length > 0 && 'navigate' in windowClients[0]) {
+             console.log(`${LOG_PREFIX} Ventana EXACTA no encontrada, pero hay otra ventana de la app (${windowClients[0].url}). Navegando y enfocando...`);
+             // Usamos la primera ventana encontrada
+             return windowClients[0].navigate(targetUrl).then(client => client.focus());
+        }
+
+        // 3. Si no hay NINGUNA ventana, abre una nueva
+        console.log(`${LOG_PREFIX} Ninguna ventana encontrada. Abriendo una nueva en ${targetUrl}`);
         if (clients.openWindow) {
             return clients.openWindow(targetUrl);
+        } else {
+             console.error(`${LOG_PREFIX} clients.openWindow no está disponible.`);
+             // Como fallback, no hacemos nada o intentamos algo más
+             return Promise.resolve();
         }
+    }).catch(err => {
+         console.error(`${LOG_PREFIX} Error dentro de matchAll/navigate/focus:`, err);
+         // Intenta abrir una ventana como último recurso si todo falla
+         if (clients.openWindow) {
+              console.log(`${LOG_PREFIX} Fallback: Intentando abrir ventana directamente.`);
+              return clients.openWindow(targetUrl);
+         }
     });
+
     event.waitUntil(promiseChain);
 });
