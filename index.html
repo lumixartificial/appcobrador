@@ -1197,7 +1197,11 @@ try {
 
             const request = client.refinanceRequest;
 
-            const lateDays = calculateLatePaymentDays(client);
+            // --- CORRECCIÓN DEL TYPO AQUÍ ---
+            const loanDetails = calculateLoanDetails(client.loans[0]); // Asumimos el primer préstamo para la reputación
+            const lateDays = loanDetails.lateDays; // Usamos el resultado de calculateLoanDetails
+            // --- FIN CORRECCIÓN ---
+
             const score = Math.max(0, 10 - lateDays);
             let reputationStatusKey = 'reputationBad';
             if (score === 10) reputationStatusKey = 'reputationPerfect';
@@ -1229,7 +1233,7 @@ try {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="kpi-card">
                         <h3 class="kpi-title">Detalhes da Solicitação</h3>
                         <div class="loan-summary" style="grid-template-columns: 1fr; gap: 10px; text-align: center;">
@@ -1248,7 +1252,7 @@ try {
                     <button class="btn-danger" id="reject-refinance-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
                     <button class="btn-primary" id="approve-refinance-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
                 </div>`;
-            
+
             history.pushState({ modal: 'refinanceModal' }, 'Refinance Modal', '#refinance');
             refinanceModal.classList.add('active');
             lucide.createIcons({ nodes: refinanceModal.querySelectorAll('[data-lucide]') });
@@ -1268,7 +1272,7 @@ try {
                 const interestRate = client.interestRate || 20;
                 const totalToPay = requestData.amount * (1 + (interestRate / 100));
                 const installmentValue = requestData.installments > 0 ? totalToPay / requestData.installments : 0;
-                
+
                 const newLoanData = {
                     totalLoan: totalToPay,
                     amount: installmentValue,
@@ -1280,9 +1284,12 @@ try {
                     startDate: new Date(),
                     history: [],
                     // Se heredan estos valores del préstamo principal para consistencia
-                    paymentFrequency: client.loans[0].paymentFrequency, 
+                    paymentFrequency: client.loans[0].paymentFrequency,
                     paymentDays: client.loans[0].paymentDays,
                     collectionTime: client.loans[0].collectionTime,
+                     // [NUEVO] Asegura guardar el principalAmount para cálculos futuros
+                    principalAmount: requestData.amount,
+                    lateFeeRate: client.loans[0].lateFeeRate || 0 // Hereda tasa de mora
                 };
 
                 try {
@@ -1310,12 +1317,12 @@ try {
                         refinanceRequest: null
                     });
                     showToast('Solicitação rejeitada.');
-                    
+
                     // [BUG CORREGIDO] Notificación de rechazo de refinanciamiento AÑADIDA
                     const notifTitle = translations[currentLang].refinanceRejectedClientTitle;
                     const notifBody = translations[currentLang].refinanceRejectedClientBody;
                     sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected', 'trending-down');
-                    
+
                     window.history.back();
                 } catch (error) {
                     console.error("Error rejecting refinance:", error);
