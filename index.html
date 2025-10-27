@@ -2792,71 +2792,115 @@ if (settlementsListContainer) {
                 }
             });
             
+            
             paymentModal.querySelector('#confirmPaymentBtn').addEventListener('click', async (e) => {
-            const confirmBtn = e.currentTarget;
-            const originalBtnHTML = confirmBtn.innerHTML;
-            confirmBtn.disabled = true;
-            confirmBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Processando...`;
-            lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
+                const confirmBtn = e.currentTarget;
+                const originalBtnHTML = confirmBtn.innerHTML;
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Processando...`;
+                lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
 
-            const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+                const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
 
-            try {
-                let receiptUrl = '';
-                if (receiptFile && (selectedMethod === 'pix' || selectedMethod === 'cartao')) {
-                    const formData = new FormData();
-                    formData.append('file', receiptFile);
-                    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                    const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-                    if (!response.ok) throw new Error('Cloudinary receipt upload failed');
-                    const data = await response.json();
-                    receiptUrl = data.secure_url;
-                }
+                try {
+                    // --- INICIO CORRECCIÓN ---
+                    // 1. Obtener el cliente y el préstamo específico USANDO clientId y loanIndex
+                    const currentClient = allClients.find(c => c.id === clientId);
+                    if (!currentClient || !currentClient.loans || !currentClient.loans[loanIndex]) {
+                         throw new Error("Cliente ou empréstimo não encontrado para registrar o pagamento.");
+                    }
+                    // 2. Definir currentLoan y updatedLoans CORRECTAMENTE
+                    const updatedLoans = JSON.parse(JSON.stringify(currentClient.loans)); // Copia profunda para modificar
+                    const currentLoan = updatedLoans[loanIndex]; // Referencia al préstamo DENTRO de la copia
+                    // --- FIN CORRECCIÓN ---
 
-                const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
-                if (isNaN(actualPaidAmount) || actualPaidAmount < 0) {
-                    showToast('Por favor, insira um valor de pagamento válido.', true);
+                    let receiptUrl = '';
+                    if (receiptFile && (selectedMethod === 'pix' || selectedMethod === 'cartao')) {
+                        const formData = new FormData();
+                        formData.append('file', receiptFile);
+                        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                        const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+                        if (!response.ok) throw new Error('Cloudinary receipt upload failed');
+                        const data = await response.json();
+                        receiptUrl = data.secure_url;
+                    }
+
+                    const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
+                    if (isNaN(actualPaidAmount) || actualPaidAmount < 0) {
+                        showToast('Por favor, insira um valor de pagamento válido.', true);
+                        confirmBtn.disabled = false; // Re-habilita en caso de error de validación
+                        confirmBtn.innerHTML = originalBtnHTML;
+                        lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
+                        return;
+                    }
+
+                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
+
+                    const newPayment = {
+                        amount: actualPaidAmount,
+                        date: new Date(),
+                        status: 'approved', // Pagos registrados por el cobrador siempre son 'approved'
+                        method: selectedMethod
+                    };
+
+                    if(receiptUrl) {
+                        newPayment.receiptUrl = receiptUrl;
+                    }
+
+                    // Aseguramos que el historial exista
+                    if (!currentLoan.history) currentLoan.history = [];
+                    currentLoan.history.push(newPayment);
+
+                    // --- INICIO CORRECCIÓN LÓGICA FINANCIERA ---
+                    // Recalcula 'paid' y 'paymentBalance' BASADO EN EL HISTORIAL COMPLETO
+                    // para asegurar consistencia, especialmente con pagos parciales/múltiples.
+
+                    // 1. Recalcula el total pagado SUMANDO el historial APROBADO
+                    const newTotalPaid = (currentLoan.history || [])
+                        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+                        .reduce((sum, h) => sum + (h.amount || 0), 0);
+                        
+                    // 2. Calcula cuántas cuotas COMPLETAS cubre el nuevo total pagado
+                    const installmentValue = currentLoan.originalInstallmentAmount || 0; // Usa el valor original
+                    const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
+                    
+                    // 3. Calcula el nuevo 'paymentBalance'
+                    // Es el total pagado menos el valor total de las cuotas completas cubiertas.
+                    const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
+
+                    // 4. Actualiza los campos en el objeto 'currentLoan' (que está dentro de 'updatedLoans')
+                    currentLoan.paid = newTotalPaid;
+                    currentLoan.paymentBalance = newBalance;
+                    // Actualiza también la cadena 'installments' (ej: "3/24")
+                    const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
+                    currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
+
+                    console.log("Datos financieros recalculados:", { newTotalPaid, paidInstallmentsCount, newBalance, newInstallmentsString: currentLoan.installments });
+                    // --- FIN CORRECCIÓN LÓGICA FINANCIERA ---
+
+
+                    // Guarda el array COMPLETO 'updatedLoans' en Firestore
+                    await updateDoc(clientRef, {
+                        loans: updatedLoans // Guarda todo el array modificado
+                    });
+
+                    window.history.back(); // Cierra el modal de pago
+                    // El modal de detalles se actualiza automáticamente por el onSnapshot
+                    showToast('Pagamento registrado com sucesso!');
+
+                } catch(error) {
+                    console.error("Error updating document: ", error);
+                    showToast('Falha ao registrar pagamento.', true);
+                    // Re-habilita el botón si hubo un error al guardar
                     confirmBtn.disabled = false;
                     confirmBtn.innerHTML = originalBtnHTML;
                     lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
-                    return;
                 }
+                // 'finally' eliminado, el botón se re-habilita solo en caso de error.
+            });
 
-                const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-                
-                
 
-                const newPayment = {
-                    amount: actualPaidAmount,
-                    date: new Date(),
-                    status: 'approved',
-                    method: selectedMethod
-                };
 
-                if(receiptUrl) {
-                    newPayment.receiptUrl = receiptUrl;
-                }
-                
-                if (!currentLoan.history) currentLoan.history = [];
-                currentLoan.history.push(newPayment);
-
-                await updateDoc(clientRef, {
-                    loans: updatedLoans
-                });
-
-                window.history.back();
-                setTimeout(() => window.history.back(), 50);
-                showToast('Pagamento registrado com sucesso!');
-
-            } catch(error) {
-                console.error("Error updating document: ", error);
-                showToast('Falha ao registrar pagamento.', true);
-            } finally {
-                confirmBtn.disabled = false;
-                confirmBtn.innerHTML = originalBtnHTML;
-                lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
-            }
-        });
         }
         
         function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0) {
