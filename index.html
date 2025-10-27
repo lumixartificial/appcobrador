@@ -1088,8 +1088,11 @@ try {
             let notifications = [];
             
             allClients.forEach(client => {
+
+                console.log(`[DIAG-NOTIF] Verificando historial para cliente: ${client.name} (ID: ${client.id})`);
                 // Notificaciones de Pagos Pendientes
                 (client.history || []).forEach((payment, index) => {
+                    console.log(`[DIAG-NOTIF] --> Pago[${index}]: Status='${payment.status}'`);
                     if (payment.status === 'pending_verification') {
                         notifications.push({ 
                             type: 'payment',
@@ -1100,6 +1103,7 @@ try {
                             historyIndex: index, 
                             profilePictureUrl: client.profilePictureUrl 
                         });
+                        console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO! Añadiendo a la lista de notificaciones.`);
                     }
                 });
 
@@ -1569,6 +1573,10 @@ try {
         function showVerificationModal(clientId, historyIndex) {
             const verificationModal = document.getElementById('verificationModal');
             const client = allClients.find(c => c.id === clientId);
+            console.log(`[DIAG-VERIF-MODAL] Intentando abrir para clientId='${clientId}', historyIndex=${historyIndex}`);
+            console.log(`[DIAG-VERIF-MODAL] Datos del cliente encontrados:`, client ? {...client} : 'NO ENCONTRADO'); // Muestra una copia
+            console.log(`[DIAG-VERIF-MODAL] Historial del cliente:`, client?.history ? [...client.history] : 'NO ENCONTRADO o VACÍO'); // Muestra una copia
+            console.log(`[DIAG-VERIF-MODAL] Pago específico (client.history[${historyIndex}]):`, client?.history?.[historyIndex] ? {...client.history[historyIndex]} : 'NO ENCONTRADO'); // Muestra una copia
             if (!client || !client.history || !client.history[historyIndex]) {
                 showToast('Notificação não encontrada ou inválida.', true);
                 return;
