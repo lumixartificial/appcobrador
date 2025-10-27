@@ -873,31 +873,43 @@ try {
 
 
         function getAllTodaysClients() {
+            console.log("[DIAGNÓSTICO RUTA] Iniciando getAllTodaysClients..."); // <-- LOG AÑADIDO
             const clientsForToday = [];
             const today = new Date();
             const dayOfWeek = today.getDay();
             const dayOfMonth = today.getDate();
+            console.log(`[DIAGNÓSTICO RUTA] Hoy es: DíaSem=${dayOfWeek}, DíaMes=${dayOfMonth}`); // <-- LOG AÑADIDO
 
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
-                    if (loan.status === 'finished') return;
+                    // [REPARACIÓN] Se cambió la condición para incluir correctamente a todos los clientes del día (pendientes, atrasados, etc.) y excluir únicamente los préstamos ya finalizados.
+                    if (loan.status === 'finished') {
+                        // console.log(`[DIAGNÓSTICO RUTA] Cliente ${client.name} (Préstamo ${index+1}): Omitido (status='finished')`); // LOG Opcional si quieres ver los finalizados
+                        return;
+                    }
 
                     let isPaymentDay = false;
                     const frequency = loan.paymentFrequency || 'daily';
+                    const paymentDays = loan.paymentDays || []; // Asegura que sea un array
 
                     if (frequency === 'daily') {
-                        isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
+                        isPaymentDay = paymentDays.includes(dayOfWeek);
                     } else if (frequency === 'weekly') {
-                        isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
+                        isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfWeek;
                     } else if (frequency === 'monthly') {
-                        isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
+                        isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfMonth;
                     }
-                    
+
+                    // Log detallado por cliente/préstamo
+                    console.log(`[DIAGNÓSTICO RUTA] Cliente ${client.name} (Préstamo ${index+1}): Freq=${frequency}, Days=${JSON.stringify(paymentDays)}, HoyEsPago=${isPaymentDay}, StatusActual=${loan.status}`); // <-- LOG DETALLADO AÑADIDO
+
                     if (isPaymentDay) {
                         clientsForToday.push({ client, loan, loanIndex: index });
+                        console.log(`[DIAGNÓSTICO RUTA] --> AÑADIDO a la lista PRE-FILTRO.`); // <-- LOG AÑADIDO
                     }
                 });
             });
+            console.log(`[DIAGNÓSTICO RUTA] getAllTodaysClients finalizado. Encontrados ${clientsForToday.length} clientes PRE-FILTRO.`); // <-- LOG AÑADIDO
             return clientsForToday;
         }
 
@@ -2249,33 +2261,27 @@ function calculateLoanDetails(loan) {
         }
 
         function updateTodaysRouteList() {
-            const clientsForRoute = [];
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const dayOfMonth = today.getDate();
+            console.log("[DIAGNÓSTICO RUTA] Iniciando updateTodaysRouteList..."); // <-- LOG AÑADIDO
+            const allClientsForToday = getAllTodaysClients(); // Obtiene TODOS los del día (sin filtrar por status aún)
+            console.log(`[DIAGNÓSTICO RUTA] Lista PRE-FILTRO recibida con ${allClientsForToday.length} elementos.`); // <-- LOG AÑADIDO
 
-            allClients.forEach(client => {
-                (client.loans || []).forEach((loan, index) => {
-                    if (loan.status === 'finished') return; // [CORRECCIÓN] Se cambió la condición para incluir correctamente a todos los clientes del día (pendientes, atrasados, etc.) y excluir únicamente los préstamos ya finalizados.
-                    
-                    let isPaymentDay = false;
-                    const frequency = loan.paymentFrequency || 'daily';
-                    if (frequency === 'daily') isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
-                    else if (frequency === 'weekly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
-                    else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
-
-                    if (isPaymentDay) {
-                        // [CORRECCIÓN 2] Se añaden a la ruta solo los clientes cuyo pago de hoy está pendiente o atrasado.
-                        if (loan.status === 'pending' || loan.status === 'late') {
-                            clientsForRoute.push({ client, loan, loanIndex: index });
-                        }
-                    }
-                });
+            // Filtra aquí para la RUTA (solo pendientes o atrasados)
+            const clientsForRoute = allClientsForToday.filter(item => {
+                const include = item.loan.status === 'pending' || item.loan.status === 'late';
+                // Log del filtro
+                console.log(`[DIAGNÓSTICO RUTA] Filtrando ${item.client.name} (Préstamo ${item.loanIndex+1}): Status=${item.loan.status}, IncluirEnRuta=${include}`); // <-- LOG DE FILTRO AÑADIDO
+                return include;
             });
+            console.log(`[DIAGNÓSTICO RUTA] Lista POST-FILTRO (para ruta) tiene ${clientsForRoute.length} elementos.`); // <-- LOG AÑADIDO
 
+            // Optimiza y renderiza la RUTA
             const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
+            console.log(`[DIAGNÓSTICO RUTA] Ruta optimizada. Renderizando ${optimizedClients.length} tarjetas...`); // <-- LOG AÑADIDO
             renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
-            updateDashboard(clientsForRoute.map(item => item.loan));
+
+            // Actualiza el Dashboard (usa la lista SIN FILTRAR por status, como antes)
+            updateDashboard(allClientsForToday.map(item => item.loan));
+            console.log("[DIAGNÓSTICO RUTA] updateTodaysRouteList finalizado."); // <-- LOG AÑADIDO
         }
 
         function updateAllClientsList() {
@@ -5148,3 +5154,4 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
