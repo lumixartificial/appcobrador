@@ -873,45 +873,34 @@ try {
 
 
         function getAllTodaysClients() {
-            console.log("[DIAGNÓSTICO RUTA] Iniciando getAllTodaysClients..."); // <-- LOG AÑADIDO
-            const clientsForToday = [];
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const dayOfMonth = today.getDate();
-            console.log(`[DIAGNÓSTICO RUTA] Hoy es: DíaSem=${dayOfWeek}, DíaMes=${dayOfMonth}`); // <-- LOG AÑADIDO
+           const clientsForToday = [];
+           const today = new Date();
+           const dayOfWeek = today.getDay();
+           const dayOfMonth = today.getDate();
 
-            allClients.forEach(client => {
-                (client.loans || []).forEach((loan, index) => {
-                    // [REPARACIÓN] Se cambió la condición para incluir correctamente a todos los clientes del día (pendientes, atrasados, etc.) y excluir únicamente los préstamos ya finalizados.
-                    if (loan.status === 'finished') {
-                        // console.log(`[DIAGNÓSTICO RUTA] Cliente ${client.name} (Préstamo ${index+1}): Omitido (status='finished')`); // LOG Opcional si quieres ver los finalizados
-                        return;
-                    }
+           allClients.forEach(client => {
+               (client.loans || []).forEach((loan, index) => {
+                   if (loan.status === 'finished') return;
 
-                    let isPaymentDay = false;
-                    const frequency = loan.paymentFrequency || 'daily';
-                    const paymentDays = loan.paymentDays || []; // Asegura que sea un array
+                   let isPaymentDay = false;
+                   const frequency = loan.paymentFrequency || 'daily';
+                   const paymentDays = loan.paymentDays || [];
 
-                    if (frequency === 'daily') {
-                        isPaymentDay = paymentDays.includes(dayOfWeek);
-                    } else if (frequency === 'weekly') {
-                        isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfWeek;
-                    } else if (frequency === 'monthly') {
-                        isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfMonth;
-                    }
+                   if (frequency === 'daily') {
+                       isPaymentDay = paymentDays.includes(dayOfWeek);
+                   } else if (frequency === 'weekly') {
+                       isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfWeek;
+                   } else if (frequency === 'monthly') {
+                       isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfMonth;
+                   }
 
-                    // Log detallado por cliente/préstamo
-                    console.log(`[DIAGNÓSTICO RUTA] Cliente ${client.name} (Préstamo ${index+1}): Freq=${frequency}, Days=${JSON.stringify(paymentDays)}, HoyEsPago=${isPaymentDay}, StatusActual=${loan.status}`); // <-- LOG DETALLADO AÑADIDO
-
-                    if (isPaymentDay) {
-                        clientsForToday.push({ client, loan, loanIndex: index });
-                        console.log(`[DIAGNÓSTICO RUTA] --> AÑADIDO a la lista PRE-FILTRO.`); // <-- LOG AÑADIDO
-                    }
-                });
-            });
-            console.log(`[DIAGNÓSTICO RUTA] getAllTodaysClients finalizado. Encontrados ${clientsForToday.length} clientes PRE-FILTRO.`); // <-- LOG AÑADIDO
-            return clientsForToday;
-        }
+                   if (isPaymentDay) {
+                       clientsForToday.push({ client, loan, loanIndex: index });
+                   }
+               });
+           });
+           return clientsForToday;
+       }
 
         function getTodaysRouteClients() {
             const todaysClients = getAllTodaysClients();
@@ -1821,177 +1810,121 @@ if (settlementsListContainer) {
         
         // Nueva función mejorada que calcula días de atraso Y mora
 
-        function calculateLoanDetails(loan) {
-    // --- INICIO DIAGNÓSTICO DETALLADO ---
-    const LOG_PREFIX = `[DIAGNÓSTICO DETALLE LOAN]`;
-    console.log(`${LOG_PREFIX} Iniciando cálculo para préstamo:`, JSON.parse(JSON.stringify(loan))); // Muestra el objeto loan completo
-    // --- FIN DIAGNÓSTICO DETALLADO ---
+        // Nueva función mejorada que calcula días de atraso Y mora
+       function calculateLoanDetails(loan) {
+           let details = {
+               lateDays: 0,
+               lateFeesAccumulated: 0,
+               status: 'pending', // Estado por defecto
+               nextDueDate: null, // Fecha del próximo vencimiento
+               amountDueToday: 0 // Cuánto debería pagar HOY si es día de pago
+           };
 
-    let details = {
-        lateDays: 0,
-        lateFeesAccumulated: 0,
-        status: 'pending', // Estado por defecto
-        nextDueDate: null, // Fecha del próximo vencimiento
-        amountDueToday: 0 // Cuánto debería pagar HOY si es día de pago
-    };
+           // Calcula el total pagado desde el historial
+           const currentTotalPaid = (loan.history || [])
+               .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+               .reduce((sum, h) => sum + (h.amount || 0), 0);
 
-    // --- INICIO CÁLCULO DEL TOTAL PAGADO DESDE HISTORIAL ---
-    const currentTotalPaid = (loan.history || [])
-        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') // Solo pagos aprobados/válidos
-        .reduce((sum, h) => sum + (h.amount || 0), 0);
-    console.log(`${LOG_PREFIX} Total pagado (desde historial): ${currentTotalPaid}`); // <-- LOG AÑADIDO
-    // --- FIN CÁLCULO ---
+           if (!loan || !loan.totalLoan || loan.status === 'finished' || (loan.paid >= loan.totalLoan)) {
+               details.status = 'finished';
+               return details;
+           }
 
-    // Si no hay préstamo o ya está finalizado, no hay nada que calcular.
-    if (!loan || !loan.totalLoan || loan.status === 'finished' || (loan.paid >= loan.totalLoan)) {
-        details.status = 'finished';
-        console.log(`${LOG_PREFIX} Estado final determinado como 'finished' (condición inicial).`); // <-- LOG AÑADIDO
-        return details;
-    }
+           const today = new Date();
+           today.setHours(0, 0, 0, 0);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    console.log(`${LOG_PREFIX} Fecha 'hoy' para cálculo: ${today.toLocaleDateString()}`); // <-- LOG AÑADIDO
+           let lastRelevantDate;
+           if (loan.history && loan.history.length > 0) {
+               const sortedHistory = [...loan.history]
+                   .filter(h => h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'postponed')
+                   .sort((a, b) => b.date.seconds - a.date.seconds);
+               if (sortedHistory.length > 0) {
+                   lastRelevantDate = new Date(sortedHistory[0].date.seconds * 1000);
+               }
+           }
+           if (!lastRelevantDate && loan.startDate?.seconds) {
+               lastRelevantDate = new Date(loan.startDate.seconds * 1000);
+           }
 
-    // Determinar la fecha de inicio relevante (inicio del préstamo o último pago)
-    let lastRelevantDate;
-    if (loan.history && loan.history.length > 0) {
-        const sortedHistory = [...loan.history]
-            .filter(h => h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'postponed') // Ignorar pendientes y aplazados
-            .sort((a, b) => b.date.seconds - a.date.seconds);
-        if (sortedHistory.length > 0) {
-            lastRelevantDate = new Date(sortedHistory[0].date.seconds * 1000);
-        }
-    }
-    if (!lastRelevantDate && loan.startDate?.seconds) {
-        lastRelevantDate = new Date(loan.startDate.seconds * 1000);
-    }
+           if (!lastRelevantDate) {
+               console.warn("No se puede calcular el estado: falta fecha de inicio o historial.");
+               return details;
+           }
+           lastRelevantDate.setHours(0, 0, 0, 0);
 
-    if (!lastRelevantDate) {
-        console.warn(`${LOG_PREFIX} No se puede calcular el estado: falta fecha de inicio o historial.`);
-        return details; // No podemos calcular sin una fecha base
-    }
-    lastRelevantDate.setHours(0, 0, 0, 0);
-    console.log(`${LOG_PREFIX} Última fecha relevante (último pago/inicio): ${lastRelevantDate.toLocaleDateString()}`); // <-- LOG AÑADIDO
+           let checkDate = new Date(lastRelevantDate);
+           let accumulatedLateDays = 0;
+           let accumulatedLateFees = 0;
+           const dailyLateRate = (loan.lateFeeRate || 0) / 100;
+           const installmentAmount = loan.originalInstallmentAmount || 0;
+           let installmentsDueCount = 0;
+           let nextDueDateFound = false;
 
-    // --- Lógica Principal de Cálculo ---
-    let checkDate = new Date(lastRelevantDate);
-    let accumulatedLateDays = 0;
-    let accumulatedLateFees = 0;
-    const dailyLateRate = (loan.lateFeeRate || 0) / 100; // Tasa diaria como decimal
-    const installmentAmount = loan.originalInstallmentAmount || 0;
-    let installmentsDueCount = 0; // Cuántas cuotas deberían haberse pagado hasta hoy
-    let nextDueDateFound = false;
+           while (checkDate <= today) {
+               const dayOfWeek = checkDate.getDay();
+               const dayOfMonth = checkDate.getDate();
+               const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
+               const isHoliday = nationalHolidays.includes(formattedDate);
+               const frequency = loan.paymentFrequency || 'daily';
+               let isPaymentDay = false;
 
-    console.log(`${LOG_PREFIX} Iniciando bucle de verificación de fechas desde ${checkDate.toLocaleDateString()} hasta ${today.toLocaleDateString()}`); // <-- LOG AÑADIDO
-    console.log(`${LOG_PREFIX} Parámetros: InstAmount=${installmentAmount}, LateRate=${dailyLateRate}`); // <-- LOG AÑADIDO
+               if (frequency === 'daily') isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
+               else if (frequency === 'weekly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
+               else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
 
-    // Bucle para calcular cuotas vencidas, días de atraso y mora
-    while (checkDate <= today) {
-        const currentCheckDateStr = checkDate.toLocaleDateString(); // <-- LOG AÑADIDO
-        const dayOfWeek = checkDate.getDay();
-        const dayOfMonth = checkDate.getDate();
-        const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
-        const isHoliday = nationalHolidays.includes(formattedDate);
-        const frequency = loan.paymentFrequency || 'daily';
-        let isPaymentDay = false;
+               if (!isHoliday && isPaymentDay) {
+                   if (checkDate < today) {
+                       installmentsDueCount++;
+                       const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
+                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
 
-        if (frequency === 'daily') isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
-        else if (frequency === 'weekly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
-        else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
+                       if (dailyLateRate > 0 && outstandingDueAmount > 0) {
+                           const dailyFee = outstandingDueAmount * dailyLateRate;
+                           accumulatedLateFees += dailyFee;
+                           accumulatedLateDays++;
+                       } else if (outstandingDueAmount > 0) {
+                           accumulatedLateDays++;
+                       }
+                   }
+                   if (checkDate.getTime() === today.getTime()) {
+                       details.amountDueToday = installmentAmount;
+                   }
+                   if (checkDate >= today && !nextDueDateFound) {
+                       details.nextDueDate = new Date(checkDate);
+                       nextDueDateFound = true;
+                   }
+               }
+               checkDate.setDate(checkDate.getDate() + 1);
+           }
 
-        console.log(`${LOG_PREFIX} Verificando ${currentCheckDateStr}: DiaSem=${dayOfWeek}, DiaMes=${dayOfMonth}, Feriado=${isHoliday}, Freq=${frequency}, EsDiaPago=${isPaymentDay}`); // <-- LOG DETALLADO DEL BUCLE
+           details.lateDays = accumulatedLateDays;
+           details.lateFeesAccumulated = accumulatedLateFees;
 
-        // Es un día de pago válido
-        if (!isHoliday && isPaymentDay) {
-             console.log(`${LOG_PREFIX} --> ${currentCheckDateStr} es un día de pago válido.`); // <-- LOG AÑADIDO
+           const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
+           const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
 
-            // Si la fecha es ANTERIOR a hoy, cuenta como cuota vencida
-            if (checkDate < today) {
-                installmentsDueCount++;
-                console.log(`${LOG_PREFIX} ----> Fecha ANTERIOR a hoy. Cuotas debidas acumuladas: ${installmentsDueCount}`); // <-- LOG AÑADIDO
+           // --- INICIO: Lógica de decisión CORREGIDA (Sin Logs) ---
+           if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
+               details.status = 'finished';
+           } else if (accumulatedLateDays > 1) {
+               details.status = 'late';
+           } else if (details.amountDueToday > 0) {
+               const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
+               const expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
+               if (currentTotalPaid < expectedTotalIncludingToday) {
+                   details.status = 'pending';
+               } else {
+                   details.status = 'paid';
+               }
+           } else if (accumulatedLateDays === 1) {
+               details.status = 'pending';
+           } else {
+               details.status = 'paid';
+           }
+           // --- FIN: Lógica de decisión CORREGIDA ---
 
-                // Calcula el monto esperado hasta esta fecha
-                const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                console.log(`${LOG_PREFIX} ----> Esperado pagar hasta ${currentCheckDateStr}: ${expectedPaidByThisDate}`); // <-- LOG AÑADIDO
-
-                // Calcula cuánto falta por pagar de lo vencido
-                const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
-                console.log(`${LOG_PREFIX} ----> Monto vencido pendiente en ${currentCheckDateStr}: ${outstandingDueAmount}`); // <-- LOG AÑADIDO
-
-                // Calcular mora SOLO si la tasa es > 0 y hay monto pendiente
-                if (dailyLateRate > 0 && outstandingDueAmount > 0) {
-                    const dailyFee = outstandingDueAmount * dailyLateRate;
-                    accumulatedLateFees += dailyFee;
-                    accumulatedLateDays++; // Solo contamos días de mora si había saldo pendiente
-                    console.log(`${LOG_PREFIX} ----> Calculada mora diaria: ${dailyFee}. Mora acumulada: ${accumulatedLateFees}. Días de mora/atraso: ${accumulatedLateDays}`); // <-- LOG AÑADIDO
-                } else if (outstandingDueAmount > 0) { // Si no hay tasa de mora, pero SÍ hay monto pendiente
-                     accumulatedLateDays++; // Contamos día de atraso (sin mora)
-                     console.log(`${LOG_PREFIX} ----> Monto pendiente (sin tasa de mora). Días de atraso acumulados: ${accumulatedLateDays}`); // <-- LOG AÑADIDO
-                } else {
-                     console.log(`${LOG_PREFIX} ----> Sin monto pendiente en esta fecha. No se acumula atraso/mora.`); // <-- LOG AÑADIDO
-                }
-            }
-
-            // Si la fecha es HOY, marca cuánto se debe pagar hoy
-            if (checkDate.getTime() === today.getTime()) {
-                details.amountDueToday = installmentAmount;
-                console.log(`${LOG_PREFIX} --> ${currentCheckDateStr} es HOY. Monto debido hoy: ${details.amountDueToday}`); // <-- LOG AÑADIDO
-            }
-
-            // Guarda la próxima fecha de vencimiento
-            if (checkDate >= today && !nextDueDateFound) {
-                details.nextDueDate = new Date(checkDate);
-                nextDueDateFound = true;
-                console.log(`${LOG_PREFIX} --> Próxima fecha de vencimiento encontrada: ${details.nextDueDate.toLocaleDateString()}`); // <-- LOG AÑADIDO
-            }
-        }
-
-        // Avanza al siguiente día
-        checkDate.setDate(checkDate.getDate() + 1);
-    } // Fin del while
-
-    console.log(`${LOG_PREFIX} Bucle finalizado. Resultados intermedios: LateDays=${accumulatedLateDays}, LateFees=${accumulatedLateFees}, AmountDueToday=${details.amountDueToday}, NextDueDate=${details.nextDueDate?.toLocaleDateString()}`); // <-- LOG AÑADIDO
-
-    // --- Determinar Estado Final ---
-        details.lateDays = accumulatedLateDays;
-        details.lateFeesAccumulated = accumulatedLateFees;
-
-        const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
-        // Recalcula cuotas pagas aquí para la decisión final
-        const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
-        console.log(`${LOG_PREFIX} Cálculo final: TotalInst=${totalInstallments}, PaidInstCalc=${paidInstallmentsCalculated}, currentTotalPaid=${currentTotalPaid}, totalLoan=${loan.totalLoan}`); // <-- LOG SIN CAMBIOS
-
-        // --- INICIO: Lógica de decisión CORREGIDA ---
-        if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
-            details.status = 'finished';
-            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'finished' (cuotas completas o monto total pagado).`);
-        } else if (accumulatedLateDays > 1) { // Más de 1 día de atraso sigue siendo 'late'
-            details.status = 'late';
-            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'late' (días de atraso > 1).`);
-        } else if (details.amountDueToday > 0) { // <-- ¡NUEVA CONDICIÓN PRIORITARIA! Si hoy vence una cuota...
-            // Verifica si el monto pagado HASTA AHORA es menor que el esperado INCLUYENDO la cuota de HOY.
-            const expectedInstallmentsIncludingToday = installmentsDueCount + 1; // Sumamos 1 por la cuota de hoy
-            const expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
-            if (currentTotalPaid < expectedTotalIncludingToday) {
-                 details.status = 'pending'; // ...y no se ha cubierto, está pendiente.
-                 console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'pending' (hoy vence y falta cubrir: esperado ${expectedTotalIncludingToday}, pagado ${currentTotalPaid}).`);
-            } else {
-                 details.status = 'paid'; // Si se debe pagar hoy PERO ya está cubierto (pago adelantado?), está 'paid'.
-                 console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'paid' (hoy vence pero ya está cubierto).`);
-            }
-        } else if (accumulatedLateDays === 1) { // 1 día de atraso (venció ayer y no pagó) también es 'pending'
-            details.status = 'pending';
-            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'pending' (exactamente 1 día de atraso).`);
-        } else { // Si no está terminado, ni atrasado, ni vence hoy...
-            details.status = 'paid'; // ...entonces está al día.
-            console.log(`${LOG_PREFIX} Decisión CORREGIDA: Estado final = 'paid' (al día, sin vencimiento hoy).`);
-        }
-        // --- FIN: Lógica de decisión CORREGIDA ---
-
-        console.log(`${LOG_PREFIX} Cálculo finalizado. Retornando detalles:`, JSON.parse(JSON.stringify(details))); // Muestra el resultado final
-        return details;
-    }
+           return details;
+       }
 
 
 
@@ -2301,28 +2234,21 @@ if (settlementsListContainer) {
         }
 
         function updateTodaysRouteList() {
-            console.log("[DIAGNÓSTICO RUTA] Iniciando updateTodaysRouteList..."); // <-- LOG AÑADIDO
-            const allClientsForToday = getAllTodaysClients(); // Obtiene TODOS los del día (sin filtrar por status aún)
-            console.log(`[DIAGNÓSTICO RUTA] Lista PRE-FILTRO recibida con ${allClientsForToday.length} elementos.`); // <-- LOG AÑADIDO
+           const allClientsForToday = getAllTodaysClients(); // Obtiene TODOS los del día
 
-            // Filtra aquí para la RUTA (solo pendientes o atrasados)
-            const clientsForRoute = allClientsForToday.filter(item => {
-                const include = item.loan.status === 'pending' || item.loan.status === 'late';
-                // Log del filtro
-                console.log(`[DIAGNÓSTICO RUTA] Filtrando ${item.client.name} (Préstamo ${item.loanIndex+1}): Status=${item.loan.status}, IncluirEnRuta=${include}`); // <-- LOG DE FILTRO AÑADIDO
-                return include;
-            });
-            console.log(`[DIAGNÓSTICO RUTA] Lista POST-FILTRO (para ruta) tiene ${clientsForRoute.length} elementos.`); // <-- LOG AÑADIDO
+           // Filtra para la RUTA (solo pendientes o atrasados)
+           const clientsForRoute = allClientsForToday.filter(item => {
+               const include = item.loan.status === 'pending' || item.loan.status === 'late';
+               return include;
+           });
 
-            // Optimiza y renderiza la RUTA
-            const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
-            console.log(`[DIAGNÓSTICO RUTA] Ruta optimizada. Renderizando ${optimizedClients.length} tarjetas...`); // <-- LOG AÑADIDO
-            renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
+           // Optimiza y renderiza la RUTA
+           const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
+           renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
 
-            // Actualiza el Dashboard (usa la lista SIN FILTRAR por status, como antes)
-            updateDashboard(allClientsForToday.map(item => item.loan));
-            console.log("[DIAGNÓSTICO RUTA] updateTodaysRouteList finalizado."); // <-- LOG AÑADIDO
-        }
+           // Actualiza el Dashboard (usa la lista SIN FILTRAR por status)
+           updateDashboard(allClientsForToday.map(item => item.loan));
+       }
 
         function updateAllClientsList() {
             const container = document.getElementById('all-clients-list');
