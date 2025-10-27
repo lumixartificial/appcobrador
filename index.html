@@ -3274,7 +3274,7 @@ newUploadedDocuments = await Promise.all(uploadPromises);
                         username: document.getElementById('client-username').value.trim(),
                         password: document.getElementById('client-password').value,
                         documents: finalDocuments,
-                        collectorId: collectorId,
+                        collectorId: currentCollectorUsername,
                         interestRate: interest
                     };
 
@@ -5119,4 +5119,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
