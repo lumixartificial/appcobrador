@@ -1080,7 +1080,7 @@ try {
         }
         
         function updateNotifications() {
-    console.log("[COBRADOR-APP][DIAG] updateNotifications() iniciada. Buscando pagos pendientes..."); // Log existente
+    console.log("[COBRADOR-APP][DIAG] updateNotifications() iniciada. Buscando pagos pendientes...");
     const container = document.getElementById('notifications-list-container');
     const badge = document.getElementById('notification-badge');
     if (!container || !badge) return;
@@ -1088,45 +1088,46 @@ try {
     let notifications = [];
 
     allClients.forEach(client => {
-        // --- Log ANTES de verificar historial ---
-        console.log(`[DIAG-NOTIF] Verificando historial para cliente: ${client.name} (ID: ${client.id})`);
+        console.log(`[DIAG-NOTIF] Verificando préstamos para cliente: ${client.name} (ID: ${client.id})`); // Log cliente
 
-        // Notificaciones de Pagos Pendientes
-        (client.history || []).forEach((payment, index) => { // <-- [CORRECCIÓN] Debe ser client.history, no client.loans[index].history
-            // --- Log DENTRO del bucle de historial ---
-            console.log(`[DIAG-NOTIF] --> Pago[${index}] en cliente ${client.id}: Status='${payment?.status}'`); // Usamos '?.' por si payment es null/undefined
+        // *** INICIO CORRECCIÓN: Iterar sobre los PRÉSTAMOS del cliente ***
+        (client.loans || []).forEach((loan, loanIndex) => {
+            console.log(`[DIAG-NOTIF] -> Préstamo[${loanIndex}]`); // Log préstamo
 
-            if (payment && payment.status === 'pending_verification') { // Verifica 'payment' antes de acceder a status
-                 // --- Log DENTRO del IF ---
-                console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO PAGO PENDIENTE! Añadiendo a la lista.`);
-                notifications.push({
-                    type: 'payment',
-                    date: payment.date,
-                    clientName: client.name,
-                    clientId: client.id,
-                    amount: payment.amount,
-                    historyIndex: index, // Usa el índice del bucle de historial
-                    profilePictureUrl: client.profilePictureUrl
-                });
-            }
-        });
+            // Notificaciones de Pagos Pendientes DENTRO de este préstamo
+            (loan.history || []).forEach((payment, historyIndex) => {
+                console.log(`[DIAG-NOTIF] --> Pago[${historyIndex}] en préstamo ${loanIndex}: Status='${payment?.status}'`); // Log pago
 
-        // Notificaciones de Refinanciamiento (Sin cambios)
-        if (client.refinancerequest && client.refinancerequest.status === 'pending') { // <-- [CORRECCIÓN] Debe ser client.refinanceRequest
-             // --- Log para refinanciamiento (Opcional pero útil) ---
+                if (payment && payment.status === 'pending_verification') {
+                    console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO PAGO PENDIENTE! Añadiendo a la lista.`);
+                    notifications.push({
+                        type: 'payment',
+                        date: payment.date,
+                        clientName: client.name,
+                        clientId: client.id,
+                        amount: payment.amount,
+                        loanIndex: loanIndex, // <-- ¡AÑADIDO! Guardamos el índice del préstamo
+                        historyIndex: historyIndex, // <-- ¡CORREGIDO! Usamos el índice correcto
+                        profilePictureUrl: client.profilePictureUrl
+                    });
+                }
+            }); // Fin forEach history
+        }); // *** FIN CORRECCIÓN: Fin forEach loans ***
+
+        // Notificaciones de Refinanciamiento (sin cambios, asume que está en el cliente principal)
+        if (client.refinanceRequest && client.refinanceRequest.status === 'pending') {
              console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO REFINANCIAMIENTO PENDIENTE! Añadiendo a la lista.`);
             notifications.push({
                 type: 'refinance',
-                date: client.refinancerequest.requestdate, // <-- [CORRECCIÓN] Debe ser client.refinanceRequest.requestDate
-                ...client.refinancerequest,
+                date: client.refinanceRequest.requestDate,
+                ...client.refinanceRequest,
                 clientName: client.name,
                 clientId: client.id,
                 profilePictureUrl: client.profilePictureUrl
             });
         }
-    }); // Fin allClients.forEach
+    }); // Fin forEach allClients
 
-    // --- Log DESPUÉS de buscar en todos los clientes ---
     console.log(`[DIAG-NOTIF] Búsqueda finalizada. Total notificaciones encontradas: ${notifications.length}`);
 
     badge.textContent = notifications.length;
@@ -1137,16 +1138,13 @@ try {
         return;
     }
 
-    // Renderizado (sin cambios lógicos, pero corregido para usar las propiedades correctas)
     container.innerHTML = notifications
         .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
         .map(p => {
             const nameInitial = (p.clientName || 'C').charAt(0).toUpperCase();
             const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
             const photoUrl = p.profilePictureUrl || placeholderUrl;
-
-            let title = '';
-            let subtitle = '';
+            let title = '', subtitle = '';
 
             if (p.type === 'payment') {
                 title = p.clientName;
@@ -1156,37 +1154,43 @@ try {
                 subtitle = `${translations[currentLang].refinanceRequested} ${money(p.amount)}. ${translations[currentLang].reviewRequest}`;
             }
 
+            // *** INICIO CORRECCIÓN: Añadir data-loan-index ***
             return `
-            <div class="notification-card" data-client-id="${p.clientId}" data-history-index="${p.historyIndex}" data-type="${p.type}">
-                <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar"> <!-- Usa clase client-avatar -->
+            <div class="notification-card"
+                 data-client-id="${p.clientId}"
+                 data-loan-index="${p.loanIndex !== undefined ? p.loanIndex : ''}"
+                 data-history-index="${p.historyIndex !== undefined ? p.historyIndex : ''}"
+                 data-type="${p.type}">
+                <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar">
                 <div class="notification-info">
                     <h4 class="notification-title">${title}</h4>
                     <p class="notification-subtitle">${subtitle}</p>
                 </div>
             </div>`;
+            // *** FIN CORRECCIÓN ***
         }).join('');
 
-
-    // Listeners (sin cambios lógicos, pero corregido selector si es necesario)
+    // Listener para las tarjetas de notificación
     container.querySelectorAll('.notification-card').forEach(card => {
         card.addEventListener('click', () => {
             const type = card.dataset.type;
             const clientId = card.dataset.clientId;
             if (type === 'payment') {
+                const loanIndex = parseInt(card.dataset.loanIndex, 10); // <-- ¡AÑADIDO! Leemos el índice del préstamo
                 const historyIndex = parseInt(card.dataset.historyIndex, 10);
-                // Asegúrate de que el índice sea válido antes de llamar
-                if (!isNaN(historyIndex)) {
-                     showVerificationModal(clientId, historyIndex);
+                // *** INICIO CORRECCIÓN: Pasar loanIndex a showVerificationModal ***
+                if (!isNaN(loanIndex) && !isNaN(historyIndex)) {
+                     showVerificationModal(clientId, loanIndex, historyIndex); // <-- ¡AÑADIDO loanIndex!
                 } else {
-                     console.error("Índice de historial inválido en la notificación:", card.dataset.historyIndex);
-                     showToast("Erro ao abrir detalhes da notificação.", true);
+                     console.error("Índices inválidos en notificación:", card.dataset);
+                     showToast("Erro ao abrir detalhes da notificação (índices).", true);
                 }
+                // *** FIN CORRECCIÓN ***
             } else if (type === 'refinance') {
                 showRefinanceModal(clientId);
             }
         });
     });
-    // Aplica idioma y crea íconos si los hubiera
     applyLanguage(currentLang);
     lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
 }
@@ -1356,6 +1360,132 @@ try {
                 }
             });
         }
+
+        // *** INICIO: NUEVA FUNCIÓN showVerificationModal ***
+    // (Pega este bloque completo después de showRefinanceModal o antes de showPaymentDetailModal)
+    function showVerificationModal(clientId, loanIndex, historyIndex) {
+        const verificationModal = document.getElementById('verificationModal');
+        // Asegúrate de tener <div id="verificationModal" class="modal-view"></div> en tu HTML (cerca de la línea 320)
+
+        console.log(`[DIAG-VERIF-MODAL] Iniciando showVerificationModal para clientId='${clientId}', loanIndex=${loanIndex}, historyIndex=${historyIndex}`);
+
+        const client = allClients.find(c => c.id === clientId);
+
+        console.log(`[DIAG-VERIF-MODAL] Buscando cliente con ID: ${clientId}. Encontrado:`, client ? 'Sí' : 'No');
+        let payment = null;
+        if (client) {
+            console.log(`[DIAG-VERIF-MODAL] Préstamos del cliente:`, client.loans ? `Array con ${client.loans.length} elementos` : 'NO o VACÍO');
+            if (client.loans && loanIndex >= 0 && loanIndex < client.loans.length) {
+                const loan = client.loans[loanIndex];
+                console.log(`[DIAG-VERIF-MODAL] Historial del préstamo[${loanIndex}]:`, loan.history ? `Array con ${loan.history.length} elementos` : 'NO o VACÍO');
+                if (loan.history && historyIndex >= 0 && historyIndex < loan.history.length) {
+                    payment = loan.history[historyIndex];
+                    console.log(`[DIAG-VERIF-MODAL] Pago específico [L${loanIndex}, H${historyIndex}]:`, payment ? {...payment} : 'NO ENCONTRADO');
+                } else {
+                     console.error(`[DIAG-VERIF-MODAL] ¡ERROR! Índice de historial (${historyIndex}) fuera de rango para préstamo ${loanIndex} (tamaño ${loan.history?.length || 0}).`);
+                }
+            } else {
+                 console.error(`[DIAG-VERIF-MODAL] ¡ERROR! Índice de préstamo (${loanIndex}) fuera de rango (total ${client.loans?.length || 0}).`);
+            }
+        }
+
+        if (!payment) {
+            console.error(`[DIAG-VERIF-MODAL] Fallo en la validación inicial. No se encontró el pago.`);
+            showToast('Notificação não encontrada ou dados inválidos.', true);
+            verificationModal?.classList.remove('active'); // Intenta cerrar si ya estaba abierto
+            return;
+        }
+
+        verificationModal.innerHTML = `
+            <header class="modal-header">
+                <button id="closeVerificationModal"><i data-lucide="arrow-left"></i></button>
+                <span class="modal-title" data-lang-key="paymentVerification"></span>
+            </header>
+            <div class="modal-content-wrapper container">
+                <div class="kpi-card">
+                    <p class="kpi-title" style="margin-bottom: 5px;">${client.name}</p>
+                    <p class="kpi-title" data-lang-key="sentAmount"></p>
+                    <p class="kpi-value green">${money(payment.amount)}</p>
+                </div>
+                <div class="kpi-card" style="margin-top: 15px;">
+                    <h3 class="kpi-title" data-lang-key="paymentReceipt"></h3>
+                    <img id="verification-receipt-img" src="${payment.receiptUrl}" alt="Comprovante" style="width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-danger" id="reject-payment-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
+                <button class="btn-primary" id="approve-payment-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
+            </div>`;
+
+        history.pushState({ modal: 'verificationModal' }, 'Verification Modal', '#verification');
+        verificationModal.classList.add('active');
+        lucide.createIcons({ nodes: verificationModal.querySelectorAll('[data-lucide]') });
+        applyLanguage(currentLang);
+
+        verificationModal.querySelector('#closeVerificationModal').addEventListener('click', () => window.history.back());
+
+        verificationModal.querySelector('#approve-payment-btn').addEventListener('click', async () => {
+            const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
+            try {
+                const currentClientData = allClients.find(c => c.id === clientId);
+                if (!currentClientData || !currentClientData.loans || !currentClientData.loans[loanIndex] || !currentClientData.loans[loanIndex].history || !currentClientData.loans[loanIndex].history[historyIndex]) throw new Error("Loan/History not found for approval");
+
+                const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
+                updatedLoans[loanIndex].history[historyIndex].status = 'approved';
+
+                const currentLoan = updatedLoans[loanIndex];
+                const newTotalPaid = (currentLoan.history || [])
+                        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+                        .reduce((sum, h) => sum + (h.amount || 0), 0);
+                const installmentValue = currentLoan.originalInstallmentAmount || 0;
+                const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
+                const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
+                const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
+
+                currentLoan.paid = newTotalPaid;
+                currentLoan.paymentBalance = newBalance;
+                currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
+
+                await updateDoc(clientRef, { loans: updatedLoans });
+                window.history.back();
+                showToast(translations[currentLang].paymentApproved);
+
+                const notifTitle = translations[currentLang].paymentApprovedClientTitle;
+                const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', money(payment.amount));
+                sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-circle');
+
+            } catch(error) {
+                 console.error("Error approving payment:", error);
+                 showToast('Erro ao aprovar pagamento.', true);
+            }
+        });
+
+        verificationModal.querySelector('#reject-payment-btn').addEventListener('click', async () => {
+             const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
+            try {
+                const currentClientData = allClients.find(c => c.id === clientId);
+                 if (!currentClientData || !currentClientData.loans || !currentClientData.loans[loanIndex] || !currentClientData.loans[loanIndex].history || !currentClientData.loans[loanIndex].history[historyIndex]) throw new Error("Loan/History not found for rejection");
+
+                const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
+                updatedLoans[loanIndex].history[historyIndex].status = 'rejected';
+
+                await updateDoc(clientRef, { loans: updatedLoans });
+                window.history.back();
+                showToast(translations[currentLang].paymentRejected);
+
+                 const notifTitle = translations[currentLang].paymentRejectedClientTitle;
+                 const notifBody = translations[currentLang].paymentRejectedClientBody;
+                 sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_rejected', 'x-circle');
+
+            } catch(error) {
+                 console.error("Error rejecting payment:", error);
+                 showToast('Erro ao rejeitar pagamento.', true);
+            }
+        });
+    }
+    // *** FIN: NUEVA FUNCIÓN showVerificationModal ***
+
+
 
         function showPaymentDetailModal(clientId, historyIndex) {
             const modal = document.getElementById('paymentDetailModal');
@@ -1591,68 +1721,7 @@ try {
             }
         }
 
-        function showVerificationModal(clientId, historyIndex) {
-    const verificationModal = document.getElementById('verificationModal'); // Reutiliza el ID existente si ya lo tienes
-
-    console.log(`[DIAG-VERIF-MODAL] Iniciando showVerificationModal para clientId='${clientId}', historyIndex=${historyIndex}`); // Log inicial
-
-    const client = allClients.find(c => c.id === clientId);
-
-    // --- INICIO: Logs de Diagnóstico DETALLADOS ---
-    console.log(`[DIAG-VERIF-MODAL] Buscando cliente con ID: ${clientId}. Encontrado:`, client ? 'Sí' : 'No');
-    if (client) {
-        console.log(`[DIAG-VERIF-MODAL] Historial del cliente encontrado:`, client.history ? `Array con ${client.history.length} elementos` : 'NO o VACÍO');
-        if (client.history && historyIndex >= 0 && historyIndex < client.history.length) {
-            console.log(`[DIAG-VERIF-MODAL] Pago específico en índice ${historyIndex}:`, client.history[historyIndex]);
-        } else {
-            console.error(`[DIAG-VERIF-MODAL] ¡ERROR! Índice de historial (${historyIndex}) fuera de rango para el historial de tamaño ${client.history?.length || 0}.`);
-        }
-    }
-    // --- FIN: Logs de Diagnóstico DETALLADOS ---
-
-    // Validación MEJORADA: verifica cliente Y el índice del historial
-    if (!client || !client.history || historyIndex < 0 || historyIndex >= client.history.length || !client.history[historyIndex]) {
-        console.error(`[DIAG-VERIF-MODAL] Fallo en la validación inicial. Client: ${!!client}, History: ${!!client?.history}, Index válido: ${historyIndex >= 0 && historyIndex < (client?.history?.length || 0)}`);
-        showToast('Notificação não encontrada ou dados inválidos.', true); // Mensaje ligeramente modificado
-        // Considera cerrar el modal si ya estaba abierto o evitar abrirlo
-        verificationModal?.classList.remove('active'); // Intenta cerrar si existe
-        return; // Detiene la ejecución
-    }
-
-    const payment = client.history[historyIndex]; // Ahora sabemos que existe
-
-    // El resto del código HTML y listeners permanece igual...
-    verificationModal.innerHTML = `
-        <header class="modal-header">
-            <button id="closeVerificationModal"><i data-lucide="arrow-left"></i></button>
-            <span class="modal-title" data-lang-key="paymentVerification"></span>
-        </header>
-        <div class="modal-content-wrapper container">
-            <div class="kpi-card">
-                <p class="kpi-title" style="margin-bottom: 5px;">${client.name}</p>
-                <p class="kpi-title" data-lang-key="sentAmount"></p>
-                <p class="kpi-value green">${money(payment.amount)}</p>
-            </div>
-            <div class="kpi-card" style="margin-top: 15px;">
-                <h3 class="kpi-title" data-lang-key="paymentReceipt"></h3>
-                <img id="verification-receipt-img" src="${payment.receiptUrl}" alt="Comprovante">
-            </div>
-        </div>
-        <div class="action-buttons">
-            <button class="btn-danger" id="reject-payment-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
-            <button class="btn-primary" id="approve-payment-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
-        </div>`;
-
-    history.pushState({ modal: 'verificationModal' }, 'Verification Modal', '#verification');
-    verificationModal.classList.add('active');
-    lucide.createIcons({ nodes: verificationModal.querySelectorAll('[data-lucide]') });
-    applyLanguage(currentLang);
-
-    // Listeners (sin cambios lógicos)
-    document.getElementById('closeVerificationModal').addEventListener('click', () => window.history.back());
-    document.getElementById('approve-payment-btn').addEventListener('click', async () => { /* ... código aprobación ... */ });
-    document.getElementById('reject-payment-btn').addEventListener('click', async () => { /* ... código rechazo ... */ });
-}
+        
         
         function applyLanguage(lang) {
             currentLang = lang;
@@ -2625,36 +2694,40 @@ if (settlementsListContainer) {
     }
 
     // Listener para ver detalles/verificación del pago (usa índice original del historial)
+            
+
             clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
-                item.addEventListener('click', (e) => {
-                    const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
-                    // Encuentra el pago específico en los datos actuales del cliente y préstamo
-                    const clickedPayment = client.loans[currentLoanIndex]?.history[historyIndex];
+    item.addEventListener('click', (e) => {
+        const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
+        // *** INICIO CORRECCIÓN: Usar currentLoanIndex ***
+        // 'currentLoanIndex' ya está definido en el scope de showClientDetails
+        const clickedPayment = client.loans[currentLoanIndex]?.history[historyIndex];
+        // *** FIN CORRECCIÓN ***
 
-                    if (!clickedPayment) {
-                         console.error("No se pudo encontrar el pago clickeado en los datos:", {clientId, currentLoanIndex, historyIndex});
-                         showToast('Erro ao obter detalhes do pagamento.', true);
-                         return;
-                    }
+        if (!clickedPayment) {
+             console.error("No se pudo encontrar el pago clickeado en los datos:", {clientId, currentLoanIndex, historyIndex});
+             showToast('Erro ao obter detalhes do pagamento.', true);
+             return;
+        }
 
-                    // *** LÓGICA CORREGIDA ***
-                    // Si el estado es 'pending_verification', muestra el modal de verificación.
-                    if (clickedPayment.status === 'pending_verification') {
-                        console.log(`Abriendo modal de VERIFICACIÓN para cliente ${clientId}, historial ${historyIndex}`);
-                        showVerificationModal(clientId, historyIndex);
-                    } 
-                    // Si es 'postponed', no hagas nada (ya está puesto `cursor: default` en el HTML).
-                    else if (clickedPayment.status === 'postponed') {
-                         console.log("Clic en pago aplazado, ninguna acción.");
-                         return; 
-                    }
-                    // Para cualquier otro estado (approved, rejected, etc.), muestra el modal de detalles.
-                    else {
-                        console.log(`Abriendo modal de DETALLES para cliente ${clientId}, historial ${historyIndex}`);
-                        showPaymentDetailModal(clientId, historyIndex); // No necesita loanIndex aquí
-                    }
-                });
-            });
+        if (clickedPayment.status === 'pending_verification') {
+            console.log(`Abriendo modal de VERIFICACIÓN para cliente ${clientId}, préstamo ${currentLoanIndex}, historial ${historyIndex}`);
+            // *** INICIO CORRECCIÓN: Pasar currentLoanIndex ***
+            showVerificationModal(clientId, currentLoanIndex, historyIndex);
+            // *** FIN CORRECCIÓN ***
+        }
+        else if (clickedPayment.status === 'postponed') {
+             console.log("Clic en pago aplazado, ninguna acción.");
+             return;
+        }
+        else {
+            console.log(`Abriendo modal de DETALLES para cliente ${clientId}, historial ${historyIndex}`);
+            showPaymentDetailModal(clientId, historyIndex); // Este modal no necesita loanIndex
+        }
+    });
+});
+
+
 
 } // Fin showClientDetails
 
