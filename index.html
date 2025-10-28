@@ -1364,15 +1364,18 @@ try {
             });
         }
 
-        function showPaymentDetailModal(clientId, historyIndex) {
+        function showPaymentDetailModal(clientId, loanIndex, historyIndex) {
             const modal = document.getElementById('paymentDetailModal');
             const client = allClients.find(c => c.id === clientId);
-            if (!client || !client.history || !client.history[historyIndex]) {
+            
+            const loan = client?.loans ? client.loans[loanIndex] : null; 
+            const payment = loan?.history ? loan.history[historyIndex] : null; // Buscamos en el historial del préstamo
+
+            if (!client || !loan || !payment) { // Verifica cliente, préstamo y pago
+                console.error("Error al buscar detalle de pago:", { clientId, loanIndex, historyIndex, client, loan, payment });
                 showToast('Detalhe do pagamento não encontrado.', true);
                 return;
             }
-
-            const payment = client.history[historyIndex];
             
             let dateStr = 'N/A';
             let timeStr = 'N/A';
@@ -2620,7 +2623,6 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
             clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
-                    // Encuentra el pago específico en los datos actuales del cliente y préstamo
                     const clickedPayment = client.loans[currentLoanIndex]?.history[historyIndex];
 
                     if (!clickedPayment) {
@@ -2629,22 +2631,19 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
                          return;
                     }
 
-                    // *** LÓGICA CORREGIDA ***
-                    // Si el estado es 'pending_verification', muestra el modal de verificación.
                     if (clickedPayment.status === 'pending_verification') {
                         console.log(`Abriendo modal de VERIFICACIÓN para cliente ${clientId}, préstamo ${currentLoanIndex}, historial ${historyIndex}`);
                         showVerificationModal(clientId, historyIndex, currentLoanIndex); // <-- ¡PASAMOS currentLoanIndex!
                     }
 
-                    // Si es 'postponed', no hagas nada (ya está puesto `cursor: default` en el HTML).
                     else if (clickedPayment.status === 'postponed') {
                          console.log("Clic en pago aplazado, ninguna acción.");
                          return; 
                     }
-                    // Para cualquier otro estado (approved, rejected, etc.), muestra el modal de detalles.
+                    
                     else {
-                        console.log(`Abriendo modal de DETALLES para cliente ${clientId}, historial ${historyIndex}`);
-                        showPaymentDetailModal(clientId, historyIndex); // No necesita loanIndex aquí
+                        console.log(`Abriendo modal de DETALLES para cliente ${clientId}, préstamo ${currentLoanIndex}, historial ${historyIndex}`);
+                        showPaymentDetailModal(clientId, currentLoanIndex, historyIndex); // <-- PASAMOS currentLoanIndex
                     }
                 });
             });
@@ -5463,3 +5462,4 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
