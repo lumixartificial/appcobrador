@@ -1636,8 +1636,18 @@ try {
 
         function updateRouteProgress() {
             const todaysTotalClientsList = getAllTodaysClients();
-            const totalClients = todaysTotalClientsList.length;
-            const paidClients = todaysTotalClientsList.filter(c => c.loan.status === 'paid').length;
+           // --- INICIO: CORRECCIÓN PARA CONTAR CLIENTES ÚNICOS ---
+            // 1. Contar clientes ÚNICOS totales para hoy
+            const uniqueClientIds = new Set(todaysTotalClientsList.map(item => item.client.id));
+            const totalClients = uniqueClientIds.size; // Usa el tamaño del Set
+
+            // 2. Contar clientes ÚNICOS que ya pagaron (al menos un préstamo) hoy
+            // Filtra los ITEMS donde el préstamo está 'paid'
+            const paidLoanItems = todaysTotalClientsList.filter(item => item.loan.status === 'paid');
+            // Luego, obtiene los IDs de cliente ÚNICOS de esa lista filtrada
+            const uniquePaidClientIds = new Set(paidLoanItems.map(item => item.client.id));
+            const paidClients = uniquePaidClientIds.size; // Usa el tamaño del Set de pagados
+            // --- FIN: CORRECCIÓN ---
 
             const progressPercentage = totalClients > 0 ? (paidClients / totalClients) * 100 : 0;
 
@@ -5453,4 +5463,5 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
 
