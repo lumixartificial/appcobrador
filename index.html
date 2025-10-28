@@ -1094,23 +1094,25 @@ try {
         console.log(`[DIAG-NOTIF] Verificando historial para cliente: ${client.name} (ID: ${client.id})`);
 
         // Notificaciones de Pagos Pendientes
-        (client.history || []).forEach((payment, index) => { // <-- [CORRECCIÓN] Debe ser client.history, no client.loans[index].history
-            // --- Log DENTRO del bucle de historial ---
-            console.log(`[DIAG-NOTIF] --> Pago[${index}] en cliente ${client.id}: Status='${payment?.status}'`); // Usamos '?.' por si payment es null/undefined
-
-            if (payment && payment.status === 'pending_verification') { // Verifica 'payment' antes de acceder a status
-                 // --- Log DENTRO del IF ---
-                console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO PAGO PENDIENTE! Añadiendo a la lista.`);
-                notifications.push({
-                    type: 'payment',
-                    date: payment.date,
-                    clientName: client.name,
-                    clientId: client.id,
-                    amount: payment.amount,
-                    historyIndex: index, // Usa el índice del bucle de historial
-                    profilePictureUrl: client.profilePictureUrl
-                });
-            }
+        (client.loans || []).forEach((loan, loanIndex) => { 
+            // Luego iteramos sobre el historial de ESE préstamo
+            (loan.history || []).forEach((payment, historyIndex) => {
+                console.log(`[DIAG-NOTIF] --> Verificando Cliente ${client.id}, Préstamo[${loanIndex}], Pago[${historyIndex}]: Status='${payment?.status}'`);
+                
+                if (payment && payment.status === 'pending_verification') {
+                    console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO PAGO PENDIENTE! Añadiendo a la lista.`);
+                    notifications.push({
+                        type: 'payment',
+                        date: payment.date,
+                        clientName: client.name,
+                        clientId: client.id,
+                        amount: payment.amount,
+                        loanIndex: loanIndex, // <-- ¡GUARDAMOS EL loanIndex!
+                        historyIndex: historyIndex, // <-- ¡GUARDAMOS EL historyIndex!
+                        profilePictureUrl: client.profilePictureUrl
+                    });
+                }
+            });
         });
 
         // Notificaciones de Refinanciamiento (Sin cambios)
@@ -1159,8 +1161,8 @@ try {
             }
 
             return `
-            <div class="notification-card" data-client-id="${p.clientId}" data-history-index="${p.historyIndex}" data-type="${p.type}">
-                <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar"> <!-- Usa clase client-avatar -->
+            <div class="notification-card" data-client-id="${p.clientId}" data-loan-index="${p.loanIndex}" data-history-index="${p.historyIndex}" data-type="${p.type}">
+        <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar"> <!-- Usa clase client-avatar -->
                 <div class="notification-info">
                     <h4 class="notification-title">${title}</h4>
                     <p class="notification-subtitle">${subtitle}</p>
@@ -1171,16 +1173,18 @@ try {
 
     // Listeners (sin cambios lógicos, pero corregido selector si es necesario)
     container.querySelectorAll('.notification-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const type = card.dataset.type;
-            const clientId = card.dataset.clientId;
-            if (type === 'payment') {
-                const historyIndex = parseInt(card.dataset.historyIndex, 10);
-                // Asegúrate de que el índice sea válido antes de llamar
-                if (!isNaN(historyIndex)) {
-                     showVerificationModal(clientId, historyIndex);
-                } else {
-                     console.error("Índice de historial inválido en la notificación:", card.dataset.historyIndex);
+                card.addEventListener('click', () => {
+    const type = card.dataset.type;
+    const clientId = card.dataset.clientId;
+    if (type === 'payment') {
+        const historyIndex = parseInt(card.dataset.historyIndex, 10);
+        const loanIndex = parseInt(card.dataset.loanIndex, 10); // <-- OBTENEMOS EL loanIndex
+        
+        // Asegúrate de que AMBOS índices sean válidos
+        if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
+             showVerificationModal(clientId, historyIndex, loanIndex); // <-- PASAMOS AMBOS
+        } else {
+             console.error("Índices inválidos en la notificación:", card.dataset);
                      showToast("Erro ao abrir detalhes da notificação.", true);
                 }
             } else if (type === 'refinance') {
@@ -1605,11 +1609,19 @@ try {
             const searchInput = document.getElementById('client-search-input');
             if(searchInput) searchInput.placeholder = translations[lang].searchClient;
             
+            // --- INICIO: CORRECCIÓN DEL BUCLE INFINITO ---
+            // Estas líneas estaban causando que CADA función de actualización
+            // llamara a applyLanguage, que a su vez llamaba a CADA función
+            // de actualización de nuevo, bloqueando la app.
+            
+            /*
             updateTodaysRouteList();
             updateAllClientsList();
             updateExpensesView();
             updateProfileView();
             updateNotifications();
+            */
+            // --- FIN: CORRECCIÓN DEL BUCLE INFINITO ---
         }
 
         function updateRouteProgress() {
@@ -1888,7 +1900,17 @@ if (settlementsListContainer) {
 
     // Ahora itera sobre el mapa de clientes únicos
     clientsMap.forEach(({ client, loans }) => { 
-        // Encuentra el préstamo más relevante para mostrar (Late > Pending > Paid > Finished)
+        
+        // --- INICIO: OPTIMIZACIÓN "ON-DEMAND" ---
+        // Calculamos los detalles SÓLO para los préstamos de ESTE cliente
+        loans.forEach(l => {
+            const details = calculateLoanDetails(l);
+            l.status = details.status; // Asignamos el status calculado
+            l.lateDays = details.lateDays; // Guardamos lateDays para usarlo después
+        });
+        // --- FIN: OPTIMIZACIÓN "ON-DEMAND" ---
+
+        // Ahora la lógica original de selección funciona
         let displayLoan = loans.find(l => l.status === 'late') || 
                           loans.find(l => l.status === 'pending') || 
                           loans.find(l => l.status === 'paid') || 
@@ -1908,8 +1930,12 @@ if (settlementsListContainer) {
         const statusClass = `status-${displayLoan.status}`;
         const statusText = (translations[currentLang] && translations[currentLang][displayLoan.status]) || displayLoan.status;
 
-        const loanDetails = calculateLoanDetails(displayLoan); 
-        const lateDays = loanDetails.lateDays;         
+        
+        // --- INICIO: CORRECCIÓN AL ERROR 'loanDetails is not defined' ---
+        // La variable 'loanDetails' fue eliminada en la optimización anterior.
+        // Ahora usamos 'displayLoan.lateDays', que ya fue calculado y guardado.
+        const lateDays = displayLoan.lateDays || 0;
+                
         const reputationScore = Math.max(0, 10 - lateDays);
         let repClass = 'rep-bad';
         if (reputationScore === 10) repClass = 'rep-perfect';
@@ -2590,9 +2616,10 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
                     // *** LÓGICA CORREGIDA ***
                     // Si el estado es 'pending_verification', muestra el modal de verificación.
                     if (clickedPayment.status === 'pending_verification') {
-                        console.log(`Abriendo modal de VERIFICACIÓN para cliente ${clientId}, historial ${historyIndex}`);
-                        showVerificationModal(clientId, historyIndex);
-                    } 
+                        console.log(`Abriendo modal de VERIFICACIÓN para cliente ${clientId}, préstamo ${currentLoanIndex}, historial ${historyIndex}`);
+                        showVerificationModal(clientId, historyIndex, currentLoanIndex); // <-- ¡PASAMOS currentLoanIndex!
+                    }
+
                     // Si es 'postponed', no hagas nada (ya está puesto `cursor: default` en el HTML).
                     else if (clickedPayment.status === 'postponed') {
                          console.log("Clic en pago aplazado, ninguna acción.");
@@ -2852,14 +2879,25 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
                     // --- FIN CORRECCIÓN LÓGICA FINANCIERA ---
 
 
-                    // Guarda el array COMPLETO 'updatedLoans' en Firestore
                     await updateDoc(clientRef, {
                         loans: updatedLoans // Guarda todo el array modificado
                     });
 
-                    window.history.back(); // Cierra el modal de pago
-                    // El modal de detalles se actualiza automáticamente por el onSnapshot
+                    // --- INICIO: Modificación para refresco inmediato ---
+                    // 1. Mostramos el Toast
                     showToast('Pagamento registrado com sucesso!');
+                    
+                    // 2. Cerramos el modal de pago
+                    window.history.back(); 
+                    console.log("[DIAG-PAYMENT] Modal de pago cerrado.");
+
+                    // 3. Forzamos el redibujado de la vista de detalles del cliente DESPUÉS de cerrar
+                    setTimeout(() => {
+                        console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanIndex}) después de registrar pago.`);
+                        showClientDetails(clientId, loanIndex);
+                    }, 50); // 50ms de espera
+                    // --- FIN: Modificación ---
+
 
                 } catch(error) {
                     console.error("Error updating document: ", error);
@@ -2877,7 +2915,7 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
 
         // Pega este bloque completo dentro de <script type="module">
 
-function showVerificationModal(clientId, historyIndex) {
+function showVerificationModal(clientId, historyIndex, loanIndex) {
     // [NUEVA FUNCIÓN] Muestra el modal para aprobar/rechazar pagos enviados por el cliente.
     console.log(`[DIAG-VERIF] showVerificationModal llamada con clientId=${clientId}, historyIndex=${historyIndex}`);
     const modalOverlay = document.getElementById('reportOptionsModal'); // Reutilizamos el overlay genérico
@@ -2895,14 +2933,18 @@ function showVerificationModal(clientId, historyIndex) {
     // PERO si el cliente tiene múltiples préstamos ACTIVOS, necesitaremos una lógica
     // más robusta para determinar a cuál pertenece el historial.
     // Por ahora, buscamos el primer préstamo ACTIVO o el ÚLTIMO si no hay activos.
-    let loanIndex = (client.loans || []).findIndex(l => l.status !== 'finished'); // Índice del primer préstamo activo
-    if (loanIndex === -1 && client.loans?.length > 0) {
-        loanIndex = client.loans.length - 1; // Si no hay activos, usa el último
-    }
-    if (loanIndex === -1) {
-         console.error(`[DIAG-VERIF] Error: No se encontraron préstamos para el cliente ${clientId}`);
-         showToast('Erro: Empréstimo não encontrado para este cliente.', true);
-         return;
+    if (loanIndex === undefined || loanIndex === null || !client.loans || !client.loans[loanIndex]) {
+                 console.error(`[DIAG-VERIF] Error: loanIndex ('${loanIndex}') es inválido o no se encontró el préstamo para el cliente ${clientId}`);
+         
+         // Fallback: Si no se pasó (ej. desde notificaciones antiguas), intentamos adivinar
+         const guessedIndex = (client.loans || []).findIndex(l => l.status !== 'finished');
+         loanIndex = guessedIndex !== -1 ? guessedIndex : (client.loans?.length ? 0 : -1);
+         
+         if (loanIndex === -1) {
+            showToast('Erro: Índice de empréstimo inválido.', true);
+            return;
+         }
+         console.warn(`[DIAG-VERIF] ¡ADVERTENCIA! loanIndex no fue proporcionado. Se usó el índice adivinado: ${loanIndex}`);
     }
     console.log(`[DIAG-VERIF] Usando loanIndex=${loanIndex}`);
 
@@ -2994,16 +3036,16 @@ function showVerificationModal(clientId, historyIndex) {
 
             
             await updateDoc(clientRef, { loans: updatedLoans });
-console.log("[DIAG-PAYMENT] Firestore actualizado con nuevo pago.");
+            console.log("[DIAG-VERIF] Firestore actualizado con rechazo."); // Log corregido
 
-// --- INICIO: NUEVA LÓGICA SIMPLIFICADA ---
-// 1. Mostrar Toast de éxito
-showToast('Pagamento registrado com sucesso!');
+            // --- INICIO: LÓGICA CORREGIDA ---
+            // 1. Mostrar Toast correcto
+            showToast(translations[currentLang].paymentRejected); // <-- Texto corregido
 
-// 2. Cerrar el modal actual (pago)
-window.history.back();
-console.log("[DIAG-PAYMENT] Modal de pago cerrado. El listener onSnapshot se encargará de actualizar la vista.");
-// --- FIN: NUEVA LÓGICA SIMPLIFICADA ---
+            // 2. Cerrar el modal
+            window.history.back();
+            console.log("[DIAG-VERIF] Modal de rechazo cerrado. onSnapshot actualizará la UI.");
+            // --- FIN: LÓGICA CORREGIDA ---
 
 
 
@@ -3074,64 +3116,19 @@ console.log("[DIAG-VERIF] Notificación de rechazo enviada al cliente.");
 
             
             await updateDoc(clientRef, { loans: updatedLoans });
-console.log("[DIAG-VERIF] Firestore actualizado con aprobación.");
+            console.log("[DIAG-VERIF] Firestore actualizado con aprobación.");
 
-// --- INICIO: NUEVA SOLUCIÓN (Loading -> getDoc -> Update Local -> Close -> Redraw) ---
-// 1. Mostrar "Actualizando..." en el modal
-const modalContent = modalOverlay.querySelector('.modal-content');
-if (modalContent) {
-    modalContent.innerHTML = `
-        <div style="padding: 40px 20px; text-align: center;">
-            <i data-lucide="loader-circle" style="animation: spin 1s linear infinite; width: 48px; height: 48px; color: var(--accent-blue);"></i>
-            <p style="margin-top: 15px; color: var(--text-secondary);">Atualizando dados...</p>
-        </div>`;
-    lucide.createIcons({ nodes: modalContent.querySelectorAll('[data-lucide]') });
-}
+            // --- INICIO: LÓGICA CORREGIDA Y OPTIMIZADA ---
+            // Eliminamos toda la lógica de 'getDoc' y la actualización manual.
+            // El onSnapshot (que ahora es rápido) se encargará de todo.
+            
+            // 1. Mostrar Toast de éxito
+            showToast(translations[currentLang].paymentApproved);
 
-try {
-    // 2. Obtener datos actualizados
-    console.log(`[DIAG-VERIF] Obteniendo datos actualizados del cliente ${clientId} con getDoc...`);
-    const updatedClientSnap = await getDoc(clientRef); // Lee el documento actualizado
-
-    if (updatedClientSnap.exists()) {
-        console.log("[DIAG-VERIF] Datos actualizados obtenidos.");
-        const updatedClientData = { id: updatedClientSnap.id, ...updatedClientSnap.data() };
-
-        // 3. Actualizar la copia local en allClients
-        const clientIndexInLocalArray = allClients.findIndex(c => c.id === clientId);
-        if (clientIndexInLocalArray !== -1) {
-            allClients[clientIndexInLocalArray] = updatedClientData;
-            console.log("[DIAG-VERIF] Array local 'allClients' actualizado.");
-        } else {
-             console.warn("[DIAG-VERIF] No se encontró el cliente en 'allClients' para actualizar localmente. Añadiendo...");
-             allClients.push(updatedClientData);
-        }
-
-        // 4. Mostrar Toast de éxito
-        showToast(translations[currentLang].paymentApproved);
-
-        // 5. Cerrar el modal actual (verificación) PRIMERO
-        window.history.back();
-        console.log("[DIAG-VERIF] Modal de verificación cerrado.");
-
-        // 6. AHORA, redibujar la vista de detalles del cliente
-        // Espera un pequeño instante para asegurar que el modal se haya ido
-        setTimeout(() => {
-             console.log(`[DIAG-VERIF] Llamando a showClientDetails(${clientId}, ${loanIndex}) para redibujar después de cerrar modal.`);
-             showClientDetails(clientId, loanIndex);
-        }, 50); // 50 milisegundos de espera
-
-    } else {
-        console.error(`[DIAG-VERIF] Error GRAVE: El documento del cliente ${clientId} no existe DESPUÉS de actualizar.`);
-        showToast('Erro crítico ao recarregar dados do cliente.', true);
-        window.history.back(); // Cierra el modal como fallback
-    }
-} catch (getDocError) {
-     console.error("[DIAG-VERIF] Error al ejecutar getDoc:", getDocError);
-     showToast('Falha ao buscar dados atualizados do cliente.', true);
-     window.history.back(); // Cierra el modal como fallback
-}
-// --- FIN: NUEVA SOLUCIÓN ---
+            // 2. Cerrar el modal
+            window.history.back();
+            console.log("[DIAG-VERIF] Modal de aprobación cerrado. onSnapshot actualizará la UI.");
+            // --- FIN: LÓGICA CORREGIDA ---
 
 
 
@@ -4812,7 +4809,7 @@ getDocs(collectorQuery).then(snapshot => {
                 allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 allClients.forEach(client => {
-                    // Capa de compatibilidad
+                    // Capa de compatibilidad (ESTO SE QUEDA)
                     if (!client.loans && client.totalLoan) {
                         client.loans = [{
                             totalLoan: client.totalLoan,
@@ -4833,14 +4830,19 @@ getDocs(collectorQuery).then(snapshot => {
                         client.loans = [];
                     }
 
+                    // --- INICIO: OPTIMIZACIÓN CRÍTICA ---
+                    // Esta sección estaba recalculando CADA préstamo de CADA cliente
+                    // en CADA actualización, causando el bloqueo. La comentamos.
+                    /*
                     client.loans.forEach(loan => {
                         const loanDetails = calculateLoanDetails(loan);
                         loan.status = loanDetails.status;
-                        loan.lateFeesAccumulated = loanDetails.lateFeesAccumulated; // Guardamos la mora calculada
-                        // Podríamos guardar también loan.lateDays = loanDetails.lateDays si quisiéramos mostrarlo
+                        loan.lateFeesAccumulated = loanDetails.lateFeesAccumulated; 
                     });
+                    */
+                    // --- FIN: OPTIMIZACIÓN CRÍTICA ---
                 });
-
+            
                 updateTodaysRouteList();
                 updateRouteProgress();
                 updateAllClientsList();
@@ -5493,4 +5495,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
