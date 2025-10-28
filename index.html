@@ -2424,6 +2424,14 @@ if (settlementsListContainer) {
     }
 
     const loanDetails = calculateLoanDetails(loan); // Llama a la nueva función
+
+    // --- INICIO: LÓGICA AÑADIDA PARA EL ESTADO ---
+    const currentStatus = loanDetails.status; // Usamos el estado calculado
+    const statusClass = `status-${currentStatus}`;
+    const statusText = (translations[currentLang] && translations[currentLang][currentStatus]) || currentStatus;
+    // --- FIN: LÓGICA AÑADIDA ---
+
+
     const lateDays = loanDetails.lateDays;         // Obtiene los días de atraso del resultado
     const score = Math.max(0, 10 - lateDays);
     let reputationStatusKey = 'reputationBad';
@@ -2476,6 +2484,15 @@ if (settlementsListContainer) {
                     <div class="progress-text" id="client-detail-progress-text"></div>
                 </div>
             </div>
+
+            <div class="kpi-card" style="margin-bottom: 20px; text-align: center;">
+                <h3 class="kpi-title" style="justify-content: center;">Estado do Préstamo ${currentLoanIndex + 1}</h3>
+                <span class="payment-status ${statusClass}" style="font-size: 1.2em; font-weight: 600; padding: 8px 20px;">
+                    ${statusText}
+                </span>
+            </div>
+
+
             <section class="kpi-grid-profile" style="margin-bottom: 30px;">
                 <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
                 <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
@@ -5477,6 +5494,7 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
 
 
 
