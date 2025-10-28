@@ -742,10 +742,7 @@ try {
                 console.log(`${LOG_PREFIX} VAPID Key encontrada y es válida.`);
         
                 console.log(`${LOG_PREFIX} Obteniendo token de FCM... (Este paso puede tardar)`);
-                const currentToken = await getToken(messaging, { 
-                    vapidKey: FCM_VAPID_KEY,
-                    serviceWorkerRegistration: registration // <-- AÑADIDO
-                });
+                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swRegistration });
         
                 if (currentToken) {
                     console.log(`${LOG_PREFIX} ¡TOKEN OBTENIDO CON ÉXITO!: ${currentToken.substring(0, 30)}...`);
