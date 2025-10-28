@@ -746,7 +746,7 @@ try {
         
                 if (currentToken) {
                     console.log(`${LOG_PREFIX} ¡TOKEN OBTENIDO CON ÉXITO!: ${currentToken.substring(0, 30)}...`);
-                    const collectorRef = doc(db, 'collectors', collectorId);
+                    const collectorRef = doc(db, 'collectors', collectorUsername);
                     console.log(`${LOG_PREFIX} Intentando guardar el token en Firestore...`);
                     await updateDoc(collectorRef, { fcmTokens: arrayUnion(currentToken) });
                     console.log(`${LOG_PREFIX} ¡ÉXITO! Token guardado/confirmado en Firestore.`);
@@ -808,6 +808,7 @@ try {
         let currentCollectorUid = null;  // Guarda o ID de autenticação (Auth UID) do cobrador
         let currentCollectorUsername = null; // Guarda o 'username' (ID de Firestore) do cobrador
         let unsubscribeNotifications = null;
+        let internalNotifications = [];
 
         
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
@@ -1083,117 +1084,134 @@ try {
         }
         
         function updateNotifications() {
-    console.log("[COBRADOR-APP][DIAG] updateNotifications() iniciada. Buscando pagos pendientes..."); // Log existente
+    console.log("[COBRADOR-APP][DIAG] updateNotifications() iniciada."); 
     const container = document.getElementById('notifications-list-container');
     const badge = document.getElementById('notification-badge');
     if (!container || !badge) return;
 
-    let notifications = [];
+    // --- INICIO: CORRECCIÓN - COMBINAR FUENTES ---
+    let combinedNotifications = [];
+    const processedIds = new Set(); // Para evitar duplicados
 
+    // 1. Añadir notificaciones directas desde la colección interna
+    console.log(`[DIAG-NOTIF] Procesando ${internalNotifications.length} notificaciones INTERNAS...`);
+    internalNotifications.forEach(n => {
+        // Aseguramos formato mínimo y añadimos ID único si falta
+        const uniqueId = n.id || `${n.type || 'unknown'}_${n.clientId}_${n.timestamp?.seconds || Date.now()}`;
+        if (!processedIds.has(uniqueId)) {
+            combinedNotifications.push({
+                // Mapea los campos esperados por la UI
+                type: n.type || 'unknown', // 'payment', 'refinance', etc.
+                date: n.timestamp, // Usa 'timestamp' como 'date'
+                clientName: n.from || 'Cliente Desconhecido',
+                clientId: n.clientId,
+                amount: n.amount || (n.type === 'refinance' ? n.data?.amount : undefined), // Intenta obtener monto
+                loanIndex: n.loanIndex, // Si existe
+                historyIndex: n.historyIndex, // Si existe
+                profilePictureUrl: n.profilePictureUrl,
+                body: n.body // Guarda el cuerpo para posible uso futuro
+                // Puedes añadir más campos si los necesitas
+            });
+            processedIds.add(uniqueId);
+        }
+    });
+    console.log(`[DIAG-NOTIF] ${combinedNotifications.length} notificaciones añadidas desde la fuente interna.`);
+
+    // 2. Revisar 'allClients' como FALLBACK o para consistencia (busca pendientes que podrían no tener notificación interna)
+    console.log("[DIAG-NOTIF] Verificando 'allClients' para pendientes adicionales...");
     allClients.forEach(client => {
-        // --- Log ANTES de verificar historial ---
-        console.log(`[DIAG-NOTIF] Verificando historial para cliente: ${client.name} (ID: ${client.id})`);
-
-        // Notificaciones de Pagos Pendientes
+        // Pagos pendientes (sin cambios en esta lógica interna)
         (client.loans || []).forEach((loan, loanIndex) => { 
-            // Luego iteramos sobre el historial de ESE préstamo
             (loan.history || []).forEach((payment, historyIndex) => {
-                console.log(`[DIAG-NOTIF] --> Verificando Cliente ${client.id}, Préstamo[${loanIndex}], Pago[${historyIndex}]: Status='${payment?.status}'`);
-                
                 if (payment && payment.status === 'pending_verification') {
-                    console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO PAGO PENDIENTE! Añadiendo a la lista.`);
-                    notifications.push({
-                        type: 'payment',
-                        date: payment.date,
-                        clientName: client.name,
-                        clientId: client.id,
-                        amount: payment.amount,
-                        loanIndex: loanIndex, // <-- ¡GUARDAMOS EL loanIndex!
-                        historyIndex: historyIndex, // <-- ¡GUARDAMOS EL historyIndex!
-                        profilePictureUrl: client.profilePictureUrl
-                    });
+                    // ID único para evitar duplicados si ya vino de internalNotifications
+                    const uniqueId = `payment_${client.id}_${loanIndex}_${historyIndex}`; 
+                    if (!processedIds.has(uniqueId)) {
+                         console.log(`[DIAG-NOTIF] --> ENCONTRADO PAGO PENDIENTE (no estaba en interna): Cliente ${client.id}, L${loanIndex}, H${historyIndex}`);
+                        combinedNotifications.push({
+                            type: 'payment', date: payment.date, clientName: client.name, clientId: client.id, amount: payment.amount, loanIndex: loanIndex, historyIndex: historyIndex, profilePictureUrl: client.profilePictureUrl, body: `${translations[currentLang].paymentSent} ${money(payment.amount)}. ${translations[currentLang].pleaseVerify}`
+                        });
+                        processedIds.add(uniqueId);
+                    }
                 }
             });
         });
 
-        // Notificaciones de Refinanciamiento (Sin cambios)
-        if (client.refinancerequest && client.refinancerequest.status === 'pending') { // <-- [CORRECCIÓN] Debe ser client.refinanceRequest
-             // --- Log para refinanciamiento (Opcional pero útil) ---
-             console.log(`[DIAG-NOTIF] ----> ¡ENCONTRADO REFINANCIAMIENTO PENDIENTE! Añadiendo a la lista.`);
-            notifications.push({
-                type: 'refinance',
-                date: client.refinancerequest.requestdate, // <-- [CORRECCIÓN] Debe ser client.refinanceRequest.requestDate
-                ...client.refinancerequest,
-                clientName: client.name,
-                clientId: client.id,
-                profilePictureUrl: client.profilePictureUrl
-            });
+        // Refinanciamientos pendientes (sin cambios en esta lógica interna)
+        if (client.refinanceRequest && client.refinanceRequest.status === 'pending') {
+             const uniqueId = `refinance_${client.id}_${client.refinanceRequest.requestDate?.seconds || 'no_date'}`;
+             if (!processedIds.has(uniqueId)) {
+                  console.log(`[DIAG-NOTIF] --> ENCONTRADO REFINANCIAMIENTO PENDIENTE (no estaba en interna): Cliente ${client.id}`);
+                 combinedNotifications.push({
+                     type: 'refinance', date: client.refinanceRequest.requestDate, clientName: client.name, clientId: client.id, amount: client.refinanceRequest.amount, installments: client.refinanceRequest.installments, profilePictureUrl: client.profilePictureUrl, body: `${translations[currentLang].refinanceRequested} ${money(client.refinanceRequest.amount)}. ${translations[currentLang].reviewRequest}`
+                 });
+                 processedIds.add(uniqueId);
+             }
         }
-    }); // Fin allClients.forEach
+    }); 
+    console.log(`[DIAG-NOTIF] Búsqueda en 'allClients' finalizada. Total notificaciones combinadas: ${combinedNotifications.length}`);
+    // --- FIN: CORRECCIÓN - COMBINAR FUENTES ---
 
-    // --- Log DESPUÉS de buscar en todos los clientes ---
-    console.log(`[DIAG-NOTIF] Búsqueda finalizada. Total notificaciones encontradas: ${notifications.length}`);
+    // Ordena y renderiza usando combinedNotifications
+    const finalNotifications = combinedNotifications.sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
 
-    badge.textContent = notifications.length;
-    badge.classList.toggle('visible', notifications.length > 0);
+    badge.textContent = finalNotifications.length; // Usa la cuenta combinada
+    badge.classList.toggle('visible', finalNotifications.length > 0);
 
-    if (notifications.length === 0) {
+    if (finalNotifications.length === 0) {
         container.innerHTML = `<div class="no-items" data-lang-key="noNotifications">${translations[currentLang].noNotifications}</div>`;
         return;
     }
 
-    // Renderizado (sin cambios lógicos, pero corregido para usar las propiedades correctas)
-    container.innerHTML = notifications
-        .sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0))
-        .map(p => {
+    // Renderizado (Usa la lógica existente pero con los datos de 'finalNotifications')
+    container.innerHTML = finalNotifications.map(p => {
             const nameInitial = (p.clientName || 'C').charAt(0).toUpperCase();
             const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
             const photoUrl = p.profilePictureUrl || placeholderUrl;
 
-            let title = '';
-            let subtitle = '';
+            // Usa el 'body' que guardamos antes, o genera uno si falta
+            let subtitle = p.body || (p.type === 'payment' 
+                ? `${translations[currentLang].paymentSent} ${money(p.amount)}. ${translations[currentLang].pleaseVerify}`
+                : (p.type === 'refinance' 
+                    ? `${translations[currentLang].refinanceRequested} ${money(p.amount)}. ${translations[currentLang].reviewRequest}`
+                    : 'Nova notificação'));
 
-            if (p.type === 'payment') {
-                title = p.clientName;
-                subtitle = `${translations[currentLang].paymentSent} ${money(p.amount)}. ${translations[currentLang].pleaseVerify}`;
-            } else if (p.type === 'refinance') {
-                title = p.clientName;
-                subtitle = `${translations[currentLang].refinanceRequested} ${money(p.amount)}. ${translations[currentLang].reviewRequest}`;
-            }
+            // Asegura que los data attributes existan, aunque sean undefined
+            const loanIndexAttr = p.loanIndex !== undefined ? `data-loan-index="${p.loanIndex}"` : '';
+            const historyIndexAttr = p.historyIndex !== undefined ? `data-history-index="${p.historyIndex}"` : '';
 
             return `
-            <div class="notification-card" data-client-id="${p.clientId}" data-loan-index="${p.loanIndex}" data-history-index="${p.historyIndex}" data-type="${p.type}">
-        <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar"> <!-- Usa clase client-avatar -->
+            <div class="notification-card" data-client-id="${p.clientId}" ${loanIndexAttr} ${historyIndexAttr} data-type="${p.type}">
+                <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar">
                 <div class="notification-info">
-                    <h4 class="notification-title">${title}</h4>
+                    <h4 class="notification-title">${p.clientName}</h4>
                     <p class="notification-subtitle">${subtitle}</p>
                 </div>
             </div>`;
         }).join('');
 
 
-    // Listeners (sin cambios lógicos, pero corregido selector si es necesario)
+    // Listeners (Sin cambios lógicos)
     container.querySelectorAll('.notification-card').forEach(card => {
-                card.addEventListener('click', () => {
-    const type = card.dataset.type;
-    const clientId = card.dataset.clientId;
-    if (type === 'payment') {
-        const historyIndex = parseInt(card.dataset.historyIndex, 10);
-        const loanIndex = parseInt(card.dataset.loanIndex, 10); // <-- OBTENEMOS EL loanIndex
-        
-        // Asegúrate de que AMBOS índices sean válidos
-        if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
-             showVerificationModal(clientId, historyIndex, loanIndex); // <-- PASAMOS AMBOS
-        } else {
-             console.error("Índices inválidos en la notificación:", card.dataset);
+        card.addEventListener('click', () => {
+            const type = card.dataset.type;
+            const clientId = card.dataset.clientId;
+            if (type === 'payment') {
+                const historyIndex = parseInt(card.dataset.historyIndex, 10);
+                const loanIndex = parseInt(card.dataset.loanIndex, 10); 
+                if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
+                     showVerificationModal(clientId, historyIndex, loanIndex); 
+                } else {
+                     console.error("Índices inválidos na notificação de pagamento:", card.dataset);
                      showToast("Erro ao abrir detalhes da notificação.", true);
                 }
             } else if (type === 'refinance') {
                 showRefinanceModal(clientId);
+            } else {
+                 console.warn("Tipo de notificação desconhecido clicado:", type);
             }
         });
     });
-    // Aplica idioma y crea íconos si los hubiera
     applyLanguage(currentLang);
     lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
 }
@@ -4720,7 +4738,7 @@ getDocs(collectorQuery).then(snapshot => {
                 if ('serviceWorker' in navigator) {
                     navigator.serviceWorker.ready.then(registration => {
                         console.log('[COBRADOR-APP] Service Worker está ativo. Configurando FCM.');
-                        setupFCM(currentCollectorUsername, registration); // Usa o USERNAME aqui!
+                        setupFCM(currentCollectorUsername, registration);
                     }).catch(err => {
                         console.error('[COBRADOR-APP] ERROR: Service Worker não pronto.', err);
                     });
@@ -4860,8 +4878,14 @@ getDocs(collectorQuery).then(snapshot => {
         unsubscribeNotifications(); // Cancela listener anterior si existe
     }
     unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
-        console.log("[COBRADOR-APP] Novas notificações recebidas do Firestore.");
-        // Llama a la función existente que actualiza el badge y la lista
+        console.log("[COBRADOR-APP] Novas notificações INTERNAS recebidas do Firestore.");
+        
+        // --- INICIO: CORRECCIÓN ---
+        // Guarda las notificaciones leídas en la variable global
+        internalNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // --- FIN: CORRECCIÓN ---
+
+        // Llama a la función que actualiza el badge y la lista
         updateNotifications();
     }, (error) => {
         console.error(`[COBRADOR-APP] Erro ao escutar notificações:`, error);
@@ -5462,4 +5486,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
