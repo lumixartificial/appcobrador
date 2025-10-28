@@ -746,7 +746,7 @@ try {
         
                 if (currentToken) {
                     console.log(`${LOG_PREFIX} ¡TOKEN OBTENIDO CON ÉXITO!: ${currentToken.substring(0, 30)}...`);
-                    const collectorRef = doc(db, 'collectors', collectorUsername);
+                    const collectorRef = doc(db, 'collectors', currentCollectorUsername);
                     console.log(`${LOG_PREFIX} Intentando guardar el token en Firestore...`);
                     await updateDoc(collectorRef, { fcmTokens: arrayUnion(currentToken) });
                     console.log(`${LOG_PREFIX} ¡ÉXITO! Token guardado/confirmado en Firestore.`);
