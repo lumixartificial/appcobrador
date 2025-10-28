@@ -661,6 +661,7 @@
     <div id="confirmationModal" class="modal-view"></div>
     <div id="mapPinModal" class="modal-view"></div>
     <div id="settlementFormModal" class="modal-view"></div>
+    <div id="verificationModal" class="modal-view"></div>
     <div id="toast-container"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -897,7 +898,16 @@ try {
                    }
 
                    if (isPaymentDay) {
-                       clientsForToday.push({ client, loan, loanIndex: index });
+                        // --- INICIO DE LA CORRECCIÓN ---
+                        // ¡El 'loan.status' está obsoleto! Lo recalculamos AHORA.
+                        const loanDetails = calculateLoanDetails(loan);
+                        
+                        // Creamos un nuevo objeto de préstamo con el estado FRESCO
+                        const updatedLoan = { ...loan, status: loanDetails.status };
+                        
+                        // Añadimos el préstamo con el estado correcto
+                        clientsForToday.push({ client, loan: updatedLoan, loanIndex: index });
+                        // --- FIN DE LA CORRECCIÓN ---
                    }
                });
            });
@@ -2915,10 +2925,11 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
 
         // Pega este bloque completo dentro de <script type="module">
 
+
 function showVerificationModal(clientId, historyIndex, loanIndex) {
-    // [NUEVA FUNCIÓN] Muestra el modal para aprobar/rechazar pagos enviados por el cliente.
-    console.log(`[DIAG-VERIF] showVerificationModal llamada con clientId=${clientId}, historyIndex=${historyIndex}`);
-    const modalOverlay = document.getElementById('reportOptionsModal'); // Reutilizamos el overlay genérico
+    // [MODIFICADO] Usa el nuevo modal #verificationModal con estilo .modal-view
+    console.log(`[DIAG-VERIF] showVerificationModal llamada con clientId=${clientId}, loanIndex=${loanIndex}, historyIndex=${historyIndex}`);
+    const modal = document.getElementById('verificationModal'); // <-- CAMBIO: Usa el nuevo ID
     const client = allClients.find(c => c.id === clientId);
 
     if (!client) {
@@ -2928,32 +2939,20 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
     }
     console.log("[DIAG-VERIF] Cliente encontrado:", client.name);
 
-    // --- INICIO: Lógica MEJORADA para encontrar el préstamo y pago correctos ---
-    // Asumimos que el historial está en el PRIMER préstamo activo por defecto,
-    // PERO si el cliente tiene múltiples préstamos ACTIVOS, necesitaremos una lógica
-    // más robusta para determinar a cuál pertenece el historial.
-    // Por ahora, buscamos el primer préstamo ACTIVO o el ÚLTIMO si no hay activos.
+    // Lógica para encontrar préstamo y pago (SIN CAMBIOS)
     if (loanIndex === undefined || loanIndex === null || !client.loans || !client.loans[loanIndex]) {
-                 console.error(`[DIAG-VERIF] Error: loanIndex ('${loanIndex}') es inválido o no se encontró el préstamo para el cliente ${clientId}`);
-         
-         // Fallback: Si no se pasó (ej. desde notificaciones antiguas), intentamos adivinar
-         const guessedIndex = (client.loans || []).findIndex(l => l.status !== 'finished');
-         loanIndex = guessedIndex !== -1 ? guessedIndex : (client.loans?.length ? 0 : -1);
-         
-         if (loanIndex === -1) {
+        console.error(`[DIAG-VERIF] Error: loanIndex ('${loanIndex}') es inválido o no se encontró el préstamo para el cliente ${clientId}`);
+        const guessedIndex = (client.loans || []).findIndex(l => l.status !== 'finished');
+        loanIndex = guessedIndex !== -1 ? guessedIndex : (client.loans?.length ? 0 : -1);
+        if (loanIndex === -1) {
             showToast('Erro: Índice de empréstimo inválido.', true);
             return;
-         }
-         console.warn(`[DIAG-VERIF] ¡ADVERTENCIA! loanIndex no fue proporcionado. Se usó el índice adivinado: ${loanIndex}`);
+        }
+        console.warn(`[DIAG-VERIF] ¡ADVERTENCIA! loanIndex no fue proporcionado. Se usó el índice adivinado: ${loanIndex}`);
     }
     console.log(`[DIAG-VERIF] Usando loanIndex=${loanIndex}`);
-
     const loan = client.loans[loanIndex];
     const payment = loan?.history ? loan.history[historyIndex] : null;
-    console.log("[DIAG-VERIF] Préstamo seleccionado:", loan);
-    console.log("[DIAG-VERIF] Pago encontrado en historial:", payment);
-    // --- FIN: Lógica MEJORADA ---
-
 
     if (!loan || !payment || payment.status !== 'pending_verification') {
         console.error("[DIAG-VERIF] Error: No se pudo encontrar el PAGO PENDIENTE o el préstamo:", { clientId, loanIndex, historyIndex, loan, payment });
@@ -2966,10 +2965,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
     const dateStr = paymentDate.toLocaleDateString(currentLang === 'pt' ? 'pt-BR' : 'es-ES');
     const timeStr = paymentDate.toLocaleTimeString(currentLang === 'pt' ? 'pt-BR' : 'es-ES', { hour: '2-digit', minute: '2-digit' });
 
-    modalOverlay.innerHTML = `
-        <div class="modal-content" style="max-width: 450px;">
-            <button class="close-modal-btn" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer;">&times;</button>
-            <h3 style="margin-top: 0; margin-bottom: 15px;" data-lang-key="paymentVerification">Verificação de Pagamento</h3>
+    // --- INICIO: NUEVA ESTRUCTURA HTML del Modal ---
+    modal.innerHTML = `
+        <header class="modal-header">
+            <button id="closeVerificationModal"><i data-lucide="arrow-left"></i></button>
+            <span class="modal-title" data-lang-key="paymentVerification">Verificação de Pagamento</span>
+        </header>
+        <div class="modal-content-wrapper container"> 
             <p style="color: var(--text-secondary); margin-bottom: 25px;">
                 Cliente: <strong>${client.name}</strong><br>
                 Data: ${dateStr} às ${timeStr}
@@ -2983,176 +2985,107 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
             <h4 style="margin-bottom: 10px;" data-lang-key="paymentReceipt">Comprovante de Pagamento</h4>
             <div style="background-color: var(--bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; min-height: 150px; display: flex; justify-content: center; align-items: center;">
                 ${payment.receiptUrl ?
+                    // Reutilizamos el ID para la imagen, no hay problema
                     `<img id="verification-receipt-img" src="${payment.receiptUrl}" alt="Comprovante" style="max-width: 100%; max-height: 50vh; object-fit: contain; border-radius: 4px;">` :
-                    `<p style="color: var(--text-secondary);">Nenhum comprovante anexado.</p>`
+                    `<p class="no-items">Nenhum comprovante anexado.</p>`
                 }
             </div>
-
-            <div class="action-buttons" style="margin-top: 25px; padding: 0; border: none; background: none;">
-                <button id="reject-payment-btn" class="btn-danger" style="flex-grow: 1;">
-                    <i data-lucide="x-circle"></i> <span data-lang-key="reject"></span>
-                </button>
-                <button id="approve-payment-btn" class="btn-primary" style="flex-grow: 1;">
-                    <i data-lucide="check-circle"></i> <span data-lang-key="approve"></span>
-                </button>
-            </div>
+        </div> 
+        <div class="action-buttons"> 
+            <button id="reject-payment-btn" class="btn-danger" style="flex-grow: 1;">
+                <i data-lucide="x-circle"></i> <span data-lang-key="reject"></span>
+            </button>
+            <button id="approve-payment-btn" class="btn-primary" style="flex-grow: 1;">
+                <i data-lucide="check-circle"></i> <span data-lang-key="approve"></span>
+            </button>
         </div>
     `;
-    console.log("[DIAG-VERIF] HTML del modal generado.");
+    // --- FIN: NUEVA ESTRUCTURA HTML ---
+    console.log("[DIAG-VERIF] HTML del modal rediseñado generado.");
 
-    modalOverlay.classList.add('active'); // Muestra el modal
-    history.pushState({ modal: 'reportOptionsModal' }, 'Verification', '#verify'); // Añade al historial
-    lucide.createIcons({ nodes: modalOverlay.querySelectorAll('[data-lucide]') });
+    history.pushState({ modal: 'verificationModal' }, 'Verification', '#verify'); // <-- CAMBIO: Usa el nuevo ID y #hash
+    modal.classList.add('active'); // Muestra el modal (con la animación de slide)
+    lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
     applyLanguage(currentLang); // Aplica traducciones
     console.log("[DIAG-VERIF] Modal mostrado y configurado.");
 
-    // --- Lógica de los botones ---
-    const closeModal = () => window.history.back(); // Usa history.back() para cerrar
-    modalOverlay.querySelector('.close-modal-btn').addEventListener('click', closeModal);
-    modalOverlay.querySelector('.modal-content').addEventListener('click', e => e.stopPropagation()); // Evita cerrar al hacer clic dentro
-    modalOverlay.addEventListener('click', closeModal); // Cierra al hacer clic fuera
+    // --- Lógica de los botones (SIN CAMBIOS INTERNOS, solo el listener de cerrar) ---
+    modal.querySelector('#closeVerificationModal').addEventListener('click', () => window.history.back()); // <-- CAMBIO: Usa el nuevo ID del botón
 
-    // Botón RECHAZAR
-    modalOverlay.querySelector('#reject-payment-btn').addEventListener('click', async (e) => {
+    // Botón RECHAZAR (Lógica interna sin cambios)
+    modal.querySelector('#reject-payment-btn').addEventListener('click', async (e) => {
         console.log("[DIAG-VERIF] Botón RECHAZAR presionado.");
         const rejectBtn = e.currentTarget;
         rejectBtn.disabled = true;
         rejectBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Rejeitando...`;
         lucide.createIcons({ nodes: [rejectBtn.querySelector('i')] });
-
         try {
             const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-            // --- INICIO: Corrección importante ---
-            // Crea una copia profunda de los préstamos para modificar
             const updatedLoans = JSON.parse(JSON.stringify(client.loans));
-            // Asegúrate que el historial existe y actualiza el estado
-            if (updatedLoans[loanIndex] && updatedLoans[loanIndex].history && updatedLoans[loanIndex].history[historyIndex]) {
+            if (updatedLoans[loanIndex]?.history?.[historyIndex]) {
                 updatedLoans[loanIndex].history[historyIndex].status = 'rejected';
-                console.log("[DIAG-VERIF] Estado del pago actualizado a 'rejected' en la copia.");
-            } else {
-                throw new Error("Índice de historial o préstamo inválido al rechazar.");
-            }
-            // --- FIN: Corrección importante ---
-
-            
+            } else { throw new Error("Índice inválido."); }
             await updateDoc(clientRef, { loans: updatedLoans });
-            console.log("[DIAG-VERIF] Firestore actualizado con rechazo."); // Log corregido
-
-            // --- INICIO: LÓGICA CORREGIDA ---
-            // 1. Mostrar Toast correcto
-            showToast(translations[currentLang].paymentRejected); // <-- Texto corregido
-
-            // 2. Cerrar el modal
-            window.history.back();
-            console.log("[DIAG-VERIF] Modal de rechazo cerrado. onSnapshot actualizará la UI.");
-            // --- FIN: LÓGICA CORREGIDA ---
-
-
-
-
-
-
-// Notificar al cliente (Esto sigue igual)
-const notifTitle = translations[currentLang].paymentRejectedClientTitle;
-const notifBody = translations[currentLang].paymentRejectedClientBody;
-sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_rejected', 'alert-circle');
-console.log("[DIAG-VERIF] Notificación de rechazo enviada al cliente.");
-// ========= FIN DEL BLOQUE DE REEMPLAZO =========
-
+            showToast(translations[currentLang].paymentRejected);
+            window.history.back(); // Cierra el modal
+            const notifTitle = translations[currentLang].paymentRejectedClientTitle;
+            const notifBody = translations[currentLang].paymentRejectedClientBody;
+            sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_rejected', 'alert-circle');
         } catch (error) {
             console.error("[DIAG-VERIF] Erro ao rejeitar pagamento:", error);
             showToast('Falha ao rejeitar pagamento.', true);
-            rejectBtn.disabled = false;
+            rejectBtn.disabled = false; // Re-habilita en error
             rejectBtn.innerHTML = `<i data-lucide="x-circle"></i> <span data-lang-key="reject"></span>`;
             lucide.createIcons({ nodes: [rejectBtn.querySelector('i')] });
             applyLanguage(currentLang);
         }
     });
 
-    // Botón APROBAR
-    modalOverlay.querySelector('#approve-payment-btn').addEventListener('click', async (e) => {
+    // Botón APROBAR (Lógica interna sin cambios)
+    modal.querySelector('#approve-payment-btn').addEventListener('click', async (e) => {
         console.log("[DIAG-VERIF] Botón APROVAR presionado.");
         const approveBtn = e.currentTarget;
         approveBtn.disabled = true;
         approveBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Aprovando...`;
         lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
-
         try {
             const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-            // --- INICIO: Corrección importante ---
             const updatedLoans = JSON.parse(JSON.stringify(client.loans));
-            const currentLoan = updatedLoans[loanIndex]; // Referencia al préstamo DENTRO de la copia
-
-            if (!currentLoan || !currentLoan.history || !currentLoan.history[historyIndex]) {
-                throw new Error("Índice de historial o préstamo inválido al aprobar.");
-            }
-
-            // 1. Cambia el estado del pago en el historial
+            const currentLoan = updatedLoans[loanIndex];
+            if (!currentLoan?.history?.[historyIndex]) { throw new Error("Índice inválido."); }
+            
+            // 1. Cambia estado
             currentLoan.history[historyIndex].status = 'approved';
-            console.log("[DIAG-VERIF] Estado del pago actualizado a 'approved' en la copia.");
 
-            // 2. RECALCULA 'paid', 'paymentBalance' e 'installments' (¡Lógica crucial!)
+            // 2. Recalcula finanzas
             const installmentValue = currentLoan.originalInstallmentAmount || 0;
-
-            // Recalcula el total pagado SUMANDO el historial APROBADO (incluyendo este)
-            const newTotalPaid = (currentLoan.history || [])
-                .filter(h => h.status === 'approved') // Solo aprobados
-                .reduce((sum, h) => sum + (h.amount || 0), 0);
-
-            // Calcula cuántas cuotas COMPLETAS cubre el nuevo total pagado
+            const newTotalPaid = (currentLoan.history || []).filter(h => h.status === 'approved').reduce((sum, h) => sum + (h.amount || 0), 0);
             const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
-
-            // Calcula el nuevo 'paymentBalance'
             const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
-
-            // Actualiza los campos en el objeto 'currentLoan'
             currentLoan.paid = newTotalPaid;
             currentLoan.paymentBalance = newBalance;
             const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
             currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
-
-            console.log("[DIAG-VERIF] Pago aprobado. Datos financieros recalculados:", { newTotalPaid, paidInstallmentsCount, newBalance, newInstallmentsString: currentLoan.installments });
-            // --- FIN: Corrección importante ---
-
             
             await updateDoc(clientRef, { loans: updatedLoans });
-            console.log("[DIAG-VERIF] Firestore actualizado con aprobación.");
-
-            // --- INICIO: LÓGICA CORREGIDA Y OPTIMIZADA ---
-            // Eliminamos toda la lógica de 'getDoc' y la actualización manual.
-            // El onSnapshot (que ahora es rápido) se encargará de todo.
-            
-            // 1. Mostrar Toast de éxito
             showToast(translations[currentLang].paymentApproved);
-
-            // 2. Cerrar el modal
-            window.history.back();
-            console.log("[DIAG-VERIF] Modal de aprobación cerrado. onSnapshot actualizará la UI.");
-            // --- FIN: LÓGICA CORREGIDA ---
-
-
-
-// --- FIN: NUEVA SOLUCIÓN ---
-
-// Notificar al cliente (Esto sigue igual, se ejecuta después de actualizar la UI localmente)
-const amountStr = money(payment.amount);
-const notifTitle = translations[currentLang].paymentApprovedClientTitle;
-const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', amountStr);
-sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-check');
-console.log("[DIAG-VERIF] Notificación de aprobación enviada al cliente.");
-// ========= FIN DEL BLOQUE DE REEMPLAZO =========
-            
-
+            window.history.back(); // Cierra el modal
+            const amountStr = money(payment.amount);
+            const notifTitle = translations[currentLang].paymentApprovedClientTitle;
+            const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', amountStr);
+            sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_approved', 'check-check');
         } catch (error) {
             console.error("[DIAG-VERIF] Erro ao aprovar pagamento:", error);
             showToast('Falha ao aprovar pagamento.', true);
-            approveBtn.disabled = false;
+            approveBtn.disabled = false; // Re-habilita en error
             approveBtn.innerHTML = `<i data-lucide="check-circle"></i> <span data-lang-key="approve"></span>`;
             lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
             applyLanguage(currentLang);
         }
     });
 }
+
+
 
 // Fin del bloque para pegar
 
@@ -4957,42 +4890,67 @@ getDocs(collectorQuery).then(snapshot => {
         }
 
         async function handleLogin(event) {
-    event.preventDefault();
-    const emailInput = document.getElementById('username'); // O ID ainda é 'username', mas agora é um email
-    const passwordInput = document.getElementById('password');
-    const email = emailInput.value.trim(); // Pega o email
-    const pass = passwordInput.value;
+            event.preventDefault();
+            const emailInput = document.getElementById('username'); // O ID ainda é 'username', mas agora é um email
+            const passwordInput = document.getElementById('password');
+            const email = emailInput.value.trim(); // Pega o email
+            const pass = passwordInput.value;
+        
+            // --- INICIO: MODIFICAÇÃO DO BOTÃO DE LOGIN ---
+            const loginButton = event.target.querySelector('button[type="submit"]');
+            let originalButtonHTML = ''; // Variável para guardar o HTML original
 
-    // Desabilita o botão e mostra carregando (opcional, mas bom UX)
-    const loginButton = event.target.querySelector('button[type="submit"]');
-    if (loginButton) loginButton.disabled = true;
-
-    try {
-        // Tenta fazer login com Firebase Auth
-        console.log(`Tentando login com email: ${email}`);
-        await signInWithEmailAndPassword(auth, email, pass);
-
-        // SUCESSO! O onAuthStateChanged vai ser chamado automaticamente
-        // e vai tratar de mostrar a app principal. Não fazemos mais nada aqui.
-        console.log("signInWithEmailAndPassword bem-sucedido. Aguardando onAuthStateChanged...");
-
-    } catch (error) {
-        // FALHA no login
-        console.error("Erro de login (signInWithEmailAndPassword):", error.code, error.message);
-        // Mostra mensagens de erro específicas
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-            showToast('Email ou senha inválidos.', true);
-        } else if (error.code === 'auth/invalid-email') {
-            showToast('Formato de email inválido.', true);
-        } else if (error.code === 'auth/too-many-requests') {
-             showToast('Muitas tentativas falhadas. Tente novamente mais tarde.', true);
-        } else {
-            showToast('Erro ao tentar fazer login. Verifique sua conexão.', true);
+            if (loginButton) {
+                originalButtonHTML = loginButton.innerHTML; // 1. Salva o HTML original (ex: "Entrar")
+                loginButton.disabled = true; // 2. Desabilita
+                
+                // 3. Define o novo HTML com spinner e texto de carregamento
+                // [NUEVO] Ajustamos el padding y añadimos el spinner
+                loginButton.innerHTML = `
+                    <span style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <i data-lucide="loader-circle" style="animation: spin 1s linear infinite; width: 20px; height: 20px;"></i>
+                        Entrando...
+                    </span>`;
+                
+                // 4. Renderiza o novo ícone
+                lucide.createIcons({ nodes: [loginButton.querySelector('i')] });
+            }
+            // --- FIM: MODIFICAÇÃO ---
+        
+            try {
+                // Tenta fazer login com Firebase Auth
+                console.log(`Tentando login com email: ${email}`);
+                await signInWithEmailAndPassword(auth, email, pass);
+        
+                // SUCESSO! O onAuthStateChanged vai ser chamado automaticamente
+                // O botão pode ficar no estado "Entrando...", pois a tela vai mudar.
+                console.log("signInWithEmailAndPassword bem-sucedido. Aguardando onAuthStateChanged...");
+        
+            } catch (error) {
+                // FALHA no login
+                console.error("Erro de login (signInWithEmailAndPassword):", error.code, error.message);
+                
+                // Mostra mensagens de erro específicas (código existente)
+                if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                    showToast('Email ou senha inválidos.', true);
+                } else if (error.code === 'auth/invalid-email') {
+                    showToast('Formato de email inválido.', true);
+                } else if (error.code === 'auth/too-many-requests') {
+                     showToast('Muitas tentativas falhadas. Tente novamente mais tarde.', true);
+                } else {
+                    showToast('Erro ao tentar fazer login. Verifique sua conexão.', true);
+                }
+                
+                // --- INICIO: REVERTER BOTÃO EM CASO DE ERRO ---
+                // Habilita o botão novamente se falhar e restaura o HTML
+                if (loginButton) {
+                    loginButton.disabled = false;
+                    loginButton.innerHTML = originalButtonHTML; // Restaura o HTML original (ex: "Entrar")
+                    // (Não é necessário chamar lucide.createIcons() aqui, pois o original não tinha ícone)
+                }
+                // --- FIM: REVERTER BOTÃO ---
+            }
         }
-        // Habilita o botão novamente se falhar
-        if (loginButton) loginButton.disabled = false;
-    }
-}
         
         // --- INICIO: LÓGICA DE OPTIMIZACIÓN DE RUTA ---
         
@@ -5495,3 +5453,4 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
