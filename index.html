@@ -1054,16 +1054,7 @@ try {
                             </div>
                         </section>
 
-                        <!-- --- INICIO NUEVA SECCIÓN: HISTÓRICO DE LIQUIDAÇÕES --- -->
-                <section style="margin-top: 30px;">
-                    <h2 class="section-title">Histórico de Liquidações</h2>
-                    <div class="item-list" id="cobrador-settlements-history-list">
-                        <!-- Las liquidaciones se cargarán aquí -->
-                        <p class="loading">Carregando histórico...</p>
-                    </div>
-                </section>
-                <!-- --- FIN NUEVA SECCIÓN --- -->
-
+                        
                     </div>
                 </main>
                 <nav class="bottom-nav">
@@ -1762,35 +1753,7 @@ capitalTotalEl.textContent = money(capitalTotal); // Usa el capitalTotal ajustad
 if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
 if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
 
-    // --- INICIO CÓDIGO PARA LLENAR HISTORIAL DE LIQUIDAÇÕES (COBRADOR) ---
-const settlementsListContainer = document.getElementById('cobrador-settlements-history-list');
-// 'allSettlements' ya está filtrada para este cobrador por el onSnapshot
-const sortedSettlements = [...allSettlements].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
-
-if (settlementsListContainer) {
-    if (sortedSettlements.length === 0) {
-        settlementsListContainer.innerHTML = `<p class="no-items">Nenhuma liquidação registrada.</p>`;
-    } else {
-        settlementsListContainer.innerHTML = sortedSettlements.map(settlement => {
-            const date = settlement.date?.seconds ? new Date(settlement.date.seconds * 1000) : null;
-            const dateString = date ? date.toLocaleDateString('pt-BR') : 'Data inválida';
-            const timeString = date ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-
-            return `
-            <div class="payment-history-item" style="cursor: default;"> <!-- Reutilizamos estilo -->
-                <div class="payment-history-details">
-                    <h4 class="payment-history-title">${dateString} - ${timeString}</h4>
-                    ${settlement.notes ? `<p class="payment-history-description" style="font-style: italic;">${settlement.notes}</p>` : ''}
-                </div>
-                <div class="payment-history-info">
-                    <span class="payment-history-amount" style="color: var(--text-primary); font-size: 1.1em;">${money(settlement.amount)}</span>
-                </div>
-            </div>
-            `;
-        }).join('');
-    }
-}
-// --- FIN CÓDIGO PARA LLENAR HISTORIAL ---
+    
 
         }
         
@@ -2580,7 +2543,9 @@ if (settlementsListContainer) {
     applyLanguage(currentLang);
 
     // Listener para cerrar
-    document.getElementById('closeDetailView').addEventListener('click', () => window.history.back());
+    document.getElementById('closeDetailView').addEventListener('click', () => {
+        location.hash = 'home'; 
+    });
 
     // --- ACTUALIZAR LISTENERS DE BOTONES DE ACCIÓN ---
     // Asegúrate de que los listeners obtengan el loanIndex correcto del botón
@@ -4045,7 +4010,7 @@ if (receiptFile) {
             // Datos a guardar en Firestore
             const settlementData = {
                 type: 'settlement', // Identifica este registro como liquidación
-                collectorId: collectorId, // Asegúrate que collectorId está disponible globalmente
+                collectorId: currentCollectorUsername, // Asegúrate que collectorId está disponible globalmente
                 collectorName: collectorName, 
                 amount: amount,
                 notes: document.getElementById('settlement-form-notes').value.trim(),
@@ -4169,7 +4134,7 @@ if (receiptFile) {
 
 const expenseData = {
     type: 'expense', // Asegúrate que este campo exista
-    collectorId,
+    collectorId: currentCollectorUsername,
     category: document.getElementById('expense-category').value,
     value: parseFloat(valueInput.value),
     observations: document.getElementById('expense-obs').value,
@@ -4179,7 +4144,7 @@ const expenseData = {
 // Guardar en Firestore (igual que antes)
 await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseData);
 
-                    await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseData);
+                    
                     window.history.back();
                     showToast('Gasto salvo com sucesso!');
 
@@ -4878,6 +4843,10 @@ getDocs(collectorQuery).then(snapshot => {
                 allSettlements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 // Actualizamos la vista de perfil que muestra el capital en mano
                 updateProfileView(collectorData); 
+
+                updateExpensesView();
+
+
             }, (error) => {
                 console.error("Error al obtener liquidaciones: ", error);
                 showToast('Falha ao carregar dados de liquidação.', true);
@@ -5494,7 +5463,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
-
-
-
