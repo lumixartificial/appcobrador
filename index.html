@@ -1636,18 +1636,32 @@ try {
 
         function updateRouteProgress() {
             const todaysTotalClientsList = getAllTodaysClients();
-           // --- INICIO: CORRECCIÓN PARA CONTAR CLIENTES ÚNICOS ---
-            // 1. Contar clientes ÚNICOS totales para hoy
-            const uniqueClientIds = new Set(todaysTotalClientsList.map(item => item.client.id));
-            const totalClients = uniqueClientIds.size; // Usa el tamaño del Set
 
-            // 2. Contar clientes ÚNICOS que ya pagaron (al menos un préstamo) hoy
-            // Filtra los ITEMS donde el préstamo está 'paid'
-            const paidLoanItems = todaysTotalClientsList.filter(item => item.loan.status === 'paid');
-            // Luego, obtiene los IDs de cliente ÚNICOS de esa lista filtrada
-            const uniquePaidClientIds = new Set(paidLoanItems.map(item => item.client.id));
-            const paidClients = uniquePaidClientIds.size; // Usa el tamaño del Set de pagados
-            // --- FIN: CORRECCIÓN ---
+            // --- INICIO: CORRECCIÓN LÓGICA "PAGO COMPLETO" ---
+            
+            // 1. Contar clientes ÚNICOS totales para hoy (Esto sigue igual)
+            const uniqueClientIds = new Set(todaysTotalClientsList.map(item => item.client.id));
+            const totalClients = uniqueClientIds.size;
+
+            // 2. Contar clientes que hayan pagado TODOS sus préstamos de hoy
+            let paidClients = 0;
+            
+            // Iteramos sobre cada ID de cliente único
+            uniqueClientIds.forEach(clientId => {
+                
+                // Obtenemos todos los préstamos de ESTE cliente para HOY
+                const clientLoansForToday = todaysTotalClientsList.filter(item => item.client.id === clientId);
+                
+                // Verificamos si ALGUNO de sus préstamos de hoy AÚN NO ESTÁ PAGADO (sigue 'pending' o 'late')
+                const hasUnpaidLoan = clientLoansForToday.some(item => item.loan.status !== 'paid');
+                
+                // Si NO tiene ningún préstamo sin pagar (es decir, !hasUnpaidLoan es verdadero),
+                // significa que todos están pagados, así que contamos al cliente.
+                if (!hasUnpaidLoan) {
+                    paidClients++;
+                }
+            });
+            // --- FIN: CORRECCIÓN LÓGICA "PAGO COMPLETO" ---
 
             const progressPercentage = totalClients > 0 ? (paidClients / totalClients) * 100 : 0;
 
@@ -5463,5 +5477,6 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
 
 
