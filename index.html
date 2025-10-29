@@ -5263,37 +5263,54 @@ getDocs(collectorQuery).then(snapshot => {
     applyLanguage(currentLang);
 }
 
+
+
 async function sendNotificationToClient(clientId, title, body, type, icon = 'info') {
-    if (!clientId) return;
+    // Verifica que tengamos los IDs necesarios (companyId y clientId)
+    if (!clientId || !currentCompanyId) {
+        console.error(`[COBRADOR->CLIENTE] Error: Falta clientId (${clientId}) o currentCompanyId (${currentCompanyId}) para enviar notificación/ticket.`);
+        return;
+    }
     try {
+        // Referencia al documento del cliente (ruta anidada correcta)
         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
 
-        // 1. La notificación interna (para ver dentro de la app) sigue igual, es correcta.
+        // 1. Notificación INTERNA (para ver dentro de la app del cliente)
         const internalNotif = {
             title: title,
             body: body,
             icon: icon,
             read: false,
-            timestamp: new Date(),
-            id: `${type}_${Date.now()}`
+            timestamp: new Date(), // Usar new Date() en cliente es más simple que serverTimestamp
+            id: `${type}_${Date.now()}` // ID único simple
         };
+        // Usamos setDoc con merge:true para asegurar que el campo 'notifications' exista
+        // y arrayUnion para añadir la nueva notificación sin borrar las antiguas.
         await setDoc(clientRef, { notifications: arrayUnion(internalNotif) }, { merge: true });
-        console.log(`Notificación INTERNA para cliente [${clientId}] creada.`);
+        console.log(`[COBRADOR->CLIENTE] Notificación INTERNA para cliente [${clientId}] creada.`);
 
-        // 2. [CORRECCIÓN APLICADA] Ahora se escribe el ticket en la sub-colección
-        //    correcta ('clients/{id}/pushNotificationTickets'), que es donde la
-        //    Cloud Function 'sendPushNotificationToClient' está escuchando.
-        const ticketRef = collection(db, 'clients', clientId, 'pushNotificationTickets');
+        // 2. Ticket para la notificación PUSH (Cloud Function)
+        
+        // [CAMBIO CLAVE] La ruta ahora es la ANIDADA MULTI-TENANT, igual que en la app cliente
+        // Antes era: collection(db, 'clients', clientId, 'pushNotificationTickets');
+        const ticketRef = collection(db, 'companies', currentCompanyId, 'clients', clientId, 'pushNotificationTickets');
+        
         await addDoc(ticketRef, {
-            // Ya no necesitamos 'target' ni 'userId' porque la ruta los define.
+            // Ya no necesitamos 'target' ni 'userId' porque la ruta los define implícitamente.
             title: title,
             body: body,
-            type: type,
-            createdAt: serverTimestamp()
+            type: type, // Ej: 'payment_approved', 'payment_rejected', etc.
+            icon: icon, // Puedes pasar el icono también si tu Cloud Function lo usa
+            // [ADICIÓN IMPORTANTE] Tus SW esperan un campo 'url' en 'payload.data'.
+            // Debemos añadirlo al ticket para que la Cloud Function pueda pasarlo.
+            url: `https://lumix-financas-app.web.app/client/index.html?page=history`, // O la URL que quieras
+            createdAt: serverTimestamp() // Fecha/hora del servidor para la creación del ticket
         });
-        console.log(`Ticket PUSH para cliente [${clientId}] enviado a su cola específica.`);
+        console.log(`[COBRADOR->CLIENTE] Ticket PUSH para cliente [${clientId}] enviado a su cola específica (ruta anidada).`);
     } catch (error) {
-        console.error(`Error al enviar notificación/ticket al cliente [${clientId}]:`, error);
+        console.error(`[COBRADOR->CLIENTE] Error al enviar notificación/ticket al cliente [${clientId}]:`, error);
+        // Considera mostrar un toast si este error es crítico para el flujo
+        // showToast('Falha ao notificar o cliente.', true);
     }
 }
 
@@ -5486,4 +5503,5 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
 
