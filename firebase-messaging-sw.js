@@ -76,26 +76,46 @@ messaging.onBackgroundMessage((payload) => {
  * Esto se ejecuta cuando el usuario toca la notificación.
  */
 
-/**
- * [LÓGICA PARA EL CLIC - SIMPLIFICADA]
- * Intenta abrir la ventana directamente. Menos elegante pero más robusto.
- */
+// [MODIFICACIÓN] Se reemplaza la lógica simple por la versión robusta del SW Cliente
+// para manejar mejor el enfoque/apertura de ventanas.
 self.addEventListener('notificationclick', (event) => {
-    const LOG_PREFIX = `[SW ${SW_VERSION}]`;
+    const LOG_PREFIX = `[SW-COBRADOR ${SW_VERSION}]`; // Prefijo actualizado para cobrador
     console.log(`${LOG_PREFIX} El usuario hizo clic en la notificación.`);
+    const targetUrl = event.notification.data.url || self.location.origin;
     event.notification.close();
 
-    const targetUrl = event.notification.data.url || self.location.origin;
-    console.log(`${LOG_PREFIX} URL de destino: ${targetUrl}`);
+    // Lógica robusta copiada del SW Cliente
+    const promiseChain = clients.matchAll({
+        type: "window",
+        includeUncontrolled: true
+    }).then((windowClients) => {
+        // Busca si ya hay una ventana abierta con la misma URL.
+        const existingClient = windowClients.find(client => client.url === targetUrl && 'focus' in client);
 
-    // Intenta abrir la ventana. Si falla, el navegador lo manejará.
-    const promiseChain = clients.openWindow(targetUrl)
-        .catch(err => {
-            console.error(`${LOG_PREFIX} Error al intentar abrir ventana con clients.openWindow:`, err);
-            // No hay mucho más que hacer aquí si openWindow falla.
-        });
+        if (existingClient) {
+            console.log(`${LOG_PREFIX} Ventana existente encontrada. Enfocando...`);
+            return existingClient.focus();
+        }
+
+        // Si no hay una ventana con la URL exacta, pero hay alguna ventana de la app abierta...
+        if (windowClients.length > 0) {
+            console.log(`${LOG_PREFIX} Otra ventana de la app está abierta. Navegando y enfocando...`);
+            // La navega a la URL correcta y luego la enfoca.
+            // [CORRECCIÓN PEQUEÑA]: Usar windowClients[0] directamente
+            const clientToNavigate = windowClients[0];
+            return clientToNavigate.navigate(targetUrl).then(client => client ? client.focus() : null); // Añadido check por si navigate no devuelve cliente
+        }
+
+        // Si no hay ninguna ventana abierta, abre una nueva.
+        console.log(`${LOG_PREFIX} Ninguna ventana abierta. Abriendo una nueva.`);
+        return clients.openWindow(targetUrl);
+    })
+    .catch(err => { // Añadido catch para depuración
+        console.error(`${LOG_PREFIX} Error en la lógica de notificationclick:`, err);
+    });
 
     event.waitUntil(promiseChain);
 });
+
 
 
