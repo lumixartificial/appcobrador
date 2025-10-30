@@ -670,7 +670,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- Adicionado getDoc aqui
+        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- Añade deleteDoc aquí
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
         
@@ -1117,8 +1117,9 @@ try {
     });
     console.log(`[DIAG-NOTIF] ${combinedNotifications.length} notificaciones añadidas desde la fuente interna.`);
 
-    // 2. Revisar 'allClients' como FALLBACK o para consistencia (busca pendientes que podrían no tener notificación interna)
+    
     console.log("[DIAG-NOTIF] Verificando 'allClients' para pendientes adicionales...");
+    /* <-- INICIO DEL BLOQUE COMENTADO
     allClients.forEach(client => {
         // Pagos pendientes (sin cambios en esta lógica interna)
         (client.loans || []).forEach((loan, loanIndex) => { 
@@ -1149,6 +1150,10 @@ try {
              }
         }
     }); 
+    */ // <-- FIN DEL BLOQUE COMENTADO
+
+
+
     console.log(`[DIAG-NOTIF] Búsqueda en 'allClients' finalizada. Total notificaciones combinadas: ${combinedNotifications.length}`);
     // --- FIN: CORRECCIÓN - COMBINAR FUENTES ---
 
@@ -1179,6 +1184,7 @@ try {
             // Asegura que los data attributes existan, aunque sean undefined
             const loanIndexAttr = p.loanIndex !== undefined ? `data-loan-index="${p.loanIndex}"` : '';
             const historyIndexAttr = p.historyIndex !== undefined ? `data-history-index="${p.historyIndex}"` : '';
+            const notificationIdAttr = p.id ? `data-notification-id="${p.id}"` : '';
 
             return `
             <div class="notification-card" data-client-id="${p.clientId}" ${loanIndexAttr} ${historyIndexAttr} data-type="${p.type}">
@@ -1196,11 +1202,14 @@ try {
         card.addEventListener('click', () => {
             const type = card.dataset.type;
             const clientId = card.dataset.clientId;
+
+            const notificationId = card.dataset.notificationId;
+
             if (type === 'payment') {
                 const historyIndex = parseInt(card.dataset.historyIndex, 10);
                 const loanIndex = parseInt(card.dataset.loanIndex, 10); 
                 if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
-                     showVerificationModal(clientId, historyIndex, loanIndex); 
+                     showVerificationModal(clientId, historyIndex, loanIndex, notificationId);
                 } else {
                      console.error("Índices inválidos na notificação de pagamento:", card.dataset);
                      showToast("Erro ao abrir detalhes da notificação.", true);
@@ -2949,9 +2958,9 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
         // Pega este bloque completo dentro de <script type="module">
 
 
-function showVerificationModal(clientId, historyIndex, loanIndex) {
+function showVerificationModal(clientId, historyIndex, loanIndex, notificationId) { // <-- [CAMBIO 1/4] Añadir notificationId
     // [MODIFICADO] Usa el nuevo modal #verificationModal con estilo .modal-view
-    console.log(`[DIAG-VERIF] showVerificationModal llamada con clientId=${clientId}, loanIndex=${loanIndex}, historyIndex=${historyIndex}`);
+    console.log(`[DIAG-VERIF] showVerificationModal llamada con clientId=${clientId}, loanIndex=${loanIndex}, historyIndex=${historyIndex}, notifId=${notificationId}`);
     const modal = document.getElementById('verificationModal'); // <-- CAMBIO: Usa el nuevo ID
     const client = allClients.find(c => c.id === clientId);
 
@@ -3035,7 +3044,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
     // --- Lógica de los botones (SIN CAMBIOS INTERNOS, solo el listener de cerrar) ---
     modal.querySelector('#closeVerificationModal').addEventListener('click', () => window.history.back()); // <-- CAMBIO: Usa el nuevo ID del botón
 
-    // Botón RECHAZAR (Lógica interna sin cambios)
+    // Botón RECHAZAR
     modal.querySelector('#reject-payment-btn').addEventListener('click', async (e) => {
         console.log("[DIAG-VERIF] Botón RECHAZAR presionado.");
         const rejectBtn = e.currentTarget;
@@ -3050,6 +3059,15 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
             } else { throw new Error("Índice inválido."); }
             await updateDoc(clientRef, { loans: updatedLoans });
             showToast(translations[currentLang].paymentRejected);
+            
+            // --- [INICIO CAMBIO 2/4] ---
+            // Elimina la notificación interna AHORA que fue procesada
+            if (notificationId) {
+                console.log(`[DIAG-VERIF] Rechazado. Eliminando notificación interna: ${notificationId}`);
+                await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
+            }
+            // --- [FIN CAMBIO 2/4] ---
+
             window.history.back(); // Cierra el modal
             const notifTitle = translations[currentLang].paymentRejectedClientTitle;
             const notifBody = translations[currentLang].paymentRejectedClientBody;
@@ -3064,7 +3082,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
         }
     });
 
-    // Botón APROBAR (Lógica interna sin cambios)
+    // Botón APROBAR
     modal.querySelector('#approve-payment-btn').addEventListener('click', async (e) => {
         console.log("[DIAG-VERIF] Botón APROVAR presionado.");
         const approveBtn = e.currentTarget;
@@ -3080,7 +3098,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
             // 1. Cambia estado
             currentLoan.history[historyIndex].status = 'approved';
 
-            // 2. Recalcula finanzas
+            // 2. Recalcula finanzas (Tu lógica existente)
             const installmentValue = currentLoan.originalInstallmentAmount || 0;
             const newTotalPaid = (currentLoan.history || []).filter(h => h.status === 'approved').reduce((sum, h) => sum + (h.amount || 0), 0);
             const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
@@ -3092,6 +3110,15 @@ function showVerificationModal(clientId, historyIndex, loanIndex) {
             
             await updateDoc(clientRef, { loans: updatedLoans });
             showToast(translations[currentLang].paymentApproved);
+
+            // --- [INICIO CAMBIO 3/4] ---
+            // Elimina la notificación interna AHORA que fue procesada
+            if (notificationId) {
+                console.log(`[DIAG-VERIF] Aprobado. Eliminando notificación interna: ${notificationId}`);
+                await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
+            }
+            // --- [FIN CAMBIO 3/4] ---
+
             window.history.back(); // Cierra el modal
             const amountStr = money(payment.amount);
             const notifTitle = translations[currentLang].paymentApprovedClientTitle;
@@ -5503,5 +5530,6 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
 
 
