@@ -1084,7 +1084,7 @@ try {
         }
         
         function updateNotifications() {
-    console.log("[COBRADOR-APP][DIAG] updateNotifications() iniciada."); 
+    console.log("[COBRADOR-APP][DIAG] updateNotifications() iniciada.");
     const container = document.getElementById('notifications-list-container');
     const badge = document.getElementById('notification-badge');
     if (!container || !badge) return;
@@ -1118,16 +1118,16 @@ try {
     });
     console.log(`[DIAG-NOTIF] ${combinedNotifications.length} notificaciones añadidas desde la fuente interna.`);
 
-    
+
     console.log("[DIAG-NOTIF] Verificando 'allClients' para pendientes adicionales...");
     /* <-- INICIO DEL BLOQUE COMENTADO
     allClients.forEach(client => {
         // Pagos pendientes (sin cambios en esta lógica interna)
-        (client.loans || []).forEach((loan, loanIndex) => { 
+        (client.loans || []).forEach((loan, loanIndex) => {
             (loan.history || []).forEach((payment, historyIndex) => {
                 if (payment && payment.status === 'pending_verification') {
                     // ID único para evitar duplicados si ya vino de internalNotifications
-                    const uniqueId = `payment_${client.id}_${loanIndex}_${historyIndex}`; 
+                    const uniqueId = `payment_${client.id}_${loanIndex}_${historyIndex}`;
                     if (!processedIds.has(uniqueId)) {
                          console.log(`[DIAG-NOTIF] --> ENCONTRADO PAGO PENDIENTE (no estaba en interna): Cliente ${client.id}, L${loanIndex}, H${historyIndex}`);
                         combinedNotifications.push({
@@ -1150,7 +1150,7 @@ try {
                  processedIds.add(uniqueId);
              }
         }
-    }); 
+    });
     */ // <-- FIN DEL BLOQUE COMENTADO
 
 
@@ -1176,9 +1176,9 @@ try {
             const photoUrl = p.profilePictureUrl || placeholderUrl;
 
             // Usa el 'body' que guardamos antes, o genera uno si falta
-            let subtitle = p.body || (p.type === 'payment' 
+            let subtitle = p.body || (p.type === 'payment'
                 ? `${translations[currentLang].paymentSent} ${money(p.amount)}. ${translations[currentLang].pleaseVerify}`
-                : (p.type === 'refinance' 
+                : (p.type === 'refinance'
                     ? `${translations[currentLang].refinanceRequested} ${money(p.amount)}. ${translations[currentLang].reviewRequest}`
                     : 'Nova notificação'));
 
@@ -1186,7 +1186,7 @@ try {
             const loanIndexAttr = p.loanIndex !== undefined ? `data-loan-index="${p.loanIndex}"` : '';
             const historyIndexAttr = p.historyIndex !== undefined ? `data-history-index="${p.historyIndex}"` : '';
             // *** [CAMBIO IMPORTANTE AQUÍ] Aseguramos que data-notification-id tenga el valor de p.id ***
-            const notificationIdAttr = p.id ? `data-notification-id="${p.id}"` : ''; 
+            const notificationIdAttr = p.id ? `data-notification-id="${p.id}"` : '';
 
             return `
             <div class="notification-card" data-client-id="${p.clientId}" ${loanIndexAttr} ${historyIndexAttr} data-type="${p.type}" ${notificationIdAttr}>
@@ -1205,11 +1205,11 @@ try {
             const type = card.dataset.type;
             const clientId = card.dataset.clientId;
             // *** [CAMBIO IMPORTANTE AQUÍ] Obtenemos el ID de la notificación desde el data attribute ***
-            const notificationId = card.dataset.notificationId; 
+            const notificationId = card.dataset.notificationId;
 
             if (type === 'payment') {
                 const historyIndex = parseInt(card.dataset.historyIndex, 10);
-                const loanIndex = parseInt(card.dataset.loanIndex, 10); 
+                const loanIndex = parseInt(card.dataset.loanIndex, 10);
                 if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
                      // *** [CAMBIO IMPORTANTE AQUÍ] Pasamos el notificationId al modal ***
                      showVerificationModal(clientId, historyIndex, loanIndex, notificationId);
@@ -1218,7 +1218,8 @@ try {
                      showToast("Erro ao abrir detalhes da notificação.", true);
                 }
             } else if (type === 'refinance') {
-                showRefinanceModal(clientId); // El modal de refinanciamiento no necesita el ID de la notificación para su lógica principal
+                // *** [CAMBIO IMPORTANTE AQUÍ] Pasamos el notificationId al modal ***
+                showRefinanceModal(clientId, notificationId);
             } else {
                  console.warn("Tipo de notificação desconhecido clicado:", type);
             }
@@ -1250,149 +1251,204 @@ try {
             });
         }
 
-        function showRefinanceModal(clientId) {
-            const refinanceModal = document.getElementById('refinanceModal');
-            const client = allClients.find(c => c.id === clientId);
-            if (!client || !client.refinanceRequest) {
-                showToast('Solicitação de refinanciamento não encontrada.', true);
-                return;
-            }
+        // Pega este bloque completo dentro de <script type="module">
 
-            const request = client.refinanceRequest;
+function showRefinanceModal(clientId, notificationId) { // <-- [CAMBIO 1/3] Añadir notificationId
+    const refinanceModal = document.getElementById('refinanceModal');
+    const client = allClients.find(c => c.id === clientId);
+    if (!client || !client.refinanceRequest) {
+        showToast('Solicitação de refinanciamento não encontrada.', true);
+        return;
+    }
+    console.log(`[DIAG-REFI] showRefinanceModal chamada com clientId=${clientId}, notifId=${notificationId}`); // Log añadido
 
-            // --- CORRECCIÓN DEL TYPO AQUÍ ---
-            const loanDetails = calculateLoanDetails(client.loans[0]); // Asumimos el primer préstamo para la reputación
-            const lateDays = loanDetails.lateDays; // Usamos el resultado de calculateLoanDetails
-            // --- FIN CORRECCIÓN ---
+    const request = client.refinanceRequest;
 
-            const score = Math.max(0, 10 - lateDays);
-            let reputationStatusKey = 'reputationBad';
-            if (score === 10) reputationStatusKey = 'reputationPerfect';
-            else if (score >= 7) reputationStatusKey = 'reputationGood';
-            else if (score >= 3) reputationStatusKey = 'reputationRegular';
+    // --- CORRECCIÓN DEL TYPO AQUÍ ---
+    const loanDetails = calculateLoanDetails(client.loans[0]); // Asumimos el primer préstamo para la reputación
+    const lateDays = loanDetails.lateDays; // Usamos el resultado de calculateLoanDetails
+    // --- FIN CORRECCIÓN ---
 
-            let barStatusClass = 'status-bad';
-            if (score === 10) barStatusClass = 'status-perfect';
-            else if (score >= 7) barStatusClass = 'status-good';
-            else if (score >= 3) barStatusClass = 'status-regular';
+    const score = Math.max(0, 10 - lateDays);
+    let reputationStatusKey = 'reputationBad';
+    if (score === 10) reputationStatusKey = 'reputationPerfect';
+    else if (score >= 7) reputationStatusKey = 'reputationGood';
+    else if (score >= 3) reputationStatusKey = 'reputationRegular';
 
-            const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
-            const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
-            const photoUrl = client.profilePictureUrl || placeholderUrl;
+    let barStatusClass = 'status-bad';
+    if (score === 10) barStatusClass = 'status-perfect';
+    else if (score >= 7) barStatusClass = 'status-good';
+    else if (score >= 3) barStatusClass = 'status-regular';
 
-            refinanceModal.innerHTML = `
-                <header class="modal-header">
-                    <button id="closeRefinanceModal"><i data-lucide="arrow-left"></i></button>
-                    <span class="modal-title">Solicitação de Refinanciamento</span>
-                </header>
-                <div class="modal-content-wrapper container">
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                        <img src="${photoUrl}" alt="Foto do Cliente" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;">
-                        <div>
-                            <h3 style="margin: 0 0 5px;">${client.name}</h3>
-                            <div class="reputation-status">
-                                <span class="reputation-value">${score} / 10</span>
-                                <span class="reputation-text ${barStatusClass}" data-lang-key="${reputationStatusKey}"></span>
-                            </div>
-                        </div>
-                    </div>
+    const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
+    const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+    const photoUrl = client.profilePictureUrl || placeholderUrl;
 
-                    <div class="kpi-card">
-                        <h3 class="kpi-title">Detalhes da Solicitação</h3>
-                        <div class="loan-summary" style="grid-template-columns: 1fr; gap: 10px; text-align: center;">
-                            <div>
-                                <p class="kpi-title" style="justify-content: center;">Valor Solicitado</p>
-                                <p class="kpi-value">${money(request.amount)}</p>
-                            </div>
-                            <div>
-                                <p class="kpi-title" style="justify-content: center;">Nº de Parcelas</p>
-                                <p class="kpi-value">${request.installments}</p>
-                            </div>
-                        </div>
+    refinanceModal.innerHTML = `
+        <header class="modal-header">
+            <button id="closeRefinanceModal"><i data-lucide="arrow-left"></i></button>
+            <span class="modal-title">Solicitação de Refinanciamento</span>
+        </header>
+        <div class="modal-content-wrapper container">
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                <img src="${photoUrl}" alt="Foto do Cliente" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;">
+                <div>
+                    <h3 style="margin: 0 0 5px;">${client.name}</h3>
+                    <div class="reputation-status">
+                        <span class="reputation-value">${score} / 10</span>
+                        <span class="reputation-text ${barStatusClass}" data-lang-key="${reputationStatusKey}"></span>
                     </div>
                 </div>
-                <div class="action-buttons">
-                    <button class="btn-danger" id="reject-refinance-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
-                    <button class="btn-primary" id="approve-refinance-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
-                </div>`;
+            </div>
 
-            history.pushState({ modal: 'refinanceModal' }, 'Refinance Modal', '#refinance');
-            refinanceModal.classList.add('active');
-            lucide.createIcons({ nodes: refinanceModal.querySelectorAll('[data-lucide]') });
+            <div class="kpi-card">
+                <h3 class="kpi-title">Detalhes da Solicitação</h3>
+                <div class="loan-summary" style="grid-template-columns: 1fr; gap: 10px; text-align: center;">
+                    <div>
+                        <p class="kpi-title" style="justify-content: center;">Valor Solicitado</p>
+                        <p class="kpi-value">${money(request.amount)}</p>
+                    </div>
+                    <div>
+                        <p class="kpi-title" style="justify-content: center;">Nº de Parcelas</p>
+                        <p class="kpi-value">${request.installments}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="action-buttons">
+            <button class="btn-danger" id="reject-refinance-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
+            <button class="btn-primary" id="approve-refinance-btn"><i data-lucide="check-circle"></i> <span data-lang-key="approve"></span></button>
+        </div>`;
+
+    history.pushState({ modal: 'refinanceModal' }, 'Refinance Modal', '#refinance');
+    refinanceModal.classList.add('active');
+    lucide.createIcons({ nodes: refinanceModal.querySelectorAll('[data-lucide]') });
+    applyLanguage(currentLang);
+
+    document.getElementById('closeRefinanceModal').addEventListener('click', () => window.history.back());
+
+    // --- Botón APROBAR (Modificado) ---
+    document.getElementById('approve-refinance-btn').addEventListener('click', async (e) => {
+        console.log("[DIAG-REFI] Botón APROVAR presionado.");
+        const approveBtn = e.currentTarget;
+        approveBtn.disabled = true;
+        approveBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Aprovando...`;
+        lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
+
+        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
+        // Obtiene datos actualizados por si acaso
+        const currentClientData = allClients.find(c => c.id === clientId);
+        const requestData = currentClientData?.refinanceRequest;
+        if (!requestData) {
+            showToast('Solicitação não encontrada.', true);
+            approveBtn.disabled = false; // Rehabilita
+            approveBtn.innerHTML = `<i data-lucide="check-circle"></i> <span data-lang-key="approve"></span>`;
+            lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
             applyLanguage(currentLang);
-
-            document.getElementById('closeRefinanceModal').addEventListener('click', () => window.history.back());
-
-            document.getElementById('approve-refinance-btn').addEventListener('click', async () => {
-                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
-                const requestData = client.refinanceRequest;
-                if (!requestData) {
-                    showToast('Solicitud no encontrada.', true);
-                    return;
-                }
-
-                // Lógica para crear el nuevo préstamo a partir de la solicitud
-                const interestRate = client.interestRate || 20;
-                const totalToPay = requestData.amount * (1 + (interestRate / 100));
-                const installmentValue = requestData.installments > 0 ? totalToPay / requestData.installments : 0;
-
-                const newLoanData = {
-                    totalLoan: totalToPay,
-                    amount: installmentValue,
-                    originalInstallmentAmount: installmentValue,
-                    installments: `0/${requestData.installments}`,
-                    paid: 0,
-                    paymentBalance: 0,
-                    status: 'active',
-                    startDate: new Date(),
-                    history: [],
-                    // Se heredan estos valores del préstamo principal para consistencia
-                    paymentFrequency: client.loans[0].paymentFrequency,
-                    paymentDays: client.loans[0].paymentDays,
-                    collectionTime: client.loans[0].collectionTime,
-                     // [NUEVO] Asegura guardar el principalAmount para cálculos futuros
-                    principalAmount: requestData.amount,
-                    lateFeeRate: client.loans[0].lateFeeRate || 0 // Hereda tasa de mora
-                };
-
-                try {
-                    await updateDoc(clientRef, {
-                        refinanceRequest: null, // Elimina la solicitud pendiente
-                        loans: arrayUnion(newLoanData) // Añade el nuevo préstamo a la lista
-                    });
-
-                    showToast('Refinanciamento aprovado e novo empréstimo criado!');
-                    window.history.back();
-
-                    const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
-                    const notifBody = translations[currentLang].refinanceApprovedClientBody;
-                    sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
-                } catch (error) {
-                    console.error("Error approving refinance:", error);
-                    showToast('Erro ao aprovar refinanciamento.', true);
-                }
-            });
-
-            document.getElementById('reject-refinance-btn').addEventListener('click', async () => {
-                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
-                try {
-                    await updateDoc(clientRef, {
-                        refinanceRequest: null
-                    });
-                    showToast('Solicitação rejeitada.');
-
-                    // [BUG CORREGIDO] Notificación de rechazo de refinanciamiento AÑADIDA
-                    const notifTitle = translations[currentLang].refinanceRejectedClientTitle;
-                    const notifBody = translations[currentLang].refinanceRejectedClientBody;
-                    sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected', 'trending-down');
-
-                    window.history.back();
-                } catch (error) {
-                    console.error("Error rejecting refinance:", error);
-                    showToast('Erro ao rejeitar solicitação.', true);
-                }
-            });
+            return;
         }
+
+        // Lógica para crear el nuevo préstamo (sin cambios)
+        const interestRate = currentClientData.interestRate || 20;
+        const totalToPay = requestData.amount * (1 + (interestRate / 100));
+        const installmentValue = requestData.installments > 0 ? totalToPay / requestData.installments : 0;
+
+        const newLoanData = {
+            totalLoan: totalToPay,
+            amount: installmentValue,
+            originalInstallmentAmount: installmentValue,
+            installments: `0/${requestData.installments}`,
+            paid: 0,
+            paymentBalance: 0,
+            status: 'active',
+            startDate: new Date(),
+            history: [],
+            paymentFrequency: currentClientData.loans[0]?.paymentFrequency || 'daily', // Hereda del primero
+            paymentDays: currentClientData.loans[0]?.paymentDays || [],
+            collectionTime: currentClientData.loans[0]?.collectionTime,
+            principalAmount: requestData.amount,
+            lateFeeRate: currentClientData.loans[0]?.lateFeeRate || 0
+        };
+
+        try {
+            await updateDoc(clientRef, {
+                refinanceRequest: null,
+                loans: arrayUnion(newLoanData)
+            });
+
+            // --- [INICIO CAMBIO 2/3] ---
+            // Elimina la notificación interna AHORA que fue procesada
+            if (notificationId) {
+                console.log(`[DIAG-REFI] Aprobado. Eliminando notificación interna: collectors/${currentCollectorUsername}/notifications/${notificationId}`);
+                await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
+                console.log(`[DIAG-REFI] Notificación ${notificationId} eliminada.`);
+            } else {
+                 console.warn("[DIAG-REFI] No se proporcionó notificationId para eliminar.");
+            }
+            // --- [FIN CAMBIO 2/3] ---
+
+            showToast('Refinanciamento aprovado e novo empréstimo criado!');
+            window.history.back(); // Cierra DESPUÉS de borrar
+
+            const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
+            const notifBody = translations[currentLang].refinanceApprovedClientBody;
+            sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
+        } catch (error) {
+            console.error("Error approving refinance:", error);
+            showToast('Erro ao aprovar refinanciamento.', true);
+            // Rehabilita botón en error (sin cambios)
+            approveBtn.disabled = false;
+            approveBtn.innerHTML = `<i data-lucide="check-circle"></i> <span data-lang-key="approve"></span>`;
+            lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
+            applyLanguage(currentLang);
+        }
+    });
+
+    // --- Botón RECHAZAR (Modificado) ---
+    document.getElementById('reject-refinance-btn').addEventListener('click', async (e) => {
+        console.log("[DIAG-REFI] Botón RECHAZAR presionado.");
+        const rejectBtn = e.currentTarget;
+        rejectBtn.disabled = true;
+        rejectBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Rejeitando...`;
+        lucide.createIcons({ nodes: [rejectBtn.querySelector('i')] });
+
+        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
+        try {
+            await updateDoc(clientRef, {
+                refinanceRequest: null
+            });
+
+            // --- [INICIO CAMBIO 3/3] ---
+            // Elimina la notificación interna AHORA que fue procesada
+            if (notificationId) {
+                console.log(`[DIAG-REFI] Rechazado. Eliminando notificación interna: collectors/${currentCollectorUsername}/notifications/${notificationId}`);
+                await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
+                console.log(`[DIAG-REFI] Notificación ${notificationId} eliminada.`);
+            } else {
+                 console.warn("[DIAG-REFI] No se proporcionó notificationId para eliminar.");
+            }
+            // --- [FIN CAMBIO 3/3] ---
+
+            showToast('Solicitação rejeitada.');
+            window.history.back(); // Cierra DESPUÉS de borrar
+
+            const notifTitle = translations[currentLang].refinanceRejectedClientTitle;
+            const notifBody = translations[currentLang].refinanceRejectedClientBody;
+            sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_rejected', 'trending-down');
+
+        } catch (error) {
+            console.error("Error rejecting refinance:", error);
+            showToast('Erro ao rejeitar solicitação.', true);
+            // Rehabilita botón en error (sin cambios)
+            rejectBtn.disabled = false;
+            rejectBtn.innerHTML = `<i data-lucide="x-circle"></i> <span data-lang-key="reject"></span>`;
+            lucide.createIcons({ nodes: [rejectBtn.querySelector('i')] });
+            applyLanguage(currentLang);
+        }
+    });
+}
+
+// Fin del bloque para pegar
 
         function showPaymentDetailModal(clientId, loanIndex, historyIndex) {
             const modal = document.getElementById('paymentDetailModal');
@@ -5561,8 +5617,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
-
-
-
-
