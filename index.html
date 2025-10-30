@@ -1101,6 +1101,7 @@ try {
         if (!processedIds.has(uniqueId)) {
             combinedNotifications.push({
                 // Mapea los campos esperados por la UI
+                id: n.id, // <-- GUARDAMOS EL ID DEL DOCUMENTO FIRESTORE
                 type: n.type || 'unknown', // 'payment', 'refinance', etc.
                 date: n.timestamp, // Usa 'timestamp' como 'date'
                 clientName: n.from || 'Cliente Desconhecido',
@@ -1184,10 +1185,11 @@ try {
             // Asegura que los data attributes existan, aunque sean undefined
             const loanIndexAttr = p.loanIndex !== undefined ? `data-loan-index="${p.loanIndex}"` : '';
             const historyIndexAttr = p.historyIndex !== undefined ? `data-history-index="${p.historyIndex}"` : '';
-            const notificationIdAttr = p.id ? `data-notification-id="${p.id}"` : '';
+            // *** [CAMBIO IMPORTANTE AQUÍ] Aseguramos que data-notification-id tenga el valor de p.id ***
+            const notificationIdAttr = p.id ? `data-notification-id="${p.id}"` : ''; 
 
             return `
-            <div class="notification-card" data-client-id="${p.clientId}" ${loanIndexAttr} ${historyIndexAttr} data-type="${p.type}">
+            <div class="notification-card" data-client-id="${p.clientId}" ${loanIndexAttr} ${historyIndexAttr} data-type="${p.type}" ${notificationIdAttr}>
                 <img src="${photoUrl}" alt="Foto do Cliente" class="client-avatar">
                 <div class="notification-info">
                     <h4 class="notification-title">${p.clientName}</h4>
@@ -1197,25 +1199,26 @@ try {
         }).join('');
 
 
-    // Listeners (Sin cambios lógicos)
+    // Listeners (Sin cambios lógicos internos, pero ahora pasamos el ID)
     container.querySelectorAll('.notification-card').forEach(card => {
         card.addEventListener('click', () => {
             const type = card.dataset.type;
             const clientId = card.dataset.clientId;
-
-            const notificationId = card.dataset.notificationId;
+            // *** [CAMBIO IMPORTANTE AQUÍ] Obtenemos el ID de la notificación desde el data attribute ***
+            const notificationId = card.dataset.notificationId; 
 
             if (type === 'payment') {
                 const historyIndex = parseInt(card.dataset.historyIndex, 10);
                 const loanIndex = parseInt(card.dataset.loanIndex, 10); 
                 if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
+                     // *** [CAMBIO IMPORTANTE AQUÍ] Pasamos el notificationId al modal ***
                      showVerificationModal(clientId, historyIndex, loanIndex, notificationId);
                 } else {
                      console.error("Índices inválidos na notificação de pagamento:", card.dataset);
                      showToast("Erro ao abrir detalhes da notificação.", true);
                 }
             } else if (type === 'refinance') {
-                showRefinanceModal(clientId);
+                showRefinanceModal(clientId); // El modal de refinanciamiento no necesita el ID de la notificación para su lógica principal
             } else {
                  console.warn("Tipo de notificação desconhecido clicado:", type);
             }
@@ -2958,6 +2961,9 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
         // Pega este bloque completo dentro de <script type="module">
 
 
+        // Pega este bloque completo dentro de <script type="module">
+
+
 function showVerificationModal(clientId, historyIndex, loanIndex, notificationId) { // <-- [CAMBIO 1/4] Añadir notificationId
     // [MODIFICADO] Usa el nuevo modal #verificationModal con estilo .modal-view
     console.log(`[DIAG-VERIF] showVerificationModal llamada con clientId=${clientId}, loanIndex=${loanIndex}, historyIndex=${historyIndex}, notifId=${notificationId}`);
@@ -2989,6 +2995,10 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
     if (!loan || !payment || payment.status !== 'pending_verification') {
         console.error("[DIAG-VERIF] Error: No se pudo encontrar el PAGO PENDIENTE o el préstamo:", { clientId, loanIndex, historyIndex, loan, payment });
         showToast('Erro: Pagamento pendente não encontrado ou já processado.', true);
+        // [NUEVO] Si el pago no es pendiente, intenta cerrar el modal si está abierto
+        if (modal.classList.contains('active')) {
+             window.history.back(); // Cierra el modal si ya no es relevante
+        }
         return;
     }
     console.log("[DIAG-VERIF] Pago pendiente validado.");
@@ -3041,7 +3051,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
     applyLanguage(currentLang); // Aplica traducciones
     console.log("[DIAG-VERIF] Modal mostrado y configurado.");
 
-    // --- Lógica de los botones (SIN CAMBIOS INTERNOS, solo el listener de cerrar) ---
+    // --- Lógica de los botones (MODIFICADA para borrar notificación) ---
     modal.querySelector('#closeVerificationModal').addEventListener('click', () => window.history.back()); // <-- CAMBIO: Usa el nuevo ID del botón
 
     // Botón RECHAZAR
@@ -3053,22 +3063,30 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
         lucide.createIcons({ nodes: [rejectBtn.querySelector('i')] });
         try {
             const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-            const updatedLoans = JSON.parse(JSON.stringify(client.loans));
+            // Obtenemos una copia ACTUALIZADA del cliente por si acaso hubo cambios mientras el modal estaba abierto
+            const currentClientData = allClients.find(c => c.id === clientId); 
+            if (!currentClientData) throw new Error("Cliente no encontrado en datos locales actualizados.");
+            const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans)); // Copia profunda de los préstamos actuales
+
             if (updatedLoans[loanIndex]?.history?.[historyIndex]) {
                 updatedLoans[loanIndex].history[historyIndex].status = 'rejected';
-            } else { throw new Error("Índice inválido."); }
+            } else { throw new Error("Índice de préstamo o historial inválido al intentar rechazar."); }
+            
             await updateDoc(clientRef, { loans: updatedLoans });
             showToast(translations[currentLang].paymentRejected);
             
             // --- [INICIO CAMBIO 2/4] ---
             // Elimina la notificación interna AHORA que fue procesada
             if (notificationId) {
-                console.log(`[DIAG-VERIF] Rechazado. Eliminando notificación interna: ${notificationId}`);
+                console.log(`[DIAG-VERIF] Rechazado. Eliminando notificación interna: collectors/${currentCollectorUsername}/notifications/${notificationId}`);
                 await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
+                console.log(`[DIAG-VERIF] Notificación ${notificationId} eliminada.`);
+            } else {
+                 console.warn("[DIAG-VERIF] No se proporcionó notificationId para eliminar.");
             }
             // --- [FIN CAMBIO 2/4] ---
 
-            window.history.back(); // Cierra el modal
+            window.history.back(); // Cierra el modal DESPUÉS de borrar la notificación
             const notifTitle = translations[currentLang].paymentRejectedClientTitle;
             const notifBody = translations[currentLang].paymentRejectedClientBody;
             sendNotificationToClient(clientId, notifTitle, notifBody, 'payment_rejected', 'alert-circle');
@@ -3091,16 +3109,23 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
         lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
         try {
             const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-            const updatedLoans = JSON.parse(JSON.stringify(client.loans));
+            // Obtenemos una copia ACTUALIZADA del cliente por si acaso
+            const currentClientData = allClients.find(c => c.id === clientId);
+            if (!currentClientData) throw new Error("Cliente no encontrado en datos locales actualizados.");
+            const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
             const currentLoan = updatedLoans[loanIndex];
-            if (!currentLoan?.history?.[historyIndex]) { throw new Error("Índice inválido."); }
+
+            if (!currentLoan?.history?.[historyIndex]) { throw new Error("Índice de préstamo o historial inválido al intentar aprobar."); }
             
-            // 1. Cambia estado
+            // 1. Cambia estado del pago en la copia
             currentLoan.history[historyIndex].status = 'approved';
 
-            // 2. Recalcula finanzas (Tu lógica existente)
+            // 2. Recalcula finanzas (Tu lógica existente, pero sobre la copia 'currentLoan')
             const installmentValue = currentLoan.originalInstallmentAmount || 0;
-            const newTotalPaid = (currentLoan.history || []).filter(h => h.status === 'approved').reduce((sum, h) => sum + (h.amount || 0), 0);
+            // Recalcula newTotalPaid DESDE EL HISTORIAL ACTUALIZADO de currentLoan
+            const newTotalPaid = (currentLoan.history || [])
+                                .filter(h => h.status === 'approved') // Solo aprobados
+                                .reduce((sum, h) => sum + (h.amount || 0), 0);
             const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
             const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
             currentLoan.paid = newTotalPaid;
@@ -3108,18 +3133,21 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
             currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
             
-            await updateDoc(clientRef, { loans: updatedLoans });
+            await updateDoc(clientRef, { loans: updatedLoans }); // Guarda la copia actualizada
             showToast(translations[currentLang].paymentApproved);
 
             // --- [INICIO CAMBIO 3/4] ---
             // Elimina la notificación interna AHORA que fue procesada
             if (notificationId) {
-                console.log(`[DIAG-VERIF] Aprobado. Eliminando notificación interna: ${notificationId}`);
+                console.log(`[DIAG-VERIF] Aprobado. Eliminando notificación interna: collectors/${currentCollectorUsername}/notifications/${notificationId}`);
                 await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
+                console.log(`[DIAG-VERIF] Notificación ${notificationId} eliminada.`);
+            } else {
+                 console.warn("[DIAG-VERIF] No se proporcionó notificationId para eliminar.");
             }
             // --- [FIN CAMBIO 3/4] ---
 
-            window.history.back(); // Cierra el modal
+            window.history.back(); // Cierra el modal DESPUÉS de borrar la notificación
             const amountStr = money(payment.amount);
             const notifTitle = translations[currentLang].paymentApprovedClientTitle;
             const notifBody = translations[currentLang].paymentApprovedClientBody.replace('{amount}', amountStr);
@@ -3134,6 +3162,9 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
         }
     });
 }
+
+
+// Fin del bloque para pegar
 
 
 
@@ -5530,6 +5561,7 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
 
 
 
