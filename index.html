@@ -670,7 +670,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- Añade deleteDoc aquí
+        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- deleteDoc AÑADIDO
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
         
@@ -5530,6 +5530,7 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
 
 
 
