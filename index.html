@@ -898,6 +898,52 @@ try {
         };
 
         const money = val => (typeof val !== 'number' || isNaN(val)) ? (currentLang === 'pt' ? 'R$ 0,00' : '$ 0.00') : val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+
+        function calculateDailyTotals() {
+            let dailyTotal = 0;
+            let dailyTotalCash = 0;
+            let dailyTotalDigital = 0;
+            
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('pt-BR');
+
+            allClients.forEach(client => {
+                (client.loans || []).forEach(loan => {
+                    (loan.history || []).forEach(h => {
+                        // 1. Filtro de Status (sin cambios)
+                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') {
+                            const paymentDate = new Date(h.date.seconds * 1000);
+                            
+                            // 2. Filtro de Fecha (sin cambios)
+                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
+                                const amount = h.amount || 0;
+                                
+                                // 3. Suma al Total del Día (sin cambios)
+                                dailyTotal += amount; 
+                                
+                                // --- [INICIO DE LA CORRECCIÓN] ---
+                                // 4. Lógica de Categoría CORREGIDA
+                                //    Solo 'dinheiro' es 'Cash'.
+                                //    Todo lo demás ('pix', 'cartao', 'receipt', o indefinido)
+                                //    se cuenta como 'Digital' (o no-efectivo).
+                                if (h.method === 'dinheiro') {
+                                    dailyTotalCash += amount;
+                                } else {
+                                    dailyTotalDigital += amount;
+                                }
+                                // --- [FIN DE LA CORRECCIÓN] ---
+                            }
+                        }
+                    });
+                });
+            });
+            
+            // Devuelve un objeto con los 3 valores correctos
+            return { dailyTotal, dailyTotalCash, dailyTotalDigital };
+        }
+
+
         
         function showToast(message, isError = false) {
             const toastContainer = document.getElementById('toast-container');
@@ -1849,15 +1895,15 @@ function showRefinanceModal(clientId, notificationId) { // <-- [CAMBIO 1/3] Aña
                 kpiRemaining.textContent = remainingClients;
             }
             
-            const todayStr = new Date().toLocaleDateString('pt-BR');
-            const receivedToday = allClients
-                .flatMap(c => c.loans || []) // Búsqueda corregida para múltiples préstamos
-                .flatMap(l => l.history || []) // Extrae el historial de cada préstamo
-                .filter(h => h?.date?.seconds && new Date(h.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr && h.status !== 'pending_verification')
-                .reduce((sum, h) => sum + h.amount, 0);
-            kpiReceived.textContent = money(receivedToday);
+            // --- [INICIO DE LA CORRECCIÓN] ---
+            // Llama a la nueva función centralizada
+            const { dailyTotal } = calculateDailyTotals();
+            
+            // Asigna el valor unificado a "Recebido Hoje"
+            kpiReceived.textContent = money(dailyTotal);
+            // --- [FIN DE LA CORRECCIÓN] ---
         }
-
+        
         function updateProfileView(collectorData = null) {
             const dailyTotalEl = document.getElementById('kpi-daily-total');
             const capitalTotalEl = document.getElementById('kpi-capital-total');
@@ -1865,69 +1911,50 @@ function showRefinanceModal(clientId, notificationId) { // <-- [CAMBIO 1/3] Aña
             const dailyDigitalEl = document.getElementById('kpi-daily-digital');
             if (!dailyTotalEl) return;
 
-            const now = new Date();
-            const todayStr = now.toLocaleDateString('pt-BR');
-            
-            let dailyTotal = 0, totalLoansMade = 0;
-            let dailyTotalCash = 0, dailyTotalDigital = 0;
+            // --- [INICIO DE LA CORRECCIÓN] ---
+            let totalLoansMade = 0;
+            let totalPaymentsReceived = 0; // Pagos totales (históricos)
 
-            // --- INICIO NUEVO CÁLCULO DE PAGOS RECIBIDOS ---
-            let totalPaymentsReceived = 0;
+            // Llama a la nueva función centralizada para obtener los totales del DÍA
+            const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
+            
+            // Recalcula totalLoansMade y totalPaymentsReceived (para Capital em Mãos)
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     // Suma el principal de este préstamo al total prestado
-                    if (loan.principalAmount) { // Usa el principal fijo que guardamos antes
+                    if (loan.principalAmount) {
                         totalLoansMade += loan.principalAmount;
                     } else if (loan.totalLoan && client.interestRate) { // Fallback para préstamos antiguos
                         totalLoansMade += (loan.totalLoan / (1 + (client.interestRate / 100)));
                     }
 
-                    // Suma los pagos aprobados del historial de este préstamo
+                    // Suma TODOS los pagos aprobados al total general (para el capital)
                     (loan.history || []).forEach(h => {
                         if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') {
-                            const paymentDate = new Date(h.date.seconds * 1000);
-                            const amount = h.amount || 0;
-                            totalPaymentsReceived += amount; // Suma al total general
-
-                            // Suma a los totales diarios si corresponde
-                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
-                                dailyTotal += amount;
-                                if (h.method === 'dinheiro') {
-                                    dailyTotalCash += amount;
-                                } else if (h.method === 'pix' || h.method === 'cartao') {
-                                    dailyTotalDigital += amount;
-                                }
-                            }
+                            totalPaymentsReceived += (h.amount || 0);
                         }
                     });
                 });
             });
-            // --- FIN NUEVO CÁLCULO ---
+            // --- [FIN DE LA CORRECCIÓN] ---
                         
             const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
             
             const currentStartingCapital = (collectorData && collectorData.startingCapital) || 0;
-
-            // --- CÁLCULO AÑADIDO PARA LIQUIDACIONES (COBRADOR) ---
             const totalSettledByThisCollector = allSettlements.reduce((sum, s) => sum + (s.amount || 0), 0);
-
-            // --- [INICIO DE LA CORRECCIÓN] ---
-            // --- CÁLCULO AÑADIDO PARA APORTES DE CAPITAL ---
             const totalCapitalInjected = allCapitalInjections.reduce((sum, i) => sum + (i.amount || 0), 0);
-            // --- [FIN DE LA CORRECCIÓN] ---
+
+            // La fórmula de capital (sin cambios) usa el totalPaymentsReceived (de todos los tiempos)
+            const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses - totalSettledByThisCollector + totalCapitalInjected;
+            currentCapitalOnHand = capitalTotal;
 
             // --- [INICIO DE LA CORRECCIÓN] ---
-            // Ajusta la fórmula final de capitalTotal
-            const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses - totalSettledByThisCollector + totalCapitalInjected; // <-- AÑADIDO +totalCapitalInjected
-
-            // Guarda el valor calculado en la variable global
-            currentCapitalOnHand = capitalTotal;
-            // --- [FIN DE LA CORRECCIÓN] ---
-
+            // Asigna los valores unificados de la nueva función
             dailyTotalEl.textContent = money(dailyTotal);
-            capitalTotalEl.textContent = money(capitalTotal); // Usa el capitalTotal ajustado
+            capitalTotalEl.textContent = money(capitalTotal); 
             if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
+            // --- [FIN DE LA CORRECCIÓN] ---
         }
         
         // Nueva función mejorada que calcula días de atraso Y mora
@@ -5750,3 +5777,4 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
