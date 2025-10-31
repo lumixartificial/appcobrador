@@ -4543,106 +4543,278 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             }
         }
 
-        function exportDailyReport() {
+        async function exportDailyReport() {
             const { jsPDF } = window.jspdf;
-            const todayStr = new Date().toLocaleDateString('pt-BR');
+            const doc = new jsPDF();
             const lang = currentLang;
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('pt-BR');
 
-            const dailyPayments = [];
-             allClients.forEach(client => {
-                (client.history || []).forEach(h => {
-                    if (h.date?.seconds) {
-                        const paymentDate = new Date(h.date.seconds * 1000);
-                        if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
-                            dailyPayments.push({
-                                clientName: client.name,
-                                amount: h.amount,
-                                time: paymentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                            });
+            // --- 1. GATHER ALL DATA FOR TODAY ---
+
+            // A. Pagos Recibidos (Lista y Totales)
+            const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
+            const dailyPaymentsList = [];
+            allClients.forEach(client => {
+                (client.loans || []).forEach((loan, loanIndex) => { // <-- CORRECCIÓN: Iterar sobre client.loans
+                    (loan.history || []).forEach(h => {
+                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') {
+                            const paymentDate = new Date(h.date.seconds * 1000);
+                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
+                                dailyPaymentsList.push({
+                                    clientName: client.name,
+                                    amount: h.amount,
+                                    time: paymentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                                    method: h.method || 'dinheiro',
+                                    loanIndex: loanIndex + 1
+                                });
+                            }
                         }
-                    }
+                    });
                 });
             });
+            dailyPaymentsList.sort((a, b) => a.time.localeCompare(b.time));
 
+            // B. Gastos (Lista y Total)
             const dailyExpenses = allExpenses.filter(e => {
                 if (!e.date?.seconds) return false;
-                const expenseDate = new Date(e.date.seconds * 1000);
-                return expenseDate.toLocaleDateString('pt-BR') === todayStr;
+                return new Date(e.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
             });
+            const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.value, 0);
+            dailyExpenses.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
+
+            // C. Liquidaciones (Lista y Total)
+            const dailySettlements = allSettlements.filter(s => {
+                if (!s.date?.seconds) return false;
+                return new Date(s.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
+            });
+            const totalSettlements = dailySettlements.reduce((sum, s) => sum + s.amount, 0);
+            dailySettlements.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
             
-            if (dailyPayments.length === 0 && dailyExpenses.length === 0) {
-                showToast("Nenhuma atividade registrada hoje.", true);
+            // D. Aportes de Capital (Lista y Total)
+            const dailyInjections = allCapitalInjections.filter(i => {
+                if (!i.date?.seconds) return false; // Asume que 'date' es la fecha de aprobación/creación
+                return new Date(i.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
+            });
+            const totalInjections = dailyInjections.reduce((sum, i) => sum + i.amount, 0);
+            dailyInjections.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
+
+
+            // E. Cálculo Final
+            const netBalance = dailyTotal + totalInjections - totalExpenses - totalSettlements;
+
+            if (dailyTotal === 0 && totalExpenses === 0 && totalSettlements === 0 && totalInjections === 0) {
+                showToast(translations[lang].noPaymentsToday, true);
                 return;
             }
 
-            const totalCollected = dailyPayments.reduce((sum, p) => sum + p.amount, 0);
-            const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.value, 0);
-            const netBalance = totalCollected - totalExpenses;
+            // --- 2. GENERATE PDF ---
+            const pageMargin = 15;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const center = pageWidth / 2;
+            let y = 0;
 
-            doc.setFontSize(18);
-            doc.text(translations[lang].reportTitle, 105, 20, { align: 'center' });
+            // A. Encabezado
+            y = 25;
+            try {
+                // Usa el logo Base64 que ya está en tu código
+                doc.addImage(LOGO_BASE64_JPG, 'JPEG', pageMargin, 15, 20, 20);
+            } catch(e) { console.warn("Falha ao adicionar logo ao PDF"); }
             
-            doc.setFontSize(11);
-            doc.text(`${translations[lang].reportDate}: ${todayStr}`, 14, 30);
-            doc.text(`${translations[lang].reportCollector}: João Silva`, 14, 35);
-            
-            doc.text(`${translations[lang].reportTotalCollected}: ${money(totalCollected)}`, 196, 30, { align: 'right' });
-            doc.text(`${translations[lang].reportTotalExpenses}: ${money(totalExpenses)}`, 196, 35, { align: 'right' });
-            doc.setFontSize(12);
+            doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
-            doc.text(`${translations[lang].reportNetBalance}: ${money(netBalance)}`, 196, 42, { align: 'right' });
+            doc.text(currentCompanyData?.name || 'Relatório de Cobrança', center, y, { align: 'center' });
+            y += 7;
+            doc.setFontSize(12);
             doc.setFont(undefined, 'normal');
+            doc.setTextColor(100);
+            doc.text(`Relatório Diário - ${todayStr}`, center, y, { align: 'center' });
 
+            // B. Información del Cobrador
+            y += 15;
+            doc.setFontSize(10);
+            doc.setTextColor(150);
+            doc.text('COBRADOR:', pageMargin, y);
+            doc.setFontSize(12);
+            doc.setTextColor(0);
+            doc.setFont(undefined, 'bold');
+            doc.text(currentCollectorUsername || 'N/A', pageMargin + 25, y); // <-- CORRECCIÓN: Usa nombre real
 
-            let y = 55;
+            // C. Resumen Contábil
+            y += 15;
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text('Resumo Contábil do Dia', pageMargin, y);
+            y += 5;
             doc.setLineWidth(0.5);
-            doc.line(14, y - 5, 196, y - 5);
+            doc.setDrawColor(200);
+            doc.line(pageMargin, y, pageWidth - pageMargin, y);
 
-            if(dailyPayments.length > 0) {
-                 doc.setFontSize(12);
-                 doc.setFont(undefined, 'bold');
-                 doc.text(translations[lang].receivedToday, 14, y);
-                 y += 7;
-                 doc.setFontSize(10);
-                 doc.setFont(undefined, 'normal');
-                 doc.text(translations[lang].reportClient, 14, y);
-                 doc.text(translations[lang].reportAmount, 150, y);
-                 doc.text(translations[lang].reportTime, 180, y);
-                 y += 7;
-                 dailyPayments.sort((a,b) => a.time.localeCompare(b.time)).forEach(p => {
-                     if (y > 280) { doc.addPage(); y = 20; }
-                     doc.text(p.clientName, 14, y);
-                     doc.text(money(p.amount), 150, y);
-                     doc.text(p.time, 180, y);
-                     y += 7;
+            const addSummaryLine = (label, value, color = '#000000') => {
+                y += 8;
+                doc.setFontSize(11);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(100);
+                doc.text(label, pageMargin + 5, y);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(color);
+                doc.text(money(value), pageWidth - pageMargin - 5, y, { align: 'right' });
+            };
+
+            addSummaryLine(`(+) Total Recebido Hoje:`, dailyTotal, '#28a745');
+            addSummaryLine(`    ... em Dinheiro:`, dailyTotalCash, '#6c757d');
+            addSummaryLine(`    ... em Digital/Recibo:`, dailyTotalDigital, '#6c757d');
+            addSummaryLine(`(+) Aportes de Capital:`, totalInjections, '#28a745');
+            addSummaryLine(`(-) Gastos Totais:`, totalExpenses, '#dc3545');
+            addSummaryLine(`(-) Liquidações Enviadas:`, totalSettlements, '#dc3545');
+
+            y += 3;
+            doc.setLineWidth(0.2);
+            doc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); // Linha fina
+            
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(netBalance >= 0 ? '#6f42c1' : '#dc3545');
+            doc.text('SALDO LÍQUIDO DO DIA:', pageMargin + 5, y + 8);
+            doc.text(money(netBalance), pageWidth - pageMargin - 5, y + 8, { align: 'right' });
+            y += 20;
+
+            // D. Secciones de Detalles (con paginación)
+            const checkPageBreak = () => {
+                if (y > 270) { // Margen para el pie de página
+                    doc.addPage();
+                    y = 20;
+                }
+            };
+
+            const addSectionHeader = (title) => {
+                checkPageBreak();
+                y += 5;
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(0);
+                doc.text(title, pageMargin, y);
+                y += 5;
+                doc.setLineWidth(0.5);
+                doc.setDrawColor(200);
+                doc.line(pageMargin, y, pageWidth - pageMargin, y);
+                y += 8;
+            };
+
+            const addTableHeaders = (headers) => {
+                 doc.setFontSize(9);
+                 doc.setTextColor(100);
+                 headers.forEach(header => {
+                     doc.text(header.label, header.x, y, { align: header.align || 'left' });
                  });
+                 y += 5;
+            };
+
+            // D.1. Pagos Recibidos
+            if (dailyPaymentsList.length > 0) {
+                addSectionHeader('Detalhe dos Pagamentos Recebidos');
+                addTableHeaders([
+                    { label: 'Hora', x: pageMargin + 5 },
+                    { label: 'Cliente (Empréstimo)', x: pageMargin + 25 },
+                    { label: 'Método', x: pageMargin + 130 },
+                    { label: 'Valor', x: pageWidth - pageMargin - 5, align: 'right' }
+                ]);
+                
+                dailyPaymentsList.forEach(p => {
+                    checkPageBreak();
+                    doc.setFontSize(10);
+                    doc.setTextColor(0);
+                    doc.text(p.time, pageMargin + 5, y);
+                    doc.text(doc.splitTextToSize(`${p.clientName} (E ${p.loanIndex})`, 95), pageMargin + 25, y);
+                    doc.text(p.method, pageMargin + 130, y);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor('#28a745');
+                    doc.text(money(p.amount), pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
             }
 
-            if(dailyExpenses.length > 0) {
-                y += 10;
-                doc.setLineWidth(0.2);
-                doc.line(14, y - 5, 196, y - 5);
-                 doc.setFontSize(12);
-                 doc.setFont(undefined, 'bold');
-                 doc.text(translations[lang].myExpenses, 14, y);
-                 y += 7;
-                 doc.setFontSize(10);
-                 doc.setFont(undefined, 'normal');
-                 doc.text(translations[lang].expenseType, 14, y);
-                 doc.text(translations[lang].reportAmount, 150, y);
-                 doc.text(translations[lang].reportTime, 180, y);
-                 y += 7;
-                 dailyExpenses.sort((a,b) => (a.date.seconds || 0) - (b.date.seconds || 0)).forEach(e => {
-                     if (y > 280) { doc.addPage(); y = 20; }
-                     const categoryText = translations[lang][e.category] || e.category;
-                     const time = new Date(e.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                     doc.text(categoryText, 14, y);
-                     doc.text(`-${money(e.value)}`, 150, y);
-                     doc.text(time, 180, y);
-                     y += 7;
-                 });
+            // D.2. Gastos
+            if (dailyExpenses.length > 0) {
+                addSectionHeader('Detalhe dos Gastos');
+                addTableHeaders([
+                    { label: 'Hora', x: pageMargin + 5 },
+                    { label: 'Categoria', x: pageMargin + 25 },
+                    { label: 'Obs.', x: pageMargin + 70 },
+                    { label: 'Valor', x: pageWidth - pageMargin - 5, align: 'right' }
+                ]);
+
+                dailyExpenses.forEach(e => {
+                    checkPageBreak();
+                    const time = new Date(e.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const category = translations[lang][e.category] || e.category;
+                    doc.setFontSize(10);
+                    doc.setTextColor(0);
+                    doc.text(time, pageMargin + 5, y);
+                    doc.text(category, pageMargin + 25, y);
+                    doc.text(doc.splitTextToSize(e.observations || '-', 60), pageMargin + 70, y);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor('#dc3545');
+                    doc.text(`-${money(e.value)}`, pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
+            }
+
+            // D.3. Liquidaciones
+            if (dailySettlements.length > 0) {
+                addSectionHeader('Detalhe das Liquidações Enviadas');
+                addTableHeaders([
+                    { label: 'Hora', x: pageMargin + 5 },
+                    { label: 'Status', x: pageMargin + 70 },
+                    { label: 'Valor', x: pageWidth - pageMargin - 5, align: 'right' }
+                ]);
+
+                dailySettlements.forEach(s => {
+                    checkPageBreak();
+                    const time = new Date(s.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    doc.setFontSize(10);
+                    doc.setTextColor(0);
+                    doc.text(time, pageMargin + 5, y);
+                    doc.text(s.status || 'Pendente', pageMargin + 70, y);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor('#dc3545');
+                    doc.text(`-${money(s.amount)}`, pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
             }
             
+            // D.4. Aportes de Capital
+            if (dailyInjections.length > 0) {
+                addSectionHeader('Detalhe dos Aportes de Capital Recebidos');
+                 addTableHeaders([
+                    { label: 'Hora', x: pageMargin + 5 },
+                    { label: 'Status', x: pageMargin + 70 },
+                    { label: 'Valor', x: pageWidth - pageMargin - 5, align: 'right' }
+                ]);
+                dailyInjections.forEach(i => {
+                    checkPageBreak();
+                    const time = new Date(i.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    doc.setFontSize(10);
+                    doc.setTextColor(0);
+                    doc.text(time, pageMargin + 5, y);
+                    doc.text(i.status || 'Aprovado', pageMargin + 70, y);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor('#28a745');
+                    doc.text(money(i.amount), pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
+            }
+            
+            // E. Pie de página
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(9);
+                doc.setTextColor(150);
+                doc.text(`Gerado por LUMIX Finanças - Página ${i} de ${pageCount}`, center, 285, { align: 'center' });
+            }
+
+            // F. Guardar
             doc.save(`relatorio-diario-${todayStr.replace(/\//g, '-')}.pdf`);
         }
         
@@ -5772,3 +5944,4 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
+
