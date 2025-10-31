@@ -4616,10 +4616,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
             // A. Encabezado
             y = 25;
-            try {
-                // Usa el logo Base64 que ya está en tu código
-                doc.addImage(LOGO_BASE64_JPG, 'JPEG', pageMargin, 15, 20, 20);
-            } catch(e) { console.warn("Falha ao adicionar logo ao PDF"); }
+            
+            // --- [INICIO CORRECCIÓN] ---
+            // Eliminado el bloque try...catch que añadía el LOGO_BASE64_JPG
+            // --- [FIN CORRECCIÓN] ---
             
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
@@ -4677,6 +4677,17 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             doc.setTextColor(netBalance >= 0 ? '#6f42c1' : '#dc3545');
             doc.text('SALDO LÍQUIDO DO DIA:', pageMargin + 5, y + 8);
             doc.text(money(netBalance), pageWidth - pageMargin - 5, y + 8, { align: 'right' });
+            
+            // --- [INICIO CORRECCIÓN] ---
+            // Añadir Capital em Mãos (usando la variable global currentCapitalOnHand)
+            y += 8; // Espacio extra
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(currentCapitalOnHand >= 0 ? '#000000' : '#dc3545'); // Negro o rojo si es negativo
+            doc.text('CAPITAL TOTAL EM MÃOS:', pageMargin + 5, y + 8);
+            doc.text(money(currentCapitalOnHand), pageWidth - pageMargin - 5, y + 8, { align: 'right' });
+            // --- [FIN CORRECCIÓN] ---
+
             y += 20;
 
             // D. Secciones de Detalles (con paginación)
