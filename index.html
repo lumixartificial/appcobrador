@@ -811,9 +811,7 @@ try {
             }
         }
         
-        const CLOUDINARY_CLOUD_NAME = "dc6as14p0";
-        const CLOUDINARY_UPLOAD_PRESET = "lumix-financas-uploads";
-        const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+        
         const DEFAULT_LOGO_URL = "https://res.cloudinary.com/dc6as14p0/image/upload/v1759611967/LOGO---LUMIX-FINANZAS-REDUCIDO_gc8zow.png";
         const LOGO_BASE64_JPG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAOEAcIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigA"
 
@@ -2343,13 +2341,21 @@ function showRefinanceModal(clientId, notificationId) { // <-- [CAMBIO 1/3] Aña
                         if (isActive) {
                             if (inputEl.type === 'file') {
                                 if (filesToUpload[methodId]) {
-                                    const formData = new FormData();
-                                    formData.append('file', filesToUpload[methodId]);
-                                    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                                    const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-                                    if (!response.ok) throw new Error(`Upload da imagem para ${methodId} falhou.`);
-                                    const result = await response.json();
-                                    data = result.secure_url;
+                                    // --- [INICIO MIGRACIÓN A FIREBASE STORAGE] ---
+                                    try {
+                                        // Ruta: companies/{companyId}/collectors/{collectorId}/paymentMethods/{methodId}/image.jpg
+                                        const storageRef = ref(storage, `companies/${currentCompanyId}/collectors/${currentCollectorUsername}/paymentMethods/${methodId}/image.jpg`);
+                                        console.log(`[COBRADOR-APP] Subiendo imagen de método de pago a: ${storageRef.fullPath}`);
+                                        
+                                        await uploadBytes(storageRef, filesToUpload[methodId]);
+                                        data = await getDownloadURL(storageRef); // Obtiene la nueva URL de Firebase
+                                        
+                                        console.log(`[COBRADOR-APP] Imagen subida. URL: ${data}`);
+                                    } catch (storageError) {
+                                        console.error(`Upload da imagem para ${methodId} falhou (Firebase):`, storageError);
+                                        throw new Error(`Upload da imagem para ${methodId} falhou.`);
+                                    }
+                                    // --- [FIN MIGRACIÓN A FIREBASE STORAGE] ---
                                 } else {
                                     data = currentSettings.methods[methodId]?.data || ''; // Mantém a imagem antiga se não houver nova
                                 }
@@ -3044,31 +3050,42 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
 
                 try {
                     // --- INICIO CORRECCIÓN ---
-                    // 1. Obtener el cliente y el préstamo específico USANDO clientId y loanIndex
                     const currentClient = allClients.find(c => c.id === clientId);
                     if (!currentClient || !currentClient.loans || !currentClient.loans[loanIndex]) {
                          throw new Error("Cliente ou empréstimo não encontrado para registrar o pagamento.");
                     }
-                    // 2. Definir currentLoan y updatedLoans CORRECTAMENTE
-                    const updatedLoans = JSON.parse(JSON.stringify(currentClient.loans)); // Copia profunda para modificar
-                    const currentLoan = updatedLoans[loanIndex]; // Referencia al préstamo DENTRO de la copia
+                    const updatedLoans = JSON.parse(JSON.stringify(currentClient.loans)); 
+                    const currentLoan = updatedLoans[loanIndex]; 
                     // --- FIN CORRECCIÓN ---
 
+                    // --- [INICIO MIGRACIÓN A FIREBASE STORAGE] ---
                     let receiptUrl = '';
                     if (receiptFile && (selectedMethod === 'pix' || selectedMethod === 'cartao')) {
-                        const formData = new FormData();
-                        formData.append('file', receiptFile);
-                        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                        const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-                        if (!response.ok) throw new Error('Cloudinary receipt upload failed');
-                        const data = await response.json();
-                        receiptUrl = data.secure_url;
+                        try {
+                            const tempPaymentId = `payment_${Date.now()}`;
+                            // Ruta: companies/{companyId}/clients/{clientId}/payments/{paymentId}/{fileName}
+                            const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${clientId}/payments/${tempPaymentId}/${receiptFile.name.replace(/\s+/g, '_')}`);
+                            
+                            console.log(`[COBRADOR-APP] Subiendo recibo de pago a Firebase Storage: ${storageRef.fullPath}`);
+                            
+                            // 1. Subir archivo (se encolará offline)
+                            await uploadBytes(storageRef, receiptFile);
+
+                            // 2. Obtener URL
+                            receiptUrl = await getDownloadURL(storageRef);
+                            console.log(`[COBRADOR-APP] Recibo de pago subido. URL: ${receiptUrl}`);
+
+                        } catch (storageError) {
+                             console.error("Error al subir recibo a Firebase Storage:", storageError);
+                             showToast('Falha ao subir o recibo. O pagamento será salvo sem ele.', true);
+                        }
                     }
+                    // --- [FIN MIGRACIÓN A FIREBASE STORAGE] ---
 
                     const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
                     if (isNaN(actualPaidAmount) || actualPaidAmount < 0) {
                         showToast('Por favor, insira um valor de pagamento válido.', true);
-                        confirmBtn.disabled = false; // Re-habilita en caso de error de validación
+                        confirmBtn.disabled = false; 
                         confirmBtn.innerHTML = originalBtnHTML;
                         lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
                         return;
@@ -3079,75 +3096,53 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
                     const newPayment = {
                         amount: actualPaidAmount,
                         date: new Date(),
-                        status: 'approved', // Pagos registrados por el cobrador siempre son 'approved'
+                        status: 'approved', 
                         method: selectedMethod
                     };
 
-                    if(receiptUrl) {
+                    if(receiptUrl) { // Añade la URL de Firebase si existe
                         newPayment.receiptUrl = receiptUrl;
                     }
 
-                    // Aseguramos que el historial exista
                     if (!currentLoan.history) currentLoan.history = [];
                     currentLoan.history.push(newPayment);
 
-                    // --- INICIO CORRECCIÓN LÓGICA FINANCIERA ---
-                    // Recalcula 'paid' y 'paymentBalance' BASADO EN EL HISTORIAL COMPLETO
-                    // para asegurar consistencia, especialmente con pagos parciales/múltiples.
-
-                    // 1. Recalcula el total pagado SUMANDO el historial APROBADO
+                    // --- INICIO CORRECCIÓN LÓGICA FINANCIERA (BUG DETECTADO) ---
                     const newTotalPaid = (currentLoan.history || [])
                         .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                         .reduce((sum, h) => sum + (h.amount || 0), 0);
                         
-                    // 2. Calcula cuántas cuotas COMPLETAS cubre el nuevo total pagado
-                    const installmentValue = currentLoan.originalInstallmentAmount || 0; // Usa el valor original
+                    // [CORRECCIÓN]: Tu código original (línea 2529) tenía un typo "originalInstallAmount".
+                    // El nombre correcto de la propiedad es "originalInstallmentAmount".
+                    const installmentValue = currentLoan.originalInstallmentAmount || 0; 
                     const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
-                    
-                    // 3. Calcula el nuevo 'paymentBalance'
-                    // Es el total pagado menos el valor total de las cuotas completas cubiertas.
                     const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
 
-                    // 4. Actualiza los campos en el objeto 'currentLoan' (que está dentro de 'updatedLoans')
                     currentLoan.paid = newTotalPaid;
                     currentLoan.paymentBalance = newBalance;
-                    // Actualiza también la cadena 'installments' (ej: "3/24")
                     const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
                     currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
-
-                    console.log("Datos financieros recalculados:", { newTotalPaid, paidInstallmentsCount, newBalance, newInstallmentsString: currentLoan.installments });
                     // --- FIN CORRECCIÓN LÓGICA FINANCIERA ---
 
-
                     await updateDoc(clientRef, {
-                        loans: updatedLoans // Guarda todo el array modificado
+                        loans: updatedLoans
                     });
 
-                    // --- INICIO: Modificación para refresco inmediato ---
-                    // 1. Mostramos el Toast
                     showToast('Pagamento registrado com sucesso!');
-                    
-                    // 2. Cerramos el modal de pago
                     window.history.back(); 
                     console.log("[DIAG-PAYMENT] Modal de pago cerrado.");
-
-                    // 3. Forzamos el redibujado de la vista de detalles del cliente DESPUÉS de cerrar
                     setTimeout(() => {
                         console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanIndex}) después de registrar pago.`);
                         showClientDetails(clientId, loanIndex);
-                    }, 50); // 50ms de espera
-                    // --- FIN: Modificación ---
-
+                    }, 50); 
 
                 } catch(error) {
                     console.error("Error updating document: ", error);
                     showToast('Falha ao registrar pagamento.', true);
-                    // Re-habilita el botón si hubo un error al guardar
                     confirmBtn.disabled = false;
                     confirmBtn.innerHTML = originalBtnHTML;
                     lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
                 }
-                // 'finally' eliminado, el botón se re-habilita solo en caso de error.
             });
 
         }
@@ -5777,4 +5772,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
