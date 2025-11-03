@@ -5243,7 +5243,13 @@ getDocs(collectorQuery).then(snapshot => {
     // AGORA, podemos usar onSnapshot com o ID correto (username) para escutar mudanças
     onSnapshot(doc(db, 'collectors', currentCollectorUsername), (docSnap) => {
         if (docSnap.exists()) {
-            let collectorData = docSnap.data(); // Guarda os dados do cobrador DENTRO do onSnapshot
+            
+            // --- [INICIO DE LA CORRECCIÓN CRÍTICA] ---
+            // ¡Quitamos 'let' de la siguiente línea!
+            // Esto actualiza la variable GLOBAL 'collectorData' en lugar de crear una local.
+            collectorData = docSnap.data(); // ANTES: let collectorData = ...
+            // --- [FIN DE LA CORRECCIÓN CRÍTICA] ---
+            
             console.log("Dados do cobrador atualizados:", collectorData); // Log añadido
 
             // --- O código que estava dentro do onSnapshot antigo vai AQUI ---
@@ -5277,6 +5283,10 @@ getDocs(collectorQuery).then(snapshot => {
                 paymentSettingsBtn.replaceWith(paymentSettingsBtn.cloneNode(true));
                 document.getElementById('payment-settings-btn').addEventListener('click', () => showPaymentSettingsModal(collectorData));
             }
+
+            // [CORRECCIÓN] Llamamos a updateProfileView aquí para asegurar que el capital
+            // se actualice INMEDIATAMENTE con los datos frescos del cobrador.
+            updateProfileView(collectorData);
 
             if (isFirstLoad) {
                 console.log('[COBRADOR-APP] Carga inicial completa. Configurando FCM...');
@@ -5330,24 +5340,14 @@ getDocs(collectorQuery).then(snapshot => {
                     } else if (!client.loans) {
                         client.loans = [];
                     }
-
-                    // --- INICIO: OPTIMIZACIÓN CRÍTICA ---
-                    // Esta sección estaba recalculando CADA préstamo de CADA cliente
-                    // en CADA actualización, causando el bloqueo. La comentamos.
-                    /*
-                    client.loans.forEach(loan => {
-                        const loanDetails = calculateLoanDetails(loan);
-                        loan.status = loanDetails.status;
-                        loan.lateFeesAccumulated = loanDetails.lateFeesAccumulated; 
-                    });
-                    */
-                    // --- FIN: OPTIMIZACIÓN CRÍTICA ---
                 });
             
                 updateTodaysRouteList();
                 updateRouteProgress();
                 updateAllClientsList();
-                updateProfileView(collectorData);
+                // [CORRECCIÓN] Esta llamada ahora usará la variable GLOBAL 'collectorData'
+                // que fue actualizada por el otro listener.
+                updateProfileView(collectorData); 
                 updateNotifications();
                 if (document.querySelector('#map-view.active')) plotClientsOnMap();
 
@@ -5355,23 +5355,17 @@ getDocs(collectorQuery).then(snapshot => {
         const clientStillExists = allClients.some(c => c.id === currentDetailClientId);
         if (clientStillExists) {
             console.log(`[DIAG-SNAPSHOT] onSnapshot detectó cambio y la vista de detalles (${currentDetailClientId}, ${currentDetailLoanIndex}) está activa. Redibujando...`);
-            // Verifica si el modal de detalles está visible o debería estarlo
-             const detailView = document.getElementById('clientDetailView');
-             // Comprobamos si la URL actual coincide con la vista de detalles
+            const detailView = document.getElementById('clientDetailView');
              const expectedHash = `#client/${currentDetailClientId}/${currentDetailLoanIndex}`;
              if (detailView && location.hash === expectedHash) {
                   showClientDetails(currentDetailClientId, currentDetailLoanIndex);
              } else {
                   console.log(`[DIAG-SNAPSHOT] Aunque el estado interno indica vista detalles, la URL (${location.hash}) o el modal no coinciden. No se redibuja.`);
-                  // Opcional: Limpiar el estado si la URL no coincide
-                  // currentDetailClientId = null;
-                  // currentDetailLoanIndex = null;
              }
         } else {
             console.log(`[DIAG-SNAPSHOT] El cliente ${currentDetailClientId} ya no existe. Limpiando estado.`);
             currentDetailClientId = null;
             currentDetailLoanIndex = null;
-            // Opcional: Si el modal estaba activo, ciérralo o navega atrás
             const detailView = document.getElementById('clientDetailView');
             if (detailView && detailView.classList.contains('active')) {
                 window.history.back();
@@ -5380,10 +5374,7 @@ getDocs(collectorQuery).then(snapshot => {
     } else {
          console.log("[DIAG-SNAPSHOT] onSnapshot detectó cambio, pero no hay vista de detalles activa.");
     }
-    // ========= FIN: Añadir =========
-
-
-                applyLanguage(currentLang);
+    applyLanguage(currentLang);
             }, (error) => {
                 console.error("Error al obtener clientes: ", error);
                 showToast('Falha ao carregar clientes.', true);
@@ -5393,22 +5384,26 @@ getDocs(collectorQuery).then(snapshot => {
             onSnapshot(expensesQuery, (snapshot) => {
                 allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 updateExpensesView();
+                // [CORRECCIÓN] Esta llamada ahora usará la variable GLOBAL 'collectorData'
                 updateProfileView(collectorData);
             }, (error) => {
                 console.error("Error al obtener gastos: ", error);
                 showToast('Falha ao carregar gastos.', true);
             });
 
-            // --- LISTENER AÑADIDO PARA LIQUIDACIONES (FILTRADO) ---
-            const settlementsQuery = query(collection(db, 'companies', currentCompanyId, 'settlements'), where("collectorId", "==", currentCollectorUsername));
+            const settlementsQuery = query(
+                collection(db, 'companies', currentCompanyId, 'settlements'), 
+                where("collectorId", "==", currentCollectorUsername)
+            );
+
             onSnapshot(settlementsQuery, (snapshot) => {
-                allSettlements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Actualizamos la vista de perfil que muestra el capital en mano
+                allSettlements = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => s.status !== 'rejected'); 
+                
+                // [CORRECCIÓN] Esta llamada ahora usará la variable GLOBAL 'collectorData'
                 updateProfileView(collectorData); 
-
                 updateExpensesView();
-
-
             }, (error) => {
                 console.error("Error al obtener liquidaciones: ", error);
                 showToast('Falha ao carregar dados de liquidação.', true);
@@ -5417,8 +5412,7 @@ getDocs(collectorQuery).then(snapshot => {
             const capitalInjectionsQuery = query(collection(db, 'companies', currentCompanyId, 'capitalInjections'), where("collectorId", "==", currentCollectorUsername), where("status", "==", "approved"));
             onSnapshot(capitalInjectionsQuery, (snapshot) => {
                 allCapitalInjections = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Actualizamos la vista de perfil que muestra el capital en mano
-                // (collectorData está disponible en este scope gracias al getDocs de más arriba)
+                // [CORRECCIÓN] Esta llamada ahora usará la variable GLOBAL 'collectorData'
                 updateProfileView(collectorData); 
             }, (error) => {
                 console.error("Error al obtener aportes de capital: ", error);
@@ -5429,24 +5423,15 @@ getDocs(collectorQuery).then(snapshot => {
             console.log(`[COBRADOR-APP] Iniciando listener para notificações em: collectors/${currentCollectorUsername}/notifications`);
     const notificationsQuery = collection(db, 'collectors', currentCollectorUsername, 'notifications');
 
-    // Guarda la función de cancelación para poder detenerla al hacer logout
     if (typeof unsubscribeNotifications !== 'undefined' && unsubscribeNotifications) {
-        unsubscribeNotifications(); // Cancela listener anterior si existe
+        unsubscribeNotifications(); 
     }
     unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
         console.log("[COBRADOR-APP] Novas notificações INTERNAS recebidas do Firestore.");
-        
-        // --- INICIO: CORRECCIÓN ---
-        // Guarda las notificaciones leídas en la variable global
         internalNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // --- FIN: CORRECCIÓN ---
-
-        // Llama a la función que actualiza el badge y la lista
         updateNotifications();
     }, (error) => {
         console.error(`[COBRADOR-APP] Erro ao escutar notificações:`, error);
-        // Considera mostrar un toast si falla
-        // showToast('Erro ao carregar notificações.', true);
     });
 
 
@@ -5455,11 +5440,11 @@ getDocs(collectorQuery).then(snapshot => {
      showBlockedView("Erro crítico ao carregar seus dados iniciais.");
      signOut(auth);
 });
+}
 
-            
-    // --- FIN DEL LISTENER AÑADIDO ---
 
-        }
+
+
         
         function loadGlobalSettings(settings) {
             const companyName = settings.companyName || 'LUMIX Finanças';
@@ -6059,5 +6044,3 @@ function triggerSystemVerification(editingClientId = null) {
     </script>
 </body>
 </html>
-
-
