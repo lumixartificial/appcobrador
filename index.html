@@ -872,6 +872,7 @@ try {
                 multiplePaymentDesc: 'Cobre {count} parcela(s) e {percent}% da próxima.',
                 multipleFullPaymentDesc: 'Cobre {count} parcela(s) integralmente.',
                 emailLogin: 'Email (Login)',
+                username: 'Usuário (Login)',
                 // --- FIN: Claves Añadidas ---
                 
                 collectorOnTheWayTitle: 'Cobrador a caminho!', collectorOnTheWayBody: 'Nosso cobrador está a caminho e chegará em alguns minutos.', paymentSettings: 'Configurações de Pagamento', currency: 'Moeda de Operação', paymentMethods: 'Métodos de Pagamento', save: 'Salvar' 
@@ -884,6 +885,7 @@ try {
                 paymentDescMultiple: 'Cubre {fullInstallments} cuota(s) y {percent}% de la próxima.', 
                 paymentDescOverpay: 'Cubre la cuota #{start} y adelanta {overpayAmount} para la próxima.',
                 emailLogin: 'Email (Login)',
+                username: 'Usuário (Login)',
                 // --- INICIO: Claves Añadidas ---
                 paymentInstallmentTitle: 'Pago Cuota #{installment}',
                 paymentInstallmentsTitle: 'Pago Cuotas #{start} - #{end}',
@@ -909,6 +911,7 @@ try {
                 multiplePaymentDesc: 'Covers {count} installment(s) and {percent}% of the next one.',
                 multipleFullPaymentDesc: 'Covers {count} installment(s) completely.',
                 emailLogin: 'Email (Login)',
+                username: 'Username (Login)',
                 // --- FIN: Claves Añadidas ---
                 collectorOnTheWayTitle: 'Collector on the way!', collectorOnTheWayBody: 'Our collector is on the way and will arrive in a few minutes.', paymentSettings: 'Payment Settings', currency: 'Operating Currency', paymentMethods: 'Payment Methods', save: 'Save' 
             }
@@ -3385,12 +3388,108 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 }
 
 
-// Fin del bloque para pegar
 
+        /**
+         * [VERSIÓN CORREGIDA]
+         * Genera un PDF profesional con los datos de acceso del cliente.
+         * @param {object} clientData - Datos del cliente (name, email, password, username).
+         * @returns {Blob} - El PDF generado como un Blob.
+         */
+        async function generateClientAccessPDF(clientData) {
+            // Usa la instancia global de jsPDF cargada en el <head>
+            const { jsPDF } = window.jspdf;
+            
+            // 1. Crear el documento (tarjeta cuadrada de 100mm x 100mm)
+            const doc = new jsPDF({ unit: 'mm', format: [100, 100] });
+            const margin = 10;
+            const width = doc.internal.pageSize.getWidth();
+            const primaryColor = '#6f42c1'; // var(--accent-purple)
+            const textColor = '#212529'; // var(--text-primary)
+            const secondaryTextColor = '#6c757d'; // var(--text-secondary)
 
+            // 2. Añadir Logo (usa la constante global LOGO_BASE64_JPG)
+            try {
+                if (LOGO_BASE64_JPG && LOGO_BASE64_JPG.startsWith('data:image/jpeg')) {
+                    doc.addImage(LOGO_BASE64_JPG, 'JPEG', margin, margin, 25, 25); // (img, formato, x, y, w, h)
+                } else {
+                    console.warn("LOGO_BASE64_JPG no es un JPG base64 válido. Usando texto.");
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(textColor);
+                    doc.text(currentCompanyData.name || 'LUMIX Finanças', margin, margin + 15);
+                }
+            } catch (e) {
+                console.error("Error al añadir logo al PDF:", e);
+                // Añadir texto si el logo falla
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(textColor);
+                doc.text(currentCompanyData.name || 'LUMIX Finanças', margin, margin + 15);
+            }
 
-// Fin del bloque para pegar
+            // 3. Nombre de la Empresa (Alineado a la derecha)
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(secondaryTextColor);
+            doc.text(currentCompanyData.name || 'LUMIX Finanças', width - margin, margin + 10, { align: 'right' });
 
+            // 4. Título de Bienvenida
+            let y = margin + 40; // Empezar debajo del logo
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(primaryColor);
+            doc.text('Bem-vindo!', width / 2, y, { align: 'center' });
+            
+            y += 8;
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(textColor);
+            doc.text(clientData.name, width / 2, y, { align: 'center' });
+
+            // 5. Datos de Acceso (en un recuadro)
+            y += 15;
+            const fieldYStart = y;
+            const fieldXLabel = margin + 5;
+            const fieldXValue = margin + 30;
+
+            // Fondo del recuadro
+            doc.setFillColor(248, 249, 250); // Color de fondo claro (var(--bg))
+            doc.setDrawColor(233, 236, 239); // Borde claro (var(--border-color))
+            doc.roundedRect(margin, fieldYStart - 6, width - (margin*2), 26, 3, 3, 'FD'); // (x, y, w, h, r, r, style)
+
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Etiquetas
+            doc.setFontSize(10);
+            doc.setTextColor(secondaryTextColor);
+            doc.text('Usuário (Login):', fieldXLabel, y); // <-- CORREGIDO
+            doc.text('Senha:', fieldXLabel, y + 10);
+
+            // Valores
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(textColor);
+            doc.text(clientData.username, fieldXValue, y); // <-- CORREGIDO (usa username)
+            doc.text(clientData.password, fieldXValue, y + 10);
+            // --- FIN DE LA CORRECCIÓN ---
+
+            // 6. Enlace Clicable
+            y += 32;
+            const appLink = 'https://cliente.lumixartificial.com';
+            const linkText = 'Acessar o Portal do Cliente';
+            const textWidth = doc.getTextWidth(linkText);
+            const linkX = (width - textWidth) / 2; // Centrado
+
+            doc.setFontSize(12);
+            doc.setTextColor(primaryColor); // Color de enlace
+            doc.text(linkText, linkX, y);
+            
+            // Añade el área clicable invisible sobre el texto
+            // (x, y_top, w, h, { url })
+            doc.link(linkX, y - 4, textWidth, 5, { url: appLink });
+
+            // 7. Devolver como Blob (formato de archivo)
+            return doc.output('blob');
+        }
 
 
         
@@ -4023,20 +4122,15 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             }
         }
 
+
+        
+
         function showShareCredentialsModal(clientData, isEditMode) {
             const modal = document.getElementById('shareCredentialsModal');
             const titleKey = isEditMode ? 'clientUpdatedSuccess' : 'clientRegisteredSuccess';
             const appLink = 'https://cliente.lumixartificial.com'; // Link actualizado
 
-            let messageTemplate = translations[currentLang].whatsappMessageTemplate;
-            messageTemplate = messageTemplate.replace('{clientName}', clientData.name)
-                                             .replace('{appLink}', appLink)
-                                             .replace('{email}', clientData.email)
-                                             .replace('{password}', clientData.password);
-            
-            const cleanPhoneNumber = clientData.whatsapp.replace(/\D/g, '');
-            const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhoneNumber}&text=${encodeURIComponent(messageTemplate)}`;
-
+            // --- INICIO DE LA CORRECCIÓN EN EL HTML DEL MODAL ---
             modal.innerHTML = `
                 <header class="modal-header">
                     <button id="closeShareModal"><i data-lucide="x"></i></button>
@@ -4051,7 +4145,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                 <strong data-lang-key="appLink"></strong>: <a href="${appLink}" target="_blank" style="color: var(--accent-purple);">${appLink}</a>
                             </div>
                             <div>
-                                <strong data-lang-key="username"></strong>: ${clientData.email}
+                                <!-- CORREGIDO: data-lang-key="username" y valor clientData.username -->
+                                <strong data-lang-key="username"></strong>: ${clientData.username}
                             </div>
                             <div>
                                 <strong data-lang-key="password"></strong>: ${clientData.password}
@@ -4060,11 +4155,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     </div>
                 </div>
                 <div class="action-buttons">
-                    <button class="btn-primary" id="share-whatsapp-btn">
-                        <i data-lucide="send"></i> <span data-lang-key="shareOnWhatsApp"></span>
+                    <!-- BOTÓN MODIFICADO: Ahora llama a la función de compartir PDF -->
+                    <button class="btn-primary" id="share-credentials-pdf-btn">
+                        <i data-lucide="share-2"></i> <span>Compartilhar Acesso (PDF)</span>
                     </button>
                 </div>
             `;
+            // --- FIN DE LA CORRECCIÓN EN EL HTML DEL MODAL ---
 
             history.pushState({ modal: 'shareCredentialsModal' }, 'Share Credentials', '#share');
             modal.classList.add('active');
@@ -4076,11 +4173,63 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 window.history.back();
             });
 
-            document.getElementById('share-whatsapp-btn').addEventListener('click', () => {
-                window.open(whatsappUrl, '_blank');
+            // --- INICIO: LÓGICA DEL BOTÓN DE COMPARTIR PDF (Sin cambios) ---
+            document.getElementById('share-credentials-pdf-btn').addEventListener('click', async (e) => {
+                const shareBtn = e.currentTarget;
+                const originalHTML = shareBtn.innerHTML;
+                shareBtn.disabled = true;
+                shareBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Gerando PDF...`;
+                lucide.createIcons({nodes: [shareBtn.querySelector('i')]});
+
+                try {
+                    // 1. Generar el PDF usando la nueva función (ahora corregida)
+                    const pdfBlob = await generateClientAccessPDF(clientData);
+                    const pdfFile = new File([pdfBlob], `Acesso_Cliente_${clientData.name.replace(/\s/g, '_')}.pdf`, { type: 'application/pdf' });
+
+                    // 2. Verificar si el navegador soporta 'navigator.share' para archivos
+                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                        
+                        // 3. Usar la API de Share nativa
+                        const shareData = {
+                            files: [pdfFile],
+                            title: `Acesso - ${clientData.name}`,
+                            text: `Olá ${clientData.name}! Segue seu acesso ao portal do cliente.`
+                        };
+
+                        await navigator.share(shareData);
+                        console.log('PDF compartido com sucesso via API nativa.');
+                        
+                    } else {
+                        // 4. Fallback: Si no soporta 'share', forzar el 'download'
+                        console.warn("API Web Share (para arquivos) não suportada. Recorrendo ao download.");
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(pdfBlob);
+                        link.download = pdfFile.name;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        showToast('PDF baixado. O compartilhamento nativo não é suportado neste navegador.');
+                    }
+
+                } catch (err) {
+                    console.error("Erro ao gerar ou compartilhar PDF:", err);
+                    // No mostrar error si el usuario simplemente canceló la ventana de compartir
+                    if (err.name !== 'AbortError') { 
+                        showToast('Erro ao compartilhar o PDF.', true);
+                    }
+                } finally {
+                    // 5. Restaurar el botón
+                    shareBtn.disabled = false;
+                    shareBtn.innerHTML = originalHTML;
+                    lucide.createIcons({nodes: [shareBtn.querySelector('i')]});
+                }
             });
+            // --- FIN: LÓGICA DEL BOTÓN ---
         }
 
+
+
+        
         
 
         // --- MÓDULO DE GASTOS ---
@@ -6027,5 +6176,6 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
