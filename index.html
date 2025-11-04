@@ -5222,64 +5222,64 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
         async function handleLogin(event) {
             event.preventDefault();
-            const emailInput = document.getElementById('username'); // O ID ainda é 'username', mas agora é um email
+            
+            // [CAMBIO] El ID 'username' ahora se trata como un 'username' real
+            const usernameInput = document.getElementById('username'); 
             const passwordInput = document.getElementById('password');
-            const email = emailInput.value.trim(); // Pega o email
+            
+            const username = usernameInput.value.trim(); // 1. Obtiene el 'username' (ej: 'joao.silva')
             const pass = passwordInput.value;
         
-            // --- INICIO: MODIFICAÇÃO DO BOTÃO DE LOGIN ---
+            // [CAMBIO] Construye el email con el sufijo @gmail.com
+            const email = `${username}@gmail.com`; 
+
+            // --- (El resto del código de manejo del botón es idéntico al original) ---
             const loginButton = event.target.querySelector('button[type="submit"]');
-            let originalButtonHTML = ''; // Variável para guardar o HTML original
+            let originalButtonHTML = ''; 
 
             if (loginButton) {
-                originalButtonHTML = loginButton.innerHTML; // 1. Salva o HTML original (ex: "Entrar")
-                loginButton.disabled = true; // 2. Desabilita
+                originalButtonHTML = loginButton.innerHTML; 
+                loginButton.disabled = true; 
                 
-                // 3. Define o novo HTML com spinner e texto de carregamento
-                // [NUEVO] Ajustamos el padding y añadimos el spinner
                 loginButton.innerHTML = `
                     <span style="display: flex; align-items: center; justify-content: center; gap: 8px;">
                         <i data-lucide="loader-circle" style="animation: spin 1s linear infinite; width: 20px; height: 20px;"></i>
                         Entrando...
                     </span>`;
                 
-                // 4. Renderiza o novo ícone
                 lucide.createIcons({ nodes: [loginButton.querySelector('i')] });
             }
-            // --- FIM: MODIFICAÇÃO ---
+            // --- (Fin del código del botón) ---
         
             try {
-                // Tenta fazer login com Firebase Auth
-                console.log(`Tentando login com email: ${email}`);
+                // [CAMBIO] Inicia sesión con el 'email' construido
+                console.log(`Tentando login com email construído: ${email}`);
                 await signInWithEmailAndPassword(auth, email, pass);
         
                 // SUCESSO! O onAuthStateChanged vai ser chamado automaticamente
-                // O botão pode ficar no estado "Entrando...", pois a tela vai mudar.
                 console.log("signInWithEmailAndPassword bem-sucedido. Aguardando onAuthStateChanged...");
         
             } catch (error) {
                 // FALHA no login
                 console.error("Erro de login (signInWithEmailAndPassword):", error.code, error.message);
                 
-                // Mostra mensagens de erro específicas (código existente)
                 if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-                    showToast('Email ou senha inválidos.', true);
+                    showToast('Usuário ou senha inválidos.', true);
                 } else if (error.code === 'auth/invalid-email') {
-                    showToast('Formato de email inválido.', true);
+                    // Este error ahora significa que el 'username' tiene caracteres inválidos
+                    showToast('Usuário inválido (não pode ser convertido em email).', true);
                 } else if (error.code === 'auth/too-many-requests') {
                      showToast('Muitas tentativas falhadas. Tente novamente mais tarde.', true);
                 } else {
                     showToast('Erro ao tentar fazer login. Verifique sua conexão.', true);
                 }
                 
-                // --- INICIO: REVERTER BOTÃO EM CASO DE ERRO ---
-                // Habilita o botão novamente se falhar e restaura o HTML
+                // --- (Restaurar el botón en error, idéntico al original) ---
                 if (loginButton) {
                     loginButton.disabled = false;
-                    loginButton.innerHTML = originalButtonHTML; // Restaura o HTML original (ex: "Entrar")
-                    // (Não é necessário chamar lucide.createIcons() aqui, pois o original não tinha ícone)
+                    loginButton.innerHTML = originalButtonHTML;
                 }
-                // --- FIM: REVERTER BOTÃO ---
+                // --- (Fin de restaurar botón) ---
             }
         }
         
@@ -6036,3 +6036,4 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
