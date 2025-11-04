@@ -3401,7 +3401,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             
             // --- INICIO: CORRECCIÓN DE DISEÑO 1/5 ---
             // Aumentamos la altura de 130mm a 140mm para mejor espaciado vertical
-            const doc = new jsPDF({ unit: 'mm', format: [100, 150] });
+            const doc = new jsPDF({ unit: 'mm', format: [100, 180] });
             const margin = 8;
             const width = doc.internal.pageSize.getWidth();
             const cardWidth = width - (margin * 1); // 80mm
@@ -3422,7 +3422,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             // --- INICIO: CORRECCIÓN DE DISEÑO 2/5 ---
             // Ajustamos el espaciado vertical (variable 'y')
-            let y = 13; // Margen superior
+            let y = 10; // Margen superior
 
             // 2. Encabezado: Nombre de la Empresa
             doc.setFontSize(16);
@@ -3513,7 +3513,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             // 5. Botón Clicable
             // --- INICIO: CORRECCIÓN DE DISEÑO 5/5 ---
             // Ajustamos la posición 'y' del botón basado en la nueva altura de la tarjeta
-            y = cardY + cardHeight + 10; // y = 70 + 40 + 10 = 120
+            y = cardY + cardHeight + 14; // y = 70 + 40 + 10 = 120
             // --- FIN: CORRECCIÓN DE DISEÑO 5/5 ---
             
             const linkText = 'Acessar o Portal do Cliente';
@@ -6222,3 +6222,4 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
