@@ -3401,11 +3401,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             
             // --- INICIO: CORRECCIÓN DE DISEÑO 1/5 ---
             // Aumentamos la altura de 130mm a 140mm para mejor espaciado vertical
-            const doc = new jsPDF({ unit: 'mm', format: [100, 140] });
-            const margin = 10;
+            const doc = new jsPDF({ unit: 'mm', format: [100, 150] });
+            const margin = 8;
             const width = doc.internal.pageSize.getWidth();
-            const cardWidth = width - (margin * 2); // 80mm
-            const cardCenterX = width / 2; // 50mm
+            const cardWidth = width - (margin * 1); // 80mm
+            const cardCenterX = width / 1; // 50mm
             // --- FIN: CORRECCIÓN DE DISEÑO 1/5 ---
             
             // Colores Dark Mode (sin cambios)
@@ -3422,14 +3422,14 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             // --- INICIO: CORRECCIÓN DE DISEÑO 2/5 ---
             // Ajustamos el espaciado vertical (variable 'y')
-            let y = 15; // Margen superior
+            let y = 13; // Margen superior
 
             // 2. Encabezado: Nombre de la Empresa
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             doc.setTextColor(primaryColor);
             doc.text(currentCompanyData?.name || 'LUMIX Finanças', cardCenterX, y, { align: 'center' });
-            y += 15; // y = 30
+            y += 13; // y = 30
 
             // 3. Mensaje de Bienvenida
             doc.setFontSize(18);
