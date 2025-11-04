@@ -3390,7 +3390,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
 
         /**
-         * [VERSIÓN CORREGIDA - CON TEXTO EXTRA Y LINK VISIBLE]
+         * [VERSIÓN REDISEÑADA - MODO OSCURO]
          * Genera un PDF profesional con los datos de acceso del cliente.
          * @param {object} clientData - Datos del cliente (name, email, password, username).
          * @returns {Blob} - El PDF generado como un Blob.
@@ -3399,105 +3399,103 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             // Usa la instancia global de jsPDF cargada en el <head>
             const { jsPDF } = window.jspdf;
             
-            // --- INICIO DE LA CORRECCIÓN 1/3 ---
-            // Cambiamos el formato a 100mm x 130mm (más alto) para que quepa el botón
+            // Mantiene el formato 100x130 (más alto)
             const doc = new jsPDF({ unit: 'mm', format: [100, 130] });
-            // --- FIN DE LA CORRECCIÓN 1/3 ---
             
             const margin = 10;
             const width = doc.internal.pageSize.getWidth();
-            const primaryColor = '#6f42c1'; // var(--accent-purple)
-            const textColor = '#212529'; // var(--text-primary)
-            const secondaryTextColor = '#6c757d'; // var(--text-secondary)
-            const cardBg = '#ffffff'; // Fondo blanco para la tarjeta
-            const cardBorder = '#e9ecef'; // Borde claro (var(--border-color))
+            
+            // --- INICIO: NUEVOS COLORES MODO OSCURO (Basados en tu CSS) ---
+            const pdfBg = '#0f172a'; // Un poco más claro que --bg (var(--surface))
+            const cardBg = '#1e293b'; // Un poco más claro que el fondo del PDF (var(--border-color))
+            const textColor = '#e2e8f0'; // Texto primario (casi blanco)
+            const secondaryTextColor = '#94a3b8'; // Texto secundario (gris claro)
+            const primaryColor = '#6f42c1'; // Púrpura (se mantiene)
+            const cardBorder = '#334155'; // Borde (más oscuro)
+            // --- FIN: NUEVOS COLORES ---
 
-            let y = margin + 5; // Empezar en y=15
+            // 1. Fondo del PDF (Color oscuro)
+            doc.setFillColor(pdfBg);
+            doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), 'F');
 
-            // 1. Encabezado: Nombre de la Empresa
+            let y = margin + 10; // Empezar en y=20
+
+            // 2. Encabezado: Nombre de la Empresa (Color Púrpura)
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             doc.setTextColor(primaryColor);
-            doc.text(currentCompanyData?.name || 'LUMIX Finanças', width / 2, y + 10, { align: 'center' }); // y=25
-            y += 20; // y ahora es 35
+            doc.text(currentCompanyData?.name || 'LUMIX Finanças', width / 2, y, { align: 'center' });
+            y += 15;
 
-            // 2. Mensaje de Bienvenida
+            // 3. Mensaje de Bienvenida (Color Blanco/Gris)
             doc.setFontSize(18);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(textColor);
-            doc.text('Bem-vindo!', width / 2, y, { align: 'center' }); // y=35
+            doc.setTextColor(textColor); // Blanco
+            doc.text('Bem-vindo!', width / 2, y, { align: 'center' });
             
-            y += 8; // y ahora es 43
+            y += 8;
             doc.setFontSize(12);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor);
-            doc.text(clientData.name, width / 2, y, { align: 'center' }); // y=43
+            doc.setTextColor(secondaryTextColor); // Gris
+            doc.text(clientData.name, width / 2, y, { align: 'center' });
 
-            // --- INICIO DE LA CORRECCIÓN 2/3 ---
-            // Añadir el nuevo texto de bienvenida
-            y += 10; // y ahora es 53
+            y += 10;
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor);
+            doc.setTextColor(secondaryTextColor); // Gris
             const introText = "Estes são seus dados para o acesso ao seu aplicativo da área do cliente.";
-            const splitText = doc.splitTextToSize(introText, width - (margin * 2)); // Ancho máximo de 80mm
-            
+            const splitText = doc.splitTextToSize(introText, width - (margin * 2));
             doc.text(splitText, width / 2, y, { align: 'center' });
             
-            // Ajusta 'y' basado en cuántas líneas ocupó el texto
-            y += (splitText.length * 5) + 5; // Ej: 2 líneas * 5mm + 5mm espacio = 15mm. y ahora es 68
-            // --- FIN DE LA CORRECCIÓN 2/3 ---
+            y += (splitText.length * 5) + 8; // y ahora es ~74
 
-            // 3. Tarjeta de Credenciales
+            // 4. Tarjeta de Credenciales (Fondo oscuro, borde oscuro)
             const cardX = margin;
-            const cardY = y; // cardY ahora es ~68
+            const cardY = y;
             const cardWidth = width - (margin * 2);
-            const cardHeight = 35; // Altura fija para la tarjeta de datos
+            const cardHeight = 35;
             const cardRadius = 3;
 
-            // (El código de la tarjeta no cambia)
             doc.setDrawColor(cardBorder);
-            doc.setFillColor(cardBg);
+            doc.setFillColor(cardBg); // Color superficie oscura
             doc.roundedRect(cardX, cardY, cardWidth, cardHeight, cardRadius, cardRadius, 'FD');
+            
+            // Barra superior Púrpura (sin cambios)
             doc.setFillColor(primaryColor);
             doc.roundedRect(cardX, cardY, cardWidth, 8, cardRadius, cardRadius, 'F');
             doc.rect(cardX, cardY + 4, cardWidth, 4, 'F');
             doc.setFontSize(10);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor('#FFFFFF');
+            doc.setTextColor('#FFFFFF'); // Texto blanco (sin cambios)
             doc.text('Seus Dados de Acesso', cardX + 5, cardY + 5.5);
-            
-            let fieldY = cardY + 15; // Posición Y para el primer campo DENTRO de la tarjeta
 
-            // Campo 1: Usuário
+            let fieldY = cardY + 15;
+
+            // Campo 1: Usuário (Color Blanco/Gris)
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor);
+            doc.setTextColor(secondaryTextColor); // Gris
             doc.text('Usuário (Login):', cardX + 8, fieldY);
             fieldY += 6;
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(textColor);
+            doc.setTextColor(textColor); // Blanco
             doc.text(clientData.username, cardX + 8, fieldY);
             fieldY += 8;
 
-            // Campo 2: Senha
+            // Campo 2: Senha (Color Blanco/Gris)
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor);
+            doc.setTextColor(secondaryTextColor); // Gris
             doc.text('Senha:', cardX + 8, fieldY);
             fieldY += 6;
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(textColor);
+            doc.setTextColor(textColor); // Blanco
             doc.text(clientData.password, cardX + 8, fieldY);
 
-            // 4. Botón Clicable
-            // --- INICIO DE LA CORRECCIÓN 3/3 ---
-            // Ajustamos la posición 'y' del botón para que esté DENTRO de la página
-            y = cardY + cardHeight + 8; // y = 68 + 35 + 8 = 111 (¡Ahora cabe en la página de 130mm!)
-            // --- FIN DE LA CORRECCIÓN 3/3 ---
-            
+            // 5. Botón Clicable (Sin cambios)
+            y = cardY + cardHeight + 10;
             const linkText = 'Acessar o Portal do Cliente';
             const appLink = 'https://cliente.lumixartificial.com';
             const btnHeight = 10;
@@ -3506,18 +3504,14 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const btnY = y;
             const btnRadius = 5;
 
-            // Dibuja el botón (igual que antes)
             doc.setFillColor(primaryColor);
             doc.roundedRect(btnX, btnY, btnWidth, btnHeight, btnRadius, btnRadius, 'F');
             doc.setFontSize(11);
             doc.setFont(undefined, 'bold');
             doc.setTextColor('#FFFFFF');
             doc.text(linkText, width / 2, btnY + (btnHeight / 2), { align: 'center', baseline: 'middle' });
-
-            // Añade el área clicable invisible sobre el botón (igual que antes)
             doc.link(btnX, btnY, btnWidth, btnHeight, { url: appLink });
 
-            // 5. Devolver como Blob (igual que antes)
             return doc.output('blob');
         }
 
