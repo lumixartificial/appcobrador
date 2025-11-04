@@ -3401,7 +3401,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             
             // --- INICIO: CORRECCIÓN DE DISEÑO 1/5 ---
             // Aumentamos la altura de 130mm a 140mm para mejor espaciado vertical
-            const doc = new jsPDF({ unit: 'mm', format: [100, 150] });
+            const doc = new jsPDF({ unit: 'mm', format: [100, 180] });
             const margin = 8;
             const width = doc.internal.pageSize.getWidth();
             const cardWidth = width - (margin * 1); // 80mm
@@ -6222,5 +6222,6 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
