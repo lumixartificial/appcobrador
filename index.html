@@ -3397,15 +3397,28 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
         function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0) {
             const isEditMode = clientId !== null && !isNewLoan;
             const client = isEditMode ? allClients.find(c => c.id === clientId) : (clientId ? allClients.find(c => c.id === clientId) : {});
-            const loan = isEditMode ? client.loans[loanIndex] : {};
+            // [CORRECCIÓN LÓGICA PRÉSTAMO] Asegura que 'loan' sea un objeto vacío si no estamos editando o si el índice no es válido
+            const loan = (isEditMode && client && client.loans && client.loans[loanIndex]) ? client.loans[loanIndex] : {};
+
 
             let filesToUpload = [];
-            let existingDocs = isEditMode ? [...(client.documents || [])] : (client.documents || []);
+            // [CORRECCIÓN LÓGICA DOCUMENTOS] Clona los documentos existentes para evitar mutación
+            let existingDocs = client.documents ? [...client.documents] : [];
+
 
             const clientFormModal = document.getElementById('clientFormModal');
             
-            const modalTitleKey = isEditMode ? 'editClient' : 'addNewClient';
-            const saveButtonKey = isEditMode ? 'saveChanges' : 'saveClient';
+            // Define los textos correctos
+            let modalTitleKey = 'addNewClient';
+            let saveButtonKey = 'saveClient';
+            if (isNewLoan) {
+                modalTitleKey = 'createNewLoan';
+                saveButtonKey = 'saveClient'; // O 'saveLoan' si lo prefieres
+            } else if (isEditMode) {
+                modalTitleKey = 'editClient';
+                saveButtonKey = 'saveChanges';
+            }
+
 
             clientFormModal.innerHTML = `
                 <header class="modal-header">
@@ -3415,13 +3428,25 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 <div class="modal-content-wrapper">
                   <div class="container">
                     <form id="client-form">
+                        
+                        <!-- === SECCIÓN 1: DATOS PERSONALES (Editables siempre) === -->
+                        <h3 class="section-title" style="margin-top: 10px; border: none; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="user-round"></i> Dados Pessoais
+                        </h3>
+                        <hr style="border: 1px solid var(--border-color); margin-top: 10px; margin-bottom: 25px;">
+
                         <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}" ${isNewLoan ? 'readonly' : ''}></div>
                         <div class="form-group"><label data-lang-key="documentNumber"></label><input type="text" id="client-document" value="${client.documentNumber || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        
+                        <!-- Contenedor para verificación de duplicados -->
                         <div id="system-verification-results" style="margin-bottom: 20px;"></div>
-                        <div class="form-group"><label data-lang-key="address"></label><input type="text" id="client-address" required value="${client.address || ''}"></div>
-                        <div class="form-group"><label data-lang-key="city"></label><input type="text" id="client-city" required value="${client.city || ''}"></div>
-                        <div class="form-group"><label data-lang-key="whatsapp"></label><input type="tel" id="client-whatsapp" required value="${client.whatsapp || ''}"></div>
-                        <div class="form-group">
+                        
+                        <div class="form-group"><label data-lang-key="address"></label><input type="text" id="client-address" required value="${client.address || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        <div class="form-group"><label data-lang-key="city"></label><input type="text" id="client-city" required value="${client.city || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        <div class="form-group"><label data-lang-key="whatsapp"></label><input type="tel" id="client-whatsapp" required value="${client.whatsapp || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        
+                        <!-- Localización GPS (Solo editable si se está creando/editando datos) -->
+                        <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
                             <label data-lang-key="location"></label>
                             <input type="text" id="client-location" readonly placeholder="Clique no botão para obter" value="${client.location || ''}">
                             <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%; margin-top: 10px;">
@@ -3429,28 +3454,35 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </button>
                         </div>
                         
-                        <!-- Client Access Section -->
-                        <h3 class="section-title" data-lang-key="clientAccess" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px;"></h3>
-                        <div class="form-group">
-                            <label data-lang-key="username"></label>
-                            <input type="text" id="client-username" required value="${client.username || ''}" ${ (isEditMode && client.username) || isNewLoan ? 'readonly' : '' }>
-                            <div id="username-validation-msg"></div>
+                        <!-- === SECCIÓN 2: ACCESO CLIENTE (Solo editable si NO es un préstamo nuevo) === -->
+                        <div style="${isNewLoan ? 'display: none;' : ''}">
+                            <h3 class="section-title" data-lang-key="clientAccess" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="smartphone"></i> <span data-lang-key="clientAccess"></span>
+                            </h3>
+                            
+                            <!-- [CAMBIO] Solo el campo "Usuário" -->
+                            <div class="form-group">
+                                <label data-lang-key="username"></label>
+                                <input type="text" id="client-username" required value="${client.username || ''}" ${isEditMode && client.username ? 'readonly' : ''} autocomplete="off" autocapitalize="none">
+                                <div id="username-validation-msg" class="validation-message"></div>
+                            </div>
+
+                            <!-- [CAMBIO] El campo de Email fue REMOVIDO de la UI -->
+
+                            <div class="form-group">
+                                <label data-lang-key="password"></label>
+                                <input type="password" id="client-password" required value="${client.password || ''}">
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                        <label for="client-email">Email (para login do cliente)</label>
-                        <input type="email" id="client-email" required autocomplete="off" value="${client.email || ''}" ${ (isEditMode && client.email) || isNewLoan ? 'readonly' : '' }>
-                        <p style="font-size: 0.8em; color: var(--text-secondary); margin-top: 5px;">Este será o email que o cliente usará para entrar na sua app.</p>
-                        </div>
-
-                        <div class="form-group">
-                            <label data-lang-key="password"></label>
-                            <input type="password" id="client-password" required value="${client.password || ''}">
-                        </div>
-
-                        <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Detalhes do Empréstimo</h3>
+                        <!-- === SECCIÓN 3: DETALLES DEL PRÉSTAMO (Siempre visible) === -->
+                        <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                           <i data-lucide="dollar-sign"></i> 
+                           ${isNewLoan ? 'Detalhes do Novo Empréstimo' : (isEditMode ? 'Detalhes do Empréstimo' : 'Detalhes do Primeiro Empréstimo')}
+                        </h3>
                         
-                        <div class="form-group" id="migration-toggle-group" style="display: ${isEditMode ? 'none' : 'block'}; background-color: var(--border-color); padding: 15px; border-radius: 12px;">
+                        <!-- Toggle de Migración (Solo en Creación de Cliente NUEVO) -->
+                        <div class="form-group" id="migration-toggle-group" style="display: ${isEditMode || isNewLoan ? 'none' : 'block'}; background-color: var(--border-color); padding: 15px; border-radius: 12px;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <label for="migration-toggle-input" style="font-weight: 600; font-size: 1.05em; color: var(--text-primary); margin: 0;">
                                     <i data-lucide="arrow-right-circle" style="width: 18px; height: 18px; margin-right: 5px; vertical-align: -3px;"></i>
@@ -3468,8 +3500,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
 
                         <div class="form-group grid-2">
-                            <div><label data-lang-key="totalLoan"></label><input type="number" id="client-loan-amount" required value="${isEditMode ? (loan.totalLoan / (1 + client.interestRate/100)) : ''}"></div>
-                            <div><label data-lang-key="interest"></label><input type="number" id="client-interest" required value="${client.interestRate || '20'}" ${isEditMode ? 'readonly' : ''}></div>
+                            <div><label data-lang-key="totalLoan"></label><input type="number" id="client-loan-amount" required value="${isEditMode ? (loan.principalAmount || (loan.totalLoan / (1 + client.interestRate/100))) : ''}"></div>
+                            <div><label data-lang-key="interest"></label><input type="number" id="client-interest" required value="${client.interestRate || '20'}" ${isNewLoan || isEditMode ? 'readonly' : ''}></div>
                         </div>
 
                         <div class="form-group" id="migration-paid-installments-group" style="display: none; background-color: var(--border-color); padding: 10px; border-radius: 8px;">
@@ -3529,11 +3561,14 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         </div>
                         <div class="form-group">
                             <label data-lang-key="collectionTimeLabel"></label>
-                            <input type="time" id="client-collection-time" value="${client.collectionTime || ''}">
+                            <input type="time" id="client-collection-time" value="${loan.collectionTime || ''}">
                         </div>
                         
-                        <div class="form-group">
-                            <label data-lang-key="clientDocs"></label>
+                        <!-- === SECCIÓN 4: DOCUMENTOS (Solo editable si NO es un préstamo nuevo) === -->
+                        <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
+                            <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="file-check"></i> <span data-lang-key="clientDocs"></span>
+                            </h3>
                             <div id="doc-preview-container" style="margin-bottom: 15px;"></div>
                             <div class="grid-2">
                                 <button type="button" class="btn-secondary" id="take-photo-btn"><i data-lucide="camera"></i> <span data-lang-key="takePhoto"></span></button>
@@ -3550,6 +3585,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             history.pushState({ modal: 'clientFormModal' }, 'Client Form', '#client-form');
             clientFormModal.classList.add('active');
             
+            // --- Lógica de UI (Frecuencia de pago, Cálculo de Préstamo, etc.) ---
             const paymentFrequencySelect = document.getElementById('payment-frequency');
             const dailySelector = document.getElementById('daily-payment-selector');
             const weeklySelector = document.getElementById('weekly-payment-selector');
@@ -3570,76 +3606,83 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             paymentFrequencySelect.addEventListener('change', (e) => handleFrequencyChange(e.target.value));
 
-            if (isEditMode) {
-                paymentFrequencySelect.value = loan.paymentFrequency || 'daily';
-                handleFrequencyChange(loan.paymentFrequency || 'daily');
+            // Poblar días de pago (basado en 'loan' o por defecto)
+            const frequency = loan.paymentFrequency || 'daily';
+            paymentFrequencySelect.value = frequency;
+            handleFrequencyChange(frequency);
 
-                if ((loan.paymentFrequency || 'daily') === 'daily') {
-                    (loan.paymentDays || []).forEach(day => {
-                        const checkbox = document.getElementById(`form-day-${day}`);
-                        if (checkbox) checkbox.checked = true;
-                    });
-                } else if (loan.paymentFrequency === 'weekly') {
-                    document.getElementById('weekly-day-select').value = (loan.paymentDays || [1])[0];
-                } else if (loan.paymentFrequency === 'monthly') {
-                    document.getElementById('monthly-day-input').value = (loan.paymentDays || [1])[0];
-                }
-            } else {
-                paymentFrequencySelect.value = 'daily';
-                handleFrequencyChange('daily');
-                // Default days for new client or new loan
-                [1,2,3,4,5,6].forEach(day => { 
+            if (frequency === 'daily') {
+                const days = loan.paymentDays || [1,2,3,4,5,6]; // Por defecto L-S si es nuevo
+                days.forEach(day => {
                     const checkbox = document.getElementById(`form-day-${day}`);
                     if (checkbox) checkbox.checked = true;
                 });
+            } else if (frequency === 'weekly') {
+                document.getElementById('weekly-day-select').value = (loan.paymentDays || [1])[0]; // Lunes por defecto
+            } else if (frequency === 'monthly') {
+                document.getElementById('monthly-day-input').value = (loan.paymentDays || [1])[0]; // Día 1 por defecto
             }
 
-            let isUsernameAvailable = (isEditMode || isNewLoan); 
+            // --- [CAMBIO] Lógica de validación de Username y Email ---
+            let isUsernameAvailable = (isEditMode || isNewLoan); // Asume true si edita/es préstamo nuevo
+            // [CAMBIO] Eliminada la variable isEmailValid
+            
             const usernameInput = document.getElementById('client-username');
             const validationMsg = document.getElementById('username-validation-msg');
+            // [CAMBIO] Eliminadas las variables de email
 
-            usernameInput.addEventListener('blur', async () => {
-                const username = usernameInput.value.trim();
-                if (!username) {
-                    validationMsg.textContent = '';
-                    isUsernameAvailable = false;
-                    return;
-                }
-                if ((isEditMode || isNewLoan) && username === client.username) {
-                     validationMsg.textContent = '';
-                     isUsernameAvailable = true;
-                     return;
-                }
-                
-                validationMsg.textContent = 'Verificando...';
-                validationMsg.className = '';
-
-                const q = query(collection(db, "clients"), where("username", "==", username));
-                const querySnapshot = await getDocs(q);
-                
-                let isTaken = false;
-                if (!querySnapshot.empty) {
-                    if (isEditMode) {
-                        isTaken = querySnapshot.docs.some(doc => doc.id !== clientId);
-                    } else {
-                        isTaken = true;
+            if (usernameInput) { // Solo añade listener si el campo existe (no en "isNewLoan")
+                usernameInput.addEventListener('blur', async () => {
+                    const username = usernameInput.value.trim();
+                    if (!username) {
+                        validationMsg.textContent = '';
+                        isUsernameAvailable = false;
+                        return;
                     }
-                }
+                    if (isEditMode && username === client.username) {
+                         validationMsg.textContent = '';
+                         isUsernameAvailable = true;
+                         return;
+                    }
+                    
+                    // [CAMBIO] Añadida validación de @
+                    if (username.includes('@')) {
+                        validationMsg.textContent = 'Usuário não pode conter "@".';
+                        validationMsg.className = 'validation-message invalid';
+                        isUsernameAvailable = false;
+                        return;
+                    }
 
-                if (isTaken) {
-                    validationMsg.textContent = translations[currentLang].usernameTaken;
-                    validationMsg.classList.add('invalid');
-                    isUsernameAvailable = false;
-                } else {
-                    validationMsg.textContent = translations[currentLang].usernameAvailable;
-                    validationMsg.classList.add('valid');
-                    isUsernameAvailable = true;
-                }
-            });
+                    validationMsg.textContent = 'Verificando...';
+                    validationMsg.className = 'validation-message checking';
 
+                    // [CORRECCIÓN RUTA] Busca en la colección correcta
+                    const q = query(collection(db, 'companies', currentCompanyId, 'clients'), where("username", "==", username));
+                    const querySnapshot = await getDocs(q);
+                    
+                    let isTaken = false;
+                    if (!querySnapshot.empty) {
+                        isTaken = true; // Asume que está tomado
+                    }
+
+                    if (isTaken) {
+                        validationMsg.textContent = translations[currentLang].usernameTaken;
+                        validationMsg.classList.add('invalid');
+                        isUsernameAvailable = false;
+                    } else {
+                        validationMsg.textContent = translations[currentLang].usernameAvailable;
+                        validationMsg.classList.add('valid');
+                        isUsernameAvailable = true;
+                    }
+                });
+            }
+            // --- [CAMBIO] Eliminado el listener de 'client-email' ---
+            
+            // --- Lógica de Documentos ---
             const docPreviewContainer = document.getElementById('doc-preview-container');
 
             function renderDocPreviews() {
+                if (!docPreviewContainer) return; // No hace nada si el contenedor no existe
                 docPreviewContainer.innerHTML = '';
                 if(existingDocs.length === 0 && filesToUpload.length === 0){
                     docPreviewContainer.innerHTML = `<p class="no-items" style="padding: 10px 0;">Nenhum documento anexado.</p>`;
@@ -3660,49 +3703,60 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 lucide.createIcons({nodes: docPreviewContainer.querySelectorAll('i')});
             }
 
-            docPreviewContainer.addEventListener('click', (e) => {
-                const removeExistingBtn = e.target.closest('.remove-existing-doc');
-                if (removeExistingBtn) {
-                    const index = parseInt(removeExistingBtn.dataset.index, 10);
-                    existingDocs.splice(index, 1);
-                    renderDocPreviews();
-                }
+            if (docPreviewContainer) {
+                docPreviewContainer.addEventListener('click', (e) => {
+                    const removeExistingBtn = e.target.closest('.remove-existing-doc');
+                    if (removeExistingBtn) {
+                        const index = parseInt(removeExistingBtn.dataset.index, 10);
+                        existingDocs.splice(index, 1);
+                        renderDocPreviews();
+                    }
 
-                const removeNewBtn = e.target.closest('.remove-new-doc');
-                if (removeNewBtn) {
-                    const index = parseInt(removeNewBtn.dataset.index, 10);
-                    filesToUpload.splice(index, 1);
-                    renderDocPreviews();
-                }
-            });
+                    const removeNewBtn = e.target.closest('.remove-new-doc');
+                    if (removeNewBtn) {
+                        const index = parseInt(removeNewBtn.dataset.index, 10);
+                        filesToUpload.splice(index, 1);
+                        renderDocPreviews();
+                    }
+                });
+                // Renderiza los documentos existentes (solo si no es préstamo nuevo)
+                if (!isNewLoan) renderDocPreviews();
+            }
 
-
-            if(isEditMode) renderDocPreviews();
 
             function handleFiles(selectedFiles) {
                 filesToUpload.push(...selectedFiles);
                 renderDocPreviews();
             }
 
-            document.getElementById('take-photo-btn').addEventListener('click', () => {
-                const docFileInput = document.getElementById('doc-file-input');
-                docFileInput.setAttribute('capture', 'camera');
-                docFileInput.click();
-            });
-            document.getElementById('upload-file-btn').addEventListener('click', () => {
-                 const docFileInput = document.getElementById('doc-file-input');
-                docFileInput.removeAttribute('capture');
-                docFileInput.click();
-            });
-            document.getElementById('doc-file-input').addEventListener('change', (e) => handleFiles(Array.from(e.target.files)));
+            const takePhotoBtn = document.getElementById('take-photo-btn');
+            const uploadFileBtn = document.getElementById('upload-file-btn');
+            const docFileInput = document.getElementById('doc-file-input');
 
+            if (takePhotoBtn) {
+                takePhotoBtn.addEventListener('click', () => {
+                    docFileInput.setAttribute('capture', 'camera');
+                    docFileInput.click();
+                });
+            }
+            if (uploadFileBtn) {
+                uploadFileBtn.addEventListener('click', () => {
+                    docFileInput.removeAttribute('capture');
+                    docFileInput.click();
+                });
+            }
+            if (docFileInput) {
+                docFileInput.addEventListener('change', (e) => handleFiles(Array.from(e.target.files)));
+            }
+
+            // --- Lógica de Cálculo de Préstamo ---
             const loanAmountInput = document.getElementById('client-loan-amount');
             const interestInput = document.getElementById('client-interest');
             const installmentsInput = document.getElementById('client-installments');
             const totalToPayInput = document.getElementById('client-total-to-pay');
             const installmentValueInput = document.getElementById('client-installment-value');
 
-            function calculateLoanDetails() {
+            function calculateLoanValues() {
                 const loanAmount = parseFloat(loanAmountInput.value) || 0;
                 const interest = parseFloat(interestInput.value) || 0;
                 const installments = parseInt(installmentsInput.value) || 0;
@@ -3712,126 +3766,111 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 installmentValueInput.value = money(installmentValue);
             }
 
-            [loanAmountInput, interestInput, installmentsInput].forEach(input => input.addEventListener('input', calculateLoanDetails));
-            calculateLoanDetails();
+            [loanAmountInput, interestInput, installmentsInput].forEach(input => input.addEventListener('input', calculateLoanValues));
+            calculateLoanValues();
 
-
-
+            // --- Lógica de Toggle de Migración ---
             const migrationToggle = document.getElementById('migration-toggle-input');
             const migrationFieldGroup = document.getElementById('migration-paid-installments-group');
             const migrationFieldInput = document.getElementById('client-initial-paid-installments');
 
-            // Solo añade el listener si el interruptor existe (es decir, !isEditMode)
             if (migrationToggle && migrationFieldGroup && migrationFieldInput) {
                 migrationToggle.addEventListener('change', (e) => {
                     if (e.target.checked) {
-                        // MODO MIGRACIÓN ACTIVADO
                         migrationFieldGroup.style.display = 'block';
                     } else {
-                        // MODO MIGRACIÓN DESACTIVADO
                         migrationFieldGroup.style.display = 'none';
-                        migrationFieldInput.value = '0'; // Resetea el valor
+                        migrationFieldInput.value = '0';
                     }
                 });
             }
 
-
-
-
-            document.getElementById('get-location-btn').addEventListener('click', () => {
-                showMapPinModal();
-            });
+            // --- Lógica de Botón GPS ---
+            const gpsBtn = document.getElementById('get-location-btn');
+            if(gpsBtn) {
+                gpsBtn.addEventListener('click', () => showMapPinModal());
+            }
             
+            // --- Lógica de Cerrar y Guardar ---
             document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
             
+            // --- [CAMBIO] Lógica de Guardado (SaveButton Click) ---
             document.getElementById('saveClientBtn').addEventListener('click', async (e) => {
                 const saveButton = e.currentTarget;
                 const originalButtonHTML = saveButton.innerHTML;
                 
+                // 1. Recolección de Datos (Campos comunes)
                 const clientNameInput = document.getElementById('client-name');
                 const loanAmountInputVal = document.getElementById('client-loan-amount');
+                const whatsappInputVal = document.getElementById('client-whatsapp');
+                const loanAmount = parseFloat(loanAmountInputVal.value);
+                
+                // Recolección de datos de acceso (pueden no existir si isNewLoan)
                 const usernameInputVal = document.getElementById('client-username');
                 const passwordInputVal = document.getElementById('client-password');
-                const whatsappInputVal = document.getElementById('client-whatsapp');
+                const username = usernameInputVal ? usernameInputVal.value.trim() : client.username; // Usa el existente si es préstamo nuevo
+                const password = passwordInputVal ? passwordInputVal.value : client.password; // Usa el existente si es préstamo nuevo
                 
-                
-                if (!clientNameInput.value || !loanAmountInputVal.value || !usernameInputVal.value || !passwordInputVal.value || !whatsappInputVal.value) {
+                // [CAMBIO] Genera el email
+                const email = `${username}@gmail.com`;
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+                // 2. Validación
+                if (!clientNameInput.value || !loanAmountInputVal.value || !whatsappInputVal.value || (usernameInputVal && !username) || (passwordInputVal && !password)) {
                     showToast('Nome, WhatsApp, Valor do Empréstimo, Usuário e Senha são obrigatórios.', true);
                     return;
                 }
                 
-                if (!isUsernameAvailable) {
+                // [CAMBIO] Valida el username y el email generado
+                if (!isNewLoan && !isUsernameAvailable) {
                      showToast(translations[currentLang].usernameTaken, true);
                      return;
                 }
-
-                // --- [INICIO DE LA CORRECCIÓN] ---
-                // Verifica el capital ANTES de continuar, solo para préstamos NUEVOS
-                // (isEditMode es falso si es cliente nuevo, isNewLoan es verdadero si es préstamo nuevo)
-                const loanAmount = parseFloat(document.getElementById('client-loan-amount').value);
-                if ((!isEditMode || isNewLoan) && loanAmount > currentCapitalOnHand) {
-                    showToast(`Capital insuficiente (${money(currentCapitalOnHand)}). Não é possível criar um empréstimo de ${money(loanAmount)}.`, true);
-                    // No deshabilitamos el botón, solo mostramos el error y paramos
+                if (!isNewLoan && !emailRegex.test(email)) {
+                    showToast('O nome de usuário não pode conter @ ou caracteres inválidos.', true);
                     return;
                 }
-                // --- [FIN DE LA CORRECCIÓN] ---
 
+                if ((!isEditMode || isNewLoan) && loanAmount > currentCapitalOnHand) {
+                    showToast(`Capital insuficiente (${money(currentCapitalOnHand)}). Não é possível criar um empréstimo de ${money(loanAmount)}.`, true);
+                    return;
+                }
+
+                // 3. Estado de Carga (Botón)
                 saveButton.disabled = true;
                 saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> <span>Salvando...</span>`;
                 lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
 
+                // 4. Procesamiento
                 try {
+                    // Subida de documentos (solo si no es préstamo nuevo)
                     let newUploadedDocuments = [];
-                    if (filesToUpload.length > 0) {
+                    if (!isNewLoan && filesToUpload.length > 0) {
                         const uploadPromises = filesToUpload.map(async (file) => {
-    // Necesitamos el ID del cliente. Si es nuevo, se genera DESPUÉS.
-    // Usaremos un nombre de archivo único por ahora.
-    const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-    // Obtén el ID del cliente SI estamos editando, si no, usa el username (que será el ID después)
-    const targetClientId = isEditMode ? clientId : document.getElementById('client-username').value.trim();
-
-    // 1. Crear referencia (clients/ID_CLIENTE/docs/nombre_archivo.ext)
-    const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
-
-    // 2. Subir archivo
-    await uploadBytes(storageRef, file);
-
-    // 3. Obtener URL
-    const downloadURL = await getDownloadURL(storageRef);
-
-    return { name: file.name, url: downloadURL }; // Devuelve el objeto esperado
-});
-newUploadedDocuments = await Promise.all(uploadPromises);
+                            const targetClientId = isEditMode ? clientId : username;
+                            const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+                            const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
+                            await uploadBytes(storageRef, file);
+                            const downloadURL = await getDownloadURL(storageRef);
+                            return { name: file.name, url: downloadURL };
+                        });
+                        newUploadedDocuments = await Promise.all(uploadPromises);
                     }
+                    const finalDocuments = isNewLoan ? client.documents : [...existingDocs, ...newUploadedDocuments];
 
-                    const finalDocuments = [...existingDocs, ...newUploadedDocuments];
+                    // Recolección de datos del préstamo
                     const interest = parseFloat(document.getElementById('client-interest').value);
                     const installments = parseInt(document.getElementById('client-installments').value);
                     const totalToPay = loanAmount * (1 + (interest / 100));
                     const installmentValue = installments > 0 ? totalToPay / installments : 0;
                     const principalAmount = loanAmount;
-                   
-
                     const paymentFrequency = document.getElementById('payment-frequency').value;
                     let paymentDaysValue = [];
+                    if (paymentFrequency === 'daily') paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
+                    else if (paymentFrequency === 'weekly') paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
+                    else if (paymentFrequency === 'monthly') paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
 
-                    if (paymentFrequency === 'daily') {
-                        paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
-                    } else if (paymentFrequency === 'weekly') {
-                        paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
-                    } else if (paymentFrequency === 'monthly') {
-                        const day = parseInt(document.getElementById('monthly-day-input').value);
-                        if (day >= 1 && day <= 31) {
-                            paymentDaysValue = [day];
-                        } else {
-                            showToast('Por favor, insira um dia do mês válido (1-31).', true);
-                            saveButton.disabled = false;
-                            saveButton.innerHTML = originalButtonHTML;
-                            lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
-                            return;
-                        }
-                    }
-
+                    // Definición de objetos de datos
                     const clientGeneralData = {
                         name: document.getElementById('client-name').value,
                         documentNumber: document.getElementById('client-document').value,
@@ -3839,9 +3878,9 @@ newUploadedDocuments = await Promise.all(uploadPromises);
                         city: document.getElementById('client-city').value,
                         whatsapp: document.getElementById('client-whatsapp').value,
                         location: document.getElementById('client-location').value,
-                        username: document.getElementById('client-username').value.trim(),
-                        email: document.getElementById('client-email').value.trim(),
-                        password: document.getElementById('client-password').value,
+                        username: username,
+                        email: email, // [CAMBIO] Guarda el email generado
+                        password: password,
                         documents: finalDocuments,
                         collectorId: currentCollectorUsername,
                         interestRate: interest
@@ -3864,51 +3903,39 @@ newUploadedDocuments = await Promise.all(uploadPromises);
                         collectionTime: document.getElementById('client-collection-time').value,
                     };
 
-                    const initialPaidInstallmentsInput = document.getElementById('client-initial-paid-installments');
-                    
-                    // Solo aplica si el input existe (no existe en modo edición)
-                    if (initialPaidInstallmentsInput) { 
-                        const initialPaidInstallments = parseInt(initialPaidInstallmentsInput.value, 10) || 0;
-                        const totalInstallmentsNum = parseInt(document.getElementById('client-installments').value, 10) || installments;
-
+                    // Lógica de Migración (sin cambios)
+                    if (migrationToggle && migrationToggle.checked) {
+                        const initialPaidInstallments = parseInt(migrationFieldInput.value, 10) || 0;
+                        const totalInstallmentsNum = installments;
                         if (initialPaidInstallments > 0 && initialPaidInstallments < totalInstallmentsNum) {
-                            // 1. Recalcular 'paid'
                             loanSpecificData.paid = installmentValue * initialPaidInstallments;
-                            // 2. Actualizar string 'installments'
                             loanSpecificData.installments = `${initialPaidInstallments}/${totalInstallmentsNum}`;
-                            // 3. Asegurar que el balance sea 0 (asumimos que migra en una fecha de corte)
                             loanSpecificData.paymentBalance = 0;
-                            // 4. El estado ya es 'active', lo cual es correcto.
                             loanSpecificData.initialMigratedAmount = loanSpecificData.paid;
                             loanSpecificData.migrationDate = new Date();
-
-                            console.log(`[MIGRACIÓN] Préstamo migrado con ${initialPaidInstallments} cuotas pagadas.`);
-                        
                         } else if (initialPaidInstallments >= totalInstallmentsNum) {
-                            // Si paga todo o más, marcar como finalizado
                             loanSpecificData.paid = totalToPay;
                             loanSpecificData.installments = `${totalInstallmentsNum}/${totalInstallmentsNum}`;
-                            loanSpecificData.status = 'finished'; // MARCA COMO FINALIZADO
+                            loanSpecificData.status = 'finished';
                             loanSpecificData.paymentBalance = 0;
                             loanSpecificData.initialMigratedAmount = loanSpecificData.paid;
                             loanSpecificData.migrationDate = new Date();
-                            console.log(`[MIGRACIÓN] Préstamo migrado como 'finished'.`);
                         }
-                        // Si es 0 (porque el interruptor estaba apagado o se dejó en 0), no se hace nada.
                     }
 
+                    // 5. Lógica de Guardado en Firestore
                     if (isNewLoan) {
+                        // Añade un nuevo préstamo a un cliente existente
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
                         await updateDoc(clientRef, {
-                            loans: arrayUnion(loanSpecificData),
-                             // Actualiza también los datos generales por si cambiaron
-                            ...clientGeneralData
+                            loans: arrayUnion(loanSpecificData)
                         });
                     } else if (isEditMode) {
-                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
-                         const updatedLoans = [...client.loans];
-                         updatedLoans[loanIndex] = {
-                             ...updatedLoans[loanIndex], // Mantén datos antiguos como historial, paid, etc.
+                        // Edita un cliente existente y su préstamo específico
+                        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
+                        const updatedLoans = [...client.loans];
+                        updatedLoans[loanIndex] = {
+                             ...updatedLoans[loanIndex], // Mantén datos antiguos (historial, paid, etc.)
                              lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
                              totalLoan: totalToPay,
                              amount: installmentValue,
@@ -3918,118 +3945,82 @@ newUploadedDocuments = await Promise.all(uploadPromises);
                              paymentDays: paymentDaysValue,
                              collectionTime: document.getElementById('client-collection-time').value,
                          };
-                         await updateDoc(clientRef, {
+                        await updateDoc(clientRef, {
                              loans: updatedLoans,
-                             ...clientGeneralData
-                         });
-                    
-                    } else { // **** INICIO BLOCO: Creando cliente nuevo ****
-                    console.log("[COBRADOR-APP] Iniciando processo de criação de novo cliente...");
-
-                    // --- PASSO 1: Obter Email e Senha do Formulário ---
-                    const clientEmailInput = document.getElementById('client-email');
-                    const clientPasswordInput = document.getElementById('client-password');
-                    const clientEmail = clientEmailInput?.value.trim();
-                    const clientPassword = clientPasswordInput?.value; // Não faz trim na senha
-
-                    // Validação extra (embora já haja validação geral antes)
-                    if (!clientEmail || !clientPassword || clientPassword.length < 6) {
-                         throw new Error("Email ou Senha inválidos ou faltantes para o acesso do cliente.");
-                    }
-                    console.log("[COBRADOR-APP] Email e Senha para Auth obtidos:", clientEmail);
-
-                    // --- PASSO 2: Chamar a Cloud Function 'createClientAuthAndLink' ---
-                    let newClientAuthUid = null; // Variável para guardar o Auth UID
-                    try {
-                        console.log("[COBRADOR-APP] Chamando Cloud Function 'createClientAuthAndLink'...");
-                        if (!auth.currentUser) throw new Error("Cobrador não autenticado para chamar a função.");
-                        const idToken = await auth.currentUser.getIdToken(true); // Token do COBRADOR
-
-                        const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/createClientAuthAndLink"; // URL da nova função
-
-                        const response = await fetch(functionUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${idToken}` // Usa o token do COBRADOR
-                            },
-                            body: JSON.stringify({
-                                data: { // Envuelve em 'data' como as outras funções
-                                    clientEmail: clientEmail,
-                                    clientPassword: clientPassword
-                                }
-                            })
+                             ...clientGeneralData // Actualiza también los datos generales
                         });
+                    
+                    } else { 
+                        // Crea un cliente completamente nuevo
+                        console.log("[COBRADOR-APP] Creando cliente nuevo...");
+                        let newClientAuthUid = null;
+                        try {
+                            console.log("[COBRADOR-APP] Llamando Cloud Function 'createClientAuthAndLink'...");
+                            if (!auth.currentUser) throw new Error("Cobrador não autenticado.");
+                            const idToken = await auth.currentUser.getIdToken(true);
+                            const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/createClientAuthAndLink";
 
-                        const result = await response.json(); // Lê a resposta
-
-                        if (!response.ok || !result.result?.success || !result.result?.clientUid) {
-                            // Se a resposta não for OK ou não tiver os dados esperados
-                            throw new Error(result.error?.message || `Falha ao criar conta de autenticação (HTTP ${response.status})`);
+                            const response = await fetch(functionUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                                body: JSON.stringify({ data: { clientEmail: email, clientPassword: password } }) // [CAMBIO] Usa el email generado
+                            });
+                            const result = await response.json();
+                            if (!response.ok || !result.result?.success || !result.result?.clientUid) {
+                                throw new Error(result.error?.message || `Falha ao criar conta (HTTP ${response.status})`);
+                            }
+                            newClientAuthUid = result.result.clientUid;
+                            console.log("[COBRADOR-APP] Cloud Function OK. Novo Auth UID:", newClientAuthUid);
+                        } catch (authCreationError) {
+                             console.error("[COBRADOR-APP] ERRO ao chamar 'createClientAuthAndLink':", authCreationError);
+                             throw authCreationError;
                         }
 
-                        newClientAuthUid = result.result.clientUid; // Guarda o Auth UID retornado!
-                        console.log("[COBRADOR-APP] Cloud Function bem-sucedida. Novo Auth UID do cliente:", newClientAuthUid);
-
-                    } catch (authCreationError) {
-                         // Se a Cloud Function falhar (ex: email já existe), o erro será capturado aqui
-                         console.error("[COBRADOR-APP] ERRO ao chamar 'createClientAuthAndLink':", authCreationError);
-                         // Re-lança o erro para ser pego pelo catch principal e mostrado ao usuário
-                         throw authCreationError;
+                        const newClientData = {
+                            ...clientGeneralData,
+                            authUid: newClientAuthUid,
+                            loans: [loanSpecificData],
+                            fcmTokens: [],
+                            notifications: []
+                        };
+                        console.log("[COBRADOR-APP] Salvando dados no Firestore...");
+                        await addDoc(collection(db, 'companies', currentCompanyId, "clients"), newClientData);
                     }
-
-                    // --- PASSO 3: Preparar Dados FINAIS para Firestore (incluindo authUid) ---
-                    const newClientData = {
-                    ...clientGeneralData, // Dados gerais (nome, docs, etc.)
-                    authUid: newClientAuthUid, // <-- ADICIONA O AUTH UID OBTIDO!
-                    email: clientEmail, // <-- Guarda también o email em Firestore por conveniência
-                    // Não guardamos a senha em Firestore!
-                    loans: [loanSpecificData], // O primeiro empréstimo
-                    fcmTokens: [], // <--- [NUEVA LÍNEA AÑADIDA] Inicializa tokens FCM
-                    notifications: [] // <--- [NUEVA LÍNEA AÑADIDA] Inicializa notificaciones internas
-                };
-                console.log("[COBRADOR-APP] Dados preparados para Firestore:", newClientData);
-
-                    // --- PASSO 4: Salvar no Firestore (Rota já corrigida antes) ---
-                    console.log("[COBRADOR-APP] Salvando dados do cliente no Firestore...");
-                    // A rota collection(db, 'companies', currentCompanyId, "clients") está correta
-                    await addDoc(collection(db, 'companies', currentCompanyId, "clients"), newClientData);
-                    console.log("[COBRADOR-APP] Cliente salvo no Firestore com sucesso.");
-
-                }
                     
-                    window.history.back(); // Cierra el modal de formulario
-                    
+                    // 6. Éxito
+                    window.history.back();
                     const successToastMessage = isEditMode ? translations[currentLang].clientUpdatedSuccess : translations[currentLang].clientRegisteredSuccess;
                     showToast(successToastMessage);
 
-                    // Para clientes nuevos o si se está creando un nuevo préstamo, muestra el modal para compartir credenciales.
                     if (!isEditMode || isNewLoan) { 
                         setTimeout(() => {
                            showShareCredentialsModal(clientGeneralData, isEditMode);
-                        }, 400); // Pequeño retraso para permitir que el modal anterior se cierre.
+                        }, 400);
                     }
 
                 } catch (error) {
                     console.error("Error al guardar cliente:", error);
                     showToast(error.message || 'Ocurrió un error al guardar los datos.', true);
                 } finally {
-                    saveButton.disabled = false;
-                    saveButton.innerHTML = originalButtonHTML;
-                    lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+                    // Restaura el botón solo si el modal sigue abierto (por si hubo error)
+                    if (clientFormModal.classList.contains('active')) {
+                        saveButton.disabled = false;
+                        saveButton.innerHTML = originalButtonHTML;
+                        lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+                    }
                 }
             });
+            // --- Fin Lógica de Guardado ---
 
             lucide.createIcons({ nodes: clientFormModal.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
             const docInput = document.getElementById('client-document');
-if (docInput) {
-    docInput.addEventListener('blur', () => triggerSystemVerification(clientId));
-}
-// Si estamos editando un cliente que ya tiene documento, ejecuta la verificación al cargar
-if (isEditMode && client.documentNumber) {
-    triggerSystemVerification(clientId);
-}
+            if (docInput && !isNewLoan) { // Solo verifica si no es "préstamo nuevo"
+                docInput.addEventListener('blur', () => triggerSystemVerification(isEditMode ? clientId : null));
+            }
+            if (isEditMode && client.documentNumber) {
+                triggerSystemVerification(clientId);
+            }
         }
 
         function showShareCredentialsModal(clientData, isEditMode) {
@@ -6036,4 +6027,5 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
