@@ -3390,7 +3390,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
 
         /**
-         * [VERSIÓN REDISEÑADA - MODO OSCURO]
+         * [VERSIÓN REFINADA - MODO OSCURO MÁS CENTRADO]
          * Genera un PDF profesional con los datos de acceso del cliente.
          * @param {object} clientData - Datos del cliente (name, email, password, username).
          * @returns {Blob} - El PDF generado como un Blob.
@@ -3399,103 +3399,123 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             // Usa la instancia global de jsPDF cargada en el <head>
             const { jsPDF } = window.jspdf;
             
-            // Mantiene el formato 100x130 (más alto)
-            const doc = new jsPDF({ unit: 'mm', format: [100, 130] });
-            
+            // --- INICIO: CORRECCIÓN DE DISEÑO 1/5 ---
+            // Aumentamos la altura de 130mm a 140mm para mejor espaciado vertical
+            const doc = new jsPDF({ unit: 'mm', format: [100, 140] });
             const margin = 10;
             const width = doc.internal.pageSize.getWidth();
+            const cardWidth = width - (margin * 2); // 80mm
+            const cardCenterX = width / 2; // 50mm
+            // --- FIN: CORRECCIÓN DE DISEÑO 1/5 ---
             
-            // --- INICIO: NUEVOS COLORES MODO OSCURO (Basados en tu CSS) ---
-            const pdfBg = '#0f172a'; // Un poco más claro que --bg (var(--surface))
-            const cardBg = '#1e293b'; // Un poco más claro que el fondo del PDF (var(--border-color))
-            const textColor = '#e2e8f0'; // Texto primario (casi blanco)
-            const secondaryTextColor = '#94a3b8'; // Texto secundario (gris claro)
-            const primaryColor = '#6f42c1'; // Púrpura (se mantiene)
-            const cardBorder = '#334155'; // Borde (más oscuro)
-            // --- FIN: NUEVOS COLORES ---
+            // Colores Dark Mode (sin cambios)
+            const pdfBg = '#0f172a';
+            const cardBg = '#1e293b';
+            const textColor = '#e2e8f0';
+            const secondaryTextColor = '#94a3b8';
+            const primaryColor = '#6f42c1';
+            const cardBorder = '#334155';
 
-            // 1. Fondo del PDF (Color oscuro)
+            // 1. Fondo del PDF (sin cambios)
             doc.setFillColor(pdfBg);
             doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), 'F');
 
-            let y = margin + 10; // Empezar en y=20
+            // --- INICIO: CORRECCIÓN DE DISEÑO 2/5 ---
+            // Ajustamos el espaciado vertical (variable 'y')
+            let y = 15; // Margen superior
 
-            // 2. Encabezado: Nombre de la Empresa (Color Púrpura)
+            // 2. Encabezado: Nombre de la Empresa
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             doc.setTextColor(primaryColor);
-            doc.text(currentCompanyData?.name || 'LUMIX Finanças', width / 2, y, { align: 'center' });
-            y += 15;
+            doc.text(currentCompanyData?.name || 'LUMIX Finanças', cardCenterX, y, { align: 'center' });
+            y += 15; // y = 30
 
-            // 3. Mensaje de Bienvenida (Color Blanco/Gris)
+            // 3. Mensaje de Bienvenida
             doc.setFontSize(18);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(textColor); // Blanco
-            doc.text('Bem-vindo!', width / 2, y, { align: 'center' });
+            doc.setTextColor(textColor);
+            doc.text('Bem-vindo!', cardCenterX, y, { align: 'center' });
+            y += 8; // y = 38
             
-            y += 8;
             doc.setFontSize(12);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor); // Gris
-            doc.text(clientData.name, width / 2, y, { align: 'center' });
+            doc.setTextColor(secondaryTextColor);
+            doc.text(clientData.name, cardCenterX, y, { align: 'center' });
+            y += 10; // y = 48
 
-            y += 10;
             doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor); // Gris
             const introText = "Estes são seus dados para o acesso ao seu aplicativo da área do cliente.";
-            const splitText = doc.splitTextToSize(introText, width - (margin * 2));
-            doc.text(splitText, width / 2, y, { align: 'center' });
-            
-            y += (splitText.length * 5) + 8; // y ahora es ~74
+            const splitText = doc.splitTextToSize(introText, cardWidth);
+            doc.text(splitText, cardCenterX, y, { align: 'center' });
+            y += (splitText.length * 5) + 12; // y = 48 + 10 + 12 = 70 (Más espacio)
+            // --- FIN: CORRECCIÓN DE DISEÑO 2/5 ---
 
-            // 4. Tarjeta de Credenciales (Fondo oscuro, borde oscuro)
+            // 4. Tarjeta de Credenciales
             const cardX = margin;
             const cardY = y;
-            const cardWidth = width - (margin * 2);
-            const cardHeight = 35;
+            // --- INICIO: CORRECCIÓN DE DISEÑO 3/5 ---
+            // Hacemos la tarjeta un poco más alta (40mm) para centrar mejor
+            const cardHeight = 40; 
+            // --- FIN: CORRECCIÓN DE DISEÑO 3/5 ---
             const cardRadius = 3;
 
+            // Dibuja la tarjeta (fondo, borde, barra púrpura - sin cambios)
             doc.setDrawColor(cardBorder);
-            doc.setFillColor(cardBg); // Color superficie oscura
+            doc.setFillColor(cardBg);
             doc.roundedRect(cardX, cardY, cardWidth, cardHeight, cardRadius, cardRadius, 'FD');
-            
-            // Barra superior Púrpura (sin cambios)
             doc.setFillColor(primaryColor);
             doc.roundedRect(cardX, cardY, cardWidth, 8, cardRadius, cardRadius, 'F');
             doc.rect(cardX, cardY + 4, cardWidth, 4, 'F');
             doc.setFontSize(10);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor('#FFFFFF'); // Texto blanco (sin cambios)
+            doc.setTextColor('#FFFFFF');
             doc.text('Seus Dados de Acesso', cardX + 5, cardY + 5.5);
 
-            let fieldY = cardY + 15;
+            // --- INICIO: CORRECCIÓN DE DISEÑO 4/5 ---
+            // Lógica de centrado vertical y horizontal para los campos
 
-            // Campo 1: Usuário (Color Blanco/Gris)
+            // Centro vertical del área de contenido (debajo de la barra púrpura)
+            // Área de contenido y = (70 + 8) = 78
+            // Altura de contenido = 40 - 8 = 32
+            // Centro del contenido = 78 + (32 / 2) = 94
+            const contentCenterY = cardY + 8 + ((cardHeight - 8) / 2); // y = 94
+
+            // Posiciones Y para los campos
+            const y_label1 = contentCenterY - 8;  // y = 86
+            const y_value1 = contentCenterY - 2;  // y = 92
+            const y_label2 = contentCenterY + 6;  // y = 100
+            const y_value2 = contentCenterY + 12; // y = 106
+
+            // Campo 1: Usuário (CENTRADO)
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor); // Gris
-            doc.text('Usuário (Login):', cardX + 8, fieldY);
-            fieldY += 6;
+            doc.setTextColor(secondaryTextColor);
+            doc.text('Usuário (Login):', cardCenterX, y_label1, { align: 'center' });
+            
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(textColor); // Blanco
-            doc.text(clientData.username, cardX + 8, fieldY);
-            fieldY += 8;
+            doc.setTextColor(textColor);
+            doc.text(clientData.username, cardCenterX, y_value1, { align: 'center' });
 
-            // Campo 2: Senha (Color Blanco/Gris)
+            // Campo 2: Senha (CENTRADO)
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor); // Gris
-            doc.text('Senha:', cardX + 8, fieldY);
-            fieldY += 6;
+            doc.setTextColor(secondaryTextColor);
+            doc.text('Senha:', cardCenterX, y_label2, { align: 'center' });
+            
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(textColor); // Blanco
-            doc.text(clientData.password, cardX + 8, fieldY);
+            doc.setTextColor(textColor);
+            doc.text(clientData.password, cardCenterX, y_value2, { align: 'center' });
+            // --- FIN: CORRECCIÓN DE DISEÑO 4/5 ---
 
-            // 5. Botón Clicable (Sin cambios)
-            y = cardY + cardHeight + 10;
+            // 5. Botón Clicable
+            // --- INICIO: CORRECCIÓN DE DISEÑO 5/5 ---
+            // Ajustamos la posición 'y' del botón basado en la nueva altura de la tarjeta
+            y = cardY + cardHeight + 10; // y = 70 + 40 + 10 = 120
+            // --- FIN: CORRECCIÓN DE DISEÑO 5/5 ---
+            
             const linkText = 'Acessar o Portal do Cliente';
             const appLink = 'https://cliente.lumixartificial.com';
             const btnHeight = 10;
@@ -3504,14 +3524,16 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const btnY = y;
             const btnRadius = 5;
 
+            // Dibuja el botón (sin cambios)
             doc.setFillColor(primaryColor);
             doc.roundedRect(btnX, btnY, btnWidth, btnHeight, btnRadius, btnRadius, 'F');
             doc.setFontSize(11);
             doc.setFont(undefined, 'bold');
             doc.setTextColor('#FFFFFF');
-            doc.text(linkText, width / 2, btnY + (btnHeight / 2), { align: 'center', baseline: 'middle' });
+            doc.text(linkText, cardCenterX, btnY + (btnHeight / 2), { align: 'center', baseline: 'middle' });
             doc.link(btnX, btnY, btnWidth, btnHeight, { url: appLink });
 
+            // 6. Devolver como Blob (sin cambios)
             return doc.output('blob');
         }
 
