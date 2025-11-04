@@ -3390,7 +3390,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
 
         /**
-         * [VERSIÓN REFINADA - MODO OSCURO MÁS CENTRADO]
+         * [VERSIÓN REFINADA v2 - MODO OSCURO, CENTRADO PROFESIONAL]
          * Genera un PDF profesional con los datos de acceso del cliente.
          * @param {object} clientData - Datos del cliente (name, email, password, username).
          * @returns {Blob} - El PDF generado como un Blob.
@@ -3400,12 +3400,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const { jsPDF } = window.jspdf;
             
             // --- INICIO: CORRECCIÓN DE DISEÑO 1/5 ---
-            // Aumentamos la altura de 130mm a 140mm para mejor espaciado vertical
-            const doc = new jsPDF({ unit: 'mm', format: [100, 180] });
-            const margin = 8;
-            const width = doc.internal.pageSize.getWidth();
-            const cardWidth = width - (margin * 1); // 80mm
-            const cardCenterX = width / 1; // 50mm
+            // Aumentamos la altura a 150mm para mejor espaciado y margen inferior
+            const doc = new jsPDF({ unit: 'mm', format: [100, 150] }); 
+            const margin = 8; // Margen lateral más estrecho (8mm)
+            const width = doc.internal.pageSize.getWidth(); // 100mm
+            const cardWidth = width - (margin * 2); // Ancho de tarjeta (84mm)
+            const cardCenterX = width / 2; // Centro horizontal (50mm)
             // --- FIN: CORRECCIÓN DE DISEÑO 1/5 ---
             
             // Colores Dark Mode (sin cambios)
@@ -3421,73 +3421,72 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), 'F');
 
             // --- INICIO: CORRECCIÓN DE DISEÑO 2/5 ---
-            // Ajustamos el espaciado vertical (variable 'y')
-            let y = 5; // Margen superior
+            // Re-cálculo de todo el espaciado vertical (variable 'y')
+            let y = 15; // Margen superior (15mm)
 
             // 2. Encabezado: Nombre de la Empresa
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             doc.setTextColor(primaryColor);
             doc.text(currentCompanyData?.name || 'LUMIX Finanças', cardCenterX, y, { align: 'center' });
-            y += 13; // y = 30
+            y += 12; // y = 27
 
             // 3. Mensaje de Bienvenida
             doc.setFontSize(18);
             doc.setFont(undefined, 'bold');
             doc.setTextColor(textColor);
             doc.text('Bem-vindo!', cardCenterX, y, { align: 'center' });
-            y += 8; // y = 38
+            y += 8; // y = 35
             
             doc.setFontSize(12);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(secondaryTextColor);
             doc.text(clientData.name, cardCenterX, y, { align: 'center' });
-            y += 10; // y = 48
+            y += 10; // y = 45
 
             doc.setFontSize(10);
             const introText = "Estes são seus dados para o acesso ao seu aplicativo da área do cliente.";
-            const splitText = doc.splitTextToSize(introText, cardWidth);
+            const splitText = doc.splitTextToSize(introText, cardWidth); // Usa el nuevo cardWidth (84mm)
             doc.text(splitText, cardCenterX, y, { align: 'center' });
-            y += (splitText.length * 5) + 12; // y = 48 + 10 + 12 = 70 (Más espacio)
+            y += (splitText.length * 5) + 10; // y = 45 + (10) + 10 = 65 (Más espacio)
             // --- FIN: CORRECCIÓN DE DISEÑO 2/5 ---
 
             // 4. Tarjeta de Credenciales
-            const cardX = margin;
-            const cardY = y;
+            const cardX = margin; // 8mm
+            const cardY = y; // y = 65
             // --- INICIO: CORRECCIÓN DE DISEÑO 3/5 ---
-            // Hacemos la tarjeta un poco más alta (40mm) para centrar mejor
+            // Tarjeta más alta (50mm) para centrar mejor el contenido
             const cardHeight = 50; 
+            const cardRadius = 5; // Bordes más redondeados
             // --- FIN: CORRECCIÓN DE DISEÑO 3/5 ---
-            const cardRadius = 5;
 
-            // Dibuja la tarjeta (fondo, borde, barra púrpura - sin cambios)
+            // Dibuja la tarjeta (fondo, borde, barra púrpura)
             doc.setDrawColor(cardBorder);
             doc.setFillColor(cardBg);
             doc.roundedRect(cardX, cardY, cardWidth, cardHeight, cardRadius, cardRadius, 'FD');
             doc.setFillColor(primaryColor);
             doc.roundedRect(cardX, cardY, cardWidth, 8, cardRadius, cardRadius, 'F');
-            doc.rect(cardX, cardY + 4, cardWidth, 4, 'F');
+            doc.rect(cardX, cardY + 4, cardWidth, 4, 'F'); // Relleno inferior de esquinas
             doc.setFontSize(10);
             doc.setFont(undefined, 'bold');
             doc.setTextColor('#FFFFFF');
             doc.text('Seus Dados de Acesso', cardX + 5, cardY + 5.5);
 
             // --- INICIO: CORRECCIÓN DE DISEÑO 4/5 ---
-            // Lógica de centrado vertical y horizontal para los campos
+            // Nueva lógica de centrado vertical para la tarjeta de 50mm
 
-            // Centro vertical del área de contenido (debajo de la barra púrpura)
-            // Área de contenido y = (70 + 8) = 78
-            // Altura de contenido = 40 - 8 = 32
-            // Centro del contenido = 78 + (32 / 2) = 94
-            const contentCenterY = cardY + 8 + ((cardHeight - 8) / 2); // y = 94
+            // Centro vertical del ÁREA DE CONTENIDO (todo bajo la barra púrpura de 8mm)
+            // Altura del contenido = 50mm (altura tarjeta) - 8mm (barra) = 42mm
+            // Punto medio del contenido = (Altura de contenido / 2) + 8mm (offset barra) + cardY
+            const contentCenterY = (42 / 2) + 8 + cardY; // (21) + 8 + 65 = 94
 
-            // Posiciones Y para los campos
-            const y_label1 = contentCenterY - 8;  // y = 86
-            const y_value1 = contentCenterY - 2;  // y = 92
-            const y_label2 = contentCenterY + 6;  // y = 100
-            const y_value2 = contentCenterY + 12; // y = 106
+            // Posiciones Y para los campos, distribuidos simétricamente alrededor de 94
+            const y_label1 = contentCenterY - 12;  // y = 82
+            const y_value1 = contentCenterY - 6;   // y = 88
+            const y_label2 = contentCenterY + 4;   // y = 98
+            const y_value2 = contentCenterY + 10;  // y = 104
 
-            // Campo 1: Usuário (CENTRADO)
+            // Campo 1: Usuário (PERFECTAMENTE CENTRADO)
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(secondaryTextColor);
@@ -3498,7 +3497,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             doc.setTextColor(textColor);
             doc.text(clientData.username, cardCenterX, y_value1, { align: 'center' });
 
-            // Campo 2: Senha (CENTRADO)
+            // Campo 2: Senha (PERFECTAMENTE CENTRADO)
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(secondaryTextColor);
@@ -3512,16 +3511,16 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             // 5. Botón Clicable
             // --- INICIO: CORRECCIÓN DE DISEÑO 5/5 ---
-            // Ajustamos la posición 'y' del botón basado en la nueva altura de la tarjeta
-            y = cardY + cardHeight + 10; // y = 70 + 40 + 10 = 120
+            // Posiciona el botón 10mm debajo de la tarjeta
+            y = cardY + cardHeight + 10; // y = 65 + 50 + 10 = 125
             // --- FIN: CORRECCIÓN DE DISEÑO 5/5 ---
             
             const linkText = 'Acessar o Portal do Cliente';
             const appLink = 'https://cliente.lumixartificial.com';
             const btnHeight = 10;
-            const btnWidth = cardWidth - 10;
-            const btnX = (width - btnWidth) / 2;
-            const btnY = y;
+            const btnWidth = cardWidth - 10; // 74mm
+            const btnX = (width - btnWidth) / 2; // Centrado
+            const btnY = y; // y = 125
             const btnRadius = 5;
 
             // Dibuja el botón (sin cambios)
@@ -3532,6 +3531,10 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             doc.setTextColor('#FFFFFF');
             doc.text(linkText, cardCenterX, btnY + (btnHeight / 2), { align: 'center', baseline: 'middle' });
             doc.link(btnX, btnY, btnWidth, btnHeight, { url: appLink });
+
+            // El botón termina en y = 135.
+            // La página termina en y = 150.
+            // Margen inferior = 15mm. (¡Corregido!)
 
             // 6. Devolver como Blob (sin cambios)
             return doc.output('blob');
