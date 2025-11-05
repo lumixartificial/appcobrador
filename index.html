@@ -1400,13 +1400,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
             }
 
-            // 3. (ELIMINADO) Ya NO notificamos al cliente aquí.
-            //    La función de 'Guardar Préstamo' se encargará de esto.
-            /*
+            
             const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
             const notifBody = translations[currentLang].refinanceApprovedClientBody;
             sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
-            */
+            
             
             // 4. (MANTENIDO) Cierra este modal de verificación
             window.history.back();
@@ -3515,6 +3513,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         <label data-lang-key="totalLoan"></label>
                         <input type="number" id="client-loan-amount" required 
                                value="${(isEditMode ? (loan.principalAmount || (loan.totalLoan / (1 + client.interestRate/100))) : prefillLoanAmount)}">
+                               ${prefillData ? 'readonly' : ''}
                     </div>
                     <div>
                         <label data-lang-key="interest"></label>
@@ -3538,6 +3537,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         <label data-lang-key="numInstallments"></label>
                         <input type="number" id="client-installments" required 
                                value="${(isEditMode ? (loan.installments || '').split('/')[1] : prefillInstallments)}">
+                               ${prefillData ? 'readonly' : ''} 
                     </div>
                     <div><label data-lang-key="installmentValue"></label><input type="text" id="client-installment-value" readonly></div>
                 </div>
