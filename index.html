@@ -715,7 +715,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // <-- deleteDoc AÑADIDO
+        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc, collectionGroup } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
         
@@ -838,6 +838,27 @@ try {
         let allSettlements = [];
         let allCapitalInjections = []; // <-- AÑADE ESTA LÍNEA
         let currentCapitalOnHand = 0;    // <-- AÑADE ESTA LÍNEA
+        
+        // --- INICIO: LISTA NEGRA (NUEVA FUNCIÓN) ---
+// ¡Por favor, rellena esta lista con tus datos!
+const BLACKLIST_DATA = {
+    // Añade números de documento (normalizados, sin puntos ni guiones)
+    documentos: [
+        "03061865195", "90929799534", "43091675866", "56573219104", "85567698100", "04924017132", "99363585115", "93478577187", "02511430150", "04147652140", "77961749187", "84325844104", "05615695170", "98281453168", "04941261160", "01411143396", "70139947159", "06162154106", "02150989352", "81141351153", "73347043120", "93707029115", "01202226124", "8820730178", "01311279423", "62059300215", "04873719176", "12172845833", "02766460373", "05602861122", "014475444102", "00811278557", "70219410135", "40925839825", "70219410135", "70219410135", "05467798162", "22214939822", "00333065166", "01012027171", "01849813108", "56537310130", "03054122131", "29088704287", "02958030105", "010160516010", "70518224112", "01065774508", "06899066173", "020040171", "1621284875", "04488063128", "77388747168", "07265531159", "03378174137", "01125760281", "01564017117", "02430297132", "00231706111", "73677094100", "03972110154", "03411326166", "03382926164", "86654233115", "54250544249", "03394722356" 
+    ],
+    // Añade nombres (en minúsculas para una comparación fácil)
+    nomes: [
+        "renner vinicius Pedrosa Araujo", "marcos pecinatti", "ana caroline souza oda", "Nilton días machado", "Alessandra maria dos santos moura", "marco Aurelio Gomes luz", "Claudio Dione da silva", "Rafael carossi Barbosa", "ozeias Barbosa pereira", "nilzete gama da costa", "divino Pereira da silva", "carlos jose da silva goncalves", "tainy costa couto", "luciene maria do couto", "Sergio Rufino da silva", "ana Amelia silva", "ana carolyna de freitas silva", "vinicios Alves días", "Antonio da cruz Sousa leite Barbosa", "fabio junior augusto de jesus", "Gabriel santos alchuffi", "ana maria barbosa", "edileidi matias gocalves", "pedro Goncalves canedo", "luiz carlos da silva", "ronie clei gouveia do nascimiento", "tulio nunes da silva", "cleber de Oliveira castro", "elson Pereira de arruda", "Gabriel fernandes", "thiago henrique santa barros", "Nelson dos santos carvalho", "weslaine de Olinda da silva", "deivid dinapoli Fernando tosto", "weslaine de Olinda da silva", "ana carolina Sousa da silva", "ana karolina Sousa da silva", "thiago leocaido dos santos", "Anderson Pereira Alves", "Elder Oliveira da silva", "alex de paula Carvalho", "leonildo rodrigues vitorino", "fabrizio amaral porto", "moema lina povoa", "jose cileno de sousa", "charleston toledo da silsa", "paulo henrrique nogueira", "arthur miguel nieves alecrim", "adilson de sousa joaquim", "datila sabrina lopes da silva espindola", "liniker ferreira da silva", "maione galdino dos santos", "dywlia samara albino da silva soares", "roberta santos galvao", "yasmim cristina de santana bueno de souza", "tatiane correa nascimento", "francisca eliane holanda de souza", "wuardensom arrais da luz", "santiago blanco nunez", "florisvaldo junio de moura", "rogerio macedo campos", "jesse da silva vieira", "patricia raimunda barbosa", "robsom dooglas pereira dos santos", "elenildo barbosa pinheiro", "dhon alacy carvalho da conceicao", "elenilda lima custodio cajado"
+    ]
+};
+// --- FIN: LISTA NEGRA ---
+
+
+
+        
+        
+        
+        
         let currentLang = localStorage.getItem('language') || 'pt';
         let mapInstance = null;
         let mapMarkers = [];
@@ -3925,14 +3946,29 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
     // --- [FIN DE LA MODIFICACIÓN (SAVE)] ---
     
     lucide.createIcons({ nodes: clientFormModal.querySelectorAll('[data-lucide]') });
-    applyLanguage(currentLang);
-    const docInput = document.getElementById('client-document');
-    if (docInput && !isNewLoan) { 
-        docInput.addEventListener('blur', () => triggerSystemVerification(isEditMode ? clientId : null));
-    }
-    if (isEditMode && client.documentNumber) {
-        triggerSystemVerification(clientId);
-    }
+applyLanguage(currentLang);
+
+// --- [INICIO DE LA MODIFICACIÓN (LLAMADA A VERIFICACIÓN)] ---
+// Reemplazamos la lógica antigua de 'triggerSystemVerification'
+
+const docInput = document.getElementById('client-document');
+const nameInput = document.getElementById('client-name');
+const editingId = isEditMode ? clientId : null;
+
+if (docInput && !isNewLoan) { 
+    // Llama a la nueva función de verificación en el 'blur' (cuando el usuario sale del campo)
+    docInput.addEventListener('blur', () => performClientChecks(editingId));
+}
+if (nameInput && !isNewLoan) {
+    // Llama a la misma función en el 'blur' del nombre también
+    nameInput.addEventListener('blur', () => performClientChecks(editingId));
+}
+
+// Si estamos editando, ejecuta la comprobación (excluyéndose a sí mismo)
+if (isEditMode && (client.documentNumber || client.name)) {
+    performClientChecks(editingId);
+}
+// --- [FIN DE LA MODIFICACIÓN] ---
 }
 
 
@@ -5491,64 +5527,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
         // --- FIN: LÓGICA DE OPTIMIZACIÓN DE RUTA ---
         
-        function renderSystemHistoryResults(results, container) {
-    if (results.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 10px;">
-                <i data-lucide="check-circle" style="color: var(--accent-green); width: 48px; height: 48px; margin-bottom: 10px;"></i>
-                <h4 data-lang-key="clientClean" style="margin: 0 0 5px;"></h4>
-                <p data-lang-key="clientCleanMsg" style="color: var(--text-secondary); font-size: 0.9em; margin: 0;"></p>
-            </div>
-        `;
-    } else {
-        const resultsHtml = results.map(loan => {
-            const lateDays = calculateLatePaymentDays(loan);
-            const score = Math.max(0, 10 - lateDays);
-            let repClass = 'rep-bad';
-            if (score === 10) repClass = 'rep-perfect';
-            else if (score >= 7) repClass = 'rep-good';
-            else if (score >= 3) repClass = 'rep-regular';
-
-            const statusClass = `status-${loan.status}`;
-            const statusText = (translations[currentLang] && translations[currentLang][loan.status]) || loan.status;
-
-            return `
-            <div class="client-card" style="cursor: default; margin-bottom: 15px; flex-wrap: wrap;">
-                <div class="client-info">
-                    <p class="client-address" style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 8px;" data-lang-key="otherLoanCollector"></p>
-                    <h4 class="client-name" style="font-size: 1em;">${loan.collectorId || 'Desconhecido'}</h4>
-                </div>
-                <div class="payment-info">
-                     <p class="client-address" style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 8px; text-align: right;" data-lang-key="otherLoanStatus"></p>
-                     <span class="payment-status ${statusClass}" style="align-self: flex-end;">${statusText}</span>
-                </div>
-                <div style="width: 100%; border-top: 1px solid var(--border-color); margin: 15px 0; padding-top: 15px;">
-                    <p class="kpi-title" style="margin-bottom: 10px;" data-lang-key="loanDetails"></p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9em;">
-                        <span><strong data-lang-key="reputation"></strong>:</span>
-                        <span class="reputation-score ${repClass}"><i data-lucide="star" style="width: 12px; height: 12px;"></i> ${score}/10</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; margin-top: 8px;">
-                        <span><strong>Total</strong>:</span>
-                        <span>${money(loan.totalLoan)}</span>
-                    </div>
-                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; margin-top: 8px;">
-                        <span style="color: var(--accent-green);"><strong>Pago</strong>:</span>
-                        <span style="color: var(--accent-green);">${money(loan.paid)}</span>
-                    </div>
-                </div>
-            </div>
-            `;
-        }).join('');
-
-        container.innerHTML = `
-            <h4 data-lang-key="loansFound" style="margin-bottom: 10px;"></h4>
-            ${resultsHtml}
-        `;
-    }
-    lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
-    applyLanguage(currentLang);
-}
+        
 
 
 
@@ -5601,21 +5580,28 @@ async function sendNotificationToClient(clientId, title, body, type, icon = 'inf
     }
 }
 
-function triggerSystemVerification(editingClientId = null) {
+
+    async function performClientChecks(editingClientId = null) {
     const docInput = document.getElementById('client-document');
+    const nameInput = document.getElementById('client-name');
     const resultsContainer = document.getElementById('system-verification-results');
-    if (!docInput || !resultsContainer) return;
+
+    if (!docInput || !nameInput || !resultsContainer) return;
 
     const documentNumber = docInput.value.trim();
-    if (!documentNumber) {
-        resultsContainer.innerHTML = ''; // Limpia los resultados si el campo está vacío
+    const clientName = nameInput.value.trim().toLowerCase();
+
+    // Si ambos campos están vacíos, limpia y sal.
+    if (!documentNumber && !clientName) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.style.display = 'none';
         return;
     }
 
-    // Muestra un indicador de "Buscando..."
+    resultsContainer.style.display = 'block';
     resultsContainer.innerHTML = `
-        <div class="kpi-card" style="text-align:center; padding: 15px;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <div class"kpi-card" style="padding: 15px; text-align: center; background-color: var(--surface); border: 1px solid var(--border-color); border-radius: 12px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-secondary);">
                 <i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i>
                 <span data-lang-key="searchingSystem"></span>
             </div>
@@ -5624,19 +5610,140 @@ function triggerSystemVerification(editingClientId = null) {
     lucide.createIcons({ nodes: resultsContainer.querySelectorAll('[data-lucide]') });
     applyLanguage(currentLang);
 
-    // Simula la búsqueda en la base de datos
-    setTimeout(() => {
-        const foundLoans = allClients.filter(c => 
-            c.documentNumber && c.documentNumber === documentNumber &&
-            (!editingClientId || c.id !== editingClientId) && // Excluye al cliente actual si se está editando
-            c.status !== 'finished'
-        );
+    let warnings = [];
+    let systemLoans = [];
 
-        // Prepara el contenedor y renderiza los resultados
-        resultsContainer.innerHTML = '<div class="kpi-card"></div>';
-        renderSystemHistoryResults(foundLoans, resultsContainer.querySelector('.kpi-card'));
-    }, 1500); // Un retraso de 1.5 segundos para simular la búsqueda
+    // 1. Comprobación de la Lista Negra (NUEVA LÓGICA)
+    const normalizedDoc = documentNumber.replace(/\D/g, ''); // Limpia doc
+    if (normalizedDoc && BLACKLIST_DATA.documentos.includes(normalizedDoc)) {
+        warnings.push(`<strong>ATENÇÃO!</strong> O documento <strong>${documentNumber}</strong> está na lista de advertência.`);
+    }
+    if (clientName && BLACKLIST_DATA.nomes.includes(clientName)) {
+        warnings.push(`<strong>ATENÇÃO!</strong> O nome <strong>${nameInput.value}</strong> está na lista de advertência.`);
+    }
+
+    // 2. Comprobación del Sistema Global (LÓGICA REAL con collectionGroup)
+    try {
+        // Solo buscamos globalmente si se proporciona un número de documento
+        if (documentNumber) {
+            console.log(`[COBRADOR-APP] Verificando GLOBALMENTE el documento: ${documentNumber}`);
+
+            // ¡AQUÍ ESTÁ LA BÚSQUEDA GLOBAL!
+            const globalClientQuery = query(
+                collectionGroup(db, 'clients'), 
+                where('documentNumber', '==', documentNumber)
+            );
+
+            const querySnapshot = await getDocs(globalClientQuery);
+            console.log(`[COBRADOR-APP] Búsqueda global encontró ${querySnapshot.size} coincidencias.`);
+
+            querySnapshot.forEach(doc => {
+                const client = { id: doc.id, ...doc.data() };
+
+                // Excluimos al cliente que estamos editando actualmente
+                if (!editingClientId || client.id !== editingClientId) {
+
+                    (client.loans || []).forEach(loan => {
+                        // Recalculamos el estado del préstamo encontrado
+                        const details = calculateLoanDetails(loan); 
+                        if (details.status !== 'finished') {
+                            systemLoans.push({ 
+                                ...loan, 
+                                status: details.status, 
+                                collectorId: client.collectorId,
+                                // (Importante) Añadimos el ID de la empresa a la que pertenece
+                                companyId: doc.ref.parent.parent.id 
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    } catch (error) {
+        console.error("Error al verificar el historial del sistema global:", error);
+        warnings.push("Error ao verificar o histórico global do sistema.");
+    }
+
+    // 3. Renderizar Resultados (warnings Y systemLoans)
+    renderVerificationResults(resultsContainer, warnings, systemLoans);
 }
+
+/**
+ * Renderiza los resultados de AMBAS verificaciones en el modal
+ */
+function renderVerificationResults(container, warnings, systemLoans) {
+
+    // Si no hay nada, limpia y oculta.
+    if (warnings.length === 0 && systemLoans.length === 0) {
+        container.innerHTML = `
+            <div class="kpi-card" style="padding: 15px; border-color: var(--accent-green); background-color: color-mix(in srgb, var(--accent-green) 5%, var(--surface));">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--accent-green);">
+                    <i data-lucide="check-circle"></i>
+                    <strong data-lang-key="clientClean"></strong>
+                </div>
+            </div>`;
+        lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
+        applyLanguage(currentLang);
+        return;
+    }
+
+    let html = '';
+
+    // Renderiza las advertencias de la lista negra
+    if (warnings.length > 0) {
+        html += `
+        <div class="kpi-card" style="padding: 15px; border-color: var(--danger-color); background-color: color-mix(in srgb, var(--danger-color) 10%, var(--surface)); margin-bottom: 15px;">
+            <h4 style="margin: 0 0 10px; color: var(--danger-color); display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="alert-octagon"></i>
+                ALERTA DE LISTA DE ADVERTÊNCIA
+            </h4>
+            <ul style="margin: 0; padding-left: 20px; font-size: 0.9em; color: var(--text-primary);">
+                ${warnings.map(w => `<li>${w}</li>`).join('')}
+            </ul>
+        </div>
+        `;
+    }
+
+    // Renderiza los préstamos del sistema (búsqueda global)
+    if (systemLoans.length > 0) {
+            html += `
+        <div class="kpi-card" style="padding: 15px; border-color: var(--warning-color); background-color: color-mix(in srgb, var(--warning-color) 10%, var(--surface));">
+            <h4 data-lang-key="loansFound" style="margin: 0 0 10px; color: #b45309;"></h4>
+            ${systemLoans.map(loan => {
+                const statusClass = `status-${loan.status}`;
+                const statusText = (translations[currentLang] && translations[currentLang][loan.status]) || loan.status;
+
+                // Muestra si el préstamo es de esta empresa o de otra
+                const companyDisplay = (loan.companyId === currentCompanyId) 
+                    ? `<strong style="color: var(--accent-purple);">(Esta Empresa)</strong>` 
+                    : `<strong style="color: var(--danger-color);">(Empresa: ${loan.companyId})</strong>`;
+
+                return `
+                <div style="font-size: 0.9em; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
+                        <span>
+                            <i data-lucide="user-cog" style="width:14px;"></i> ${loan.collectorId || 'N/A'} ${companyDisplay}
+                        </span>
+                        <span class="payment-status ${statusClass}" style="font-size: 0.9em;">${statusText}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>Total: ${money(loan.totalLoan)}</span>
+                        <span>Pago: ${money(loan.paid)}</span>
+                    </div>
+                </div>
+                `;
+            }).join('')}
+        </div>
+        `;
+    }
+
+    container.innerHTML = html;
+    lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
+    applyLanguage(currentLang);
+}
+// --- FIN: NUEVAS FUNCIONES DE VERIFICACIÓN ---
+
+
 
     function showMainApp(authUid) { // <-- Recebe o UID de Auth
     // --- FIM TAREFA C1 ---
@@ -6025,3 +6132,4 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
