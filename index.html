@@ -3730,15 +3730,65 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
     }
     
     const docPreviewContainer = document.getElementById('doc-preview-container');
-    function renderDocPreviews() { /* ... (sin cambios) ... */ }
-    if (docPreviewContainer) { /* ... (sin cambios) ... */ }
-    function handleFiles(selectedFiles) { /* ... (sin cambios) ... */ }
+    
+    function renderDocPreviews() {
+        if (!docPreviewContainer) return;
+        docPreviewContainer.innerHTML = '';
+        const allDocs = [...existingDocs, ...filesToUpload];
+        allDocs.forEach((doc, index) => {
+            const isExisting = index < existingDocs.length;
+            const item = document.createElement('div');
+            item.className = 'preview-item';
+            item.innerHTML = `
+                <span>${isExisting ? doc.name : doc.name}</span>
+                <button type="button" class="remove-doc-btn" data-index="${index}" style="background:none; border:none; color:var(--danger-color); cursor:pointer;"><i data-lucide="x-circle"></i></button>
+            `;
+            item.querySelector('.remove-doc-btn').addEventListener('click', (e) => {
+                const i = parseInt(e.currentTarget.dataset.index, 10);
+                if (i < existingDocs.length) {
+                    existingDocs.splice(i - 0, 1); // Corrige el índice si es 'existing'
+                } else {
+                    filesToUpload.splice(i - existingDocs.length, 1);
+                }
+                renderDocPreviews();
+            });
+            docPreviewContainer.appendChild(item);
+        });
+        lucide.createIcons({ nodes: docPreviewContainer.querySelectorAll('[data-lucide]') });
+    }
+    if (docPreviewContainer) renderDocPreviews();
+
+    function handleFiles(selectedFiles) {
+        filesToUpload = [...filesToUpload, ...Array.from(selectedFiles)];
+        renderDocPreviews();
+    }
     const takePhotoBtn = document.getElementById('take-photo-btn');
     const uploadFileBtn = document.getElementById('upload-file-btn');
     const docFileInput = document.getElementById('doc-file-input');
-    if (takePhotoBtn) { /* ... (sin cambios) ... */ }
-    if (uploadFileBtn) { /* ... (sin cambios) ... */ }
-    if (docFileInput) { /* ... (sin cambios) ... */ }
+    
+    // --- [INICIO DE LA CORRECCIÓN] ---
+    // Esta es la lógica que faltaba o estaba rota en tu archivo
+    if (takePhotoBtn) {
+        takePhotoBtn.addEventListener('click', () => {
+            docFileInput.accept = "image/*";
+            docFileInput.capture = "environment"; // Pide la cámara trasera
+            docFileInput.click();
+        });
+    }
+    if (uploadFileBtn) {
+        uploadFileBtn.addEventListener('click', () => {
+            docFileInput.accept = "image/*,application/pdf";
+            docFileInput.removeAttribute('capture'); // Permite seleccionar de la galería
+            docFileInput.click();
+        });
+    }
+    if (docFileInput) {
+        docFileInput.addEventListener('change', (e) => {
+            if (e.target.files) {
+                handleFiles(e.target.files);
+            }
+        });
+    }
 
     const loanAmountInput = document.getElementById('client-loan-amount');
     const interestInput = document.getElementById('client-interest');
@@ -6197,6 +6247,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
