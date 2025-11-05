@@ -1385,29 +1385,40 @@ async function showRefinanceModal(clientId, notificationId) {
         lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
 
         try {
-            // 1. Marca la solicitud como 'approved' (esto es temporal, la limpiaremos en el form)
+            // --- [INICIO DE LA MODIFICACIÓN] ---
+            
+            // 1. (ELIMINADO) Ya NO actualizamos el 'status' a 'approved'.
+            //    El formulario de préstamo lo hará al limpiar el 'refinanceRequest'.
+            /*
             await updateDoc(clientRef, {
                 'refinanceRequest.status': 'approved'
             });
+            */
 
-            // 2. Elimina la notificación interna
+            // 2. (MANTENIDO) Elimina la notificación interna (ya que la estamos procesando)
             if (notificationId) {
                 await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
             }
 
-            // 3. Notifica al cliente
+            // 3. (ELIMINADO) Ya NO notificamos al cliente aquí.
+            //    La función de 'Guardar Préstamo' se encargará de esto.
+            /*
             const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
             const notifBody = translations[currentLang].refinanceApprovedClientBody;
             sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
+            */
             
-            // 4. Cierra este modal y ABRE el formulario de nuevo préstamo
-            window.history.back(); // Cierra el modal de refinanciamiento
+            // 4. (MANTENIDO) Cierra este modal de verificación
+            window.history.back();
             
-            // 5. Llama a showClientFormModal con prefillData
+            // 5. (MANTENIDO) Muestra el modal de "Nuevo Préstamo", pasando 'true' para isNewLoan
+            //    y los datos pre-llenados (prefillData).
             showClientFormModal(clientId, true, null, {
                 amount: request.amount,
                 installments: request.installments
             });
+
+            // --- [FIN DE LA MODIFICACIÓN] ---
 
         } catch (error) {
             console.error("Error approving refinance:", error);
@@ -5985,6 +5996,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
