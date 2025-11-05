@@ -1377,7 +1377,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
     const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
 
-    // --- Botón APROBAR ---
+    // --- Botón APROBAR (¡AQUÍ ESTÁ LA CORRECCIÓN!) ---
     modal.querySelector('#approve-refinance-btn').addEventListener('click', async (e) => {
         const approveBtn = e.currentTarget;
         approveBtn.disabled = true;
@@ -1385,38 +1385,69 @@ async function showRefinanceModal(clientId, notificationId) {
         lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
 
         try {
-            // --- [INICIO DE LA MODIFICACIÓN] ---
+            // --- INICIO DE LA NUEVA LÓGICA (EL ARREGLO) ---
             
-            // 1. (ELIMINADO) Ya NO actualizamos el 'status' a 'approved'.
-            //    El formulario de préstamo lo hará al limpiar el 'refinanceRequest'.
-            /*
-            await updateDoc(clientRef, {
-                'refinanceRequest.status': 'approved'
-            });
-            */
+            // 1. Construir el objeto del nuevo préstamo (lógica de showClientFormModal)
+            const loanAmount = parseFloat(request.amount);
+            const installments = parseInt(request.installments, 10);
+            const interest = parseFloat(client.interestRate || '20'); // Usar la tasa guardada en el cliente
+            const totalToPay = loanAmount * (1 + (interest / 100));
+            const installmentValue = installments > 0 ? totalToPay / installments : 0;
+            
+            // Heredar la tasa de mora y la frecuencia del último préstamo (o usar defaults)
+            const lastLoan = client.loans && client.loans.length > 0 ? client.loans[client.loans.length - 1] : {};
+            const lateFeeRate = lastLoan.lateFeeRate !== undefined ? lastLoan.lateFeeRate : (currentCompanyData?.defaultInterest || 0);
 
-            // 2. (MANTENIDO) Elimina la notificación interna (ya que la estamos procesando)
+            const loanSpecificData = {
+                principalAmount: loanAmount,
+                lateFeeRate: lateFeeRate,
+                totalLoan: totalToPay,
+                amount: installmentValue,
+                originalInstallmentAmount: installmentValue,
+                installments: `0/${installments}`,
+                paid: 0,
+                paymentBalance: 0,
+                status: 'active', // Estado inicial
+                startDate: new Date(), // ¡Nuevo préstamo empieza hoy!
+                history: [],
+                paymentFrequency: lastLoan.paymentFrequency || 'daily',
+                paymentDays: lastLoan.paymentDays || [1, 2, 3, 4, 5, 6],
+                collectionTime: lastLoan.collectionTime || '',
+            };
+
+            // 2. Añadir el nuevo préstamo al array del cliente (activando el multi-préstamo)
+            console.log("[COBRADOR-APP] Aprobando refinanciamento. Añadiendo nuevo préstamo...");
+            await updateDoc(clientRef, {
+                loans: arrayUnion(loanSpecificData)
+            });
+            console.log("[COBRADOR-APP] Préstamo añadido.");
+
+            // 3. Limpiar la solicitud de refinanciamiento
+            console.log("[COBRADOR-APP] Limpando 'refinanceRequest' del cliente...");
+            await updateDoc(clientRef, {
+                refinanceRequest: null // Limpia la solicitud
+            });
+            console.log("[COBRADOR-APP] 'refinanceRequest' limpiado.");
+
+            // 4. Eliminar la notificación interna (lógica existente)
             if (notificationId) {
                 await deleteDoc(doc(db, 'collectors', currentCollectorUsername, 'notifications', notificationId));
             }
 
-            
+            // 5. Notificar al cliente (lógica existente)
             const notifTitle = translations[currentLang].refinanceApprovedClientTitle;
             const notifBody = translations[currentLang].refinanceApprovedClientBody;
             sendNotificationToClient(clientId, notifTitle, notifBody, 'refinance_approved', 'trending-up');
             
-            
-            // 4. (MANTENIDO) Cierra este modal de verificación
+            // 6. Cerrar este modal
             window.history.back();
-            
-            // 5. (MANTENIDO) Muestra el modal de "Nuevo Préstamo", pasando 'true' para isNewLoan
-            //    y los datos pre-llenados (prefillData).
-            showClientFormModal(clientId, true, null, {
-                amount: request.amount,
-                installments: request.installments
-            });
 
-            // --- [FIN DE LA MODIFICACIÓN] ---
+            // 7. (ELIMINADO) Ya no abrimos showClientFormModal
+            // showClientFormModal(clientId, true, null, { ... });
+
+            showToast('Refinanciamento aprovado e novo empréstimo criado!');
+            
+            // --- FIN DE LA NUEVA LÓGICA ---
 
         } catch (error) {
             console.error("Error approving refinance:", error);
@@ -1428,7 +1459,7 @@ async function showRefinanceModal(clientId, notificationId) {
         }
     });
 
-    // --- Botón RECHAZAR ---
+    // --- Botón RECHAZAR (Sin cambios, pero se incluye por completitud) ---
     modal.querySelector('#reject-refinance-btn').addEventListener('click', async (e) => {
         const rejectBtn = e.currentTarget;
         rejectBtn.disabled = true;
@@ -1436,11 +1467,9 @@ async function showRefinanceModal(clientId, notificationId) {
         lucide.createIcons({ nodes: [rejectBtn.querySelector('i')] });
 
         try {
-            // 1. Actualiza el estado a 'rejected_collector' y limpia la solicitud
+            // 1. Actualiza el estado a 'rejected_collector'
             await updateDoc(clientRef, {
                 'refinanceRequest.status': 'rejected_collector',
-                // Opcional: limpiar la solicitud
-                // refinanceRequest: null 
             });
 
             // 2. Elimina la notificación interna
