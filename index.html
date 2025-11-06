@@ -693,6 +693,32 @@
     </div>
 
     <div id="clientDetailView" class="modal-view"></div>
+
+    <!-- El Header ahora existe permanentemente -->
+    <header class="modal-header" style="justify-content: space-between;">
+        <!-- El contenido del header (botones, título) será inyectado por JS aquí -->
+        <div id="detail-header-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <!-- El JS pondrá el botón de volver, título y botones de acción (WA, Editar) aquí -->
+        </div>
+    </header>
+    
+    <!-- El contenedor de Pestañas será llenado por JS -->
+    <div id="detail-loan-tabs-wrapper"></div>
+
+    <!-- El Content Wrapper es estático, pero su contenido (scrollable) es dinámico -->
+    <div class="modal-content-wrapper" id="detail-content-area">
+        <!-- El JS llenará esto con los KPIs, historial, etc. -->
+    </div>
+    
+    <!-- El Action Bar es estático, pero sus botones son dinámicos -->
+    <div class="action-buttons" id="detail-action-area">
+        <!-- El JS llenará esto con los botones (Pagar, Aplazar, etc.) -->
+    </div>
+
+</div>
+<!-- [FIN DE LA MODIFICACIÓN ESTRUCTURAL] -->
+
+
     <div id="paymentModal" class="modal-view"></div>
     <div id="clientFormModal" class="modal-view"></div>
     <div id="expenseFormModal" class="modal-view"></div>
@@ -2429,7 +2455,7 @@ async function showRefinanceModal(clientId, notificationId) {
     const whatsappLogoUrl = "https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO%20WHATSAPP%20OFI.png?alt=media&token=e022ad51-a151-4812-bb3d-9be867dac891";
     
     const whatsappButtonHtml = cleanedWhatsapp
-        ? `<a id="whatsappClientBtn" href="https://api.whatsapp.com/send?phone=${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
+        ? `<a id="whatsappClientBtn" href="https://wa.me/${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
                <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px;">
            </a>`
         : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível">
@@ -6274,4 +6300,3 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
-
