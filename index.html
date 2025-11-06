@@ -2413,11 +2413,29 @@ async function showRefinanceModal(clientId, notificationId) {
         
         function showClientDetails(clientId, loanIndex = 0) {
 
-            currentDetailClientId = clientId;
+    currentDetailClientId = clientId;
     currentDetailLoanIndex = loanIndex;
     console.log(`[DIAG-STATE] Vista de detalles abierta para Cliente: ${currentDetailClientId}, Préstamo Índice: ${currentDetailLoanIndex}`);
     const clientDetailView = document.getElementById('clientDetailView');
     const client = allClients.find(c => c.id == clientId);
+
+    // --- [INICIO DE LA MODIFICACIÓN (BOTÓN WHATSAPP)] ---
+    // 1. Limpiamos el número de WhatsApp para crear el enlace
+    const cleanedWhatsapp = client.whatsapp ? client.whatsapp.replace(/\D/g, '') : '';
+    
+    // 2. [¡AQUÍ ESTÁ LA MODIFICACIÓN!]
+    //    Reemplazamos el SVG borroso por la imagen de alta calidad de Firebase.
+    const whatsappLogoUrl = "https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO%20WHATSAPP%20OFI.png?alt=media&token=e022ad51-a151-4812-bb3d-9be867dac891";
+    
+    const whatsappButtonHtml = cleanedWhatsapp
+        ? `<a id="whatsappClientBtn" href="https://wa.me/${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
+               <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px;">
+           </a>`
+        : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível">
+               <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px; opacity: 0.5;">
+           </button>`;
+    // --- [FIN DE LA MODIFICACIÓN (BOTÓN WHATSAPP)] ---
+
 
     // Encuentra todos los préstamos activos (o finalizados si no hay activos)
     const displayableLoans = (client.loans || []).filter(l => l.status !== 'finished');
@@ -2617,8 +2635,14 @@ async function showRefinanceModal(clientId, notificationId) {
                     ${client.documentNumber ? `<span style="font-size: 0.8em; color: var(--text-secondary); display: block;">Doc: ${client.documentNumber}</span>` : ''}
                 </div>
             </div>
-            <!-- Botón Editar ahora edita DATOS del cliente + ESTE préstamo -->
-            <button id="editClientBtn" class="header-btn" title="Editar Cliente e Préstamo Atual"><i data-lucide="edit"></i></button>
+            
+            <!-- [INICIO DE LA MODIFICACIÓN (HEADER)] -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+                ${whatsappButtonHtml} <!-- Botón de WhatsApp añadido aquí -->
+                <button id="editClientBtn" class="header-btn" title="Editar Cliente e Préstamo Atual"><i data-lucide="edit"></i></button>
+            </div>
+            <!-- [FIN DE LA MODIFICACIÓN (HEADER)] -->
+
         </header>
 
         <!-- [INICIO CORRECCIÓN PESTAÑAS] Añadido .loan-tabs-wrapper -->
@@ -2849,6 +2873,8 @@ console.log(`[DIAG-PAYMENT] Recargando showClientDetails(${clientId}, ${loanInde
             });
 
 }
+
+
 
 
 
@@ -6247,7 +6273,3 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
-
-
-
-
