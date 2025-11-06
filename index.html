@@ -560,7 +560,7 @@
 
         @media (max-width: 480px) {
             .form-group .grid-2 {
-                grid-template-columns: 1fr; /* Apila los campos del formulario */
+                grid-template-columns: 1fr; /* la los campos del formulario */
             }
             .profile-info {
                 display: none; /* Oculta nombre y rol en cabecera muy pequeña */
@@ -2455,7 +2455,7 @@ async function showRefinanceModal(clientId, notificationId) {
     const whatsappLogoUrl = "https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO%20WHATSAPP%20OFI.png?alt=media&token=e022ad51-a151-4812-bb3d-9be867dac891";
     
     const whatsappButtonHtml = cleanedWhatsapp
-        ? `<a id="whatsappClientBtn" href="https://api.whatsapp.com/send?phone=${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
+        ? `<a id="whatsappClientBtn" href="https://wa.me/${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
                <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px;">
            </a>`
         : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível">
@@ -6300,4 +6300,5 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
