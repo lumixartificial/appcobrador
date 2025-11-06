@@ -560,7 +560,7 @@
 
         @media (max-width: 480px) {
             .form-group .grid-2 {
-                grid-template-columns: 1fr; /* la los campos del formulario */
+                grid-template-columns: 1fr; /* Apila los campos del formulario */
             }
             .profile-info {
                 display: none; /* Oculta nombre y rol en cabecera muy pequeña */
@@ -2446,22 +2446,27 @@ async function showRefinanceModal(clientId, notificationId) {
     const clientDetailView = document.getElementById('clientDetailView');
     const client = allClients.find(c => c.id == clientId);
 
-    // --- [INICIO DE LA MODIFICACIÓN (BOTÓN WHATSAPP)] ---
-    // 1. Limpiamos el número de WhatsApp para crear el enlace
-    const cleanedWhatsapp = client.whatsapp ? client.whatsapp.replace(/\D/g, '') : '';
+    // --- [INICIO DE LA CORRECCIÓN (BUG 'NO TIENE WHATSAPP')] ---
+    // 1. Convertimos a string ANTES de limpiar, para evitar error con números
+    const whatsappString = (client.whatsapp || '').toString(); 
+    // 2. Limpiamos el string
+    const cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
+    // --- [FIN DE LA CORRECCIÓN] ---
     
     // 2. [¡AQUÍ ESTÁ LA MODIFICACIÓN!]
     //    Reemplazamos el SVG borroso por la imagen de alta calidad de Firebase.
     const whatsappLogoUrl = "https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO%20WHATSAPP%20OFI.png?alt=media&token=e022ad51-a151-4812-bb3d-9be867dac891";
     
+    // --- [INICIO DE LA MODIFICACIÓN (API LINK)] ---
+    // Cambiamos 'https://wa.me/' por 'https://api.whatsapp.com/send?phone='
     const whatsappButtonHtml = cleanedWhatsapp
-        ? `<a id="whatsappClientBtn" href="https://wa.me/${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
+        ? `<a id="whatsappClientBtn" href="https://api.whatsapp.com/send?phone=${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
                <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px;">
            </a>`
         : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível">
                <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px; opacity: 0.5;">
            </button>`;
-    // --- [FIN DE LA MODIFICACIÓN (BOTÓN WHATSAPP)] ---
+    // --- [FIN DE LA MODIFICACIÓN (API LINK)] ---
 
 
     // Encuentra todos los préstamos activos (o finalizados si no hay activos)
@@ -6300,5 +6305,6 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
