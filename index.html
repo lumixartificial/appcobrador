@@ -1014,8 +1014,14 @@ const BLACKLIST_DATA = {
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     (loan.history || []).forEach(h => {
-                        // 1. Filtro de Status (sin cambios)
-                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') {
+                        
+                        // --- [INICIO DE LA CORRECCIÓN (RECIBIDO HOJE)] ---
+                        // ¡AQUÍ ESTÁ LA CORRECCIÓN!
+                        // Añadimos "&& h.method !== 'migration'" para ignorar el pago
+                        // inicial de un cliente migrado en la contabilidad diaria.
+                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
+                        // --- [FIN DE LA CORRECCIÓN (RECIBIDO HOJE)] ---
+
                             const paymentDate = new Date(h.date.seconds * 1000);
                             
                             // 2. Filtro de Fecha (sin cambios)
@@ -1938,6 +1944,11 @@ async function showRefinanceModal(clientId, notificationId) {
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     // Suma el principal de este préstamo al total prestado
+                    
+                    // --- [INICIO DE LA CORRECCIÓN DE MIGRACIÓN (PASO 4)] ---
+                    // ¡AQUÍ ESTÁ LA LÓGICA CLAVE!
+                    // Solo suma al "total prestado" si NO es un préstamo migrado
+                    // (Usamos el campo 'migrationDate' que guardamos en el Paso 3)
                     if (!loan.migrationDate) {
                         // Suma el principal de este préstamo al total prestado
                         if (loan.principalAmount) {
@@ -1946,12 +1957,17 @@ async function showRefinanceModal(clientId, notificationId) {
                             totalLoansMade += (loan.totalLoan / (1 + (client.interestRate / 100)));
                         }
                     }
+                    // --- [FIN DE LA CORRECCIÓN DE MIGRACIÓN (PASO 4)] ---
 
                     // Suma TODOS los pagos aprobados al total general (para el capital)
                     (loan.history || []).forEach(h => {
-                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') {
+                        // --- [INICIO DE LA CORRECCIÓN 1 (CAPITAL)] ---
+                        // ¡AQUÍ ESTÁ LA CORRECCIÓN!
+                        // AHORA IGNORAMOS PAGOS DE MIGRACIÓN
+                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
                             totalPaymentsReceived += (h.amount || 0);
                         }
+                        // --- [FIN DE LA CORRECCIÓN 1] ---
                     });
                 });
             });
@@ -2525,16 +2541,20 @@ async function showRefinanceModal(clientId, notificationId) {
     const loan = client.loans[currentLoanIndex];
     const hasMultipleDisplayable = activeOrLastFinishedLoans.length > 1; // ¿Hay más de un préstamo activo/relevante?
 
-    // --- [INICIO DE LA MODIFICACIÓN] ---
-    // Definimos el valor de la cuota y el contador acumulativo ANTES de generar el historial
-    const originalInstallment = loan.originalInstallmentAmount || 1; // Evita división por cero
-    let approvedCumulativePaidForNumbering = loan.initialMigratedAmount || 0;
-    // --- [FIN DE LA MODIFICACIÓN] ---
+    // --- [INICIO DE LA CORRECCIÓN 3.A (TÍTULO HISTORIAL)] ---
+    // Definimos el valor de la cuota y el contador acumulativo
+    const originalInstallment = loan.originalInstallmentAmount || 1;
+    // (A) EL CONTADOR DEBE EMPEZAR EN CERO
+    let approvedCumulativePaidForNumbering = 0;
+    // --- [FIN DE LA CORRECCIÓN 3.A] ---
 
 
+    // --- [INICIO DE LA CORRECCIÓN 2.A (BARRA DE PROGRESO)] ---
+    // Parte A: Corregimos el cálculo de 'historyPaid' para que no cuente doble
     const historyPaid = (loan.history || [])
-        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') // <-- AÑADIDO: && h.method !== 'migration'
         .reduce((sum, h) => sum + (h.amount || 0), 0);
+    // --- [FIN DE LA CORRECCIÓN 2.A] ---
     
     // 2. Obtiene el valor inicial migrado (que guardamos en el Paso 1)
     const initialPaid = loan.initialMigratedAmount || 0;
@@ -2592,9 +2612,29 @@ async function showRefinanceModal(clientId, notificationId) {
                  amountDisplay = ''; // No mostrar monto para aplazamiento
                  hasReceipt = ''; // No hay recibo para aplazamiento
             
-            // --- [INICIO DE LA MODIFICACIÓN] ---
-            // Reemplaza el 'else' con la lógica de cálculo de la App del Cliente
-            } else { // Presume 'approved' o estado válido para cálculo
+            // --- [INICIO DE LA CORRECCIÓN 3.B (TÍTULO HISTORIAL)] ---
+            // (B) AÑADIMOS UN 'ELSE IF' ESPECIAL PARA 'migration'
+            } else if (p.method === 'migration') {
+                statusText = 'Aprovado (Migração)';
+                statusStyle = 'color: var(--accent-green); font-style: italic;';
+                
+                const initialPaid = p.amount || 0;
+                // Leemos los números "12" y "24" desde el string
+                const installmentsString = (loan.installments || "0/0").split('/');
+                const initialInstallments = parseInt(installmentsString[0], 10) || 0;
+                const totalInstallments = installmentsString[1] || 0;
+
+                // Creamos el título correcto
+                title = `Registro de Migração (${initialInstallments}/${totalInstallments})`;
+                description = `Valor inicial de ${money(initialPaid)} registrado.`;
+                hasReceipt = ''; // Migraciones no tienen recibo
+                
+                // IMPORTANTE: Suma al acumulador para que los siguientes pagos sean correctos
+                approvedCumulativePaidForNumbering += (p.amount || 0);
+            
+            } else { // Pagos 'approved' normales
+            // --- [FIN DE LA CORRECCIÓN 3.B] ---
+                
                 const paymentAmount = p.amount || 0;
                 
                 statusText = 'Aprovado';
@@ -2734,7 +2774,7 @@ async function showRefinanceModal(clientId, notificationId) {
             <!-- El resto del contenido (KPIs, Historial, etc.) se genera usando el objeto 'loan' seleccionado -->
 
             <div class="kpi-card progress-card" style="margin-bottom: 20px;">
-                <h3 class="kpi-title" style="justify-content: center;">Progresso do Empréstamo ${currentLoanIndex + 1}</h3>
+                <h3 class="kpi-title" style="justify-content: center;">Progresso do Empréstimo ${currentLoanIndex + 1}</h3>
                 <div class="progress-circle">
                     <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="client-detail-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292; stroke: var(--accent-purple);"></circle></svg>
                     <div class="progress-text" id="client-detail-progress-text"></div>
@@ -2805,8 +2845,13 @@ async function showRefinanceModal(clientId, notificationId) {
     // Cálculo y actualización del círculo de progreso
     const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
     const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
-    // Calcula cuotas pagas basado en monto pagado y valor de cuota
-    const paidInstallments = loan.originalInstallmentAmount > 0 ? Math.floor(displayTotalPaid / loan.originalInstallmentAmount) : 0;
+    
+    // --- [INICIO CORRECCIÓN 2.B (BARRA DE PROGRESO)] ---
+    // AHORA LEEMOS EL "12" DEL "12/24"
+    const paidInstallmentsString = (loan.installments || "0/0").split('/')[0];
+    const paidInstallments = paidInstallmentsString ? parseInt(paidInstallmentsString, 10) : 0;
+    // --- [FIN CORRECCIÓN 2.B] ---
+
     const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
     const circleCircumference = 2 * Math.PI * 54; // Radio 54
     const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
@@ -2816,7 +2861,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
     if(progressBar && progressText) {
         progressBar.style.strokeDashoffset = strokeDashoffset;
-        progressText.textContent = `${paidInstallments}/${totalInstallments}`;
+        progressText.textContent = `${paidInstallments}/${totalInstallments}`; // <-- Esto ahora mostrará 12/24
     }
 
     // --- AÑADIR LISTENERS PARA LAS PESTAÑAS (si existen) ---
@@ -3902,7 +3947,20 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
     const migrationToggle = document.getElementById('migration-toggle-input');
     const migrationFieldGroup = document.getElementById('migration-paid-installments-group');
     const migrationFieldInput = document.getElementById('client-initial-paid-installments');
-    if (migrationToggle && migrationFieldGroup && migrationFieldInput) { /* ... (sin cambios) ... */ }
+    
+    if (migrationToggle && migrationFieldGroup && migrationFieldInput) {
+        // ESTA ES LA LÓGICA QUE FALTABA:
+        migrationToggle.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            // Muestra u oculta el campo de "cuotas pagadas"
+            migrationFieldGroup.style.display = isChecked ? 'block' : 'none';
+            if (!isChecked) {
+                migrationFieldInput.value = '0'; // Resetea a 0 si se desactiva
+            }
+        });
+    }
+    
+    
     const gpsBtn = document.getElementById('get-location-btn');
     if(gpsBtn) { gpsBtn.addEventListener('click', () => showMapPinModal()); }
     
@@ -3938,9 +3996,17 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
         if (!isNewLoan && !emailRegex.test(email)) {
             showToast('O nome de usuário não pode conter @ ou caracteres inválidos.', true); return;
         }
-        if ((!isEditMode || isNewLoan) && loanAmount > currentCapitalOnHand) {
+        // --- [INICIO DE LA CORRECCIÓN DE MIGRACIÓN (PASO 2)] ---
+        // Obtenemos el estado del toggle ANTES de la validación
+        const migrationToggle = document.getElementById('migration-toggle-input');
+        const isMigration = migrationToggle && migrationToggle.checked;
+
+        // Si NO es edición, NO es préstamo nuevo, NO es migración, y el capital es insuficiente -> Bloquea
+        if ((!isEditMode || isNewLoan) && !isMigration && loanAmount > currentCapitalOnHand) { // <-- AÑADIDO: !isMigration
+            // Esta validación AHORA se saltará si la migración está activa
             showToast(`Capital insuficiente (${money(currentCapitalOnHand)}). Não é possível criar um empréstimo de ${money(loanAmount)}.`, true); return;
         }
+        // --- [FIN DE LA CORRECCIÓN DE MIGRACIÓN (PASO 2)] ---
 
         saveButton.disabled = true;
         saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> <span>Salvando...</span>`;
@@ -4004,7 +4070,42 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 collectionTime: document.getElementById('client-collection-time').value,
             };
 
-            if (migrationToggle && migrationToggle.checked) { /* ... (lógica de migración sin cambios) ... */ }
+
+            
+            
+            // --- [INICIO DE LA CORRECCIÓN DE MIGRACIÓN (PASO 3)] ---
+            // const migrationToggle = document.getElementById('migration-toggle-input'); // Ya lo definimos arriba
+            if (migrationToggle && migrationToggle.checked) {
+                const initialPaidInstallments = parseInt(document.getElementById('client-initial-paid-installments').value, 10) || 0;
+                
+                if (initialPaidInstallments > 0 && initialPaidInstallments <= installments) {
+                    // Calculamos cuánto dinero representan esas cuotas
+                    const initialPaidAmount = installmentValue * initialPaidInstallments;
+                    
+                    // Ajustamos el objeto del préstamo
+                    loanSpecificData.paid = initialPaidAmount;
+                    loanSpecificData.installments = `${initialPaidInstallments}/${installments}`;
+                    
+                    // [CAMPO CRUCIAL 1] Guardamos el monto migrado para cálculos de detalles
+                    loanSpecificData.initialMigratedAmount = initialPaidAmount; 
+                    
+                    // [CAMPO CRUCIAL 2] Guardamos la fecha de migración para el cálculo de capital
+                    loanSpecificData.migrationDate = new Date(); 
+
+                    // Añadimos un registro de historial falso para la migración
+                    if (!loanSpecificData.history) loanSpecificData.history = [];
+                    loanSpecificData.history.push({
+                        amount: initialPaidAmount,
+                        date: new Date(), // Usamos la fecha de hoy
+                        status: 'approved',
+                        method: 'migration' // Un método especial
+                    });
+                }
+            }
+            // --- [FIN DE LA CORRECCIÓN DE MIGRACIÓN (PASO 3)] ---
+            
+
+
 
             if (isNewLoan) {
                 const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
