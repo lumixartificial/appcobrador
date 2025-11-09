@@ -1926,6 +1926,8 @@ async function showRefinanceModal(clientId, notificationId) {
             // --- [FIN DE LA CORRECCIÓN] ---
         }
         
+        
+
         function updateProfileView(collectorData = null) {
             const dailyTotalEl = document.getElementById('kpi-daily-total');
             const capitalTotalEl = document.getElementById('kpi-capital-total');
@@ -1933,63 +1935,67 @@ async function showRefinanceModal(clientId, notificationId) {
             const dailyDigitalEl = document.getElementById('kpi-daily-digital');
             if (!dailyTotalEl) return;
 
-            // --- [INICIO DE LA CORRECCIÓN] ---
             let totalLoansMade = 0;
             let totalPaymentsReceived = 0; // Pagos totales (históricos)
 
             // Llama a la nueva función centralizada para obtener los totales del DÍA
             const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
             
-            // Recalcula totalLoansMade y totalPaymentsReceived (para Capital em Mãos)
-            allClients.forEach(client => {
+            // --- [INICIO DE LA CORRECCIÓN (COBRADOR)] ---
+            // ¡ESTA ES LA CORRECCIÓN CLAVE!
+            // Filtramos la lista global 'allClients' para incluir SOLO los clientes
+            // que pertenecen a ESTE cobrador (currentCollectorUsername).
+            const collectorClients = allClients.filter(c => c.collectorId === currentCollectorUsername);
+
+            // Ahora, en lugar de iterar sobre 'allClients', iteramos sobre 'collectorClients'.
+            collectorClients.forEach(client => {
+            // --- [FIN DE LA CORRECCIÓN (COBRADOR)] ---
+            
                 (client.loans || []).forEach(loan => {
                     // Suma el principal de este préstamo al total prestado
                     
-                    // --- [INICIO DE LA CORRECCIÓN DE MIGRACIÓN (PASO 4)] ---
-                    // ¡AQUÍ ESTÁ LA LÓGICA CLAVE!
-                    // Solo suma al "total prestado" si NO es un préstamo migrado
-                    // (Usamos el campo 'migrationDate' que guardamos en el Paso 3)
+                    // (Lógica de migración - SIN CAMBIOS)
                     if (!loan.migrationDate) {
-                        // Suma el principal de este préstamo al total prestado
                         if (loan.principalAmount) {
                             totalLoansMade += loan.principalAmount;
-                        } else if (loan.totalLoan && client.interestRate) { // Fallback para préstamos antiguos
+                        } else if (loan.totalLoan && client.interestRate) { 
                             totalLoansMade += (loan.totalLoan / (1 + (client.interestRate / 100)));
                         }
                     }
-                    // --- [FIN DE LA CORRECCIÓN DE MIGRACIÓN (PASO 4)] ---
+                    // (FIN Lógica de migración)
 
                     // Suma TODOS los pagos aprobados al total general (para el capital)
                     (loan.history || []).forEach(h => {
-                        // --- [INICIO DE LA CORRECCIÓN 1 (CAPITAL)] ---
-                        // ¡AQUÍ ESTÁ LA CORRECCIÓN!
-                        // AHORA IGNORAMOS PAGOS DE MIGRACIÓN
+                        // (Lógica de migración de pagos - SIN CAMBIOS)
                         if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
                             totalPaymentsReceived += (h.amount || 0);
                         }
-                        // --- [FIN DE LA CORRECCIÓN 1] ---
+                        // (FIN Lógica de migración de pagos)
                     });
                 });
             });
-            // --- [FIN DE LA CORRECCIÓN] ---
                         
+            // El resto de los cálculos ya están filtrados (allExpenses, allSettlements)
             const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
             
             const currentStartingCapital = (collectorData && collectorData.startingCapital) || 0;
-            const totalSettledByThisCollector = allSettlements.reduce((sum, s) => sum + (s.amount || 0), 0);
-            const totalCapitalInjected = allCapitalInjections.reduce((sum, i) => sum + (i.amount || 0), 0);
+            const totalSettledByThisCollector = allSettlements
+                .filter(s => s.status === 'approved')
+                .reduce((sum, s) => sum + (s.amount || 0), 0);
+            const totalCapitalInjected = allCapitalInjections
+                .filter(i => i.status === 'approved')
+                .reduce((sum, i) => sum + (i.amount || 0), 0);
 
-            // La fórmula de capital (sin cambios) usa el totalPaymentsReceived (de todos los tiempos)
+            // Esta fórmula ahora es CORRECTA porque totalLoansMade y totalPaymentsReceived
+            // también están filtrados por cobrador.
             const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses - totalSettledByThisCollector + totalCapitalInjected;
             currentCapitalOnHand = capitalTotal;
 
-            // --- [INICIO DE LA CORRECCIÓN] ---
-            // Asigna los valores unificados de la nueva función
+            // Asigna los valores
             dailyTotalEl.textContent = money(dailyTotal);
             capitalTotalEl.textContent = money(capitalTotal); 
             if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
-            // --- [FIN DE LA CORRECCIÓN] ---
         }
         
 
