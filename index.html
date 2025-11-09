@@ -1992,10 +1992,12 @@ async function showRefinanceModal(clientId, notificationId) {
             // --- [FIN DE LA CORRECCIÓN] ---
         }
         
-        // Nueva función mejorada que calcula días de atraso Y mora
+
 
         // Nueva función mejorada que calcula días de atraso Y mora
-       function calculateLoanDetails(loan) {
+
+    
+    function calculateLoanDetails(loan) {
            let details = {
                lateDays: 0,
                lateFeesAccumulated: 0,
@@ -2016,6 +2018,18 @@ async function showRefinanceModal(clientId, notificationId) {
 
            const today = new Date();
            today.setHours(0, 0, 0, 0);
+           
+           // --- [INICIO CORRECCIÓN RUTA MIGRADO (1/2)] ---
+           // Verificamos si el cliente fue migrado HOY
+           let isMigratedToday = false;
+           if (loan.migrationDate?.seconds) {
+               const migrationDt = new Date(loan.migrationDate.seconds * 1000);
+               migrationDt.setHours(0, 0, 0, 0);
+               if (migrationDt.getTime() === today.getTime()) {
+                   isMigratedToday = true;
+               }
+           }
+           // --- [FIN CORRECCIÓN RUTA MIGRADO (1/2)] ---
 
            let lastRelevantDate;
            if (loan.history && loan.history.length > 0) {
@@ -2092,14 +2106,29 @@ async function showRefinanceModal(clientId, notificationId) {
                details.status = 'finished';
            } else if (accumulatedLateDays > 1) {
                details.status = 'late';
-           } else if (details.amountDueToday > 0) {
-               const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
-               const expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
-               if (currentTotalPaid < expectedTotalIncludingToday) {
-                   details.status = 'pending';
-               } else {
-                   details.status = 'paid';
-               }
+           } else if (details.amountDueToday > 0) { // Hoy es día de pago
+                
+                // --- [INICIO CORRECCIÓN RUTA MIGRADO (2/2)] ---
+                if (isMigratedToday) {
+                    // Si fue migrado HOY y es día de pago, debe estar 'pending'
+                    // para aparecer en la ruta.
+                    details.status = 'pending';
+                } else {
+                // --- [FIN CORRECCIÓN RUTA MIGRADO (2/2)] ---
+                
+                    // Lógica normal para clientes existentes
+                   const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
+                   const expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
+                   if (currentTotalPaid < expectedTotalIncludingToday) {
+                       details.status = 'pending';
+                   } else {
+                       details.status = 'paid';
+                   }
+                   
+                // --- [INICIO CORRECCIÓN RUTA MIGRADO (2/2)] ---
+                } // Cierra el 'else' de la corrección
+                // --- [FIN CORRECCIÓN RUTA MIGRADO (2/2)] ---
+
            } else if (accumulatedLateDays === 1) {
                details.status = 'pending';
            } else {
