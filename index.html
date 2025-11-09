@@ -2612,28 +2612,48 @@ async function showRefinanceModal(clientId, notificationId) {
                  amountDisplay = ''; // No mostrar monto para aplazamiento
                  hasReceipt = ''; // No hay recibo para aplazamiento
             
-            // --- [INICIO DE LA CORRECCIÓN 3.B (TÍTULO HISTORIAL)] ---
-            // (B) AÑADIMOS UN 'ELSE IF' ESPECIAL PARA 'migration'
+            // --- [INICIO FASE 3 MIGRACIÓN PARCIAL (TÍTULO HISTORIAL)] ---
             } else if (p.method === 'migration') {
                 statusText = 'Aprovado (Migração)';
                 statusStyle = 'color: var(--accent-green); font-style: italic;';
-                
-                const initialPaid = p.amount || 0;
-                // Leemos los números "12" y "24" desde el string
-                const installmentsString = (loan.installments || "0/0").split('/');
-                const initialInstallments = parseInt(installmentsString[0], 10) || 0;
-                const totalInstallments = installmentsString[1] || 0;
-
-                // Creamos el título correcto
-                title = `Registro de Migração (${initialInstallments}/${totalInstallments})`;
-                description = `Valor inicial de ${money(initialPaid)} registrado.`;
                 hasReceipt = ''; // Migraciones no tienen recibo
+
+                // Verificamos el TIPO de ticket de migración que guardamos en Fase 2
+                if (p.migrationType === 'full_installments') {
+                    // Es el ticket de las cuotas completas (ej: 12)
+                    const fullAmount = p.amount || 0;
+                    const installmentsString = (loan.installments || "0/0").split('/');
+                    const initialInstallments = parseInt(installmentsString[0], 10) || 0;
+                    
+                    title = `Migração: ${initialInstallments} Cuota(s) Completa(s)`;
+                    description = `Valor total de ${money(fullAmount)} registrado.`;
+
+                } else if (p.migrationType === 'partial_payment') {
+                    // Es el ticket del pago parcial (ej: $50)
+                    const partialAmount = p.amount || 0;
+                    // Calculamos a qué cuota pertenece este parcial (la siguiente a las completas)
+                    const installmentsString = (loan.installments || "0/0").split('/');
+                    const initialInstallments = parseInt(installmentsString[0], 10) || 0;
+                    const nextInstallmentNum = initialInstallments + 1; // La cuota #13
+
+                    title = `Migração: Pago Parcial (Cuota #${nextInstallmentNum})`;
+                    description = `Valor parcial de ${money(partialAmount)} registrado.`;
+
+                } else {
+                    // Fallback (Lógica antigua, si migrationType no existe)
+                    const initialPaid = p.amount || 0;
+                    const installmentsString = (loan.installments || "0/0").split('/');
+                    const initialInstallments = parseInt(installmentsString[0], 10) || 0;
+                    const totalInstallments = installmentsString[1] || 0;
+                    title = `Registro de Migração (${initialInstallments}/${totalInstallments})`;
+                    description = `Valor inicial de ${money(initialPaid)} registrado.`;
+                }
                 
-                // IMPORTANTE: Suma al acumulador para que los siguientes pagos sean correctos
+                // IMPORTANTE: Suma al acumulador (esto no cambia)
                 approvedCumulativePaidForNumbering += (p.amount || 0);
             
             } else { // Pagos 'approved' normales
-            // --- [FIN DE LA CORRECCIÓN 3.B] ---
+            // --- [FIN FASE 3 MIGRACIÓN PARCIAL] ---
                 
                 const paymentAmount = p.amount || 0;
                 
@@ -3718,10 +3738,35 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                value="${client.interestRate || '20'}" ${isNewLoan || isEditMode ? 'readonly' : ''}>
                     </div>
                 </div>
+                
+                <!-- CAMPO 1 DE MIGRACIÓN (Existente) -->
                 <div class="form-group" id="migration-paid-installments-group" style="display: none;">
                     <label for="client-initial-paid-installments" style="font-weight: 600; color: var(--accent-purple);">Cuotas Pagadas ao Início</label>
                     <input type="number" id="client-initial-paid-installments" value="0" min="0" style="background-color: var(--surface);">
                 </div>
+
+                <!-- --- [INICIO FASE 1 MIGRACIÓN PARCIAL] --- -->
+                <!-- CAMPO 2 DE MIGRACIÓN (Nuevo) -->
+                <div class="form-group" id="migration-partial-payment-group" style="display: none;">
+                    <label for="client-initial-partial-payment" style="font-weight: 600; color: var(--accent-orange);">Valor Parcial Adicional (${money(0).replace(/\d+,\d+/g, '')})</label>
+                    <input type="number" id="client-initial-partial-payment" value="0.00" step="0.01" min="0" style="background-color: var(--surface);">
+                </div>
+                <!-- --- [FIN FASE 1 MIGRACIÓN PARCIAL] --- -->
+                
+                <!-- --- [INICIO MODIFICACIÓN: AVISO DE MIGRACIÓN] --- -->
+                <div id="migration-info-box" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent); padding: 15px; border-radius: 12px; margin: -10px 0 20px 0; display: none; align-items: flex-start; gap: 12px;">
+                    <i data-lucide="info" style="color: var(--accent-purple); width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px;"></i>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); line-height: 1.5;">
+                        <strong style="color: var(--text-primary);">Guia de Migração:</strong>
+                        <ul style="margin: 8px 0 0 18px; padding: 0;">
+                            <li><strong>Parcelas Pagas:</strong> Insira o número de parcelas <strong>completas</strong> (ex: 12).</li>
+                            <li><strong>Valor Parcial:</strong> Se o cliente pagou uma parte da parcela seguinte (ex: R$50 da parcela #13), insira o valor aqui.</li>
+                            <li>Deixe em <strong>R$ 0,00</strong> se não houver valor parcial.</li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- --- [FIN MODIFICACIÓN: AVISO DE MIGRACIÓN] --- -->
+
                 <div class="form-group">
                     <label for="client-late-fee">Tasa de Mora Diaria (%)</label>
                     <input type="number" id="client-late-fee" step="0.1" 
@@ -3944,21 +3989,31 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
     [loanAmountInput, interestInput, installmentsInput].forEach(input => input.addEventListener('input', calculateLoanValues));
     calculateLoanValues();
 
+    // --- [INICIO MODIFICACIÓN: AVISO DE MIGRACIÓN] ---
+    // (Lógica de JS actualizada)
     const migrationToggle = document.getElementById('migration-toggle-input');
-    const migrationFieldGroup = document.getElementById('migration-paid-installments-group');
-    const migrationFieldInput = document.getElementById('client-initial-paid-installments');
+    const migrationInstallmentsGroup = document.getElementById('migration-paid-installments-group');
+    const migrationInstallmentsInput = document.getElementById('client-initial-paid-installments');
+    const migrationPartialGroup = document.getElementById('migration-partial-payment-group'); 
+    const migrationPartialInput = document.getElementById('client-initial-partial-payment'); 
+    const migrationInfoBox = document.getElementById('migration-info-box'); // <-- AÑADIDO
     
-    if (migrationToggle && migrationFieldGroup && migrationFieldInput) {
-        // ESTA ES LA LÓGICA QUE FALTABA:
+    if (migrationToggle && migrationInstallmentsGroup && migrationInstallmentsInput && migrationPartialGroup && migrationPartialInput && migrationInfoBox) { // <-- AÑADIDO
+        
         migrationToggle.addEventListener('change', (e) => {
             const isChecked = e.target.checked;
-            // Muestra u oculta el campo de "cuotas pagadas"
-            migrationFieldGroup.style.display = isChecked ? 'block' : 'none';
+            // Muestra u oculta TODOS los campos
+            migrationInstallmentsGroup.style.display = isChecked ? 'block' : 'none';
+            migrationPartialGroup.style.display = isChecked ? 'block' : 'none'; 
+            migrationInfoBox.style.display = isChecked ? 'flex' : 'none'; // <-- AÑADIDO (usamos flex)
+            
             if (!isChecked) {
-                migrationFieldInput.value = '0'; // Resetea a 0 si se desactiva
+                migrationInstallmentsInput.value = '0'; // Resetea
+                migrationPartialInput.value = '0.00'; 
             }
         });
     }
+    // --- [FIN MODIFICACIÓN: AVISO DE MIGRACIÓN] ---
     
     
     const gpsBtn = document.getElementById('get-location-btn');
@@ -4073,36 +4128,58 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             
             
-            // --- [INICIO DE LA CORRECCIÓN DE MIGRACIÓN (PASO 3)] ---
-            // const migrationToggle = document.getElementById('migration-toggle-input'); // Ya lo definimos arriba
+            // --- [INICIO FASE 2 MIGRACIÓN PARCIAL] ---
+            // ESTE ES EL ÚNICO BLOQUE QUE HA CAMBIADO
             if (migrationToggle && migrationToggle.checked) {
+                // 1. Leer ambos campos
                 const initialPaidInstallments = parseInt(document.getElementById('client-initial-paid-installments').value, 10) || 0;
+                const initialPartialAmount = parseFloat(document.getElementById('client-initial-partial-payment').value) || 0.0;
                 
-                if (initialPaidInstallments > 0 && initialPaidInstallments <= installments) {
-                    // Calculamos cuánto dinero representan esas cuotas
-                    const initialPaidAmount = installmentValue * initialPaidInstallments;
+                // 2. Validar que al menos uno tenga valor y las cuotas no excedan el total
+                if ((initialPaidInstallments > 0 || initialPartialAmount > 0) && (initialPaidInstallments <= installments)) {
                     
-                    // Ajustamos el objeto del préstamo
-                    loanSpecificData.paid = initialPaidAmount;
-                    loanSpecificData.installments = `${initialPaidInstallments}/${installments}`;
+                    // 3. Calcular montos
+                    const fullInstallmentsAmount = installmentValue * initialPaidInstallments;
+                    const totalMigratedAmount = fullInstallmentsAmount + initialPartialAmount;
                     
-                    // [CAMPO CRUCIAL 1] Guardamos el monto migrado para cálculos de detalles
-                    loanSpecificData.initialMigratedAmount = initialPaidAmount; 
+                    // 4. Ajustar el objeto del préstamo con el MONTO TOTAL
+                    loanSpecificData.paid = totalMigratedAmount;
+                    // Las cuotas "pagadas" (barra de progreso) solo cuentan las completas
+                    loanSpecificData.installments = `${initialPaidInstallments}/${installments}`; 
                     
-                    // [CAMPO CRUCIAL 2] Guardamos la fecha de migración para el cálculo de capital
+                    // initialMigratedAmount DEBE ser el total para que 'displayTotalPaid' funcione
+                    loanSpecificData.initialMigratedAmount = totalMigratedAmount; 
+                    
+                    // migrationDate (para contabilidad)
                     loanSpecificData.migrationDate = new Date(); 
 
-                    // Añadimos un registro de historial falso para la migración
                     if (!loanSpecificData.history) loanSpecificData.history = [];
-                    loanSpecificData.history.push({
-                        amount: initialPaidAmount,
-                        date: new Date(), // Usamos la fecha de hoy
-                        status: 'approved',
-                        method: 'migration' // Un método especial
-                    });
+                    const migrationTimestamp = new Date(); // Usar la misma fecha para ambos tickets
+
+                    // 5. Ticket 1: Cuotas Completas (si > 0)
+                    if (fullInstallmentsAmount > 0) {
+                        loanSpecificData.history.push({
+                            amount: fullInstallmentsAmount,
+                            date: migrationTimestamp,
+                            status: 'approved',
+                            method: 'migration', // Método especial para contabilidad
+                            migrationType: 'full_installments' // Identificador para Fase 3
+                        });
+                    }
+
+                    // 6. Ticket 2: Valor Parcial (si > 0)
+                    if (initialPartialAmount > 0) {
+                        loanSpecificData.history.push({
+                            amount: initialPartialAmount,
+                            date: migrationTimestamp, // Misma fecha
+                            status: 'approved',
+                            method: 'migration', // Método especial para contabilidad
+                            migrationType: 'partial_payment' // Identificador para Fase 3
+                        });
+                    }
                 }
             }
-            // --- [FIN DE LA CORRECCIÓN DE MIGRACIÓN (PASO 3)] ---
+            // --- [FIN FASE 2 MIGRACIÓN PARCIAL] ---
             
 
 
@@ -6440,12 +6517,3 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
