@@ -2155,17 +2155,22 @@ async function showRefinanceModal(clientId, notificationId) {
            let details = {
                lateDays: 0,
                lateFeesAccumulated: 0,
-               status: 'pending', // Estado por defecto
-               nextDueDate: null, // Fecha del próximo vencimiento
-               amountDueToday: 0 // Cuánto debería pagar HOY si es día de pago
+               status: 'pending', 
+               nextDueDate: null, 
+               amountDueToday: 0 
            };
 
-           // Calcula el total pagado desde el historial (INCLUYE PAGOS DE MIGRACIÓN)
+           // 1. OBTENER TOTAL PAGADO (Esto es correcto, incluye migración)
            const currentTotalPaid = (loan.history || [])
                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                .reduce((sum, h) => sum + (h.amount || 0), 0);
+            
+           // OBTENER TOTAL PAGADO (SIN MIGRACIÓN) - (Esto es nuevo, para calcular atrasos)
+           const currentTotalPaid_NoMigration = (loan.history || [])
+               .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') // <-- IGNORA MIGRACIÓN
+               .reduce((sum, h) => sum + (h.amount || 0), 0);
 
-           if (!loan || !loan.totalLoan || loan.status === 'finished' || (loan.paid >= loan.totalLoan)) {
+           if (!loan || !loan.totalLoan || loan.status === 'finished' || (currentTotalPaid >= loan.totalLoan)) {
                details.status = 'finished';
                return details;
            }
@@ -2173,44 +2178,28 @@ async function showRefinanceModal(clientId, notificationId) {
            const today = new Date();
            today.setHours(0, 0, 0, 0);
            
-           // Verificamos si el cliente fue migrado HOY
-           let isMigratedToday = false;
-           if (loan.migrationDate?.seconds) {
-               const migrationDt = new Date(loan.migrationDate.seconds * 1000);
-               migrationDt.setHours(0, 0, 0, 0);
-               if (migrationDt.getTime() === today.getTime()) {
-                   isMigratedToday = true;
-               }
+           // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (1/4)] ---
+           // ¡EL BUG ESTÁ AQUÍ! No podemos usar 'lastRelevantDate'. 
+           // Debemos calcular el atraso SIEMPRE desde la 'startDate' del préstamo.
+           if (!loan.startDate?.seconds) {
+                console.warn("No se puede calcular el estado: falta fecha de inicio (startDate).");
+                return details; // No podemos calcular nada sin la fecha de inicio
            }
-
-           let lastRelevantDate;
-           if (loan.history && loan.history.length > 0) {
-               const sortedHistory = [...loan.history]
-                   .filter(h => h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'postponed')
-                   .sort((a, b) => b.date.seconds - a.date.seconds);
-               if (sortedHistory.length > 0) {
-                   lastRelevantDate = new Date(sortedHistory[0].date.seconds * 1000);
-               }
-           }
-           if (!lastRelevantDate && loan.startDate?.seconds) {
-               lastRelevantDate = new Date(loan.startDate.seconds * 1000);
-           }
-
-           if (!lastRelevantDate) {
-               console.warn("No se puede calcular el estado: falta fecha de inicio o historial.");
-               return details;
-           }
-           lastRelevantDate.setHours(0, 0, 0, 0);
-
-           let checkDate = new Date(lastRelevantDate);
+           let checkDate = new Date(loan.startDate.seconds * 1000); 
+           checkDate.setHours(0, 0, 0, 0);
+           // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA (1/4)] ---
+           
            let accumulatedLateDays = 0;
            let accumulatedLateFees = 0;
            const dailyLateRate = (loan.lateFeeRate || 0) / 100;
            const installmentAmount = loan.originalInstallmentAmount || 0;
-           let installmentsDueCount = 0;
+           let installmentsDueCount = 0; // Cuotas debidas HASTA AYER
            let nextDueDateFound = false;
+           
+           let stopDate = new Date(today);
+           stopDate.setDate(stopDate.getDate() + 35); 
 
-           while (checkDate <= today) {
+           while (checkDate <= stopDate) {
                const dayOfWeek = checkDate.getDay();
                const dayOfMonth = checkDate.getDate();
                const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
@@ -2223,83 +2212,106 @@ async function showRefinanceModal(clientId, notificationId) {
                else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
 
                if (!isHoliday && isPaymentDay) {
+                   
+                   // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (2/4)] ---
+                   // Lógica del PASADO (hasta ayer)
                    if (checkDate < today) {
-                       installmentsDueCount++;
+                       installmentsDueCount++; // Contamos esta cuota como debida
+                       
+                       // Calculamos el total esperado HASTA ESTE DÍA
                        const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
+                       
+                       // Comparamos con lo pagado (sin migración)
+                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid_NoMigration);
 
-                       if (dailyLateRate > 0 && outstandingDueAmount > 0) {
-                           const dailyFee = outstandingDueAmount * dailyLateRate;
-                           accumulatedLateFees += dailyFee;
-                           accumulatedLateDays++;
-                       } else if (outstandingDueAmount > 0) {
-                           accumulatedLateDays++;
+                       if (outstandingDueAmount > 0) {
+                           accumulatedLateDays++; // ¡Está atrasado este día!
+                           if (dailyLateRate > 0) {
+                               const dailyFee = outstandingDueAmount * dailyLateRate;
+                               accumulatedLateFees += dailyFee;
+                           }
                        }
-                   }
-                   if (checkDate.getTime() === today.getTime()) {
+                   // Lógica de HOY
+                   } else if (checkDate.getTime() === today.getTime()) {
                        details.amountDueToday = installmentAmount;
-                   }
-                   if (checkDate >= today && !nextDueDateFound) {
+                       if (!nextDueDateFound) {
+                           details.nextDueDate = new Date(checkDate);
+                           nextDueDateFound = true;
+                       }
+                   // Lógica del FUTURO
+                   } else if (checkDate > today && !nextDueDateFound) {
                        details.nextDueDate = new Date(checkDate);
                        nextDueDateFound = true;
                    }
+                   // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA (2/4)] ---
+               }
+               
+               if (nextDueDateFound && checkDate > today) {
+                    break;
                }
                checkDate.setDate(checkDate.getDate() + 1);
            }
-
+           
            details.lateDays = accumulatedLateDays;
            details.lateFeesAccumulated = accumulatedLateFees;
 
            const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
            const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
 
-           // --- INICIO: Lógica de decisión CORREGIDA ---
+           // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (3/4)] ---
+           // Lógica de STATUS revisada
            if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
                details.status = 'finished';
-           } else if (accumulatedLateDays > 1) {
+           
+           } else if (accumulatedLateDays > 0) { 
+                // ¡ESTA ES LA CORRECCIÓN CLAVE!
+                // Si tiene 1 o más días de atraso (calculado desde el INICIO),
+                // SIEMPRE está 'late', incluso en domingo.
                details.status = 'late';
-           } else if (details.amountDueToday > 0) { // Hoy es día de pago
+
+           } else if (details.amountDueToday > 0) { // Hoy es día de pago (y no está atrasado)
                 
-                // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA] ---
-                
-                // Calculamos el monto total esperado para hoy (esto es igual para todos)
+                // Calculamos el total esperado HOY (cuotas de ayer + cuota de hoy)
                 const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
                 let expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
-
-                if (isMigratedToday) {
-                    // SI ES MIGRADO HOY
-                    // El "total esperado" no es solo la cuota de hoy ($100),
-                    // sino la cuota de hoy MÁS todo lo que se migró ($1250).
-                    const totalMigratedAmount = loan.initialMigratedAmount || 0;
-                    
-                    // Si 'installmentsDueCount' es 0 (porque la migración fue hoy),
-                    // 'expectedTotalIncludingToday' será 1 cuota ($100).
-                    // Lo ajustamos para que sea la migración + 1 cuota ($1250 + $100 = $1350).
-                    if (installmentsDueCount === 0) {
-                        expectedTotalIncludingToday = totalMigratedAmount + installmentAmount;
+                
+                // Verificamos si es un cliente migrado HOY
+                let isMigratedToday = false;
+                if (loan.migrationDate?.seconds) {
+                    const migrationDt = new Date(loan.migrationDate.seconds * 1000);
+                    migrationDt.setHours(0, 0, 0, 0);
+                    if (migrationDt.getTime() === today.getTime()) {
+                        isMigratedToday = true;
                     }
-                    // (Si installmentsDueCount > 0, la lógica normal ya funciona)
                 }
 
-                // AHORA, la comparación funciona para AMBOS casos:
-                if (currentTotalPaid < expectedTotalIncludingToday) {
-                    // Cliente Normal: (Pago 0 < Esperado 100) -> PENDING
-                    // Cliente Migrado: (Pago Migración 1250 < Esperado 1350) -> PENDING
-                    details.status = 'pending';
+                // Ajuste para el primer día de un cliente migrado
+                if (isMigratedToday && installmentsDueCount === 0) {
+                    // El "esperado" es el monto migrado + la cuota de hoy
+                    expectedTotalIncludingToday = (loan.initialMigratedAmount || 0) + installmentAmount;
+                    // Comparamos con el PAGO TOTAL (que incluye la migración)
+                    if (currentTotalPaid < expectedTotalIncludingToday) {
+                        details.status = 'pending';
+                    } else {
+                        details.status = 'paid';
+                    }
                 } else {
-                    // Cliente Normal: (Pago 100 < Esperado 100) -> FALSO -> PAID
-                    // Cliente Migrado: (Pago Migración 1250 + Pago Hoy 100 = 1350 < Esperado 1350) -> FALSO -> PAID
-                    details.status = 'paid';
+                    // Cliente normal: comparamos lo pagado (sin migración) con lo esperado
+                    if (currentTotalPaid_NoMigration < expectedTotalIncludingToday) {
+                        details.status = 'pending';
+                    } else {
+                        details.status = 'paid';
+                    }
                 }
-                // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA] ---
-
-           } else if (accumulatedLateDays === 1) {
-               details.status = 'pending';
+           
            } else {
-               details.status = 'paid';
+                // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (4/4)] ---
+                // Si NO está 'finished', NO está 'late', y NO paga hoy...
+                // significa que está "Al día".
+                details.status = 'paid'; // Se considera 'paid' (Pagado/Al día)
+                // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA (4/4)] ---
            }
-           // --- FIN: Lógica de decisión CORREGIDA ---
-
+           
            return details;
        }
 
