@@ -1617,7 +1617,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
 // Fin del bloque para pegar
 
-        function showPaymentDetailModal(clientId, loanIndex, historyIndex) {
+    function showPaymentDetailModal(clientId, loanIndex, historyIndex) {
             const modal = document.getElementById('paymentDetailModal');
             const client = allClients.find(c => c.id === clientId);
             
@@ -1632,12 +1632,49 @@ async function showRefinanceModal(clientId, notificationId) {
             
             let dateStr = 'N/A';
             let timeStr = 'N/A';
+            
+            // --- [INICIO FASE 3: LÓGICA DE EXCLUSÃO] ---
+            let canDelete = false;
+            let deleteTitle = "Exclusão não permitida";
+            let deleteButtonHtml = '';
 
             if (payment.date?.seconds) {
-                const d = new Date(payment.date.seconds * 1000);
-                dateStr = d.toLocaleDateString('pt-BR');
-                timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const paymentDate = new Date(payment.date.seconds * 1000);
+                const today = new Date();
+                
+                dateStr = paymentDate.toLocaleDateString('pt-BR');
+                timeStr = paymentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                // 1. Es de Hoy? (Compara 'YYYY-MM-DD' de ambas fechas)
+                const isToday = paymentDate.toDateString() === today.toDateString();
+
+                // 2. Es el Último Pago? (Compara el timestamp en segundos)
+                // Ordenamos el historial para encontrar el pago más reciente
+                const sortedHistory = [...loan.history].sort((a, b) => (a.date?.seconds || 0) - (b.date?.seconds || 0));
+                const lastPaymentInHistory = sortedHistory[sortedHistory.length - 1];
+                const isLastPayment = (payment.date.seconds === lastPaymentInHistory.date.seconds && payment.amount === lastPaymentInHistory.amount);
+                
+                // 3. Define si se puede eliminar
+                if (isToday && isLastPayment) {
+                    canDelete = true;
+                    deleteTitle = "Excluir este pagamento";
+                } else if (!isToday) {
+                    deleteTitle = "Não é possível excluir: O pagamento não foi feito hoje.";
+                } else if (!isLastPayment) {
+                    deleteTitle = "Não é possível excluir: Este não é o último pagamento. Contate o admin.";
+                }
             }
+            
+            // 4. Prepara el HTML del botón de eliminar
+            deleteButtonHtml = `
+                <button id="delete-payment-btn" class="btn-danger" 
+                    ${canDelete ? '' : 'disabled'} 
+                    title="${deleteTitle}" 
+                    style="${canDelete ? '' : 'flex-grow: 1; background-color: var(--text-secondary); border-color: var(--text-secondary); opacity: 0.7;'}">
+                    <i data-lucide="trash-2"></i> Excluir Pagamento
+                </button>`;
+            // --- [FIN FASE 3: LÓGICA DE EXCLUSÃO] ---
+
 
             let receiptPreviewHtml = `<p class="no-items">Nenhum comprovante anexado.</p>`;
             if (payment.receiptUrl) {
@@ -1677,6 +1714,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 <div class="action-buttons">
                     ${receiptButtonHtml}
                     ${invoiceButtonHtml}
+                    ${deleteButtonHtml} <!-- Botón de eliminar añadido aquí -->
                 </div>
             `;
 
@@ -1687,7 +1725,83 @@ async function showRefinanceModal(clientId, notificationId) {
             
             modal.querySelector('#closePaymentDetailModal').addEventListener('click', () => window.history.back());
             modal.querySelector('#generate-invoice-btn').addEventListener('click', () => generateInvoicePDF(client, payment));
-        }
+            
+            // --- [INICIO FASE 3: LISTENER DE EXCLUSÃO] ---
+            if (canDelete) {
+                modal.querySelector('#delete-payment-btn').addEventListener('click', async () => {
+                    // 1. Pedir Confirmación
+                    showConfirmationModal(
+                        'Excluir Pagamento?',
+                        'Esta ação é irreversível e irá recalcular o saldo deste cliente. Tem certeza?',
+                        async () => {
+                            // Usuario confirmó...
+                            const deleteBtn = document.getElementById('delete-payment-btn');
+                            if(deleteBtn) {
+                                deleteBtn.disabled = true;
+                                deleteBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Excluindo...`;
+                                lucide.createIcons({nodes: [deleteBtn.querySelector('i')]});
+                            }
+                            
+                            try {
+                                const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
+                                
+                                // 2. Obtenemos los datos más frescos (por si acaso)
+                                const currentClientData = allClients.find(c => c.id === clientId);
+                                const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
+                                const currentLoan = updatedLoans[loanIndex];
+
+                                // 3. Eliminar el pago del array
+                                currentLoan.history.splice(historyIndex, 1);
+                                
+                                // 4. Recalcular la contabilidad (La lógica MÁS IMPORTANTE)
+                                // (Esta lógica es la misma que usamos en Fase 2 y 3, es la lógica unificada)
+                                const historyPaid = (currentLoan.history || [])
+                                    .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
+                                    .reduce((sum, h) => sum + (h.amount || 0), 0);
+                                
+                                const initialPaid = currentLoan.initialMigratedAmount || 0;
+                                const newTotalPaid = historyPaid + initialPaid;
+                                const installmentValue = currentLoan.originalInstallmentAmount || 1; // Evita división por cero
+                                const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
+                                const totalInstallments = parseInt(totalInstallmentsStr, 10);
+                                
+                                let paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
+                                if (paidInstallmentsCount > totalInstallments) {
+                                    paidInstallmentsCount = totalInstallments; // No puede pagar más cuotas de las que existen
+                                }
+                                
+                                const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
+
+                                currentLoan.paid = newTotalPaid;
+                                currentLoan.paymentBalance = newBalance;
+                                currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
+
+                                // 5. Guardar en Firestore
+                                await updateDoc(clientRef, { loans: updatedLoans });
+
+                                showToast('Pagamento excluído com sucesso!');
+                                window.history.back(); // Cierra el modal de confirmación
+                                window.history.back(); // Cierra el modal de detalles del pago
+                                
+                                // 6. Refrescar la vista de detalles del cliente
+                                showClientDetails(clientId, loanIndex); 
+                                
+                            } catch (error) {
+                                console.error("Erro ao excluir pagamento:", error);
+                                showToast('Falha ao excluir o pagamento.', true);
+                                if(deleteBtn) {
+                                    deleteBtn.disabled = false;
+                                    deleteBtn.innerHTML = `<i data-lucide="trash-2"></i> Excluir Pagamento`;
+                                    lucide.createIcons({nodes: [deleteBtn.querySelector('i')]});
+                                }
+                                window.history.back(); // Cierra el modal de confirmación
+                            }
+                        }
+                    );
+                });
+            }
+            // --- [FIN FASE 3: LISTENER DE EXCLUSÃO] ---
+        }    
 
         async function generateInvoicePDF(client, payment) {
             const { jsPDF } = window.jspdf;
