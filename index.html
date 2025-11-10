@@ -2017,11 +2017,13 @@ async function showRefinanceModal(clientId, notificationId) {
                 // Obtenemos todos los préstamos de ESTE cliente para HOY
                 const clientLoansForToday = todaysTotalClientsList.filter(item => item.client.id === clientId);
                 
-                // Verificamos si ALGUNO de sus préstamos de hoy AÚN NO ESTÁ PAGADO (sigue 'pending' o 'late')
-                const hasUnpaidLoan = clientLoansForToday.some(item => item.loan.status !== 'paid');
+                // === [INICIO DE LA CORRECCIÓN] ===
+                // Verificamos si ALGUNO de sus préstamos de hoy AÚN ESTÁ 'pending' o 'late'
+                const hasUnpaidLoan = clientLoansForToday.some(item => item.loan.status === 'pending' || item.loan.status === 'late');
+                // === [FIN DE LA CORRECCIÓN] ===
                 
-                // Si NO tiene ningún préstamo sin pagar (es decir, !hasUnpaidLoan es verdadero),
-                // significa que todos están pagados, así que contamos al cliente.
+                // Si NO tiene ningún préstamo pendiente o atrasado (es decir, !hasUnpaidLoan es verdadero),
+                // significa que todos están 'paid' o 'finished', así que contamos al cliente como "completo".
                 if (!hasUnpaidLoan) {
                     paidClients++;
                 }
@@ -2088,7 +2090,7 @@ async function showRefinanceModal(clientId, notificationId) {
         
         
 
-        function updateProfileView(collectorData = null) {
+    function updateProfileView(collectorData = null) {
             // --- [INICIO FASE 2: KPIs] ---
             const dailyTotalEl = document.getElementById('kpi-daily-total');
             const capitalTotalEl = document.getElementById('kpi-capital-total'); // Este es 'Capital em Mãos'
@@ -2193,6 +2195,9 @@ async function showRefinanceModal(clientId, notificationId) {
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
             // --- [FIN DE LA CORRECCIÓN CONTABLE (RENDERIZADO)] ---
         }
+
+
+        
         
 
 
@@ -3105,8 +3110,9 @@ async function showRefinanceModal(clientId, notificationId) {
           </div>
         </div>
         <div class="action-buttons">
-            <!-- Los botones ahora necesitan saber el loanIndex actual -->
-            ${loan.status === 'finished' ? `
+            <!-- === INICIO DE LA CORRECCIÓN === -->
+            <!-- Usamos currentStatus (el recalculado) en lugar de loan.status (el obsoleto) -->
+            ${currentStatus === 'finished' ? `
                 <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
                 <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
             ` : `
@@ -3115,6 +3121,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
                 <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> Registrar Pagamento</button>
             `}
+            <!-- === FIN DE LA CORRECCIÓN === -->
         </div>`;
     // --- FIN HTML PRINCIPAL ---
 
@@ -3171,7 +3178,10 @@ async function showRefinanceModal(clientId, notificationId) {
     // Botón Editar: ahora edita cliente + préstamo actual
     document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
 
-    if (loan.status === 'finished') {
+    // === INICIO DE LA CORRECCIÓN ===
+    // Usamos 'currentStatus' aquí también
+    if (currentStatus === 'finished') {
+    // === FIN DE LA CORRECCIÓN ===
         document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true)); // Crear nuevo préstamo siempre es posible desde aquí
         // El botón updateClientDataBtn ahora pasa el índice del préstamo finalizado que se está viendo
         document.getElementById('updateClientDataBtn').addEventListener('click', (e) => showClientFormModal(clientId, false, parseInt(e.currentTarget.dataset.loanIndex, 10)));
@@ -4466,13 +4476,35 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             // --- [FIN FASE 2 MIGRACIÓN PARCIAL] ---
             
 
-
-
+            // === [INICIO DE LA CORRECCIÓN: LÓGICA DE REEMPLAZO/AÑADIR] ===
             if (isNewLoan) {
                 const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
-                await updateDoc(clientRef, {
-                    loans: arrayUnion(loanSpecificData)
-                });
+                
+                // 1. Obtener los préstamos existentes del cliente
+                const currentClientData = allClients.find(c => c.id === clientIdToSave);
+                const existingLoans = currentClientData ? (currentClientData.loans || []) : [];
+
+                // 2. Verificar si hay préstamos ACTIVOS (recalculando su estado)
+                const activeLoans = existingLoans.filter(l => calculateLoanDetails(l).status !== 'finished');
+
+                // 3. Decidir la acción
+                if (activeLoans.length === 0) {
+                    // No hay préstamos activos (todos están 'finished' o la lista está vacía)
+                    // REEMPLAZAR la lista de préstamos con solo el nuevo
+                    console.log("Detectado: Sin préstamos activos. REEMPLAZANDO array de préstamos.");
+                    await updateDoc(clientRef, {
+                        loans: [loanSpecificData] // Reemplaza el array
+                    });
+                } else {
+                    // Hay un préstamo activo. Activar multi-préstamo.
+                    // AÑADIR el nuevo préstamo a la lista
+                    console.log("Detectado: Préstamo activo existente. AÑADIENDO nuevo préstamo (multi-préstamo).");
+                    await updateDoc(clientRef, {
+                        loans: arrayUnion(loanSpecificData) // Añade al array
+                    });
+                }
+            // === [FIN DE LA CORRECCIÓN] ===
+
             } else if (isEditMode) {
                 const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
                 const updatedLoans = [...client.loans];
