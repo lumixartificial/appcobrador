@@ -1263,7 +1263,11 @@ const BLACKLIST_DATA = {
 
                 <!-- KPI 1: Capital em Mãos (Efectivo) -->
                 <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-green); border-width: 2px;">
-                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-green);" data-lang-key="capitalTotal"><i data-lucide="banknote"></i></h3>
+                    <!-- === INICIO DE LA CORRECCIÓN === -->
+                    <!-- 1. Eliminamos data-lang-key="capitalTotal" -->
+                    <!-- 2. Añadimos el texto "Capital em Mãos" después del icono -->
+                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-green);"><i data-lucide="banknote"></i> Capital em Mãos</h3>
+                    <!-- === FIN DE LA CORRECCIÓN === -->
                     <p class="kpi-value" id="kpi-capital-total"></p>
                 </div>
 
@@ -6745,3 +6749,4 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
