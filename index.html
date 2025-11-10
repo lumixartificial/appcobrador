@@ -2721,7 +2721,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
 
 
-        function updateAllClientsList() {
+    function updateAllClientsList() {
             const container = document.getElementById('all-clients-list');
             const searchInput = document.getElementById('client-search-input');
             const activeFilter = document.querySelector('#clients-view .filter-btn.active');
@@ -2733,15 +2733,30 @@ async function showRefinanceModal(clientId, notificationId) {
             let clientsWithLoans = [];
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, loanIndex) => {
+                    
+                    // --- [INICIO DE LA CORRECCIÓN] ---
+                    // 1. Recalculamos el estado real del préstamo AHORA
+                    const details = calculateLoanDetails(loan);
+                    const currentStatus = details.status; 
+                    // --- [FIN DE LA CORRECCIÓN] ---
+
                     let passesFilter = true;
-                    if (filter !== 'all' && loan.status !== filter) {
+                    
+                    // --- [INICIO DE LA CORRECCIÓN] ---
+                    // 2. Comparamos el filtro con el 'currentStatus' (el real), no con 'loan.status' (el obsoleto)
+                    if (filter !== 'all' && currentStatus !== filter) { 
                         passesFilter = false;
                     }
+                    // --- [FIN DE LA CORRECCIÓN] ---
+
+                    // La lógica del buscador (searchTerm) está bien y no cambia
                     if (searchTerm && !(client.name.toLowerCase().includes(searchTerm) || (client.address && client.address.toLowerCase().includes(searchTerm)))) {
                         passesFilter = false;
                     }
+                    
                     if(passesFilter) {
-                        clientsWithLoans.push({ client, loan, loanIndex });
+                        // Pasamos el préstamo original (loan)
+                        clientsWithLoans.push({ client, loan, loanIndex }); 
                     }
                 });
             });
