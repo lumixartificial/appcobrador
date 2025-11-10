@@ -2160,7 +2160,7 @@ async function showRefinanceModal(clientId, notificationId) {
                amountDueToday: 0 // Cuánto debería pagar HOY si es día de pago
            };
 
-           // Calcula el total pagado desde el historial
+           // Calcula el total pagado desde el historial (INCLUYE PAGOS DE MIGRACIÓN)
            const currentTotalPaid = (loan.history || [])
                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                .reduce((sum, h) => sum + (h.amount || 0), 0);
@@ -2173,7 +2173,6 @@ async function showRefinanceModal(clientId, notificationId) {
            const today = new Date();
            today.setHours(0, 0, 0, 0);
            
-           // --- [INICIO CORRECCIÓN RUTA MIGRADO (1/2)] ---
            // Verificamos si el cliente fue migrado HOY
            let isMigratedToday = false;
            if (loan.migrationDate?.seconds) {
@@ -2183,7 +2182,6 @@ async function showRefinanceModal(clientId, notificationId) {
                    isMigratedToday = true;
                }
            }
-           // --- [FIN CORRECCIÓN RUTA MIGRADO (1/2)] ---
 
            let lastRelevantDate;
            if (loan.history && loan.history.length > 0) {
@@ -2255,33 +2253,45 @@ async function showRefinanceModal(clientId, notificationId) {
            const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
            const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
 
-           // --- INICIO: Lógica de decisión CORREGIDA (Sin Logs) ---
+           // --- INICIO: Lógica de decisión CORREGIDA ---
            if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
                details.status = 'finished';
            } else if (accumulatedLateDays > 1) {
                details.status = 'late';
            } else if (details.amountDueToday > 0) { // Hoy es día de pago
                 
-                // --- [INICIO CORRECCIÓN RUTA MIGRADO (2/2)] ---
+                // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA] ---
+                
+                // Calculamos el monto total esperado para hoy (esto es igual para todos)
+                const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
+                let expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
+
                 if (isMigratedToday) {
-                    // Si fue migrado HOY y es día de pago, debe estar 'pending'
-                    // para aparecer en la ruta.
+                    // SI ES MIGRADO HOY
+                    // El "total esperado" no es solo la cuota de hoy ($100),
+                    // sino la cuota de hoy MÁS todo lo que se migró ($1250).
+                    const totalMigratedAmount = loan.initialMigratedAmount || 0;
+                    
+                    // Si 'installmentsDueCount' es 0 (porque la migración fue hoy),
+                    // 'expectedTotalIncludingToday' será 1 cuota ($100).
+                    // Lo ajustamos para que sea la migración + 1 cuota ($1250 + $100 = $1350).
+                    if (installmentsDueCount === 0) {
+                        expectedTotalIncludingToday = totalMigratedAmount + installmentAmount;
+                    }
+                    // (Si installmentsDueCount > 0, la lógica normal ya funciona)
+                }
+
+                // AHORA, la comparación funciona para AMBOS casos:
+                if (currentTotalPaid < expectedTotalIncludingToday) {
+                    // Cliente Normal: (Pago 0 < Esperado 100) -> PENDING
+                    // Cliente Migrado: (Pago Migración 1250 < Esperado 1350) -> PENDING
                     details.status = 'pending';
                 } else {
-                // --- [FIN CORRECCIÓN RUTA MIGRADO (2/2)] ---
-                
-                    // Lógica normal para clientes existentes
-                   const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
-                   const expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
-                   if (currentTotalPaid < expectedTotalIncludingToday) {
-                       details.status = 'pending';
-                   } else {
-                       details.status = 'paid';
-                   }
-                   
-                // --- [INICIO CORRECCIÓN RUTA MIGRADO (2/2)] ---
-                } // Cierra el 'else' de la corrección
-                // --- [FIN CORRECCIÓN RUTA MIGRADO (2/2)] ---
+                    // Cliente Normal: (Pago 100 < Esperado 100) -> FALSO -> PAID
+                    // Cliente Migrado: (Pago Migración 1250 + Pago Hoy 100 = 1350 < Esperado 1350) -> FALSO -> PAID
+                    details.status = 'paid';
+                }
+                // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA] ---
 
            } else if (accumulatedLateDays === 1) {
                details.status = 'pending';
