@@ -2102,8 +2102,10 @@ async function showRefinanceModal(clientId, notificationId) {
 
             let totalLoansMade = 0; // Capital PRINCIPAL de préstamos NO-MIGRADOS
             let totalPaymentsReceived = 0; // Pagos NO-MIGRADOS
-            let totalDistributedCapital = 0; // Valor TOTAL (c/ juros) de préstamos ACTIVOS
-            // --- [FIN FASE 2: KPIs] ---
+            
+            // --- [INICIO DE LA CORRECCIÓN CONTABLE] ---
+            let totalDistributedCapital_Outstanding = 0; // ¡Variable Renombrada! Guardará el SALDO PENDIENTE
+            // --- [FIN DE LA CORRECCIÓN CONTABLE] ---
 
             const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
             
@@ -2112,7 +2114,8 @@ async function showRefinanceModal(clientId, notificationId) {
             collectorClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     
-                    // --- Lógica para 'Capital em Mãos' ---
+                    // --- Lógica para 'Capital em Mãos' (SIN CAMBIOS) ---
+                    // Esta lógica es correcta, calcula el flujo de caja.
                     if (!loan.migrationDate) {
                         // Suma el capital principal de préstamos NUEVOS (NO migrados)
                         if (loan.principalAmount) {
@@ -2127,25 +2130,40 @@ async function showRefinanceModal(clientId, notificationId) {
                             totalPaymentsReceived += (h.amount || 0);
                         }
                     });
+                    // --- FIN Lógica 'Capital em Mãos' ---
+
                     
-                    // --- [INICIO FASE 2: CÁLCULO DISTRIBUIDO] ---
-                    // Suma el VALOR TOTAL (con intereses) de todos los préstamos que no estén finalizados.
-                    if (loan.status !== 'finished') {
-                        totalDistributedCapital += (loan.totalLoan || 0);
+                    // --- [INICIO DE LA CORRECCIÓN CONTABLE] ---
+                    // Esta es la nueva lógica para 'Capital Distribuido' (Saldo Pendiente)
+                    
+                    // 1. Recalculamos el estado real del préstamo (usando la función moderna)
+                    const loanDetails = calculateLoanDetails(loan);
+                    const currentStatus = loanDetails.status;
+                    
+                    // 2. Solo sumamos el saldo de préstamos que NO están finalizados
+                    if (currentStatus !== 'finished') {
+                        
+                        // 3. Calcular el Total Pagado para ESTE préstamo (incluye migración y pagos normales)
+                        const totalPaidForThisLoan = (loan.history || [])
+                            .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+                            .reduce((sum, h) => sum + (h.amount || 0), 0);
+                        
+                        // 4. Calcular el Saldo Pendiente (Total del Préstamo - Total Pagado)
+                        const outstandingBalance = (loan.totalLoan || 0) - totalPaidForThisLoan;
+                        
+                        // 5. Sumar solo el saldo pendiente al total distribuido
+                        totalDistributedCapital_Outstanding += outstandingBalance;
                     }
-                    // --- [FIN FASE 2: CÁLCULO DISTRIBUIDO] ---
+                    // --- [FIN DE LA CORRECCIÓN CONTABLE] ---
                 });
             });
                         
             const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
             
-            // --- [INICIO FASE 2: LÓGICA DE CAPITAL (RECTIFICACIÓN)] ---
-            // Lógica de Rectificación: Usa el nuevo campo 'startingCapitalOnHand' (de Fase 1) si existe.
-            // Si no, usa el campo antiguo 'startingCapital' para cuentas antiguas (Rectificación Manual).
+            // --- Lógica de Capital (RECTIFICACIÓN) (SIN CAMBIOS) ---
             const currentStartingCapital = (collectorData && collectorData.startingCapitalOnHand !== undefined) 
                 ? collectorData.startingCapitalOnHand 
                 : (collectorData && collectorData.startingCapital) || 0;
-            // --- [FIN FASE 2: LÓGICA DE CAPITAL (RECTIFICACIÓN)] ---
 
             const totalSettledByThisCollector = allSettlements
                 .filter(s => s.status === 'approved')
@@ -2154,21 +2172,26 @@ async function showRefinanceModal(clientId, notificationId) {
                 .filter(i => i.status === 'approved')
                 .reduce((sum, i) => sum + (i.amount || 0), 0);
 
-            // Fórmula de 'Capital em Mãos' (El efectivo en caja)
-            const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses - totalSettledByThisCollector + totalCapitalInjected;
-            currentCapitalOnHand = capitalTotal; // Actualiza la variable global para la validación de préstamos
+            // --- Fórmula de 'Capital em Mãos' (SIN CAMBIOS) ---
+            // (CapitalInicial + Aportes + PagosRecibidos) - (PréstamosNuevos + Gastos + Liquidaciones)
+            const capitalTotal = currentStartingCapital + totalCapitalInjected + totalPaymentsReceived - totalLoansMade - totalExpenses - totalSettledByThisCollector;
+            currentCapitalOnHand = capitalTotal; // Actualiza la variable global
 
-            // --- [INICIO FASE 2: ACTUALIZAR DOM] ---
+            // --- [INICIO DE LA CORRECCIÓN CONTABLE (RENDERIZADO)] ---
             dailyTotalEl.textContent = money(dailyTotal);
-            capitalTotalEl.textContent = money(capitalTotal); // KPI 1: Capital em Mãos (Efectivo)
-            distributedCapitalEl.textContent = money(totalDistributedCapital); // KPI 2: Capital Distribuido (En la calle)
-            // --- [INICIO FASE 3: CALCULAR Y MOSTRAR KPI 3] ---
-            const totalPatrimonio = capitalTotal + totalDistributedCapital;
-            totalPatrimonioEl.textContent = money(totalPatrimonio); // KPI 3: Capital Total (Patrimônio)
-            // --- [FIN FASE 3] ---
+            capitalTotalEl.textContent = money(capitalTotal); // KPI 1: Capital em Mãos (Correcto)
+            
+            // ¡Usamos la nueva variable con el saldo pendiente!
+            distributedCapitalEl.textContent = money(totalDistributedCapital_Outstanding); // KPI 2: Capital Distribuido (Corregido)
+            
+            // ¡Calculamos Patrimonio con el valor corregido!
+            // Patrimonio = (Lo que tengo en efectivo) + (Lo que me deben en la calle)
+            const totalPatrimonio = capitalTotal + totalDistributedCapital_Outstanding;
+            totalPatrimonioEl.textContent = money(totalPatrimonio); // KPI 3: Capital Total (Corregido)
+            
             if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
-            // --- [FIN FASE 2: ACTUALIZAR DOM] ---
+            // --- [FIN DE LA CORRECCIÓN CONTABLE (RENDERIZADO)] ---
         }
         
 
