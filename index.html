@@ -2041,28 +2041,49 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }
 
-        function updateDashboard(clientsForDashboard) {
+        
+
+        function updateDashboard(clientsForDashboard) { // 'clientsForDashboard' ahora es una lista de items [{ client, loan, ... }]
             const kpiGoal = document.getElementById('kpi-goal');
             const kpiReceived = document.getElementById('kpi-received');
             const kpiRemaining = document.getElementById('kpi-remaining');
             if (!kpiGoal) return;
+            
             if (!clientsForDashboard || clientsForDashboard.length === 0) {
                  kpiGoal.textContent = money(0);
                  kpiRemaining.textContent = 0;
             } else {
-                const dailyGoal = clientsForDashboard.filter(c => c.status !== 'paid').reduce((sum, c) => sum + (c.amount || 0), 0);
-                const remainingClients = clientsForDashboard.filter(c => c.status === 'pending' || c.status === 'late').length;
+                
+                // --- [INICIO DE LA CORRECCIÓN] ---
+                
+                // 1. Calcular "Meta Diária" (Daily Goal)
+                //    Suma el valor de todos los préstamos NO pagados (esto sigue igual).
+                const dailyGoal = clientsForDashboard
+                    .filter(item => item.loan.status !== 'paid')
+                    .reduce((sum, item) => sum + (item.loan.amount || 0), 0);
+                
+                // 2. Calcular "Clientes Restantes" (Remaining Clients)
+                //    ¡AQUÍ ESTÁ LA NUEVA LÓGICA!
+                
+                //    Filtramos los *items* que están pendientes o atrasados
+                const remainingItems = clientsForDashboard.filter(item => item.loan.status === 'pending' || item.loan.status === 'late');
+                
+                //    Creamos un Set (lista única) de los IDs de clientes de esos items
+                const uniqueRemainingClientIds = new Set(remainingItems.map(item => item.client.id));
+                
+                //    Contamos el tamaño del Set.
+                const remainingClientsCount = uniqueRemainingClientIds.size;
+
                 kpiGoal.textContent = money(dailyGoal);
-                kpiRemaining.textContent = remainingClients;
+                // Asignamos el nuevo conteo de CLIENTES ÚNICOS
+                kpiRemaining.textContent = remainingClientsCount; 
+                
+                // --- [FIN DE LA CORRECCIÓN] ---
             }
             
-            // --- [INICIO DE LA CORRECCIÓN] ---
-            // Llama a la nueva función centralizada
+            // La lógica de "Recebido Hoje" no cambia
             const { dailyTotal } = calculateDailyTotals();
-            
-            // Asigna el valor unificado a "Recebido Hoje"
             kpiReceived.textContent = money(dailyTotal);
-            // --- [FIN DE LA CORRECCIÓN] ---
         }
         
         
@@ -2648,6 +2669,7 @@ async function showRefinanceModal(clientId, notificationId) {
             return result;
         }
 
+        
         function updateTodaysRouteList() {
            const allClientsForToday = getAllTodaysClients(); // Obtiene TODOS los del día
 
@@ -2661,9 +2683,15 @@ async function showRefinanceModal(clientId, notificationId) {
            const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
            renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
 
-           // Actualiza el Dashboard (usa la lista SIN FILTRAR por status)
-           updateDashboard(allClientsForToday.map(item => item.loan));
+           // --- [INICIO DE LA CORRECCIÓN] ---
+           // La llamada a updateDashboard ahora pasa la lista COMPLETA de items,
+           // no solo los préstamos. Esto permite a updateDashboard contar clientes únicos.
+           updateDashboard(allClientsForToday);
+           // --- [FIN DE LA CORRECCIÓN] ---
        }
+
+
+
 
         function updateAllClientsList() {
             const container = document.getElementById('all-clients-list');
@@ -6749,4 +6777,3 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
-
