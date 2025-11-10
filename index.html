@@ -1153,6 +1153,7 @@ const BLACKLIST_DATA = {
             return todaysClients.filter(item => item.loan.status === 'pending' || item.loan.status === 'late');
         }
 
+        
         function renderMainLayout() {
     document.getElementById('app-container').innerHTML = `
         <header class="main-header">
@@ -1200,7 +1201,7 @@ const BLACKLIST_DATA = {
                 <div class="client-list" id="all-clients-list"></div>
             </div>
 
-            <!-- [INICIO DE LA MODIFICACIÓN] -->
+            <!-- (Notificaciones sin cambios) -->
             <div id="notifications-view" class="view container">
                  <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-purple);">
                     <span data-lang-key="navNotifications" style="font-size: 1.3em; font-weight: 600; padding-bottom: 10px;"></span>
@@ -1211,8 +1212,8 @@ const BLACKLIST_DATA = {
                 </div>
                  <div class="notification-list" id="notifications-list-container"></div>
             </div>
-            <!-- [FIN DE LA MODIFICACIÓN] -->
 
+             <!-- (Gastos sin cambios) -->
              <div id="expenses-view" class="view container">
                  <h2 class="section-title" data-lang-key="myExpenses"></h2>
                  <div class="filter-buttons">
@@ -1230,18 +1231,18 @@ const BLACKLIST_DATA = {
                      <button class="filter-btn" data-category="other" data-lang-key="other"></button>
                  </div>
                  <div class="expense-list" id="expenses-list-container"></div>
-                 <!-- --- INICIO SECCIÓN LIQUIDACIONES --- -->
                  <section style="margin-top: 30px;">
                      <h2 class="section-title">Histórico de Liquidações</h2>
                      <div class="item-list" id="settlements-list-container">
                          <p class="loading">Carregando liquidações...</p>
                      </div>
                  </section>
-                 <!-- --- FIN SECCIÓN LIQUIDACIONES --- -->
              </div>
             <div id="map-view" class="view container">
                 <div id="map-container"></div>
             </div>
+            
+            <!-- --- [INICIO FASE 2: MODIFICACIÓN UI PERFIL] --- -->
             <div id="profile-view" class="view container">
                 <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 30px;">
                     <label for="profile-pic-input" class="profile-pic-wrapper">
@@ -1252,10 +1253,26 @@ const BLACKLIST_DATA = {
                     <p style="margin: 5px 0 0; color: var(--text-secondary);" data-lang-key="collector"></p>
                 </div>
 
-                <div class="kpi-card" style="margin-bottom: 20px; text-align: center;">
-                    <h3 class="kpi-title" style="justify-content: center;" data-lang-key="capitalTotal"><i data-lucide="wallet"></i></h3>
+                <!-- --- [INICIO FASE 3: KPI DE CAPITAL TOTAL] --- -->
+                <!-- KPI 3: Capital Total (Patrimônio) -->
+                <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-purple); border-width: 2px;">
+                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-purple);"><i data-lucide="gem"></i> Capital Total (Patrimônio)</h3>
+                    <p class="kpi-value" id="kpi-total-patrimonio" style="color: var(--accent-purple); font-size: 1.8em;"></p>
+                </div>
+                <!-- --- [FIN FASE 3] --- -->
+
+                <!-- KPI 1: Capital em Mãos (Efectivo) -->
+                <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-green); border-width: 2px;">
+                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-green);" data-lang-key="capitalTotal"><i data-lucide="banknote"></i></h3>
                     <p class="kpi-value" id="kpi-capital-total"></p>
                 </div>
+
+                <!-- KPI 2: Capital Distribuido (en la Calle) -->
+                <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-orange);">
+                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-orange);"><i data-lucide="briefcase"></i> Capital Distribuído</h3>
+                    <p class="kpi-value" id="kpi-distributed-capital" style="color: var(--accent-orange);"></p>
+                </div>
+                <!-- --- [FIN FASE 2: MODIFICACIÓN UI PERFIL] --- -->
 
                 <section class="kpi-grid-profile">
                      <div class="kpi-card">
@@ -1315,6 +1332,10 @@ const BLACKLIST_DATA = {
         <button class="fab" id="addClientBtn" title="Adicionar Cliente"><i data-lucide="plus"></i></button>
         <button class="fab hidden" id="addExpenseBtn" title="Adicionar Gasto"><i data-lucide="plus"></i></button>`;
 }
+
+
+
+
         
         function applyTheme(theme) {
             const body = document.body;
@@ -1929,56 +1950,64 @@ async function showRefinanceModal(clientId, notificationId) {
         
 
         function updateProfileView(collectorData = null) {
+            // --- [INICIO FASE 2: KPIs] ---
             const dailyTotalEl = document.getElementById('kpi-daily-total');
-            const capitalTotalEl = document.getElementById('kpi-capital-total');
+            const capitalTotalEl = document.getElementById('kpi-capital-total'); // Este es 'Capital em Mãos'
+            const distributedCapitalEl = document.getElementById('kpi-distributed-capital'); // Este es 'Capital Distribuido'
             const dailyCashEl = document.getElementById('kpi-daily-cash');
             const dailyDigitalEl = document.getElementById('kpi-daily-digital');
-            if (!dailyTotalEl) return;
+            // --- [INICIO FASE 3: SELECCIONAR KPI 3] ---
+            const totalPatrimonioEl = document.getElementById('kpi-total-patrimonio'); // KPI 3 (Total)
+            if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return; // Verifica todos
+            // --- [FIN FASE 3] ---
 
-            let totalLoansMade = 0;
-            let totalPaymentsReceived = 0; // Pagos totales (históricos)
+            let totalLoansMade = 0; // Capital PRINCIPAL de préstamos NO-MIGRADOS
+            let totalPaymentsReceived = 0; // Pagos NO-MIGRADOS
+            let totalDistributedCapital = 0; // Valor TOTAL (c/ juros) de préstamos ACTIVOS
+            // --- [FIN FASE 2: KPIs] ---
 
-            // Llama a la nueva función centralizada para obtener los totales del DÍA
             const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
             
-            // --- [INICIO DE LA CORRECCIÓN (COBRADOR)] ---
-            // ¡ESTA ES LA CORRECCIÓN CLAVE!
-            // Filtramos la lista global 'allClients' para incluir SOLO los clientes
-            // que pertenecen a ESTE cobrador (currentCollectorUsername).
             const collectorClients = allClients.filter(c => c.collectorId === currentCollectorUsername);
 
-            // Ahora, en lugar de iterar sobre 'allClients', iteramos sobre 'collectorClients'.
             collectorClients.forEach(client => {
-            // --- [FIN DE LA CORRECCIÓN (COBRADOR)] ---
-            
                 (client.loans || []).forEach(loan => {
-                    // Suma el principal de este préstamo al total prestado
                     
-                    // (Lógica de migración - SIN CAMBIOS)
+                    // --- Lógica para 'Capital em Mãos' ---
                     if (!loan.migrationDate) {
+                        // Suma el capital principal de préstamos NUEVOS (NO migrados)
                         if (loan.principalAmount) {
                             totalLoansMade += loan.principalAmount;
                         } else if (loan.totalLoan && client.interestRate) { 
                             totalLoansMade += (loan.totalLoan / (1 + (client.interestRate / 100)));
                         }
                     }
-                    // (FIN Lógica de migración)
-
-                    // Suma TODOS los pagos aprobados al total general (para el capital)
                     (loan.history || []).forEach(h => {
-                        // (Lógica de migración de pagos - SIN CAMBIOS)
+                        // Suma pagos (NO migrados)
                         if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
                             totalPaymentsReceived += (h.amount || 0);
                         }
-                        // (FIN Lógica de migración de pagos)
                     });
+                    
+                    // --- [INICIO FASE 2: CÁLCULO DISTRIBUIDO] ---
+                    // Suma el VALOR TOTAL (con intereses) de todos los préstamos que no estén finalizados.
+                    if (loan.status !== 'finished') {
+                        totalDistributedCapital += (loan.totalLoan || 0);
+                    }
+                    // --- [FIN FASE 2: CÁLCULO DISTRIBUIDO] ---
                 });
             });
                         
-            // El resto de los cálculos ya están filtrados (allExpenses, allSettlements)
             const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
             
-            const currentStartingCapital = (collectorData && collectorData.startingCapital) || 0;
+            // --- [INICIO FASE 2: LÓGICA DE CAPITAL (RECTIFICACIÓN)] ---
+            // Lógica de Rectificación: Usa el nuevo campo 'startingCapitalOnHand' (de Fase 1) si existe.
+            // Si no, usa el campo antiguo 'startingCapital' para cuentas antiguas (Rectificación Manual).
+            const currentStartingCapital = (collectorData && collectorData.startingCapitalOnHand !== undefined) 
+                ? collectorData.startingCapitalOnHand 
+                : (collectorData && collectorData.startingCapital) || 0;
+            // --- [FIN FASE 2: LÓGICA DE CAPITAL (RECTIFICACIÓN)] ---
+
             const totalSettledByThisCollector = allSettlements
                 .filter(s => s.status === 'approved')
                 .reduce((sum, s) => sum + (s.amount || 0), 0);
@@ -1986,16 +2015,21 @@ async function showRefinanceModal(clientId, notificationId) {
                 .filter(i => i.status === 'approved')
                 .reduce((sum, i) => sum + (i.amount || 0), 0);
 
-            // Esta fórmula ahora es CORRECTA porque totalLoansMade y totalPaymentsReceived
-            // también están filtrados por cobrador.
+            // Fórmula de 'Capital em Mãos' (El efectivo en caja)
             const capitalTotal = currentStartingCapital - totalLoansMade + totalPaymentsReceived - totalExpenses - totalSettledByThisCollector + totalCapitalInjected;
-            currentCapitalOnHand = capitalTotal;
+            currentCapitalOnHand = capitalTotal; // Actualiza la variable global para la validación de préstamos
 
-            // Asigna los valores
+            // --- [INICIO FASE 2: ACTUALIZAR DOM] ---
             dailyTotalEl.textContent = money(dailyTotal);
-            capitalTotalEl.textContent = money(capitalTotal); 
+            capitalTotalEl.textContent = money(capitalTotal); // KPI 1: Capital em Mãos (Efectivo)
+            distributedCapitalEl.textContent = money(totalDistributedCapital); // KPI 2: Capital Distribuido (En la calle)
+            // --- [INICIO FASE 3: CALCULAR Y MOSTRAR KPI 3] ---
+            const totalPatrimonio = capitalTotal + totalDistributedCapital;
+            totalPatrimonioEl.textContent = money(totalPatrimonio); // KPI 3: Capital Total (Patrimônio)
+            // --- [FIN FASE 3] ---
             if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
+            // --- [FIN FASE 2: ACTUALIZAR DOM] ---
         }
         
 
