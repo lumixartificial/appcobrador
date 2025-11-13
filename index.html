@@ -899,6 +899,7 @@ try {
         let allSettlements = [];
         let allCapitalInjections = []; // <-- AÑADE ESTA LÍNEA
         let currentCapitalOnHand = 0;    // <-- AÑADE ESTA LÍNEA
+        let currentCollectorData = null;
         
         // --- INICIO: LISTA NEGRA (NUEVA FUNCIÓN) ---
 // ¡Por favor, rellena esta lista con tus datos!
@@ -1015,33 +1016,34 @@ const BLACKLIST_DATA = {
                 (client.loans || []).forEach(loan => {
                     (loan.history || []).forEach(h => {
                         
-                        // --- [INICIO DE LA CORRECCIÓN (RECIBIDO HOJE)] ---
-                        // ¡AQUÍ ESTÁ LA CORRECCIÓN!
-                        // Añadimos "&& h.method !== 'migration'" para ignorar el pago
-                        // inicial de un cliente migrado en la contabilidad diaria.
-                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
-                        // --- [FIN DE LA CORRECCIÓN (RECIBIDO HOJE)] ---
+                        // --- [INICIO DE LA CORRECCIÓN (calculateDailyTotals)] ---
+                        
+                        // 1. Obtener la fecha (ya sea JS Date o Firestore Timestamp)
+                        let paymentDate = null;
+                        if (h.date?.seconds) { // Es un Firestore Timestamp
+                            paymentDate = new Date(h.date.seconds * 1000);
+                        } else if (h.date instanceof Date) { // Es un JS Date (pago local)
+                            paymentDate = h.date;
+                        }
 
-                            const paymentDate = new Date(h.date.seconds * 1000);
-                            
-                            // 2. Filtro de Fecha (sin cambios)
+                        // 2. Comprobar si la fecha es válida Y el pago es válido
+                        //    (Se ignora 'migration' como antes)
+                        if (paymentDate && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
+                        // --- [FIN DE LA CORRECCIÓN] ---
+
+                            // 3. Filtro de Fecha (sin cambios)
                             if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
                                 const amount = h.amount || 0;
                                 
-                                // 3. Suma al Total del Día (sin cambios)
+                                // 4. Suma al Total del Día (sin cambios)
                                 dailyTotal += amount; 
                                 
-                                // --- [INICIO DE LA CORRECCIÓN] ---
-                                // 4. Lógica de Categoría CORREGIDA
-                                //    Solo 'dinheiro' es 'Cash'.
-                                //    Todo lo demás ('pix', 'cartao', 'receipt', o indefinido)
-                                //    se cuenta como 'Digital' (o no-efectivo).
+                                // 5. Lógica de Categoría (sin cambios)
                                 if (h.method === 'dinheiro') {
                                     dailyTotalCash += amount;
                                 } else {
                                     dailyTotalDigital += amount;
                                 }
-                                // --- [FIN DE LA CORRECCIÓN] ---
                             }
                         }
                     });
@@ -3652,7 +3654,11 @@ async function showRefinanceModal(clientId, notificationId) {
                     updateTodaysRouteList();
                     updateRouteProgress(); 
                     updateAllClientsList(); 
-                    updateProfileView(window.collectorData); 
+                    
+                    // --- [INICIO DE LA CORRECCIÓN] ---
+                    // ANTES: updateProfileView(window.collectorData);
+                    updateProfileView(currentCollectorData); // ★★★ CORRECCIÓN: Usa el global
+                    // --- [FIN DE LA CORRECCIÓN] ---
                     
                 } catch(error) {
                     console.error("Error updating document: ", error);
@@ -5818,7 +5824,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             updateRouteProgress();
             updateAllClientsList();
             updateExpensesView();
-            updateProfileView(window.collectorData); 
+            // --- [INICIO DE LA CORRECCIÓN] ---
+            // ANTES: updateProfileView(window.collectorData); 
+            updateProfileView(currentCollectorData); // ★★★ CORRECCIÓN: Usa el global
+            // --- [FIN DE LA CORRECCIÓN] ---
             updateNotifications(); 
             
             // Si una vista de detalles está abierta, también la refrescamos
@@ -5889,11 +5898,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
         
         // Listener para el botón de Configuración de Pagos
         if (target.closest('#payment-settings-btn')) {
-             if (window.collectorData) {
-                showPaymentSettingsModal(window.collectorData);
+             // --- [INICIO DE LA CORRECCIÓN] ---
+            // ANTES: if (window.collectorData) { showPaymentSettingsModal(window.collectorData); }
+             if (currentCollectorData) { // ★★★ CORRECCIÓN: Usa el global
+                showPaymentSettingsModal(currentCollectorData);
              } else {
-                 console.error("collectorData no está disponible globalmente.");
+                 console.error("currentCollectorData no está disponible globalmente.");
              }
+            // --- [FIN DE LA CORRECCIÓN] ---
         }
     });
     
@@ -6569,7 +6581,10 @@ function renderVerificationResults(container, warnings, systemLoans) {
             showView(initialView);
 
             let isFirstLoad = true; // Flag para ejecutar la configuración solo una vez
-            let collectorData = null;
+            // --- [INICIO DE LA CORRECCIÓN] ---
+            // ANTES: let collectorData = null;
+            // AHORA: Esta línea se elimina. Usaremos 'currentCollectorData' (global).
+            // --- [FIN DE LA CORRECCIÓN] ---
 
             console.log(`Buscando documento do cobrador com authUid: ${authUid}...`); // Log añadido
 const collectorQuery = query(collection(db, 'collectors'), where('authUid', '==', authUid));
@@ -6591,19 +6606,19 @@ getDocs(collectorQuery).then(snapshot => {
     onSnapshot(doc(db, 'collectors', currentCollectorUsername), (docSnap) => {
         if (docSnap.exists()) {
             
-            // --- [INICIO DE LA CORRECCIÓN CRÍTICA ANTERIOR] ---
-            // (Esta corrección ya estaba, la mantenemos)
-            // ¡Quitamos 'let' de la siguiente línea!
-            collectorData = docSnap.data(); // ANTES: let collectorData = ...
-            // --- [FIN DE LA CORRECCIÓN CRÍTICA ANTERIOR] ---
+            // --- [INICIO DE LA CORRECCIÓN] ---
+            // ANTES: collectorData = docSnap.data();
+            currentCollectorData = docSnap.data(); // ★★★ CORRECCIÓN: Asigna al global
             
-            console.log("Dados do cobrador atualizados:", collectorData); // Log añadido
+            console.log("Dados do cobrador atualizados:", currentCollectorData); // Log añadido
 
             // --- O código que estava dentro do onSnapshot antigo vai AQUI ---
-            document.querySelectorAll('.profile-name').forEach(el => el.textContent = collectorData.name || 'Cobrador');
+            // ★★★ CORRECCIÓN: Usa el global
+            document.querySelectorAll('.profile-name').forEach(el => el.textContent = currentCollectorData.name || 'Cobrador'); 
 
-            const imageUrl = collectorData.profilePictureUrl;
-            const nameInitial = (collectorData.name || 'C').charAt(0).toUpperCase();
+            // ★★★ CORRECCIÓN: Usa el global
+            const imageUrl = currentCollectorData.profilePictureUrl; 
+            const nameInitial = (currentCollectorData.name || 'C').charAt(0).toUpperCase();
             const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${nameInitial}`;
 
             const headerImg = document.getElementById('header-profile-img');
@@ -6612,22 +6627,25 @@ getDocs(collectorQuery).then(snapshot => {
             if (profileImg) profileImg.src = imageUrl || placeholderUrl;
 
             const realtimeToggle = document.getElementById('realtime-tracking-toggle');
-            if(realtimeToggle) realtimeToggle.checked = collectorData.isRealtimeTrackingActive || false;
+            // ★★★ CORRECCIÓN: Usa el global
+            if(realtimeToggle) realtimeToggle.checked = currentCollectorData.isRealtimeTrackingActive || false; 
 
-            if (collectorData.isRealtimeTrackingActive && !locationWatchId) {
+            // ★★★ CORRECCIÓN: Usa el global
+            if (currentCollectorData.isRealtimeTrackingActive && !locationWatchId) { 
                 startRealtimeGeolocation();
-            } else if (!collectorData.isRealtimeTrackingActive && locationWatchId) {
+            } else if (!currentCollectorData.isRealtimeTrackingActive && locationWatchId) { 
                 stopRealtimeGeolocation();
             }
 
             const paymentSettingsBtn = document.getElementById('payment-settings-btn');
             if (paymentSettingsBtn) {
                 paymentSettingsBtn.replaceWith(paymentSettingsBtn.cloneNode(true));
-                document.getElementById('payment-settings-btn').addEventListener('click', () => showPaymentSettingsModal(collectorData));
+                // ★★★ CORRECCIÓN: Pasa el global al listener
+                document.getElementById('payment-settings-btn').addEventListener('click', () => showPaymentSettingsModal(currentCollectorData));
             }
 
-            // [CORRECCIÓN] Llamamos a updateProfileView aquí
-            updateProfileView(collectorData);
+            // ★★★ CORRECCIÓN: Pasa el global
+            updateProfileView(currentCollectorData); 
 
             if (isFirstLoad) {
                 console.log('[COBRADOR-APP] Carga inicial completa. Configurando FCM...');
@@ -6684,7 +6702,10 @@ getDocs(collectorQuery).then(snapshot => {
                 updateTodaysRouteList();
                 updateRouteProgress();
                 updateAllClientsList();
-                updateProfileView(collectorData); 
+                // --- [INICIO DE LA CORRECCIÓN] ---
+                // ANTES: updateProfileView(collectorData); 
+                updateProfileView(currentCollectorData); // ★★★ CORRECCIÓN: Usa el global
+                // --- [FIN DE LA CORRECCIÓN] ---
                 updateNotifications();
                 if (document.querySelector('#map-view.active')) plotClientsOnMap();
 
@@ -6721,7 +6742,10 @@ getDocs(collectorQuery).then(snapshot => {
             onSnapshot(expensesQuery, (snapshot) => {
                 allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 updateExpensesView();
-                updateProfileView(collectorData);
+                // --- [INICIO DE LA CORRECCIÓN] ---
+                // ANTES: updateProfileView(collectorData);
+                updateProfileView(currentCollectorData); // ★★★ CORRECCIÓN: Usa el global
+                // --- [FIN DE LA CORRECCIÓN] ---
             }, (error) => {
                 console.error("Error al obtener gastos: ", error);
                 showToast('Falha ao carregar gastos.', true);
@@ -6737,7 +6761,10 @@ getDocs(collectorQuery).then(snapshot => {
                     .map(doc => ({ id: doc.id, ...doc.data() }))
                     .filter(s => s.status !== 'rejected'); 
                 
-                updateProfileView(collectorData); 
+                // --- [INICIO DE LA CORRECCIÓN] ---
+                // ANTES: updateProfileView(collectorData); 
+                updateProfileView(currentCollectorData); // ★★★ CORRECCIÓN: Usa el global
+                // --- [FIN DE LA CORRECCIÓN] ---
                 updateExpensesView();
             }, (error) => {
                 console.error("Error al obtener liquidaciones: ", error);
@@ -6747,7 +6774,10 @@ getDocs(collectorQuery).then(snapshot => {
             const capitalInjectionsQuery = query(collection(db, 'companies', currentCompanyId, 'capitalInjections'), where("collectorId", "==", currentCollectorUsername), where("status", "==", "approved"));
             onSnapshot(capitalInjectionsQuery, (snapshot) => {
                 allCapitalInjections = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateProfileView(collectorData); 
+                // --- [INICIO DE LA CORRECCIÓN] ---
+                // ANTES: updateProfileView(collectorData); 
+                updateProfileView(currentCollectorData); // ★★★ CORRECCIÓN: Usa el global
+                // --- [FIN DE LA CORRECCIÓN] ---
             }, (error) => {
                 console.error("Error al obtener aportes de capital: ", error);
                 showToast('Falha ao carregar dados de aportes de capital.', true);
