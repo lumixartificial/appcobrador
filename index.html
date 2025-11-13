@@ -3919,718 +3919,701 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
 
         
+        /**
+         * INSTRUCCIÓN 2: Reemplaza tu función 'showClientFormModal' existente
+         * (aprox. línea 2056) con este bloque de código completo.
+         */
         function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0, prefillData = null) {
-    const isEditMode = clientId !== null && !isNewLoan;
-    const client = isEditMode ? allClients.find(c => c.id === clientId) : (clientId ? allClients.find(c => c.id === clientId) : {});
-    const loan = (isEditMode && client && client.loans && client.loans[loanIndex]) ? client.loans[loanIndex] : {};
+            const isEditMode = clientId !== null && !isNewLoan;
+            const client = isEditMode ? allClients.find(c => c.id === clientId) : (clientId ? allClients.find(c => c.id === clientId) : {});
+            const loan = (isEditMode && client && client.loans && client.loans[loanIndex]) ? client.loans[loanIndex] : {};
 
-    let filesToUpload = [];
-    let existingDocs = client.documents ? [...client.documents] : [];
+            let filesToUpload = [];
+            let existingDocs = client.documents ? [...client.documents] : [];
 
-    const clientFormModal = document.getElementById('clientFormModal');
-    
-    let modalTitleKey = 'addNewClient';
-    let saveButtonKey = 'saveClient';
-    if (isNewLoan) {
-        modalTitleKey = 'createNewLoan';
-        saveButtonKey = 'saveClient'; 
-    } else if (isEditMode) {
-        modalTitleKey = 'editClient';
-        saveButtonKey = 'saveChanges';
-    }
+            const clientFormModal = document.getElementById('clientFormModal');
+            
+            let modalTitleKey = 'addNewClient';
+            let saveButtonKey = 'saveClient';
+            if (isNewLoan) {
+                modalTitleKey = 'createNewLoan';
+                saveButtonKey = 'saveClient'; 
+            } else if (isEditMode) {
+                modalTitleKey = 'editClient';
+                saveButtonKey = 'saveChanges';
+            }
 
-    // --- [INICIO DE LA MODIFICACIÓN (PREFILL)] ---
-    const prefillLoanAmount = prefillData ? prefillData.amount : '';
-    const prefillInstallments = prefillData ? prefillData.installments : '';
-    // --- [FIN DE LA MODIFICACIÓN (PREFILL)] ---
+            const prefillLoanAmount = prefillData ? prefillData.amount : '';
+            const prefillInstallments = prefillData ? prefillData.installments : '';
 
-    clientFormModal.innerHTML = `
-        <header class="modal-header">
-            <button id="closeClientFormModal"><i data-lucide="arrow-left"></i></button>
-            <span class="modal-title" data-lang-key="${modalTitleKey}"></span>
-        </header>
-        <div class="modal-content-wrapper">
-          <div class="container">
-            <form id="client-form">
-                
-                <h3 class="section-title" style="margin-top: 10px; border: none; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                    <i data-lucide="user-round"></i> Dados Pessoais
-                </h3>
-                <hr style="border: 1px solid var(--border-color); margin-top: 10px; margin-bottom: 25px;">
+            clientFormModal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closeClientFormModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title" data-lang-key="${modalTitleKey}"></span>
+                </header>
+                <div class="modal-content-wrapper">
+                  <div class="container">
+                    <form id="client-form">
+                        
+                        <h3 class="section-title" style="margin-top: 10px; border: none; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="user-round"></i> Dados Pessoais
+                        </h3>
+                        <hr style="border: 1px solid var(--border-color); margin-top: 10px; margin-bottom: 25px;">
 
-                <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}" ${isNewLoan ? 'readonly' : ''}></div>
-                <div class="form-group"><label data-lang-key="documentNumber"></label><input type="text" id="client-document" value="${client.documentNumber || ''}" ${isNewLoan ? 'readonly' : ''}></div>
-                <div id="system-verification-results" style="margin-bottom: 20px;"></div>
-                <div class="form-group"><label data-lang-key="address"></label><input type="text" id="client-address" required value="${client.address || ''}" ${isNewLoan ? 'readonly' : ''}></div>
-                <div class="form-group"><label data-lang-key="city"></label><input type="text" id="client-city" required value="${client.city || ''}" ${isNewLoan ? 'readonly' : ''}></div>
-                <div class="form-group"><label data-lang-key="whatsapp"></label><input type="tel" id="client-whatsapp" required value="${client.whatsapp || ''}" ${isNewLoan ? 'readonly' : ''}></div>
-                
-                <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
-                    <label data-lang-key="location"></label>
-                    <input type="text" id="client-location" readonly placeholder="Clique no botão para obter" value="${client.location || ''}">
-                    <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%; margin-top: 10px;">
-                        <i data-lucide="map-pin"></i> Obter Localização GPS
-                    </button>
-                </div>
-                
-                <!-- --- [INICIO MODIFICACIÓN: USUARIO Y CONTRASEÑA] --- -->
-                <div style="${isNewLoan ? 'display: none;' : ''}">
-                    <h3 class="section-title" data-lang-key="clientAccess" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="smartphone"></i> <span data-lang-key="clientAccess"></span>
-                    </h3>
-                    <div class="form-group">
-                        <label data-lang-key="username"></label>
-                        <!-- (1) Añadido 'oninput' para bloquear espacios -->
-                        <input type="text" id="client-username" required value="${client.username || ''}" ${isEditMode && client.username ? 'readonly' : ''} autocomplete="off" autocapitalize="none"
-                               oninput="this.value=this.value.replace(/\s/g, '')">
-                        <div id="username-validation-msg" class="validation-message"></div>
-                        <!-- (2) Añadido texto de ayuda -->
-                        <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
-                            Crie um nome de usuário <strong>sem espaços</strong>, usando letras e números. Ex: <strong>andresruiz1649</strong>
-                        </p>
-                    </div>
-                    <div class="form-group">
-                        <label data-lang-key="password"></label>
-                        <!-- (3) Añadido 'oninput' para bloquear espacios y caracteres especiales -->
-                        <input type="password" id="client-password" required value="${client.password || ''}"
-                               oninput="this.value=this.value.replace(/[^A-Za-z0-9]/g, '')">
-                        <!-- (4) Añadido texto de ayuda -->
-                         <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
-                            Mínimo 6 caracteres. Use <strong>apenas letras e números</strong> (sem espaços ou @, #, $).
-                        </p>
-                    </div>
-                </div>
-                <!-- --- [FIN MODIFICACIÓN: USUARIO Y CONTRASEÑA] --- -->
-
-                <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                   <i data-lucide="dollar-sign"></i> 
-                   ${isNewLoan ? 'Detalhes do Novo Empréstimo' : (isEditMode ? 'Detalhes do Empréstimo' : 'Detalhes do Primeiro Empréstimo')}
-                </h3>
-                
-                <div class="form-group" id="migration-toggle-group" style="display: ${isEditMode || isNewLoan ? 'none' : 'block'}; background-color: var(--border-color); padding: 15px; border-radius: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <label for="migration-toggle-input" style="font-weight: 600; font-size: 1.05em; color: var(--text-primary); margin: 0;">
-                            <i data-lucide="arrow-right-circle" style="width: 18px; height: 18px; margin-right: 5px; vertical-align: -3px;"></i>
-                            Préstamo Antigo (Migração)
-                        </label>
-                        <div class="switch">
-                            <input type="checkbox" id="migration-toggle-input">
-                            <label for="migration-toggle-input"></label>
+                        <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        <div class="form-group"><label data-lang-key="documentNumber"></label><input type="text" id="client-document" value="${client.documentNumber || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        <div id="system-verification-results" style="margin-bottom: 20px;"></div>
+                        <div class="form-group"><label data-lang-key="address"></label><input type="text" id="client-address" required value="${client.address || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        <div class="form-group"><label data-lang-key="city"></label><input type="text" id="client-city" required value="${client.city || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        <div class="form-group"><label data-lang-key="whatsapp"></label><input type="tel" id="client-whatsapp" required value="${client.whatsapp || ''}" ${isNewLoan ? 'readonly' : ''}></div>
+                        
+                        <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
+                            <label data-lang-key="location"></label>
+                            <input type="text" id="client-location" readonly placeholder="Clique no botão para obter" value="${client.location || ''}">
+                            <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%; margin-top: 10px;">
+                                <i data-lucide="map-pin"></i> Obter Localização GPS
+                            </button>
                         </div>
-                    </div>
-                    <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
-                        Ative esta opção <strong>APENAS</strong> se estiver migrando um empréstimo antigo que já possui pagamentos.
-                    </p>
-                </div>
+                        
+                        <div style="${isNewLoan ? 'display: none;' : ''}">
+                            <h3 class="section-title" data-lang-key="clientAccess" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="smartphone"></i> <span data-lang-key="clientAccess"></span>
+                            </h3>
+                            <div class="form-group">
+                                <label data-lang-key="username"></label>
+                                <input type="text" id="client-username" required value="${client.username || ''}" ${isEditMode && client.username ? 'readonly' : ''} autocomplete="off" autocapitalize="none"
+                                       oninput="this.value=this.value.replace(/\s/g, '')">
+                                <div id="username-validation-msg" class="validation-message"></div>
+                                <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
+                                    Crie um nome de usuário <strong>sem espaços</strong>, usando letras e números. Ex: <strong>andresruiz1649</strong>
+                                </p>
+                            </div>
+                            
+                            <!-- ***** INICIO DE LA MODIFICACIÓN 1 (Senha Visível) ***** -->
+                            <div class="form-group">
+                                <label data-lang-key="password"></label>
+                                <!-- MODIFICADO: type="password" alterado para type="text" -->
+                                <input type="text" id="client-password" required value="${client.password || ''}"
+                                       oninput="this.value=this.value.replace(/[^A-Za-z0-9]/g, '')">
+                                <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
+                                    Mínimo 6 caracteres. Use <strong>apenas letras e números</strong> (sem espaços ou @, #, $).
+                                </p>
+                            </div>
+                            <!-- ***** FIN DE LA MODIFICACIÓN 1 ***** -->
 
-                <!-- --- [INICIO DE LA MODIFICACIÓN (PREFILL)] --- -->
-                <div class="form-group grid-2">
-                    <div>
-                        <label data-lang-key="totalLoan"></label>
-                        <input type="number" id="client-loan-amount" required 
-                               value="${(isEditMode ? (loan.principalAmount || (loan.totalLoan / (1 + client.interestRate/100))) : prefillLoanAmount)}">
-                               ${prefillData ? 'readonly' : ''}
-                    </div>
-                    <div>
-                        <label data-lang-key="interest"></label>
-                        <input type="number" id="client-interest" required 
-                               value="${client.interestRate || '20'}" ${isNewLoan || isEditMode ? 'readonly' : ''}>
-                    </div>
-                </div>
-                
-                <!-- CAMPO 1 DE MIGRACIÓN (Existente) -->
-                <div class="form-group" id="migration-paid-installments-group" style="display: none;">
-                    <label for="client-initial-paid-installments" style="font-weight: 600; color: var(--accent-purple);">Cuotas Pagadas ao Início</label>
-                    <input type="number" id="client-initial-paid-installments" value="0" min="0" style="background-color: var(--surface);">
-                </div>
-
-                <!-- --- [INICIO FASE 1 MIGRACIÓN PARCIAL] --- -->
-                <!-- CAMPO 2 DE MIGRACIÓN (Nuevo) -->
-                <div class="form-group" id="migration-partial-payment-group" style="display: none;">
-                    <label for="client-initial-partial-payment" style="font-weight: 600; color: var(--accent-orange);">Valor Parcial Adicional (${money(0).replace(/\d+,\d+/g, '')})</label>
-                    <input type="number" id="client-initial-partial-payment" value="0.00" step="0.01" min="0" style="background-color: var(--surface);">
-                </div>
-                <!-- --- [FIN FASE 1 MIGRACIÓN PARCIAL] --- -->
-                
-                <!-- --- [INICIO MODIFICACIÓN: AVISO DE MIGRACIÓN] --- -->
-                <div id="migration-info-box" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent); padding: 15px; border-radius: 12px; margin: -10px 0 20px 0; display: none; align-items: flex-start; gap: 12px;">
-                    <i data-lucide="info" style="color: var(--accent-purple); width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px;"></i>
-                    <div style="font-size: 0.85em; color: var(--text-secondary); line-height: 1.5;">
-                        <strong style="color: var(--text-primary);">Guia de Migração:</strong>
-                        <ul style="margin: 8px 0 0 18px; padding: 0;">
-                            <li><strong>Parcelas Pagas:</strong> Insira o número de parcelas <strong>completas</strong> (ex: 12).</li>
-                            <li><strong>Valor Parcial:</strong> Se o cliente pagou uma parte da parcela seguinte (ex: R$50 da parcela #13), insira o valor aqui.</li>
-                            <li>Deixe em <strong>R$ 0,00</strong> se não houver valor parcial.</li>
-                        </ul>
-                    </div>
-                </div>
-                <!-- --- [FIN MODIFICACIÓN: AVISO DE MIGRACIÓN] --- -->
-
-                <div class="form-group">
-                    <label for="client-late-fee">Tasa de Mora Diaria (%)</label>
-                    <input type="number" id="client-late-fee" step="0.1" 
-                           value="${loan.lateFeeRate !== undefined ? loan.lateFeeRate : (currentCompanyData?.defaultInterest || 0)}" 
-                           placeholder="0.0">
-                </div>
-                <div class="form-group"><label data-lang-key="totalToPay"></label><input type="text" id="client-total-to-pay" readonly></div>
-                <div class="form-group grid-2">
-                    <div>
-                        <label data-lang-key="numInstallments"></label>
-                        <input type="number" id="client-installments" required 
-                               value="${(isEditMode ? (loan.installments || '').split('/')[1] : prefillInstallments)}">
-                               ${prefillData ? 'readonly' : ''} 
-                    </div>
-                    <div><label data-lang-key="installmentValue"></label><input type="text" id="client-installment-value" readonly></div>
-                </div>
-                <!-- --- [FIN DE LA MODIFICACIÓN (PREFILL)] --- -->
-
-                <div class="form-group">
-                    <label data-lang-key="paymentFrequency"></label>
-                    <select id="payment-frequency" class="form-control">
-                        <option value="daily" data-lang-key="daily"></option>
-                        <option value="weekly" data-lang-key="weekly"></option>
-                        <option value="monthly" data-lang-key="monthly"></option>
-                    </select>
-                </div>
-                <div id="payment-days-container">
-                    <div id="daily-payment-selector">
-                        <label data-lang-key="paymentDays"></label>
-                        <div class="day-selector">
-                            ${['D','S','T','Q','Q','S','S'].map((day, i) => `<div><input type="checkbox" id="form-day-${i}" value="${i}"><label for="form-day-${i}">${day}</label></div>`).join('')}
                         </div>
-                    </div>
-                    <div id="weekly-payment-selector" style="display: none;">
-                         <div class="form-group">
-                            <label data-lang-key="dayOfWeek"></label>
-                            <select id="weekly-day-select" class="form-control">
-                                <option value="1" data-lang-key="monday"></option>
-                                <option value="2" data-lang-key="tuesday"></option>
-                                <option value="3" data-lang-key="wednesday"></option>
-                                <option value="4" data-lang-key="thursday"></option>
-                                <option value="5" data-lang-key="friday"></option>
-                                <option value="6" data-lang-key="saturday"></option>
-                                <option value="0" data-lang-key="sunday"></option>
+
+                        <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                           <i data-lucide="dollar-sign"></i> 
+                           ${isNewLoan ? 'Detalhes do Novo Empréstimo' : (isEditMode ? 'Detalhes do Empréstimo' : 'Detalhes do Primeiro Empréstimo')}
+                        </h3>
+                        
+                        <div class="form-group" id="migration-toggle-group" style="display: ${isEditMode || isNewLoan ? 'none' : 'block'}; background-color: var(--border-color); padding: 15px; border-radius: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label for="migration-toggle-input" style="font-weight: 600; font-size: 1.05em; color: var(--text-primary); margin: 0;">
+                                    <i data-lucide="arrow-right-circle" style="width: 18px; height: 18px; margin-right: 5px; vertical-align: -3px;"></i>
+                                    Préstamo Antigo (Migração)
+                                </label>
+                                <div class="switch">
+                                    <input type="checkbox" id="migration-toggle-input">
+                                    <label for="migration-toggle-input"></label>
+                                </div>
+                            </div>
+                            <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
+                                Ative esta opção <strong>APENAS</strong> se estiver migrando um empréstimo antigo que já possui pagamentos.
+                            </p>
+                        </div>
+
+                        <div class="form-group grid-2">
+                            <div>
+                                <label data-lang-key="totalLoan"></label>
+                                <input type="number" id="client-loan-amount" required 
+                                       value="${(isEditMode ? (loan.principalAmount || (loan.totalLoan / (1 + client.interestRate/100))) : prefillLoanAmount)}">
+                                       ${prefillData ? 'readonly' : ''}
+                            </div>
+                            <div>
+                                <label data-lang-key="interest"></label>
+                                <input type="number" id="client-interest" required 
+                                       value="${client.interestRate || '20'}" ${isNewLoan || isEditMode ? 'readonly' : ''}>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" id="migration-paid-installments-group" style="display: none;">
+                            <label for="client-initial-paid-installments" style="font-weight: 600; color: var(--accent-purple);">Cuotas Pagadas ao Início</label>
+                            <input type="number" id="client-initial-paid-installments" value="0" min="0" style="background-color: var(--surface);">
+                        </div>
+
+                        <div class="form-group" id="migration-partial-payment-group" style="display: none;">
+                            <label for="client-initial-partial-payment" style="font-weight: 600; color: var(--accent-orange);">Valor Parcial Adicional (${money(0).replace(/\d+,\d+/g, '')})</label>
+                            <input type="number" id="client-initial-partial-payment" value="0.00" step="0.01" min="0" style="background-color: var(--surface);">
+                        </div>
+                        
+                        <div id="migration-info-box" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent); padding: 15px; border-radius: 12px; margin: -10px 0 20px 0; display: none; align-items: flex-start; gap: 12px;">
+                            <i data-lucide="info" style="color: var(--accent-purple); width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px;"></i>
+                            <div style="font-size: 0.85em; color: var(--text-secondary); line-height: 1.5;">
+                                <strong style="color: var(--text-primary);">Guia de Migração:</strong>
+                                <ul style="margin: 8px 0 0 18px; padding: 0;">
+                                    <li><strong>Parcelas Pagas:</strong> Insira o número de parcelas <strong>completas</strong> (ex: 12).</li>
+                                    <li><strong>Valor Parcial:</strong> Se o cliente pagou uma parte da parcela seguinte (ex: R$50 da parcela #13), insira o valor aqui.</li>
+                                    <li>Deixe em <strong>R$ 0,00</strong> se não houver valor parcial.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="client-late-fee">Tasa de Mora Diaria (%)</label>
+                            <input type="number" id="client-late-fee" step="0.1" 
+                                   value="${loan.lateFeeRate !== undefined ? loan.lateFeeRate : (currentCompanyData?.defaultInterest || 0)}" 
+                                   placeholder="0.0">
+                        </div>
+                        <div class="form-group"><label data-lang-key="totalToPay"></label><input type="text" id="client-total-to-pay" readonly></div>
+                        <div class="form-group grid-2">
+                            <div>
+                                <label data-lang-key="numInstallments"></label>
+                                <input type="number" id="client-installments" required 
+                                       value="${(isEditMode ? (loan.installments || '').split('/')[1] : prefillInstallments)}">
+                                       ${prefillData ? 'readonly' : ''} 
+                            </div>
+                            <div><label data-lang-key="installmentValue"></label><input type="text" id="client-installment-value" readonly></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label data-lang-key="paymentFrequency"></label>
+                            <select id="payment-frequency" class="form-control">
+                                <option value="daily" data-lang-key="daily"></option>
+                                <option value="weekly" data-lang-key="weekly"></option>
+                                <option value="monthly" data-lang-key="monthly"></option>
                             </select>
                         </div>
-                    </div>
-                    <div id="monthly-payment-selector" style="display: none;">
-                         <div class="form-group">
-                            <label data-lang-key="dayOfMonth"></label>
-                            <input type="number" id="monthly-day-input" min="1" max="31" class="form-control">
+                        <div id="payment-days-container">
+                            <div id="daily-payment-selector">
+                                <label data-lang-key="paymentDays"></label>
+                                <div class="day-selector">
+                                    ${['D','S','T','Q','Q','S','S'].map((day, i) => `<div><input type="checkbox" id="form-day-${i}" value="${i}"><label for="form-day-${i}">${day}</label></div>`).join('')}
+                                </div>
+                            </div>
+                            <div id="weekly-payment-selector" style="display: none;">
+                                 <div class="form-group">
+                                    <label data-lang-key="dayOfWeek"></label>
+                                    <select id="weekly-day-select" class="form-control">
+                                        <option value="1" data-lang-key="monday"></option>
+                                        <option value="2" data-lang-key="tuesday"></option>
+                                        <option value="3" data-lang-key="wednesday"></option>
+                                        <option value="4" data-lang-key="thursday"></option>
+                                        <option value="5" data-lang-key="friday"></option>
+                                        <option value="6" data-lang-key="saturday"></option>
+                                        <option value="0" data-lang-key="sunday"></option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="monthly-payment-selector" style="display: none;">
+                                 <div class="form-group">
+                                    <label data-lang-key="dayOfMonth"></label>
+                                    <input type="number" id="monthly-day-input" min="1" max="31" class="form-control">
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                        <div class="form-group">
+                            <label data-lang-key="collectionTimeLabel"></label>
+                            <input type="time" id="client-collection-time" value="${loan.collectionTime || ''}">
+                        </div>
+                        
+                        <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
+                            <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="file-check"></i> <span data-lang-key="clientDocs"></span>
+                            </h3>
+                            <div id="doc-preview-container" style="margin-bottom: 15px;"></div>
+                            <div class="grid-2">
+                                <button type="button" class="btn-secondary" id="take-photo-btn"><i data-lucide="camera"></i> <span data-lang-key="takePhoto"></span></button>
+                                <button type="button" class="btn-secondary" id="upload-file-btn"><i data-lucide="upload"></i> <span data-lang-key="uploadFile"></span></button>
+                            </div>
+                            <input type="file" id="doc-file-input" multiple accept="image/*,application/pdf" style="display: none;">
+                        </div>
+                    </form>
+                  </div>
                 </div>
-                <div class="form-group">
-                    <label data-lang-key="collectionTimeLabel"></label>
-                    <input type="time" id="client-collection-time" value="${loan.collectionTime || ''}">
-                </div>
-                
-                <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
-                    <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="file-check"></i> <span data-lang-key="clientDocs"></span>
-                    </h3>
-                    <div id="doc-preview-container" style="margin-bottom: 15px;"></div>
-                    <div class="grid-2">
-                        <button type="button" class="btn-secondary" id="take-photo-btn"><i data-lucide="camera"></i> <span data-lang-key="takePhoto"></span></button>
-                        <button type="button" class="btn-secondary" id="upload-file-btn"><i data-lucide="upload"></i> <span data-lang-key="uploadFile"></span></button>
-                    </div>
-                    <input type="file" id="doc-file-input" multiple accept="image/*,application/pdf" style="display: none;">
-                </div>
-            </form>
-          </div>
-        </div>
-        <div class="action-buttons">
-            <button class="btn-primary" id="saveClientBtn"><i data-lucide="save"></i> <span data-lang-key="${saveButtonKey}"></span></button>
-        </div>`;
-    history.pushState({ modal: 'clientFormModal' }, 'Client Form', '#client-form');
-    clientFormModal.classList.add('active');
-    
-    // --- Lógica de UI (Frecuencia de pago, Cálculo de Préstamo, etc.) ---
-    const paymentFrequencySelect = document.getElementById('payment-frequency');
-    const dailySelector = document.getElementById('daily-payment-selector');
-    const weeklySelector = document.getElementById('weekly-payment-selector');
-    const monthlySelector = document.getElementById('monthly-payment-selector');
+                <div class="action-buttons">
+                    <button class="btn-primary" id="saveClientBtn"><i data-lucide="save"></i> <span data-lang-key="${saveButtonKey}"></span></button>
+                </div>`;
+            history.pushState({ modal: 'clientFormModal' }, 'Client Form', '#client-form');
+            clientFormModal.classList.add('active');
+            
+            // --- (Lógica de UI, Frecuencia, Cálculo, etc. - SIN CAMBIOS) ---
+            const paymentFrequencySelect = document.getElementById('payment-frequency');
+            const dailySelector = document.getElementById('daily-payment-selector');
+            const weeklySelector = document.getElementById('weekly-payment-selector');
+            const monthlySelector = document.getElementById('monthly-payment-selector');
 
-    const handleFrequencyChange = (frequency) => {
-        dailySelector.style.display = 'none';
-        weeklySelector.style.display = 'none';
-        monthlySelector.style.display = 'none';
-        if (frequency === 'daily') {
-            dailySelector.style.display = 'block';
-        } else if (frequency === 'weekly') {
-            weeklySelector.style.display = 'block';
-        } else if (frequency === 'monthly') {
-            monthlySelector.style.display = 'block';
-        }
-    };
-
-    paymentFrequencySelect.addEventListener('change', (e) => handleFrequencyChange(e.target.value));
-
-    const frequency = loan.paymentFrequency || client.loans?.[0]?.paymentFrequency || 'daily';
-    paymentFrequencySelect.value = frequency;
-    handleFrequencyChange(frequency);
-    
-    const paymentDays = loan.paymentDays || client.loans?.[0]?.paymentDays || [1,2,3,4,5,6];
-    if (frequency === 'daily') {
-        paymentDays.forEach(day => {
-            const checkbox = document.getElementById(`form-day-${day}`);
-            if (checkbox) checkbox.checked = true;
-        });
-    } else if (frequency === 'weekly') {
-        document.getElementById('weekly-day-select').value = paymentDays[0];
-    } else if (frequency === 'monthly') {
-        document.getElementById('monthly-day-input').value = paymentDays[0];
-    }
-
-    let isUsernameAvailable = (isEditMode || isNewLoan);
-    const usernameInput = document.getElementById('client-username');
-    const validationMsg = document.getElementById('username-validation-msg');
-
-    if (usernameInput) { 
-        usernameInput.addEventListener('blur', async () => {
-            const username = usernameInput.value.trim();
-            if (!username) { validationMsg.textContent = ''; isUsernameAvailable = false; return; }
-            if (isEditMode && username === client.username) { validationMsg.textContent = ''; isUsernameAvailable = true; return; }
-            if (username.includes('@')) {
-                validationMsg.textContent = 'Usuário não pode conter "@".';
-                validationMsg.className = 'validation-message invalid';
-                isUsernameAvailable = false; return;
-            }
-            validationMsg.textContent = 'Verificando...'; validationMsg.className = 'validation-message checking';
-            const q = query(collection(db, 'companies', currentCompanyId, 'clients'), where("username", "==", username));
-            const querySnapshot = await getDocs(q);
-            let isTaken = !querySnapshot.empty;
-            if (isTaken) {
-                validationMsg.textContent = translations[currentLang].usernameTaken;
-                validationMsg.classList.add('invalid'); isUsernameAvailable = false;
-            } else {
-                validationMsg.textContent = translations[currentLang].usernameAvailable;
-                validationMsg.classList.add('valid'); isUsernameAvailable = true;
-            }
-        });
-    }
-    
-    const docPreviewContainer = document.getElementById('doc-preview-container');
-    
-    function renderDocPreviews() {
-        if (!docPreviewContainer) return;
-        docPreviewContainer.innerHTML = '';
-        const allDocs = [...existingDocs, ...filesToUpload];
-        allDocs.forEach((doc, index) => {
-            const isExisting = index < existingDocs.length;
-            const item = document.createElement('div');
-            item.className = 'preview-item';
-            item.innerHTML = `
-                <span>${isExisting ? doc.name : doc.name}</span>
-                <button type="button" class="remove-doc-btn" data-index="${index}" style="background:none; border:none; color:var(--danger-color); cursor:pointer;"><i data-lucide="x-circle"></i></button>
-            `;
-            item.querySelector('.remove-doc-btn').addEventListener('click', (e) => {
-                const i = parseInt(e.currentTarget.dataset.index, 10);
-                if (i < existingDocs.length) {
-                    existingDocs.splice(i - 0, 1); // Corrige el índice si es 'existing'
-                } else {
-                    filesToUpload.splice(i - existingDocs.length, 1);
+            const handleFrequencyChange = (frequency) => {
+                dailySelector.style.display = 'none';
+                weeklySelector.style.display = 'none';
+                monthlySelector.style.display = 'none';
+                if (frequency === 'daily') {
+                    dailySelector.style.display = 'block';
+                } else if (frequency === 'weekly') {
+                    weeklySelector.style.display = 'block';
+                } else if (frequency === 'monthly') {
+                    monthlySelector.style.display = 'block';
                 }
+            };
+
+            paymentFrequencySelect.addEventListener('change', (e) => handleFrequencyChange(e.target.value));
+
+            const frequency = loan.paymentFrequency || client.loans?.[0]?.paymentFrequency || 'daily';
+            paymentFrequencySelect.value = frequency;
+            handleFrequencyChange(frequency);
+            
+            const paymentDays = loan.paymentDays || client.loans?.[0]?.paymentDays || [1,2,3,4,5,6];
+            if (frequency === 'daily') {
+                paymentDays.forEach(day => {
+                    const checkbox = document.getElementById(`form-day-${day}`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            } else if (frequency === 'weekly') {
+                document.getElementById('weekly-day-select').value = paymentDays[0];
+            } else if (frequency === 'monthly') {
+                document.getElementById('monthly-day-input').value = paymentDays[0];
+            }
+
+            let isUsernameAvailable = (isEditMode || isNewLoan);
+            const usernameInput = document.getElementById('client-username');
+            const validationMsg = document.getElementById('username-validation-msg');
+
+            if (usernameInput) { 
+                usernameInput.addEventListener('blur', async () => {
+                    const username = usernameInput.value.trim();
+                    if (!username) { validationMsg.textContent = ''; isUsernameAvailable = false; return; }
+                    if (isEditMode && username === client.username) { validationMsg.textContent = ''; isUsernameAvailable = true; return; }
+                    if (username.includes('@')) {
+                        validationMsg.textContent = 'Usuário não pode conter "@".';
+                        validationMsg.className = 'validation-message invalid';
+                        isUsernameAvailable = false; return;
+                    }
+                    validationMsg.textContent = 'Verificando...'; validationMsg.className = 'validation-message checking';
+                    const q = query(collection(db, 'companies', currentCompanyId, 'clients'), where("username", "==", username));
+                    const querySnapshot = await getDocs(q);
+                    let isTaken = !querySnapshot.empty;
+                    if (isTaken) {
+                        validationMsg.textContent = translations[currentLang].usernameTaken;
+                        validationMsg.classList.add('invalid'); isUsernameAvailable = false;
+                    } else {
+                        validationMsg.textContent = translations[currentLang].usernameAvailable;
+                        validationMsg.classList.add('valid'); isUsernameAvailable = true;
+                    }
+                });
+            }
+            
+            const docPreviewContainer = document.getElementById('doc-preview-container');
+            
+            function renderDocPreviews() {
+                if (!docPreviewContainer) return;
+                docPreviewContainer.innerHTML = '';
+                const allDocs = [...existingDocs, ...filesToUpload];
+                allDocs.forEach((doc, index) => {
+                    const isExisting = index < existingDocs.length;
+                    const item = document.createElement('div');
+                    item.className = 'preview-item';
+                    item.innerHTML = `
+                        <span>${isExisting ? doc.name : doc.name}</span>
+                        <button type="button" class="remove-doc-btn" data-index="${index}" style="background:none; border:none; color:var(--danger-color); cursor:pointer;"><i data-lucide="x-circle"></i></button>
+                    `;
+                    item.querySelector('.remove-doc-btn').addEventListener('click', (e) => {
+                        const i = parseInt(e.currentTarget.dataset.index, 10);
+                        if (i < existingDocs.length) {
+                            existingDocs.splice(i - 0, 1);
+                        } else {
+                            filesToUpload.splice(i - existingDocs.length, 1);
+                        }
+                        renderDocPreviews();
+                    });
+                    docPreviewContainer.appendChild(item);
+                });
+                lucide.createIcons({ nodes: docPreviewContainer.querySelectorAll('[data-lucide]') });
+            }
+            if (docPreviewContainer) renderDocPreviews();
+
+            function handleFiles(selectedFiles) {
+                filesToUpload = [...filesToUpload, ...Array.from(selectedFiles)];
                 renderDocPreviews();
-            });
-            docPreviewContainer.appendChild(item);
-        });
-        lucide.createIcons({ nodes: docPreviewContainer.querySelectorAll('[data-lucide]') });
-    }
-    if (docPreviewContainer) renderDocPreviews();
-
-    function handleFiles(selectedFiles) {
-        filesToUpload = [...filesToUpload, ...Array.from(selectedFiles)];
-        renderDocPreviews();
-    }
-    const takePhotoBtn = document.getElementById('take-photo-btn');
-    const uploadFileBtn = document.getElementById('upload-file-btn');
-    const docFileInput = document.getElementById('doc-file-input');
-    
-    // --- [INICIO DE LA CORRECCIÓN] ---
-    // Esta es la lógica que faltaba o estaba rota en tu archivo
-    if (takePhotoBtn) {
-        takePhotoBtn.addEventListener('click', () => {
-            docFileInput.accept = "image/*";
-            docFileInput.capture = "environment"; // Pide la cámara trasera
-            docFileInput.click();
-        });
-    }
-    if (uploadFileBtn) {
-        uploadFileBtn.addEventListener('click', () => {
-            docFileInput.accept = "image/*,application/pdf";
-            docFileInput.removeAttribute('capture'); // Permite seleccionar de la galería
-            docFileInput.click();
-        });
-    }
-    if (docFileInput) {
-        docFileInput.addEventListener('change', (e) => {
-            if (e.target.files) {
-                handleFiles(e.target.files);
             }
-        });
-    }
-
-    const loanAmountInput = document.getElementById('client-loan-amount');
-    const interestInput = document.getElementById('client-interest');
-    const installmentsInput = document.getElementById('client-installments');
-    const totalToPayInput = document.getElementById('client-total-to-pay');
-    const installmentValueInput = document.getElementById('client-installment-value');
-    function calculateLoanValues() {
-        const loanAmount = parseFloat(loanAmountInput.value) || 0;
-        const interest = parseFloat(interestInput.value) || 0;
-        const installments = parseInt(installmentsInput.value) || 0;
-        const totalToPay = loanAmount * (1 + (interest / 100));
-        const installmentValue = installments > 0 ? totalToPay / installments : 0;
-        totalToPayInput.value = money(totalToPay);
-        installmentValueInput.value = money(installmentValue);
-    }
-    [loanAmountInput, interestInput, installmentsInput].forEach(input => input.addEventListener('input', calculateLoanValues));
-    calculateLoanValues();
-
-    // --- [INICIO MODIFICACIÓN: AVISO DE MIGRACIÓN] ---
-    // (Lógica de JS actualizada)
-    const migrationToggle = document.getElementById('migration-toggle-input');
-    const migrationInstallmentsGroup = document.getElementById('migration-paid-installments-group');
-    const migrationInstallmentsInput = document.getElementById('client-initial-paid-installments');
-    const migrationPartialGroup = document.getElementById('migration-partial-payment-group'); 
-    const migrationPartialInput = document.getElementById('client-initial-partial-payment'); 
-    const migrationInfoBox = document.getElementById('migration-info-box'); // <-- AÑADIDO
-    
-    if (migrationToggle && migrationInstallmentsGroup && migrationInstallmentsInput && migrationPartialGroup && migrationPartialInput && migrationInfoBox) { // <-- AÑADIDO
-        
-        migrationToggle.addEventListener('change', (e) => {
-            const isChecked = e.target.checked;
-            // Muestra u oculta TODOS los campos
-            migrationInstallmentsGroup.style.display = isChecked ? 'block' : 'none';
-            migrationPartialGroup.style.display = isChecked ? 'block' : 'none'; 
-            migrationInfoBox.style.display = isChecked ? 'flex' : 'none'; // <-- AÑADIDO (usamos flex)
+            const takePhotoBtn = document.getElementById('take-photo-btn');
+            const uploadFileBtn = document.getElementById('upload-file-btn');
+            const docFileInput = document.getElementById('doc-file-input');
             
-            if (!isChecked) {
-                migrationInstallmentsInput.value = '0'; // Resetea
-                migrationPartialInput.value = '0.00'; 
-            }
-        });
-    }
-    // --- [FIN MODIFICACIÓN: AVISO DE MIGRACIÓN] ---
-    
-    
-    const gpsBtn = document.getElementById('get-location-btn');
-    if(gpsBtn) { gpsBtn.addEventListener('click', () => showMapPinModal()); }
-    
-    document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
-    
-    // --- [INICIO DE LA MODIFICACIÓN (SAVE)] ---
-    const saveButton = document.getElementById('saveClientBtn');
-    // Guardamos si esto vino de un refinanciamiento
-    saveButton.dataset.isRefinance = prefillData ? 'true' : 'false';
-    const clientIdToSave = isEditMode || isNewLoan ? client.id : null; // ID del cliente si ya existe
-
-    saveButton.addEventListener('click', async (e) => {
-        const originalButtonHTML = saveButton.innerHTML;
-        
-        const clientNameInput = document.getElementById('client-name');
-        const loanAmountInputVal = document.getElementById('client-loan-amount');
-        const whatsappInputVal = document.getElementById('client-whatsapp');
-        const loanAmount = parseFloat(loanAmountInputVal.value);
-        
-        const usernameInputVal = document.getElementById('client-username');
-        const passwordInputVal = document.getElementById('client-password');
-        const username = usernameInputVal ? usernameInputVal.value.trim() : client.username;
-        const password = passwordInputVal ? passwordInputVal.value : client.password;
-        const email = `${username}@gmail.com`;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        if (!clientNameInput.value || !loanAmountInputVal.value || !whatsappInputVal.value || (usernameInputVal && !username) || (passwordInputVal && !password)) {
-            showToast('Nome, WhatsApp, Valor do Empréstimo, Usuário e Senha são obrigatórios.', true); return;
-        }
-        if (!isNewLoan && !isUsernameAvailable) {
-             showToast(translations[currentLang].usernameTaken, true); return;
-        }
-        
-        // --- [INICIO MODIFICACIÓN: VALIDACIÓN CONTRASEÑA (SAVE)] ---
-        // (5) Añadida validación de 6 caracteres en el guardado
-        const passwordRegex = /^[A-Za-z0-9]{6,}$/; // Alfanumérico, 6+ caracteres
-        if (!isNewLoan && !passwordRegex.test(password)) {
-             showToast('A senha deve ter no mínimo 6 caracteres, usando apenas letras e números (sem espaços ou caracteres especiais).', true); 
-             return;
-        }
-        // --- [FIN MODIFICACIÓN: VALIDACIÓN CONTRASEÑA (SAVE)] ---
-        
-        if (!isNewLoan && !emailRegex.test(email)) {
-            showToast('O nome de usuário não pode conter @ ou caracteres inválidos.', true); return;
-        }
-        // --- [INICIO DE LA CORRECCIÓN DE MIGRACIÓN (PASO 2)] ---
-        // Obtenemos el estado del toggle ANTES de la validación
-        const migrationToggle = document.getElementById('migration-toggle-input');
-        const isMigration = migrationToggle && migrationToggle.checked;
-
-        // Si NO es edición, NO es préstamo nuevo, NO es migración, y el capital es insuficiente -> Bloquea
-        if ((!isEditMode || isNewLoan) && !isMigration && loanAmount > currentCapitalOnHand) { // <-- AÑADIDO: !isMigration
-            // Esta validación AHORA se saltará si la migración está activa
-            showToast(`Capital insuficiente (${money(currentCapitalOnHand)}). Não é possível criar um empréstimo de ${money(loanAmount)}.`, true); return;
-        }
-        // --- [FIN DE LA CORRECCIÓN DE MIGRACIÓN (PASO 2)] ---
-
-        saveButton.disabled = true;
-        saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> <span>Salvando...</span>`;
-        lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
-
-        try {
-            let newUploadedDocuments = [];
-            if (!isNewLoan && filesToUpload.length > 0) {
-                const uploadPromises = filesToUpload.map(async (file) => {
-                    const targetClientId = isEditMode ? clientId : username;
-                    const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-                    const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
-                    await uploadBytes(storageRef, file);
-                    const downloadURL = await getDownloadURL(storageRef);
-                    return { name: file.name, url: downloadURL };
+            if (takePhotoBtn) {
+                takePhotoBtn.addEventListener('click', () => {
+                    docFileInput.accept = "image/*";
+                    docFileInput.capture = "environment";
+                    docFileInput.click();
                 });
-                newUploadedDocuments = await Promise.all(uploadPromises);
             }
-            const finalDocuments = isNewLoan ? client.documents : [...existingDocs, ...newUploadedDocuments];
+            if (uploadFileBtn) {
+                uploadFileBtn.addEventListener('click', () => {
+                    docFileInput.accept = "image/*,application/pdf";
+                    docFileInput.removeAttribute('capture');
+                    docFileInput.click();
+                });
+            }
+            if (docFileInput) {
+                docFileInput.addEventListener('change', (e) => {
+                    if (e.target.files) {
+                        handleFiles(e.target.files);
+                    }
+                });
+            }
 
-            const interest = parseFloat(document.getElementById('client-interest').value);
-            const installments = parseInt(document.getElementById('client-installments').value);
-            const totalToPay = loanAmount * (1 + (interest / 100));
-            const installmentValue = installments > 0 ? totalToPay / installments : 0;
-            const principalAmount = loanAmount;
-            const paymentFrequency = document.getElementById('payment-frequency').value;
-            let paymentDaysValue = [];
-            if (paymentFrequency === 'daily') paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
-            else if (paymentFrequency === 'weekly') paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
-            else if (paymentFrequency === 'monthly') paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
+            const loanAmountInput = document.getElementById('client-loan-amount');
+            const interestInput = document.getElementById('client-interest');
+            const installmentsInput = document.getElementById('client-installments');
+            const totalToPayInput = document.getElementById('client-total-to-pay');
+            const installmentValueInput = document.getElementById('client-installment-value');
+            function calculateLoanValues() {
+                const loanAmount = parseFloat(loanAmountInput.value) || 0;
+                const interest = parseFloat(interestInput.value) || 0;
+                const installments = parseInt(installmentsInput.value) || 0;
+                const totalToPay = loanAmount * (1 + (interest / 100));
+                const installmentValue = installments > 0 ? totalToPay / installments : 0;
+                totalToPayInput.value = money(totalToPay);
+                installmentValueInput.value = money(installmentValue);
+            }
+            [loanAmountInput, interestInput, installmentsInput].forEach(input => input.addEventListener('input', calculateLoanValues));
+            calculateLoanValues();
 
-            const clientGeneralData = {
-                name: document.getElementById('client-name').value,
-                documentNumber: document.getElementById('client-document').value,
-                address: document.getElementById('client-address').value,
-                city: document.getElementById('client-city').value,
-                whatsapp: document.getElementById('client-whatsapp').value,
-                location: document.getElementById('client-location').value,
-                username: username,
-                email: email, 
-                password: password,
-                documents: finalDocuments,
-                collectorId: currentCollectorUsername,
-                interestRate: interest
-            };
-
-            const loanSpecificData = {
-                principalAmount: principalAmount,
-                lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
-                totalLoan: totalToPay,
-                amount: installmentValue,
-                originalInstallmentAmount: installmentValue,
-                installments: `0/${installments}`,
-                paid: 0,
-                paymentBalance: 0,
-                status: 'active',
-                startDate: new Date(),
-                history: [],
-                paymentFrequency: paymentFrequency,
-                paymentDays: paymentDaysValue,
-                collectionTime: document.getElementById('client-collection-time').value,
-            };
-
-
+            const migrationToggle = document.getElementById('migration-toggle-input');
+            const migrationInstallmentsGroup = document.getElementById('migration-paid-installments-group');
+            const migrationInstallmentsInput = document.getElementById('client-initial-paid-installments');
+            const migrationPartialGroup = document.getElementById('migration-partial-payment-group'); 
+            const migrationPartialInput = document.getElementById('client-initial-partial-payment'); 
+            const migrationInfoBox = document.getElementById('migration-info-box');
             
+            if (migrationToggle && migrationInstallmentsGroup && migrationInstallmentsInput && migrationPartialGroup && migrationPartialInput && migrationInfoBox) {
+                migrationToggle.addEventListener('change', (e) => {
+                    const isChecked = e.target.checked;
+                    migrationInstallmentsGroup.style.display = isChecked ? 'block' : 'none';
+                    migrationPartialGroup.style.display = isChecked ? 'block' : 'none'; 
+                    migrationInfoBox.style.display = isChecked ? 'flex' : 'none';
+                    if (!isChecked) {
+                        migrationInstallmentsInput.value = '0';
+                        migrationPartialInput.value = '0.00'; 
+                    }
+                });
+            }
             
-            // --- [INICIO FASE 2 MIGRACIÓN PARCIAL] ---
-            // ESTE ES EL ÚNICO BLOQUE QUE HA CAMBIADO
-            if (migrationToggle && migrationToggle.checked) {
-                // 1. Leer ambos campos
-                const initialPaidInstallments = parseInt(document.getElementById('client-initial-paid-installments').value, 10) || 0;
-                const initialPartialAmount = parseFloat(document.getElementById('client-initial-partial-payment').value) || 0.0;
+            const gpsBtn = document.getElementById('get-location-btn');
+            if(gpsBtn) { gpsBtn.addEventListener('click', () => showMapPinModal()); }
+            
+            document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
+            
+            // --- (Listener de Guardar - CON MODIFICACIONES) ---
+            const saveButton = document.getElementById('saveClientBtn');
+            saveButton.dataset.isRefinance = prefillData ? 'true' : 'false';
+            
+            // ¡ESTE ES EL ID DEL CLIENTE QUE ESTAMOS EDITANDO!
+            // Si estamos creando uno nuevo, esto será 'null' al principio.
+            const clientIdToSave = isEditMode || isNewLoan ? client.id : null; 
+
+            saveButton.addEventListener('click', async (e) => {
+                const originalButtonHTML = saveButton.innerHTML;
                 
-                // 2. Validar que al menos uno tenga valor y las cuotas no excedan el total
-                if ((initialPaidInstallments > 0 || initialPartialAmount > 0) && (initialPaidInstallments <= installments)) {
-                    
-                    // 3. Calcular montos
-                    const fullInstallmentsAmount = installmentValue * initialPaidInstallments;
-                    const totalMigratedAmount = fullInstallmentsAmount + initialPartialAmount;
-                    
-                    // 4. Ajustar el objeto del préstamo con el MONTO TOTAL
-                    loanSpecificData.paid = totalMigratedAmount;
-                    // Las cuotas "pagadas" (barra de progreso) solo cuentan las completas
-                    loanSpecificData.installments = `${initialPaidInstallments}/${installments}`; 
-                    
-                    // initialMigratedAmount DEBE ser el total para que 'displayTotalPaid' funcione
-                    loanSpecificData.initialMigratedAmount = totalMigratedAmount; 
-                    
-                    // migrationDate (para contabilidad)
-                    loanSpecificData.migrationDate = new Date(); 
-
-                    if (!loanSpecificData.history) loanSpecificData.history = [];
-                    const migrationTimestamp = new Date(); // Usar la misma fecha para ambos tickets
-
-                    // 5. Ticket 1: Cuotas Completas (si > 0)
-                    if (fullInstallmentsAmount > 0) {
-                        loanSpecificData.history.push({
-                            amount: fullInstallmentsAmount,
-                            date: migrationTimestamp,
-                            status: 'approved',
-                            method: 'migration', // Método especial para contabilidad
-                            migrationType: 'full_installments' // Identificador para Fase 3
-                        });
-                    }
-
-                    // 6. Ticket 2: Valor Parcial (si > 0)
-                    if (initialPartialAmount > 0) {
-                        loanSpecificData.history.push({
-                            amount: initialPartialAmount,
-                            date: migrationTimestamp, // Misma fecha
-                            status: 'approved',
-                            method: 'migration', // Método especial para contabilidad
-                            migrationType: 'partial_payment' // Identificador para Fase 3
-                        });
-                    }
-                }
-            }
-            // --- [FIN FASE 2 MIGRACIÓN PARCIAL] ---
-            
-
-            // === [INICIO DE LA CORRECCIÓN: LÓGICA DE REEMPLAZO/AÑADIR] ===
-            if (isNewLoan) {
-                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
+                const clientNameInput = document.getElementById('client-name');
+                const loanAmountInputVal = document.getElementById('client-loan-amount');
+                const whatsappInputVal = document.getElementById('client-whatsapp');
+                const loanAmount = parseFloat(loanAmountInputVal.value);
                 
-                // 1. Obtener los préstamos existentes del cliente
-                const currentClientData = allClients.find(c => c.id === clientIdToSave);
-                const existingLoans = currentClientData ? (currentClientData.loans || []) : [];
+                const usernameInputVal = document.getElementById('client-username');
+                const passwordInputVal = document.getElementById('client-password');
+                
+                // ¡AQUÍ LEEMOS LOS VALORES!
+                const username = usernameInputVal ? usernameInputVal.value.trim() : client.username;
+                const password = passwordInputVal ? passwordInputVal.value : client.password;
+                
+                const email = `${username}@gmail.com`;
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-                // 2. Verificar si hay préstamos ACTIVOS (recalculando su estado)
-                const activeLoans = existingLoans.filter(l => calculateLoanDetails(l).status !== 'finished');
-
-                // 3. Decidir la acción
-                if (activeLoans.length === 0) {
-                    // No hay préstamos activos (todos están 'finished' o la lista está vacía)
-                    // REEMPLAZAR la lista de préstamos con solo el nuevo
-                    console.log("Detectado: Sin préstamos activos. REEMPLAZANDO array de préstamos.");
-                    await updateDoc(clientRef, {
-                        loans: [loanSpecificData] // Reemplaza el array
-                    });
-                } else {
-                    // Hay un préstamo activo. Activar multi-préstamo.
-                    // AÑADIR el nuevo préstamo a la lista
-                    console.log("Detectado: Préstamo activo existente. AÑADIENDO nuevo préstamo (multi-préstamo).");
-                    await updateDoc(clientRef, {
-                        loans: arrayUnion(loanSpecificData) // Añade al array
-                    });
+                // (Validaciones - sin cambios)
+                if (!clientNameInput.value || !loanAmountInputVal.value || !whatsappInputVal.value || (usernameInputVal && !username) || (passwordInputVal && !password)) {
+                    showToast('Nome, WhatsApp, Valor do Empréstimo, Usuário e Senha são obrigatórios.', true); return;
                 }
-            // === [FIN DE LA CORRECCIÓN] ===
-
-            } else if (isEditMode) {
-                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
-                const updatedLoans = [...client.loans];
-                updatedLoans[loanIndex] = {
-                     ...updatedLoans[loanIndex], 
-                     lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
-                     totalLoan: totalToPay,
-                     amount: installmentValue,
-                     originalInstallmentAmount: installmentValue,
-                     installments: `${(loan.installments || '0/0').split('/')[0]}/${installments}`,
-                     paymentFrequency: paymentFrequency,
-                     paymentDays: paymentDaysValue,
-                     collectionTime: document.getElementById('client-collection-time').value,
-                 };
-                await updateDoc(clientRef, {
-                     loans: updatedLoans,
-                     ...clientGeneralData 
-                });
-            
-            } else { 
-                console.log("[COBRADOR-APP] Creando cliente nuevo...");
-                let newClientAuthUid = null;
-                try {
-                    console.log("[COBRADOR-APP] Llamando Cloud Function 'createClientAuthAndLink'...");
-                    if (!auth.currentUser) throw new Error("Cobrador não autenticado.");
-                    const idToken = await auth.currentUser.getIdToken(true);
-                    const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/createClientAuthAndLink";
-                    const response = await fetch(functionUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                        body: JSON.stringify({ data: { clientEmail: email, clientPassword: password } }) 
-                    });
-                    const result = await response.json();
-                    if (!response.ok || !result.result?.success || !result.result?.clientUid) {
-                        throw new Error(result.error?.message || `Falha ao criar conta (HTTP ${response.status})`);
-                    }
-                    newClientAuthUid = result.result.clientUid;
-                    console.log("[COBRADOR-APP] Cloud Function OK. Novo Auth UID:", newClientAuthUid);
-                } catch (authCreationError) {
-                     console.error("[COBRADOR-APP] ERRO ao chamar 'createClientAuthAndLink':", authCreationError);
-                     throw authCreationError;
+                if (!isNewLoan && !isUsernameAvailable) {
+                     showToast(translations[currentLang].usernameTaken, true); return;
                 }
-                const newClientData = {
-                    ...clientGeneralData,
-                    authUid: newClientAuthUid,
-                    loans: [loanSpecificData],
-                    fcmTokens: [],
-                    notifications: []
-                };
-                console.log("[COBRADOR-APP] Salvando dados no Firestore...");
-                await addDoc(collection(db, 'companies', currentCompanyId, "clients"), newClientData);
-            }
-            
-            // --- [INICIO DE LA MODIFICACIÓN (LIMPIAR REFINANCE)] ---
-            // Si esto vino de un refinanciamiento, limpia la solicitud
-            if (saveButton.dataset.isRefinance === 'true') {
-                console.log("Limpando 'refinanceRequest' del cliente...");
-                const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
-                await updateDoc(clientRef, {
-                    refinanceRequest: null // Limpia la solicitud
-                });
-            }
-            // --- [FIN DE LA MODIFICACIÓN (LIMPIAR REFINANCE)] ---
+                const passwordRegex = /^[A-Za-z0-9]{6,}$/;
+                if (!isNewLoan && !passwordRegex.test(password)) {
+                     showToast('A senha deve ter no mínimo 6 caracteres, usando apenas letras e números (sem espaços ou caracteres especiais).', true); 
+                     return;
+                }
+                if (!isNewLoan && !emailRegex.test(email)) {
+                    showToast('O nome de usuário não pode conter @ ou caracteres inválidos.', true); return;
+                }
+                const migrationToggle = document.getElementById('migration-toggle-input');
+                const isMigration = migrationToggle && migrationToggle.checked;
+                if ((!isEditMode || isNewLoan) && !isMigration && loanAmount > currentCapitalOnHand) {
+                    showToast(`Capital insuficiente (${money(currentCapitalOnHand)}). Não é possível criar um empréstimo de ${money(loanAmount)}.`, true); return;
+                }
 
-            window.history.back();
-            const successToastMessage = isEditMode ? translations[currentLang].clientUpdatedSuccess : translations[currentLang].clientRegisteredSuccess;
-            showToast(successToastMessage);
-
-            if (!isEditMode) { 
-                setTimeout(() => {
-                   showShareCredentialsModal(clientGeneralData, isEditMode);
-                }, 400);
-            }
-        } catch (error) {
-            console.error("Error al guardar cliente:", error);
-            showToast(error.message || 'Ocurrió un error al guardar los datos.', true);
-        } finally {
-            if (clientFormModal.classList.contains('active')) {
-                saveButton.disabled = false;
-                saveButton.innerHTML = originalButtonHTML;
+                saveButton.disabled = true;
+                saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> <span>Salvando...</span>`;
                 lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+
+                try {
+                    let newUploadedDocuments = [];
+                    // (Lógica de subida de documentos - sin cambios)
+                    if (!isNewLoan && filesToUpload.length > 0) {
+                        const uploadPromises = filesToUpload.map(async (file) => {
+                            // Si estamos creando (isEditMode=false), el ID es el username
+                            const targetClientId = isEditMode ? clientId : username; 
+                            const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+                            // [CORRECCIÓN] Usa la ruta correcta de Firebase Storage
+                            const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
+                            await uploadBytes(storageRef, file);
+                            const downloadURL = await getDownloadURL(storageRef);
+                            return { name: file.name, url: downloadURL };
+                        });
+                        newUploadedDocuments = await Promise.all(uploadPromises);
+                    }
+                    const finalDocuments = isNewLoan ? client.documents : [...existingDocs, ...newUploadedDocuments];
+
+                    // (Lógica de datos del préstamo - sin cambios)
+                    const interest = parseFloat(document.getElementById('client-interest').value);
+                    const installments = parseInt(document.getElementById('client-installments').value);
+                    const totalToPay = loanAmount * (1 + (interest / 100));
+                    const installmentValue = installments > 0 ? totalToPay / installments : 0;
+                    const principalAmount = loanAmount;
+                    const paymentFrequency = document.getElementById('payment-frequency').value;
+                    let paymentDaysValue = [];
+                    if (paymentFrequency === 'daily') paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
+                    else if (paymentFrequency === 'weekly') paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
+                    else if (paymentFrequency === 'monthly') paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
+
+                    // (Datos del cliente - sin cambios)
+                    const clientGeneralData = {
+                        name: document.getElementById('client-name').value,
+                        documentNumber: document.getElementById('client-document').value,
+                        address: document.getElementById('client-address').value,
+                        city: document.getElementById('client-city').value,
+                        whatsapp: document.getElementById('client-whatsapp').value,
+                        location: document.getElementById('client-location').value,
+                        username: username,
+                        email: email, 
+                        password: password, // <-- Se sigue guardando en Firestore por tu petición
+                        documents: finalDocuments,
+                        collectorId: currentCollectorUsername,
+                        interestRate: interest
+                    };
+
+                    // (Datos del préstamo - sin cambios)
+                    const loanSpecificData = {
+                        principalAmount: principalAmount,
+                        lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
+                        totalLoan: totalToPay,
+                        amount: installmentValue,
+                        originalInstallmentAmount: installmentValue,
+                        installments: `0/${installments}`,
+                        paid: 0,
+                        paymentBalance: 0,
+                        status: 'active',
+                        startDate: new Date(),
+                        history: [],
+                        paymentFrequency: paymentFrequency,
+                        paymentDays: paymentDaysValue,
+                        collectionTime: document.getElementById('client-collection-time').value,
+                    };
+                    
+                    // (Lógica de Migración - sin cambios)
+                    if (migrationToggle && migrationToggle.checked) {
+                        const initialPaidInstallments = parseInt(document.getElementById('client-initial-paid-installments').value, 10) || 0;
+                        const initialPartialAmount = parseFloat(document.getElementById('client-initial-partial-payment').value) || 0.0;
+                        if ((initialPaidInstallments > 0 || initialPartialAmount > 0) && (initialPaidInstallments <= installments)) {
+                            const fullInstallmentsAmount = installmentValue * initialPaidInstallments;
+                            const totalMigratedAmount = fullInstallmentsAmount + initialPartialAmount;
+                            loanSpecificData.paid = totalMigratedAmount;
+                            loanSpecificData.installments = `${initialPaidInstallments}/${installments}`; 
+                            loanSpecificData.initialMigratedAmount = totalMigratedAmount; 
+                            loanSpecificData.migrationDate = new Date(); 
+                            if (!loanSpecificData.history) loanSpecificData.history = [];
+                            const migrationTimestamp = new Date();
+                            if (fullInstallmentsAmount > 0) {
+                                loanSpecificData.history.push({
+                                    amount: fullInstallmentsAmount, date: migrationTimestamp,
+                                    status: 'approved', method: 'migration', migrationType: 'full_installments'
+                                });
+                            }
+                            if (initialPartialAmount > 0) {
+                                loanSpecificData.history.push({
+                                    amount: initialPartialAmount, date: migrationTimestamp,
+                                    status: 'approved', method: 'migration', migrationType: 'partial_payment'
+                                });
+                            }
+                        }
+                    }
+                    
+                    // (Lógica de 'isNewLoan' - sin cambios)
+                    if (isNewLoan) {
+                        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
+                        const currentClientData = allClients.find(c => c.id === clientIdToSave);
+                        const existingLoans = currentClientData ? (currentClientData.loans || []) : [];
+                        const activeLoans = existingLoans.filter(l => calculateLoanDetails(l).status !== 'finished');
+                        if (activeLoans.length === 0) {
+                            console.log("Detectado: Sin préstamos activos. REEMPLAZANDO array de préstamos.");
+                            await updateDoc(clientRef, {
+                                loans: [loanSpecificData]
+                            });
+                        } else {
+                            console.log("Detectado: Préstamo activo existente. AÑADIENDO nuevo préstamo (multi-préstamo).");
+                            await updateDoc(clientRef, {
+                                loans: arrayUnion(loanSpecificData)
+                            });
+                        }
+                    
+                    // --- MODO EDICIÓN (AQUÍ ESTÁ LA MODIFICACIÓN) ---
+                    } else if (isEditMode) {
+                        
+                        // ***** INICIO DE LA MODIFICACIÓN 2 (Alterar Senha) *****
+                        // Verificamos si la contraseña en el formulario es DIFERENTE
+                        // de la contraseña guardada en 'client.password'
+                        if (password && password !== client.password) {
+                            console.log(`[COBRADOR] Solicitando alteração de senha para o cliente: ${clientIdToSave}...`);
+                            showToast("Atualizando senha...", false);
+                            
+                            if (!auth.currentUser) throw new Error("Cobrador não está autenticado.");
+                            const idToken = await auth.currentUser.getIdToken(true);
+
+                            // ¡Llamamos a la nueva Cloud Function!
+                            const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/updateClientAuth";
+                            const response = await fetch(functionUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${idToken}`
+                                },
+                                body: JSON.stringify({ 
+                                    data: {
+                                        clientUsername: clientIdToSave, // El ID del cliente
+                                        newPassword: password
+                                    }
+                                })
+                            });
+
+                            if (!response.ok) {
+                                const errorData = await response.json().catch(() => ({}));
+                                if (response.status === 404) {
+                                    throw new Error("Função 'updateClientAuth' não encontrada. (HTTP 404)");
+                                }
+                                throw new Error(errorData.error?.message || `Error HTTP ${response.status} ao alterar senha.`);
+                            }
+                            
+                            console.log("[COBRADOR] Senha do cliente alterada com sucesso via Cloud Function.");
+                            showToast("Senha do cliente alterada com sucesso!");
+                        }
+                        // ***** FIN DE LA MODIFICACIÓN 2 (Alterar Senha) *****
+
+                        // (Lógica de actualización de Firestore - sin cambios)
+                        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
+                        const updatedLoans = [...client.loans];
+                        updatedLoans[loanIndex] = {
+                             ...updatedLoans[loanIndex], 
+                             lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
+                             totalLoan: totalToPay,
+                             amount: installmentValue,
+                             originalInstallmentAmount: installmentValue,
+                             installments: `${(loan.installments || '0/0').split('/')[0]}/${installments}`,
+                             paymentFrequency: paymentFrequency,
+                             paymentDays: paymentDaysValue,
+                             collectionTime: document.getElementById('client-collection-time').value,
+                         };
+                        await updateDoc(clientRef, {
+                             loans: updatedLoans,
+                             ...clientGeneralData // Esto guarda la contraseña en Firestore (como querías)
+                        });
+                    
+                    // --- MODO CREACIÓN (AQUÍ ESTÁ LA MODIFICACIÓN) ---
+                    } else { 
+                        console.log("[COBRADOR-APP] Creando cliente nuevo...");
+                        let newClientAuthUid = null;
+                        try {
+                            // (Llamada a Cloud Function - sin cambios)
+                            if (!auth.currentUser) throw new Error("Cobrador não autenticado.");
+                            const idToken = await auth.currentUser.getIdToken(true);
+                            const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/createClientAuthAndLink";
+                            const response = await fetch(functionUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                                body: JSON.stringify({ data: { clientEmail: email, clientPassword: password } }) 
+                            });
+                            const result = await response.json();
+                            if (!response.ok || !result.result?.success || !result.result?.clientUid) {
+                                throw new Error(result.error?.message || `Falha ao criar conta (HTTP ${response.status})`);
+                            }
+                            newClientAuthUid = result.result.clientUid;
+                        } catch (authCreationError) {
+                             console.error("[COBRADOR-APP] ERRO ao chamar 'createClientAuthAndLink':", authCreationError);
+                             throw authCreationError;
+                        }
+                        
+                        // ¡AQUÍ ESTABA EL ERROR!
+                        // El ID del documento debe ser el 'username'
+                        const newClientId = username; 
+                        
+                        const newClientData = {
+                            ...clientGeneralData,
+                            authUid: newClientAuthUid,
+                            loans: [loanSpecificData],
+                            fcmTokens: [],
+                            notifications: []
+                        };
+                        
+                        // Usamos setDoc() con el ID = username
+                        const newClientRef = doc(db, 'companies', currentCompanyId, "clients", newClientId);
+                        await setDoc(newClientRef, newClientData);
+                    }
+                    
+                    // (Lógica de 'refinance' - sin cambios)
+                    if (saveButton.dataset.isRefinance === 'true') {
+                        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
+                        await updateDoc(clientRef, {
+                            refinanceRequest: null
+                        });
+                    }
+
+                    window.history.back();
+                    const successToastMessage = isEditMode ? translations[currentLang].clientUpdatedSuccess : translations[currentLang].clientRegisteredSuccess;
+                    showToast(successToastMessage);
+
+                    if (!isEditMode) { 
+                        setTimeout(() => {
+                           showShareCredentialsModal(clientGeneralData, isEditMode);
+                        }, 400);
+                    }
+                } catch (error) {
+                    console.error("Error al guardar cliente:", error);
+                    showToast(error.message || 'Ocurrió un error al guardar los datos.', true);
+                } finally {
+                    if (clientFormModal.classList.contains('active')) {
+                        saveButton.disabled = false;
+                        saveButton.innerHTML = originalButtonHTML;
+                        lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+                    }
+                }
+            });
+            
+            lucide.createIcons({ nodes: clientFormModal.querySelectorAll('[data-lucide]') });
+            applyLanguage(currentLang);
+
+            // (Lógica de verificación de cliente - sin cambios)
+            const docInput = document.getElementById('client-document');
+            const nameInput = document.getElementById('client-name');
+            const editingId = isEditMode ? clientId : null;
+
+            if (docInput && !isNewLoan) { 
+                docInput.addEventListener('blur', () => performClientChecks(editingId));
+            }
+            if (nameInput && !isNewLoan) {
+                nameInput.addEventListener('blur', () => performClientChecks(editingId));
+            }
+            if (isEditMode && (client.documentNumber || client.name)) {
+                performClientChecks(editingId);
             }
         }
-    });
-    // --- [FIN DE LA MODIFICACIÓN (SAVE)] ---
-    
-    lucide.createIcons({ nodes: clientFormModal.querySelectorAll('[data-lucide]') });
-applyLanguage(currentLang);
-
-// --- [INICIO DE LA MODIFICACIÓN (LLAMADA A VERIFICACIÓN)] ---
-// Reemplazamos la lógica antigua de 'triggerSystemVerification'
-
-const docInput = document.getElementById('client-document');
-const nameInput = document.getElementById('client-name');
-const editingId = isEditMode ? clientId : null;
-
-if (docInput && !isNewLoan) { 
-    // Llama a la nueva función de verificación en el 'blur' (cuando el usuario sale del campo)
-    docInput.addEventListener('blur', () => performClientChecks(editingId));
-}
-if (nameInput && !isNewLoan) {
-    // Llama a la misma función en el 'blur' del nombre también
-    nameInput.addEventListener('blur', () => performClientChecks(editingId));
-}
-
-// Si estamos editando, ejecuta la comprobación (excluyéndose a sí mismo)
-if (isEditMode && (client.documentNumber || client.name)) {
-    performClientChecks(editingId);
-}
-// --- [FIN DE LA MODIFICACIÓN] ---
-}
 
         
 
