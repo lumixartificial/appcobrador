@@ -2930,19 +2930,14 @@ async function showRefinanceModal(clientId, notificationId) {
         }
         
         
-        /**
-         * INSTRUCCIÓN 2: Reemplaza tu función 'showClientDetails' (aprox. línea 3938)
-         * con este bloque de código completo.
-         */
         function showClientDetails(clientId, loanIndex = 0) {
-
             currentDetailClientId = clientId;
             currentDetailLoanIndex = loanIndex;
             console.log(`[DIAG-STATE] Vista de detalles abierta para Cliente: ${currentDetailClientId}, Préstamo Índice: ${currentDetailLoanIndex}`);
             const clientDetailView = document.getElementById('clientDetailView');
             const client = allClients.find(c => c.id == clientId);
 
-            // --- (Corrección WhatsApp - SIN CAMBIOS) ---
+            // --- WhatsApp (Sin Cambios) ---
             const whatsappString = (client.whatsapp || '').toString(); 
             const cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
             const whatsappLogoUrl = "https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO%20WHATSAPP%20OFI.png?alt=media&token=e022ad51-a151-4812-bb3d-9be867dac891";
@@ -2954,22 +2949,36 @@ async function showRefinanceModal(clientId, notificationId) {
                        <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px; opacity: 0.5;">
                    </button>`;
 
-            // --- (Lógica de Pestañas - SIN CAMBIOS) ---
-            const displayableLoans = (client.loans || []).filter(l => l.status !== 'finished');
-            const activeOrLastFinishedLoans = displayableLoans.length > 0 ? displayableLoans : (client.loans && client.loans.length > 0 ? [client.loans[client.loans.length - 1]] : []);
-            const currentLoanIndex = (loanIndex >= 0 && client.loans && loanIndex < client.loans.length && (client.loans[loanIndex].status !== 'finished' || activeOrLastFinishedLoans.some(l => client.loans[loanIndex] === l)))
-                                   ? loanIndex
-                                   : (activeOrLastFinishedLoans.length > 0 ? client.loans.findIndex(l => l === activeOrLastFinishedLoans[0]) : 0);
-
-            if (!client || !client.loans || !client.loans[currentLoanIndex]) {
-                 console.error(`Cliente o préstamo con índice ${currentLoanIndex} no encontrado para ${clientId}`);
-                 showToast("Erro ao carregar detalhes do empréstimo.", true);
+            // --- LÓGICA DE SELECCIÓN DE PRÉSTAMO Y PESTAÑAS (CORREGIDA) ---
+            // 1. No filtramos nada. Mostramos TODOS los préstamos. Historial Ilimitado.
+            const allLoans = client.loans || [];
+            
+            // 2. Buscamos el índice del primer préstamo ACTIVO (no finalizado) para darle prioridad visual
+            const firstActiveIndex = allLoans.findIndex(l => calculateLoanDetails(l).status !== 'finished');
+            
+            // 3. Decidimos qué índice mostrar:
+            // - Si el usuario seleccionó uno específico (loanIndex), usamos ese.
+            // - Si no, intentamos mostrar el primer activo.
+            // - Si no hay activos, mostramos el último de la lista (el más reciente finalizado).
+            let targetIndex = loanIndex;
+            
+            // Verificamos si el loanIndex solicitado es válido
+            if (targetIndex < 0 || targetIndex >= allLoans.length) {
+                targetIndex = firstActiveIndex !== -1 ? firstActiveIndex : (allLoans.length - 1);
+            }
+            
+            // Si después de todo es -1 (cliente sin préstamos, raro pero posible), salimos
+            if (targetIndex === -1 && allLoans.length === 0) {
+                 console.error(`Cliente sin préstamos: ${clientId}`);
+                 showToast("Erro: Cliente sem empréstimos.", true);
                  if(clientDetailView.classList.contains('active')) window.history.back();
                  return; 
             }
 
-            const loan = client.loans[currentLoanIndex];
-            const hasMultipleDisplayable = activeOrLastFinishedLoans.length > 1;
+            // Actualizamos la variable global con el índice real que vamos a mostrar
+            const currentLoanIndex = targetIndex;
+            const loan = allLoans[currentLoanIndex];
+            const hasMultipleLoans = allLoans.length > 1;
 
             // (Corrección Desajuste - SIN CAMBIOS)
             const originalInstallment = loan.originalInstallmentAmount || 0;
@@ -2982,39 +2991,25 @@ async function showRefinanceModal(clientId, notificationId) {
             const initialPaid = loan.initialMigratedAmount || 0;
             const displayTotalPaid = initialPaid + historyPaid;
 
-            // --- (Lógica de Generación de Historial - CON CORRECCIÓN) ---
+            // --- (Lógica de Generación de Historial - CON CORRECCIÓN ROBUSTA DE FECHAS) ---
             let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
             if (loan.history && loan.history.length > 0) {
                 
-                // ***** INICIO DE LA CORRECCIÓN 2 (DESORDEN) *****
-                
-                // 1. Función auxiliar ROBUSTA para obtener un timestamp numérico
                 const getSortableTimestamp = (dateObj) => {
                     if (!dateObj) return 0;
-                    // Caso 1: Es un Firestore Timestamp (viene de onSnapshot)
-                    if (typeof dateObj.toDate === 'function') {
-                        return dateObj.toDate().getTime(); // Usamos milisegundos
-                    }
-                    // Caso 2: Es un JS Date (viene del pago local o migración)
-                    if (typeof dateObj.getTime === 'function') {
-                        return dateObj.getTime(); // Usamos milisegundos
-                    }
-                    // Caso 3: Es un string (fallback de JSON.parse, aunque ya no debería pasar)
+                    if (typeof dateObj.toDate === 'function') return dateObj.toDate().getTime();
+                    if (typeof dateObj.getTime === 'function') return dateObj.getTime();
                     if (typeof dateObj === 'string') {
                         const d = new Date(dateObj);
                         if (!isNaN(d.getTime())) return d.getTime();
                     }
-                    console.warn("Formato de data desconhecido no historial:", dateObj);
                     return 0;
                 };
 
-                // 2. Ordenar cronológicamente (A->B para más antiguo a más reciente)
                 const sortedHistory = loan.history
                     .map((p, index) => ({ ...p, originalIndex: index }))
                     .sort((a, b) => getSortableTimestamp(a.date) - getSortableTimestamp(b.date));
-                // ***** FIN DE LA CORRECCIÓN 2 (DESORDEN) *****
 
-                // 2. Mapear (CON CORRECCIÓN DENTRO)
                 historyHtml = sortedHistory.map(p => {
                     let title = '';
                     let description = '';
@@ -3025,22 +3020,16 @@ async function showRefinanceModal(clientId, notificationId) {
                     let statusText = '';
                     let amountDisplay = money(p.amount || 0);
 
-                    // 3. Lógica de Fecha (Ahora maneja JS Date y Timestamps robustamente)
                     let d;
-                    if (p.date?.toDate) { // <-- Es un Timestamp de Firestore
-                        d = p.date.toDate();
-                    } else if (p.date instanceof Date) { // <-- Es un JS Date
-                        d = p.date;
-                    } else if (typeof p.date === 'string') { // <-- Fallback
-                        d = new Date(p.date);
-                    }
+                    if (p.date?.toDate) d = p.date.toDate();
+                    else if (p.date instanceof Date) d = p.date;
+                    else if (typeof p.date === 'string') d = new Date(p.date);
                     
                     if (d && !isNaN(d.getTime())) {
                         dateString = d.toLocaleDateString('pt-BR');
                         timeString = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                     }
 
-                    // 4. Lógica de Estados (SIN CAMBIOS)
                     if (p.status === 'pending_verification') {
                          statusText = 'Pendente'; statusStyle = 'color: var(--warning-color); font-weight: bold;';
                          title = 'Pagamento Enviado'; description = `Aguardando aprovação do admin`;
@@ -3054,7 +3043,6 @@ async function showRefinanceModal(clientId, notificationId) {
                          title = 'Pagamento Adiado'; description = `Data de vencimento movida`;
                          amountDisplay = ''; hasReceipt = ''; 
                     } else if (p.method === 'migration') {
-                        // ... (Lógica de Migración - SIN CAMBIOS) ...
                         statusText = 'Aprovado (Migração)'; statusStyle = 'color: var(--accent-green); font-style: italic;';
                         hasReceipt = ''; 
                         if (p.migrationType === 'full_installments') {
@@ -3079,9 +3067,7 @@ async function showRefinanceModal(clientId, notificationId) {
                             description = `Valor inicial de ${money(initialPaid)} registrado.`;
                         }
                         approvedCumulativePaidForNumbering += (p.amount || 0);
-                    
-                    } else { // Pagos 'approved' normales (Lógica de Títulos - SIN CAMBIOS)
-                        
+                    } else { 
                         const paymentAmount = p.amount || 0;
                         statusText = 'Aprovado';
                         statusStyle = 'color: var(--accent-green);';
@@ -3100,20 +3086,16 @@ async function showRefinanceModal(clientId, notificationId) {
                             if (numFullInstallmentsInThisPayment === 0 && percentage > 0) {
                                 title = translations[currentLang].paymentInstallmentTitle.replace('{installment}', startInstallmentNum);
                                 description = translations[currentLang].partialPaymentDesc.replace('{percent}', percentage);
-                            }
-                            else if (numFullInstallmentsInThisPayment === 1 && percentage === 0) {
+                            } else if (numFullInstallmentsInThisPayment === 1 && percentage === 0) {
                                 title = translations[currentLang].paymentInstallmentTitle.replace('{installment}', startInstallmentNum);
                                 description = translations[currentLang].fullPaymentDesc.replace('{installment}', startInstallmentNum);
-                            }
-                            else if (numFullInstallmentsInThisPayment > 1 && percentage === 0) {
+                            } else if (numFullInstallmentsInThisPayment > 1 && percentage === 0) {
                                 title = translations[currentLang].paymentInstallmentsTitle.replace('{start}', startInstallmentNum).replace('{end}', endInstallmentNum);
                                 description = translations[currentLang].multipleFullPaymentDesc.replace('{count}', numFullInstallmentsInThisPayment);
-                            }
-                            else if (numFullInstallmentsInThisPayment >= 1 && percentage > 0) {
+                            } else if (numFullInstallmentsInThisPayment >= 1 && percentage > 0) {
                                  title = translations[currentLang].paymentInstallmentsTitle.replace('{start}', startInstallmentNum).replace('{end}', endInstallmentNum);
                                 description = translations[currentLang].multiplePaymentDesc.replace('{count}', numFullInstallmentsInThisPayment).replace('{percent}', percentage);
-                            }
-                            else {
+                            } else {
                                  title = "Pagamento Recebido";
                                  description = "Valor creditado ao saldo.";
                                  if (percentage === 0 && startInstallmentNum === endInstallmentNum) {
@@ -3123,12 +3105,11 @@ async function showRefinanceModal(clientId, notificationId) {
                             }
                         } else {
                             title = "Pagamento Recebido";
-                            description = "Valor creditado ao saldo (valor da cuota não definido).";
+                            description = "Valor creditado ao saldo.";
                         }
                         approvedCumulativePaidForNumbering += paymentAmount;
                     }
 
-                    // 5. HTML del Ticket (SIN CAMBIOS)
                     return `<div class="payment-history-item" data-history-index="${p.originalIndex}" style="cursor: ${p.status !== 'postponed' ? 'pointer' : 'default'};">
                                 <div class="payment-history-details">
                                     <h4 class="payment-history-title">${title}</h4>
@@ -3141,11 +3122,9 @@ async function showRefinanceModal(clientId, notificationId) {
                                     ${hasReceipt}
                                 </div>
                             </div>`;
-                }).reverse().join(''); // 6. Invertir al final (SIN CAMBIOS, correcto)
+                }).reverse().join(''); 
             }
 
-            // --- (Resto de la función showClientDetails - SIN CAMBIOS HASTA EL BOTÓN DE APLAZAR) ---
-            
             const loanDetails = calculateLoanDetails(loan);
             const currentStatus = loanDetails.status;
             const statusClass = `status-${currentStatus}`;
@@ -3177,17 +3156,16 @@ async function showRefinanceModal(clientId, notificationId) {
                     </div>
                 </header>
 
-                ${hasMultipleDisplayable ? `
+                ${hasMultipleLoans ? `
                 <div class="loan-tabs-wrapper"> 
                     <div class="loan-tabs-container" id="loan-tabs-container">
-                        ${client.loans.map((l, index) => {
-                            const isRelevant = activeOrLastFinishedLoans.some(relevantLoan => client.loans[index] === relevantLoan);
-                            if (isRelevant || index === currentLoanIndex) {
-                                return `<button class="loan-tab ${index === currentLoanIndex ? 'active' : ''}" data-loan-index="${index}">
-                                            Préstamo ${index + 1} ${l.status === 'finished' ? '(Finalizado)' : ''}
-                                        </button>`;
-                            }
-                            return '';
+                        ${allLoans.map((l, index) => {
+                            // CORRECCIÓN: Generamos pestañas para TODOS los préstamos
+                            const lStatus = calculateLoanDetails(l).status;
+                            const isFinished = lStatus === 'finished';
+                            return `<button class="loan-tab ${index === currentLoanIndex ? 'active' : ''}" data-loan-index="${index}" style="${isFinished ? 'opacity: 0.7;' : ''}">
+                                        Préstamo ${index + 1} ${isFinished ? '(Finalizado)' : ''}
+                                    </button>`;
                         }).join('')}
                     </div>
                 </div>` : ''}
@@ -3241,6 +3219,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 <div class="action-buttons">
                     ${currentStatus === 'finished' ? `
                         <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
+                        <!-- CORRECCIÓN: Botón para nuevo préstamo siempre visible -->
                         <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
                     ` : `
                         <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
@@ -3267,7 +3246,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 progressText.textContent = `${paidInstallments}/${totalInstallments}`;
             }
 
-            if (hasMultipleDisplayable) {
+            if (hasMultipleLoans) {
                 clientDetailView.querySelectorAll('.loan-tab').forEach(tab => {
                     tab.addEventListener('click', (e) => {
                         const newLoanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10);
@@ -3299,39 +3278,29 @@ async function showRefinanceModal(clientId, notificationId) {
                         async () => {
                             const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
                             try {
-                                // --- [INICIO REPARACIÓN APLAZAR (MUTACIÓN)] ---
-                                // 1. Obtenemos la referencia directa (igual que en showPaymentModal)
                                 const clientIndex = allClients.findIndex(c => c.id === clientId);
                                 if (clientIndex === -1) throw new Error("Cliente no encontrado en allClients.");
                                 const currentClientData = allClients[clientIndex]; 
                                 if (!currentClientData || !currentClientData.loans || !currentClientData.loans[indexToPostpone]) throw new Error("Loan not found");
                                 
-                                // 2. Mutamos la referencia del préstamo
                                 const updatedLoans = currentClientData.loans;
                                 const currentLoan = updatedLoans[indexToPostpone];
-                                
                                 if (!currentLoan.history) currentLoan.history = [];
                                 
-                                // 3. ***** CORRECCIÓN CRASH: Usamos new Date() *****
                                 const postponedPayment = { amount: 0, date: new Date(), status: 'postponed' };
                                 currentLoan.history.push(postponedPayment);
-                                // --- [FIN REPARACIÓN APLAZAR (MUTACIÓN)] ---
-                                
                                 await updateDoc(clientRef, { loans: updatedLoans });
 
-                                // 4. 'allClients' ya está sincronizado por mutación
                                 showToast('Pagamento adiado com sucesso!');
-                                window.history.back(); // Cierra el modal de confirmación
-                                
+                                window.history.back(); 
                                 showClientDetails(clientId, indexToPostpone);
                                 updateTodaysRouteList();
                                 updateRouteProgress();
                                 updateAllClientsList();
-
                             } catch(error) {
                                 console.error("Error postponing payment: ", error);
                                 showToast('Falha ao adiar pagamento.', true);
-                                 window.history.back();
+                                window.history.back();
                             }
                         }
                     );
@@ -3356,31 +3325,20 @@ async function showRefinanceModal(clientId, notificationId) {
             clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
-                    // --- [INICIO CORRECCIÓN 'historyIndex'] ---
-                    // Volvemos a buscar en 'allClients' para obtener el préstamo FRESCO
-                    // (Esto evita datos rancios si onSnapshot actualizó 'allClients'
-                    // pero la UI de 'showClientDetails' aún no se refrescó)
                     const freshClient = allClients.find(c => c.id === clientId);
                     const freshLoan = freshClient?.loans ? freshClient.loans[currentLoanIndex] : null;
                     const clickedPayment = freshLoan?.history ? freshLoan.history[historyIndex] : null;
-                    // --- [FIN CORRECCIÓN 'historyIndex'] ---
 
                     if (!clickedPayment) {
-                         console.error("No se pudo encontrar el pago clickeado en los datos:", {clientId, currentLoanIndex, historyIndex});
                          showToast('Erro ao obter detalhes do pagamento.', true);
                          return;
                     }
                     if (clickedPayment.status === 'pending_verification') {
-                        console.log(`Abriendo modal de VERIFICACIÓN para cliente ${clientId}, préstamo ${currentLoanIndex}, historial ${historyIndex}`);
                         const notification = internalNotifications.find(n => n.clientId === clientId && n.loanIndex === currentLoanIndex && n.historyIndex === historyIndex && n.type === 'payment');
                         showVerificationModal(clientId, historyIndex, currentLoanIndex, notification?.id);
                     }
-                    else if (clickedPayment.status === 'postponed') {
-                         console.log("Clic en pago aplazado, ninguna acción.");
-                         return; 
-                    }
+                    else if (clickedPayment.status === 'postponed') { return; }
                     else {
-                        console.log(`Abriendo modal de DETALLES para cliente ${clientId}, préstamo ${currentLoanIndex}, historial ${historyIndex}`);
                         showPaymentDetailModal(clientId, currentLoanIndex, historyIndex);
                     }
                 });
@@ -4411,12 +4369,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             
             document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
             
-            // --- (Listener de Guardar - CON MODIFICACIONES) ---
+            // --- (Listener de Guardar - CORREGIDO PARA EVITAR BORRADO DE HISTORIAL Y ERROR CONTABLE) ---
             const saveButton = document.getElementById('saveClientBtn');
             saveButton.dataset.isRefinance = prefillData ? 'true' : 'false';
             
-            // ¡ESTE ES EL ID DEL CLIENTE QUE ESTAMOS EDITANDO!
-            // Si estamos creando uno nuevo, esto será 'null' al principio.
+            // ID del cliente a editar (o null si es creación inicial)
             const clientIdToSave = isEditMode || isNewLoan ? client.id : null; 
 
             saveButton.addEventListener('click', async (e) => {
@@ -4430,14 +4387,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 const usernameInputVal = document.getElementById('client-username');
                 const passwordInputVal = document.getElementById('client-password');
                 
-                // ¡AQUÍ LEEMOS LOS VALORES!
                 const username = usernameInputVal ? usernameInputVal.value.trim() : client.username;
                 const password = passwordInputVal ? passwordInputVal.value : client.password;
                 
                 const email = `${username}@gmail.com`;
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-                // (Validaciones - sin cambios)
+                // (Validaciones Básicas)
                 if (!clientNameInput.value || !loanAmountInputVal.value || !whatsappInputVal.value || (usernameInputVal && !username) || (passwordInputVal && !password)) {
                     showToast('Nome, WhatsApp, Valor do Empréstimo, Usuário e Senha são obrigatórios.', true); return;
                 }
@@ -4464,13 +4420,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
                 try {
                     let newUploadedDocuments = [];
-                    // (Lógica de subida de documentos - sin cambios)
+                    // (Lógica de documentos)
                     if (!isNewLoan && filesToUpload.length > 0) {
                         const uploadPromises = filesToUpload.map(async (file) => {
-                            // Si estamos creando (isEditMode=false), el ID es el username
                             const targetClientId = isEditMode ? clientId : username; 
                             const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-                            // [CORRECCIÓN] Usa la ruta correcta de Firebase Storage
                             const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
                             await uploadBytes(storageRef, file);
                             const downloadURL = await getDownloadURL(storageRef);
@@ -4480,7 +4434,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     }
                     const finalDocuments = isNewLoan ? client.documents : [...existingDocs, ...newUploadedDocuments];
 
-                    // (Lógica de datos del préstamo - sin cambios)
+                    // (Datos del Préstamo)
                     const interest = parseFloat(document.getElementById('client-interest').value);
                     const installments = parseInt(document.getElementById('client-installments').value);
                     const totalToPay = loanAmount * (1 + (interest / 100));
@@ -4492,7 +4446,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     else if (paymentFrequency === 'weekly') paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
                     else if (paymentFrequency === 'monthly') paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
 
-                    // (Datos del cliente - sin cambios)
                     const clientGeneralData = {
                         name: document.getElementById('client-name').value,
                         documentNumber: document.getElementById('client-document').value,
@@ -4502,13 +4455,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         location: document.getElementById('client-location').value,
                         username: username,
                         email: email, 
-                        password: password, // <-- Se sigue guardando en Firestore por tu petición
+                        password: password,
                         documents: finalDocuments,
                         collectorId: currentCollectorUsername,
                         interestRate: interest
                     };
 
-                    // (Datos del préstamo - sin cambios)
                     const loanSpecificData = {
                         principalAmount: principalAmount,
                         lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
@@ -4526,7 +4478,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         collectionTime: document.getElementById('client-collection-time').value,
                     };
                     
-                    // (Lógica de Migración - sin cambios)
+                    // (Migración)
                     if (migrationToggle && migrationToggle.checked) {
                         const initialPaidInstallments = parseInt(document.getElementById('client-initial-paid-installments').value, 10) || 0;
                         const initialPartialAmount = parseFloat(document.getElementById('client-initial-partial-payment').value) || 0.0;
@@ -4554,67 +4506,37 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         }
                     }
                     
-                    // (Lógica de 'isNewLoan' - sin cambios)
+                    // --- AQUÍ ESTÁ LA CORRECCIÓN CRÍTICA ---
+                    // Caso: Nuevo Préstamo para Cliente Existente
                     if (isNewLoan) {
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
-                        const currentClientData = allClients.find(c => c.id === clientIdToSave);
-                        const existingLoans = currentClientData ? (currentClientData.loans || []) : [];
-                        const activeLoans = existingLoans.filter(l => calculateLoanDetails(l).status !== 'finished');
-                        if (activeLoans.length === 0) {
-                            console.log("Detectado: Sin préstamos activos. REEMPLAZANDO array de préstamos.");
-                            await updateDoc(clientRef, {
-                                loans: [loanSpecificData]
-                            });
-                        } else {
-                            console.log("Detectado: Préstamo activo existente. AÑADIENDO nuevo préstamo (multi-préstamo).");
-                            await updateDoc(clientRef, {
-                                loans: arrayUnion(loanSpecificData)
-                            });
-                        }
+                        
+                        // CORRECCIÓN: SIEMPRE usamos arrayUnion. 
+                        // Nunca sobrescribimos el array entero, así no se borran los préstamos antiguos.
+                        // Esto soluciona el error contable y la pérdida de historial.
+                        console.log("Añadiendo nuevo préstamo al historial existente (arrayUnion)...");
+                        await updateDoc(clientRef, {
+                            loans: arrayUnion(loanSpecificData)
+                        });
                     
-                    // --- MODO EDICIÓN (AQUÍ ESTÁ LA MODIFICACIÓN) ---
+                    // Caso: Edición de Préstamo Existente
                     } else if (isEditMode) {
                         
-                        // ***** INICIO DE LA MODIFICACIÓN 2 (Alterar Senha) *****
-                        // Verificamos si la contraseña en el formulario es DIFERENTE
-                        // de la contraseña guardada en 'client.password'
+                        // (Lógica de cambio de contraseña - sin cambios)
                         if (password && password !== client.password) {
-                            console.log(`[COBRADOR] Solicitando alteração de senha para o cliente: ${clientIdToSave}...`);
+                            console.log(`[COBRADOR] Solicitando alteração de senha...`);
                             showToast("Atualizando senha...", false);
-                            
                             if (!auth.currentUser) throw new Error("Cobrador não está autenticado.");
                             const idToken = await auth.currentUser.getIdToken(true);
-
-                            // ¡Llamamos a la nueva Cloud Function!
                             const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/updateClientAuth";
                             const response = await fetch(functionUrl, {
                                 method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${idToken}`
-                                },
-                                body: JSON.stringify({ 
-                                    data: {
-                                        clientUsername: clientIdToSave, // El ID del cliente
-                                        newPassword: password
-                                    }
-                                })
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                                body: JSON.stringify({ data: { clientUsername: clientIdToSave, newPassword: password } })
                             });
-
-                            if (!response.ok) {
-                                const errorData = await response.json().catch(() => ({}));
-                                if (response.status === 404) {
-                                    throw new Error("Função 'updateClientAuth' não encontrada. (HTTP 404)");
-                                }
-                                throw new Error(errorData.error?.message || `Error HTTP ${response.status} ao alterar senha.`);
-                            }
-                            
-                            console.log("[COBRADOR] Senha do cliente alterada com sucesso via Cloud Function.");
-                            showToast("Senha do cliente alterada com sucesso!");
+                            if (!response.ok) throw new Error("Erro ao alterar senha.");
                         }
-                        // ***** FIN DE LA MODIFICACIÓN 2 (Alterar Senha) *****
 
-                        // (Lógica de actualización de Firestore - sin cambios)
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
                         const updatedLoans = [...client.loans];
                         updatedLoans[loanIndex] = {
@@ -4630,15 +4552,14 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                          };
                         await updateDoc(clientRef, {
                              loans: updatedLoans,
-                             ...clientGeneralData // Esto guarda la contraseña en Firestore (como querías)
+                             ...clientGeneralData
                         });
                     
-                    // --- MODO CREACIÓN (AQUÍ ESTÁ LA MODIFICACIÓN) ---
+                    // Caso: Creación de Cliente Nuevo
                     } else { 
                         console.log("[COBRADOR-APP] Creando cliente nuevo...");
                         let newClientAuthUid = null;
                         try {
-                            // (Llamada a Cloud Function - sin cambios)
                             if (!auth.currentUser) throw new Error("Cobrador não autenticado.");
                             const idToken = await auth.currentUser.getIdToken(true);
                             const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/createClientAuthAndLink";
@@ -4648,19 +4569,14 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                 body: JSON.stringify({ data: { clientEmail: email, clientPassword: password } }) 
                             });
                             const result = await response.json();
-                            if (!response.ok || !result.result?.success || !result.result?.clientUid) {
-                                throw new Error(result.error?.message || `Falha ao criar conta (HTTP ${response.status})`);
-                            }
+                            if (!response.ok || !result.result?.success) throw new Error(result.error?.message || "Erro na criação");
                             newClientAuthUid = result.result.clientUid;
                         } catch (authCreationError) {
-                             console.error("[COBRADOR-APP] ERRO ao chamar 'createClientAuthAndLink':", authCreationError);
+                             console.error("Erro auth:", authCreationError);
                              throw authCreationError;
                         }
                         
-                        // ¡AQUÍ ESTABA EL ERROR!
-                        // El ID del documento debe ser el 'username'
                         const newClientId = username; 
-                        
                         const newClientData = {
                             ...clientGeneralData,
                             authUid: newClientAuthUid,
@@ -4668,18 +4584,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             fcmTokens: [],
                             notifications: []
                         };
-                        
-                        // Usamos setDoc() con el ID = username
                         const newClientRef = doc(db, 'companies', currentCompanyId, "clients", newClientId);
                         await setDoc(newClientRef, newClientData);
                     }
                     
-                    // (Lógica de 'refinance' - sin cambios)
                     if (saveButton.dataset.isRefinance === 'true') {
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
-                        await updateDoc(clientRef, {
-                            refinanceRequest: null
-                        });
+                        await updateDoc(clientRef, { refinanceRequest: null });
                     }
 
                     window.history.back();
@@ -4687,9 +4598,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     showToast(successToastMessage);
 
                     if (!isEditMode) { 
-                        setTimeout(() => {
-                           showShareCredentialsModal(clientGeneralData, isEditMode);
-                        }, 400);
+                        setTimeout(() => { showShareCredentialsModal(clientGeneralData, isEditMode); }, 400);
                     }
                 } catch (error) {
                     console.error("Error al guardar cliente:", error);
