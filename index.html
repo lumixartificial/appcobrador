@@ -5315,17 +5315,22 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const now = new Date();
             const todayStr = now.toLocaleDateString('pt-BR');
 
-            // --- 1. GATHER ALL DATA FOR TODAY ---
+            // --- 1. RECOPILAR DATOS DE HOY ---
 
             // A. Pagos Recibidos (Lista y Totales)
             const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
             const dailyPaymentsList = [];
             allClients.forEach(client => {
-                (client.loans || []).forEach((loan, loanIndex) => { // <-- CORRECCIÓN: Iterar sobre client.loans
+                (client.loans || []).forEach((loan, loanIndex) => { 
                     (loan.history || []).forEach(h => {
-                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed') {
-                            const paymentDate = new Date(h.date.seconds * 1000);
-                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
+                        // Filtramos pagos válidos (ignoramos pendientes, rechazados y migraciones)
+                        if (h.date && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
+                            // Normalizamos la fecha (soporta Timestamp y Date)
+                            let paymentDate = null;
+                            if (h.date.seconds) paymentDate = new Date(h.date.seconds * 1000);
+                            else if (h.date instanceof Date) paymentDate = h.date;
+
+                            if (paymentDate && paymentDate.toLocaleDateString('pt-BR') === todayStr) {
                                 dailyPaymentsList.push({
                                     clientName: client.name,
                                     amount: h.amount,
@@ -5358,22 +5363,55 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             
             // D. Aportes de Capital (Lista y Total)
             const dailyInjections = allCapitalInjections.filter(i => {
-                if (!i.date?.seconds) return false; // Asume que 'date' es la fecha de aprobación/creación
+                if (!i.date?.seconds) return false; 
                 return new Date(i.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
             });
             const totalInjections = dailyInjections.reduce((sum, i) => sum + i.amount, 0);
             dailyInjections.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
 
+            // E. NUEVO: Préstamos Nuevos / Refinanciamientos (Salidas de Capital)
+            const dailyNewLoans = [];
+            allClients.forEach(client => {
+                (client.loans || []).forEach((loan, index) => {
+                    // Normalizamos la fecha de inicio del préstamo
+                    let loanDate = null;
+                    if (loan.startDate?.seconds) loanDate = new Date(loan.startDate.seconds * 1000);
+                    else if (loan.startDate instanceof Date) loanDate = loan.startDate;
 
-            // E. Cálculo Final
-            const netBalance = dailyTotal + totalInjections - totalExpenses - totalSettlements;
+                    // Si el préstamo inició HOY y NO es una migración antigua
+                    if (loanDate && loanDate.toLocaleDateString('pt-BR') === todayStr && !loan.migrationDate) {
+                        // Obtenemos el capital principal entregado
+                        let principal = loan.principalAmount;
+                        // Fallback de cálculo si no existe principalAmount
+                        if (!principal && loan.totalLoan) {
+                             const rate = client.interestRate || 20;
+                             principal = loan.totalLoan / (1 + (rate/100));
+                        }
+                        
+                        dailyNewLoans.push({
+                            clientName: client.name,
+                            amount: principal || 0,
+                            time: loanDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                            loanIndex: index + 1
+                        });
+                    }
+                });
+            });
+            const totalLoansOutflow = dailyNewLoans.reduce((sum, l) => sum + l.amount, 0);
+            dailyNewLoans.sort((a, b) => a.time.localeCompare(b.time));
 
-            if (dailyTotal === 0 && totalExpenses === 0 && totalSettlements === 0 && totalInjections === 0) {
+
+            // F. CÁLCULO FINAL DE FLUJO DE CAJA (NET BALANCE)
+            // Neto = (Entradas: Pagos + Aportes) - (Salidas: Gastos + Liquidaciones + Nuevos Préstamos)
+            const netBalance = (dailyTotal + totalInjections) - (totalExpenses + totalSettlements + totalLoansOutflow);
+
+            // Verificación si no hay nada que reportar
+            if (dailyTotal === 0 && totalExpenses === 0 && totalSettlements === 0 && totalInjections === 0 && totalLoansOutflow === 0) {
                 showToast(translations[lang].noPaymentsToday, true);
                 return;
             }
 
-            // --- 2. GENERATE PDF ---
+            // --- 2. GENERAR PDF ---
             const pageMargin = 15;
             const pageWidth = doc.internal.pageSize.getWidth();
             const center = pageWidth / 2;
@@ -5381,11 +5419,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
             // A. Encabezado
             y = 25;
-            
-            // --- [INICIO CORRECCIÓN] ---
-            // Eliminado el bloque try...catch que añadía el LOGO_BASE64_JPG
-            // --- [FIN CORRECCIÓN] ---
-            
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
             doc.text(currentCompanyData?.name || 'Relatório de Cobrança', center, y, { align: 'center' });
@@ -5403,7 +5436,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             doc.setFontSize(12);
             doc.setTextColor(0);
             doc.setFont(undefined, 'bold');
-            doc.text(currentCollectorUsername || 'N/A', pageMargin + 25, y); // <-- CORRECCIÓN: Usa nombre real
+            doc.text(currentCollectorData?.name || 'N/A', pageMargin + 25, y); 
 
             // C. Resumen Contábil
             y += 15;
@@ -5430,12 +5463,15 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             addSummaryLine(`    ... em Dinheiro:`, dailyTotalCash, '#6c757d');
             addSummaryLine(`    ... em Digital/Recibo:`, dailyTotalDigital, '#6c757d');
             addSummaryLine(`(+) Aportes de Capital:`, totalInjections, '#28a745');
+            
+            // Nuevas líneas de salida
+            addSummaryLine(`(-) Empréstimos Realizados:`, totalLoansOutflow, '#dc3545'); // NUEVA LÍNEA
             addSummaryLine(`(-) Gastos Totais:`, totalExpenses, '#dc3545');
             addSummaryLine(`(-) Liquidações Enviadas:`, totalSettlements, '#dc3545');
 
             y += 3;
             doc.setLineWidth(0.2);
-            doc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); // Linha fina
+            doc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); 
             
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
@@ -5443,21 +5479,18 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             doc.text('SALDO LÍQUIDO DO DIA:', pageMargin + 5, y + 8);
             doc.text(money(netBalance), pageWidth - pageMargin - 5, y + 8, { align: 'right' });
             
-            // --- [INICIO CORRECCIÓN] ---
-            // Añadir Capital em Mãos (usando la variable global currentCapitalOnHand)
             y += 8; // Espacio extra
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.setTextColor(currentCapitalOnHand >= 0 ? '#000000' : '#dc3545'); // Negro o rojo si es negativo
+            doc.setTextColor(currentCapitalOnHand >= 0 ? '#000000' : '#dc3545');
             doc.text('CAPITAL TOTAL EM MÃOS:', pageMargin + 5, y + 8);
             doc.text(money(currentCapitalOnHand), pageWidth - pageMargin - 5, y + 8, { align: 'right' });
-            // --- [FIN CORRECCIÓN] ---
 
             y += 20;
 
             // D. Secciones de Detalles (con paginación)
             const checkPageBreak = () => {
-                if (y > 270) { // Margen para el pie de página
+                if (y > 270) { 
                     doc.addPage();
                     y = 20;
                 }
@@ -5510,7 +5543,31 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
 
-            // D.2. Gastos
+            // D.2. NUEVO: Nuevos Préstamos
+            if (dailyNewLoans.length > 0) {
+                addSectionHeader('Detalhe dos Empréstimos Realizados (Saídas)');
+                addTableHeaders([
+                    { label: 'Hora', x: pageMargin + 5 },
+                    { label: 'Cliente (Novo Empréstimo)', x: pageMargin + 25 },
+                    { label: 'Tipo', x: pageMargin + 130 },
+                    { label: 'Valor Entregue', x: pageWidth - pageMargin - 5, align: 'right' }
+                ]);
+                
+                dailyNewLoans.forEach(l => {
+                    checkPageBreak();
+                    doc.setFontSize(10);
+                    doc.setTextColor(0);
+                    doc.text(l.time, pageMargin + 5, y);
+                    doc.text(doc.splitTextToSize(`${l.clientName} (E ${l.loanIndex})`, 95), pageMargin + 25, y);
+                    doc.text("Novo / Refin.", pageMargin + 130, y);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor('#dc3545'); // Rojo para salidas
+                    doc.text(`-${money(l.amount)}`, pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
+            }
+
+            // D.3. Gastos
             if (dailyExpenses.length > 0) {
                 addSectionHeader('Detalhe dos Gastos');
                 addTableHeaders([
@@ -5536,7 +5593,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
 
-            // D.3. Liquidaciones
+            // D.4. Liquidaciones
             if (dailySettlements.length > 0) {
                 addSectionHeader('Detalhe das Liquidações Enviadas');
                 addTableHeaders([
@@ -5559,7 +5616,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
             
-            // D.4. Aportes de Capital
+            // D.5. Aportes de Capital
             if (dailyInjections.length > 0) {
                 addSectionHeader('Detalhe dos Aportes de Capital Recebidos');
                  addTableHeaders([
@@ -6870,3 +6927,4 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
