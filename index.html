@@ -1202,187 +1202,176 @@ const BLACKLIST_DATA = {
 
         
         function renderMainLayout() {
-    document.getElementById('app-container').innerHTML = `
-        <header class="main-header">
-            <div class="logo"><img id="header-logo" src="${DEFAULT_LOGO_URL}" alt="Logo da Empresa"><span id="header-logo-text" class="logo-text">Portal do Cobrador</span></div>
-            <div class="header-controls">
-                <div style="position: relative;">
-                    <button class="header-btn" id="lang-toggle" title="Mudar idioma"><i data-lucide="globe"></i></button>
-                    <div class="lang-dropdown" id="lang-dropdown"><button data-lang="pt">Português</button><button data-lang="es">Español</button><button data-lang="en">English</button></div>
-                </div>
-                <button class="header-btn" id="theme-toggle" title="Mudar tema"><i data-lucide="moon"></i></button>
-                <div class="profile" id="header-profile-link" style="cursor: pointer;">
-                    <div class="profile-info"><span class="profile-name">João Silva</span><span class="profile-role" data-lang-key="collector"></span></div>
-                    <img id="header-profile-img" src="" alt="Foto do Cobrador">
-                </div>
-            </div>
-        </header>
-        <main>
-            <div id="home-view" class="view active container">
-                <div class="kpi-card progress-card" style="margin-bottom: 20px;">
-                    <h3 class="kpi-title" style="justify-content: center;">Progresso da Rota</h3>
-                    <div class="progress-circle">
-                        <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="route-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292;"></circle></svg>
-                        <div class="progress-text" id="route-progress-text">0/0</div>
+            document.getElementById('app-container').innerHTML = `
+                <header class="main-header">
+                    <div class="logo"><img id="header-logo" src="${DEFAULT_LOGO_URL}" alt="Logo da Empresa"><span id="header-logo-text" class="logo-text">Portal do Cobrador</span></div>
+                    <div class="header-controls">
+                        <div style="position: relative;">
+                            <button class="header-btn" id="lang-toggle" title="Mudar idioma"><i data-lucide="globe"></i></button>
+                            <div class="lang-dropdown" id="lang-dropdown"><button data-lang="pt">Português</button><button data-lang="es">Español</button><button data-lang="en">English</button></div>
+                        </div>
+                        <button class="header-btn" id="theme-toggle" title="Mudar tema"><i data-lucide="moon"></i></button>
+                        <div class="profile" id="header-profile-link" style="cursor: pointer;">
+                            <div class="profile-info"><span class="profile-name">João Silva</span><span class="profile-role" data-lang-key="collector"></span></div>
+                            <img id="header-profile-img" src="" alt="Foto do Cobrador">
+                        </div>
                     </div>
-                </div>
-                <section class="kpi-grid">
-                    <div class="kpi-card"><h3 class="kpi-title" data-lang-key="dailyGoal"><i data-lucide="target"></i></h3><p class="kpi-value" id="kpi-goal"></p></div>
-                    <div class="kpi-card"><h3 class="kpi-title" data-lang-key="receivedToday"><i data-lucide="check-circle"></i></h3><p class="kpi-value green" id="kpi-received"></p></div>
-                    <div class="kpi-card"><h3 class="kpi-title" data-lang-key="clientsRemaining"><i data-lucide="users"></i></h3><p class="kpi-value" id="kpi-remaining"></p></div>
-                </section>
-                <section class="route-section"><h2 class="section-title" data-lang-key="todaysRoute"></h2><div class="client-list" id="todays-route-list"><div class="loading">Carregando clientes...</div></div></section>
-            </div>
-            <div id="clients-view" class="view container">
-                <div class="search-bar-wrapper">
-                    <i class="icon" data-lucide="search"></i>
-                    <input type="text" id="client-search-input">
-                </div>
-                <div class="filter-buttons">
-                    <button class="filter-btn active" data-filter="all" data-lang-key="all"></button>
-                    <button class="filter-btn" data-filter="pending" data-lang-key="pending"></button>
-                    <button class="filter-btn" data-filter="paid" data-lang-key="paid"></button>
-                    <button class="filter-btn" data-filter="late" data-lang-key="late"></button>
-                    <button class="filter-btn" data-filter="finished" data-lang-key="finished"></button>
-                </div>
-                <div class="client-list" id="all-clients-list"></div>
-            </div>
-
-            <!-- (Notificaciones sin cambios) -->
-            <div id="notifications-view" class="view container">
-                 <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-purple);">
-                    <span data-lang-key="navNotifications" style="font-size: 1.3em; font-weight: 600; padding-bottom: 10px;"></span>
-                    <button id="clear-collector-notifications-btn" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 0.8em; font-weight: 500; display:flex; align-items:center; gap: 4px; padding-bottom: 10px;">
-                        <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
-                        <span>Limpar Tudo</span>
-                    </button>
-                </div>
-                 <div class="notification-list" id="notifications-list-container"></div>
-            </div>
-
-             <!-- (Gastos sin cambios) -->
-             <div id="expenses-view" class="view container">
-                 <h2 class="section-title" data-lang-key="myExpenses"></h2>
-                 <div class="filter-buttons">
-                     <button class="filter-btn active" data-period="today" data-lang-key="today"></button>
-                     <button class="filter-btn" data-period="week" data-lang-key="thisWeek"></button>
-                     <button class="filter-btn" data-period="month" data-lang-key="thisMonth"></button>
-                     <button class="filter-btn" data-period="all" data-lang-key="fromBeginning"></button>
-                 </div>
-                  <div class="filter-buttons grid">
-                     <button class="filter-btn active" data-category="all" data-lang-key="all"></button>
-                     <button class="filter-btn" data-category="fuel" data-lang-key="fuel"></button>
-                     <button class="filter-btn" data-category="food" data-lang-key="food"></button>
-                     <button class="filter-btn" data-category="rent" data-lang-key="rent"></button>
-                     <button class="filter-btn" data-category="mechanics" data-lang-key="mechanics"></button>
-                     <button class="filter-btn" data-category="other" data-lang-key="other"></button>
-                 </div>
-                 <div class="expense-list" id="expenses-list-container"></div>
-                 <section style="margin-top: 30px;">
-                     <h2 class="section-title">Histórico de Liquidações</h2>
-                     <div class="item-list" id="settlements-list-container">
-                         <p class="loading">Carregando liquidações...</p>
-                     </div>
-                 </section>
-             </div>
-            <div id="map-view" class="view container">
-                <div id="map-container"></div>
-            </div>
-            
-            <!-- --- [INICIO FASE 2: MODIFICACIÓN UI PERFIL] --- -->
-            <div id="profile-view" class="view container">
-                <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 30px;">
-                    <label for="profile-pic-input" class="profile-pic-wrapper">
-                        <img id="profile-view-img" src="" alt="Foto do Cobrador">
-                    </label>
-                    <input type="file" id="profile-pic-input" accept="image/*" style="display: none;">
-                    <h2 style="margin: 15px 0 0; font-size: 1.5em;" class="profile-name"></h2>
-                    <p style="margin: 5px 0 0; color: var(--text-secondary);" data-lang-key="collector"></p>
-                </div>
-
-                <!-- --- [INICIO FASE 3: KPI DE CAPITAL TOTAL] --- -->
-                <!-- KPI 3: Capital Total (Patrimônio) -->
-                <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-purple); border-width: 2px;">
-                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-purple);"><i data-lucide="gem"></i> Capital Total (Patrimônio)</h3>
-                    <p class="kpi-value" id="kpi-total-patrimonio" style="color: var(--accent-purple); font-size: 1.8em;"></p>
-                </div>
-                <!-- --- [FIN FASE 3] --- -->
-
-                <!-- KPI 1: Capital em Mãos (Efectivo) -->
-                <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-green); border-width: 2px;">
-                    <!-- === INICIO DE LA CORRECCIÓN === -->
-                    <!-- 1. Eliminamos data-lang-key="capitalTotal" -->
-                    <!-- 2. Añadimos el texto "Capital em Mãos" después del icono -->
-                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-green);"><i data-lucide="banknote"></i> Capital em Mãos</h3>
-                    <!-- === FIN DE LA CORRECCIÓN === -->
-                    <p class="kpi-value" id="kpi-capital-total"></p>
-                </div>
-
-                <!-- KPI 2: Capital Distribuido (en la Calle) -->
-                <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-orange);">
-                    <h3 class="kpi-title" style="justify-content: center; color: var(--accent-orange);"><i data-lucide="briefcase"></i> Capital Distribuído</h3>
-                    <p class="kpi-value" id="kpi-distributed-capital" style="color: var(--accent-orange);"></p>
-                </div>
-                <!-- --- [FIN FASE 2: MODIFICACIÓN UI PERFIL] --- -->
-
-                <section class="kpi-grid-profile">
-                     <div class="kpi-card">
-                         <h3 class="kpi-title" data-lang-key="dailyTotal"><i data-lucide="sun"></i></h3>
-                         <p class="kpi-value green" id="kpi-daily-total"></p>
-                     </div>
-                     <div class="kpi-card" style="background-color: color-mix(in srgb, var(--accent-green) 5%, var(--surface));">
-                         <h3 class="kpi-title" data-lang-key="receivedInCash"><i data-lucide="banknote" style="color: var(--accent-green);"></i></h3>
-                         <p class="kpi-value" id="kpi-daily-cash"></p>
-                     </div>
-                     <div class="kpi-card" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface));">
-                     <h3 class="kpi-title" data-lang-key="receivedInDigital"><i data-lucide="smartphone" style="color: var(--accent-purple);"></i></h3>
-                     <p class="kpi-value" id="kpi-daily-digital"></p>
-                 </div>
-                </section>
-                 <section>
-                    <h2 class="section-title" data-lang-key="accountSettings"></h2>
-                    <div class="client-list">
-                        <div class="settings-item" id="realtime-tracking-item">
-<i data-lucide="map-pin"></i>
-<span data-lang-key="realtimeTracking" style="flex-grow: 1;"></span>
-<div class="switch">
-<input type="checkbox" id="realtime-tracking-toggle">
-<label for="realtime-tracking-toggle"></label>
-</div>
-</div>
-<a class="settings-item" id="payment-settings-btn">
-<i data-lucide="dollar-sign"></i><span data-lang-key="paymentSettings"></span>
-</a>
-<a class="settings-item" id="change-password-btn">
-<i data-lucide="key-round"></i><span data-lang-key="changePassword"></span>
-</a>
-                        </a>
-                        <a class="settings-item" id="export-report-btn">
-                            <i data-lucide="download"></i><span data-lang-key="exportReport"></span>
-                        </a>
-                         <a class="settings-item logout" id="logout-btn">
-                             <i data-lucide="log-out"></i><span data-lang-key="logout"></span>
-                         </a>
+                </header>
+                <main>
+                    <div id="home-view" class="view active container">
+                        <div class="kpi-card progress-card" style="margin-bottom: 20px;">
+                            <h3 class="kpi-title" style="justify-content: center;">Progresso da Rota</h3>
+                            <div class="progress-circle">
+                                <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="route-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292;"></circle></svg>
+                                <div class="progress-text" id="route-progress-text">0/0</div>
+                            </div>
+                        </div>
+                        <section class="kpi-grid">
+                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="dailyGoal"><i data-lucide="target"></i></h3><p class="kpi-value" id="kpi-goal"></p></div>
+                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="receivedToday"><i data-lucide="check-circle"></i></h3><p class="kpi-value green" id="kpi-received"></p></div>
+                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="clientsRemaining"><i data-lucide="users"></i></h3><p class="kpi-value" id="kpi-remaining"></p></div>
+                        </section>
+                        <section class="route-section"><h2 class="section-title" data-lang-key="todaysRoute"></h2><div class="client-list" id="todays-route-list"><div class="loading">Carregando clientes...</div></div></section>
                     </div>
-                </section>
+                    <div id="clients-view" class="view container">
+                        <div class="search-bar-wrapper">
+                            <i class="icon" data-lucide="search"></i>
+                            <input type="text" id="client-search-input">
+                        </div>
+                        <div class="filter-buttons">
+                            <button class="filter-btn active" data-filter="all" data-lang-key="all"></button>
+                            <button class="filter-btn" data-filter="pending" data-lang-key="pending"></button>
+                            <button class="filter-btn" data-filter="paid" data-lang-key="paid"></button>
+                            <button class="filter-btn" data-filter="late" data-lang-key="late"></button>
+                            <button class="filter-btn" data-filter="finished" data-lang-key="finished"></button>
+                        </div>
+                        <div class="client-list" id="all-clients-list"></div>
+                    </div>
 
-                
-            </div>
-        </main>
-        <nav class="bottom-nav">
-            <a class="nav-item active" data-view="home"><i data-lucide="home"></i><span data-lang-key="navHome"></span></a>
-            <a class="nav-item" data-view="clients"><i data-lucide="users"></i><span data-lang-key="navClients"></span></a>
-            <a class="nav-item" data-view="notifications">
-                <i data-lucide="bell"></i>
-                <span data-lang-key="navNotifications"></span>
-                <span class="notification-badge" id="notification-badge">0</span>
-            </a>
-            <a class="nav-item" data-view="expenses"><i data-lucide="receipt"></i><span data-lang-key="navExpenses"></span></a>
-            <a class="nav-item" data-view="map"><i data-lucide="map"></i><span data-lang-key="navMap"></span></a>
-        </nav>
-        <button class="fab" id="addClientBtn" title="Adicionar Cliente"><i data-lucide="plus"></i></button>
-        <button class="fab hidden" id="addExpenseBtn" title="Adicionar Gasto"><i data-lucide="plus"></i></button>`;
-}
+                    <!-- (Notificaciones sin cambios) -->
+                    <div id="notifications-view" class="view container">
+                         <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-purple);">
+                            <span data-lang-key="navNotifications" style="font-size: 1.3em; font-weight: 600; padding-bottom: 10px;"></span>
+                            <button id="clear-collector-notifications-btn" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 0.8em; font-weight: 500; display:flex; align-items:center; gap: 4px; padding-bottom: 10px;">
+                                <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+                                <span>Limpar Tudo</span>
+                            </button>
+                        </div>
+                         <div class="notification-list" id="notifications-list-container"></div>
+                    </div>
+
+                     <!-- (Gastos sin cambios) -->
+                     <div id="expenses-view" class="view container">
+                         <h2 class="section-title" data-lang-key="myExpenses"></h2>
+                         <div class="filter-buttons">
+                             <button class="filter-btn active" data-period="today" data-lang-key="today"></button>
+                             <button class="filter-btn" data-period="week" data-lang-key="thisWeek"></button>
+                             <button class="filter-btn" data-period="month" data-lang-key="thisMonth"></button>
+                             <button class="filter-btn" data-period="all" data-lang-key="fromBeginning"></button>
+                         </div>
+                          <div class="filter-buttons grid">
+                             <button class="filter-btn active" data-category="all" data-lang-key="all"></button>
+                             <button class="filter-btn" data-category="fuel" data-lang-key="fuel"></button>
+                             <button class="filter-btn" data-category="food" data-lang-key="food"></button>
+                             <button class="filter-btn" data-category="rent" data-lang-key="rent"></button>
+                             <button class="filter-btn" data-category="mechanics" data-lang-key="mechanics"></button>
+                             <button class="filter-btn" data-category="other" data-lang-key="other"></button>
+                         </div>
+                         <div class="expense-list" id="expenses-list-container"></div>
+                         <section style="margin-top: 30px;">
+                             <h2 class="section-title">Histórico de Liquidações</h2>
+                             <div class="item-list" id="settlements-list-container">
+                                 <p class="loading">Carregando liquidações...</p>
+                             </div>
+                         </section>
+                     </div>
+                    <div id="map-view" class="view container">
+                        <div id="map-container"></div>
+                    </div>
+                    
+                    <div id="profile-view" class="view container">
+                        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 30px;">
+                            <label for="profile-pic-input" class="profile-pic-wrapper">
+                                <img id="profile-view-img" src="" alt="Foto do Cobrador">
+                            </label>
+                            <input type="file" id="profile-pic-input" accept="image/*" style="display: none;">
+                            <h2 style="margin: 15px 0 0; font-size: 1.5em;" class="profile-name"></h2>
+                            <p style="margin: 5px 0 0; color: var(--text-secondary);" data-lang-key="collector"></p>
+                        </div>
+
+                        <!-- KPI 3: Capital Total (Patrimônio) - OCULTO -->
+                        <div class="kpi-card" style="display: none !important; margin-bottom: 20px; text-align: center; border-color: var(--accent-purple); border-width: 2px;">
+                            <h3 class="kpi-title" style="justify-content: center; color: var(--accent-purple);"><i data-lucide="gem"></i> Capital Total (Patrimônio)</h3>
+                            <p class="kpi-value" id="kpi-total-patrimonio" style="color: var(--accent-purple); font-size: 1.8em;"></p>
+                        </div>
+
+                        <!-- KPI 1: Capital em Mãos (Efectivo) - VISIBLE -->
+                        <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-green); border-width: 2px;">
+                            <h3 class="kpi-title" style="justify-content: center; color: var(--accent-green);"><i data-lucide="banknote"></i> Capital em Mãos</h3>
+                            <p class="kpi-value" id="kpi-capital-total"></p>
+                        </div>
+
+                        <!-- KPI 2: Capital Distribuido (en la Calle) - OCULTO -->
+                        <div class="kpi-card" style="display: none !important; margin-bottom: 20px; text-align: center; border-color: var(--accent-orange);">
+                            <h3 class="kpi-title" style="justify-content: center; color: var(--accent-orange);"><i data-lucide="briefcase"></i> Capital Distribuído</h3>
+                            <p class="kpi-value" id="kpi-distributed-capital" style="color: var(--accent-orange);"></p>
+                        </div>
+
+                        <section class="kpi-grid-profile">
+                             <div class="kpi-card">
+                                 <h3 class="kpi-title" data-lang-key="dailyTotal"><i data-lucide="sun"></i></h3>
+                                 <p class="kpi-value green" id="kpi-daily-total"></p>
+                             </div>
+                             <div class="kpi-card" style="background-color: color-mix(in srgb, var(--accent-green) 5%, var(--surface));">
+                                 <h3 class="kpi-title" data-lang-key="receivedInCash"><i data-lucide="banknote" style="color: var(--accent-green);"></i></h3>
+                                 <p class="kpi-value" id="kpi-daily-cash"></p>
+                             </div>
+                             <div class="kpi-card" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface));">
+                             <h3 class="kpi-title" data-lang-key="receivedInDigital"><i data-lucide="smartphone" style="color: var(--accent-purple);"></i></h3>
+                             <p class="kpi-value" id="kpi-daily-digital"></p>
+                         </div>
+                        </section>
+                         <section>
+                            <h2 class="section-title" data-lang-key="accountSettings"></h2>
+                            <div class="client-list">
+                                <div class="settings-item" id="realtime-tracking-item">
+                                    <i data-lucide="map-pin"></i>
+                                    <span data-lang-key="realtimeTracking" style="flex-grow: 1;"></span>
+                                    <div class="switch">
+                                        <input type="checkbox" id="realtime-tracking-toggle">
+                                        <label for="realtime-tracking-toggle"></label>
+                                    </div>
+                                </div>
+                                <a class="settings-item" id="payment-settings-btn">
+                                    <i data-lucide="dollar-sign"></i><span data-lang-key="paymentSettings"></span>
+                                </a>
+                                <a class="settings-item" id="change-password-btn">
+                                    <i data-lucide="key-round"></i><span data-lang-key="changePassword"></span>
+                                </a>
+                                <a class="settings-item" id="export-report-btn">
+                                    <i data-lucide="download"></i><span data-lang-key="exportReport"></span>
+                                </a>
+                                 <a class="settings-item logout" id="logout-btn">
+                                     <i data-lucide="log-out"></i><span data-lang-key="logout"></span>
+                                 </a>
+                            </div>
+                        </section>
+                    </div>
+                </main>
+                <nav class="bottom-nav">
+                    <a class="nav-item active" data-view="home"><i data-lucide="home"></i><span data-lang-key="navHome"></span></a>
+                    <a class="nav-item" data-view="clients"><i data-lucide="users"></i><span data-lang-key="navClients"></span></a>
+                    <a class="nav-item" data-view="notifications">
+                        <i data-lucide="bell"></i>
+                        <span data-lang-key="navNotifications"></span>
+                        <span class="notification-badge" id="notification-badge">0</span>
+                    </a>
+                    <a class="nav-item" data-view="expenses"><i data-lucide="receipt"></i><span data-lang-key="navExpenses"></span></a>
+                    <a class="nav-item" data-view="map"><i data-lucide="map"></i><span data-lang-key="navMap"></span></a>
+                </nav>
+                <button class="fab" id="addClientBtn" title="Adicionar Cliente"><i data-lucide="plus"></i></button>
+                <button class="fab hidden" id="addExpenseBtn" title="Adicionar Gasto"><i data-lucide="plus"></i></button>`;
+        }
 
 
 
@@ -6927,4 +6916,5 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
