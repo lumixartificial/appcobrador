@@ -1227,7 +1227,12 @@ const BLACKLIST_DATA = {
                             </div>
                         </div>
                         <section class="kpi-grid">
-                            <div class="kpi-card"><h3 class="kpi-title" data-lang-key="dailyGoal"><i data-lucide="target"></i></h3><p class="kpi-value" id="kpi-goal"></p></div>
+                            <!-- META DIARIA UNIFICADA -->
+                            <div class="kpi-card">
+                                <h3 class="kpi-title" data-lang-key="dailyGoal"><i data-lucide="target"></i></h3>
+                                <p class="kpi-value" id="kpi-goal"></p>
+                            </div>
+                            
                             <div class="kpi-card"><h3 class="kpi-title" data-lang-key="receivedToday"><i data-lucide="check-circle"></i></h3><p class="kpi-value green" id="kpi-received"></p></div>
                             <div class="kpi-card"><h3 class="kpi-title" data-lang-key="clientsRemaining"><i data-lucide="users"></i></h3><p class="kpi-value" id="kpi-remaining"></p></div>
                         </section>
@@ -1248,7 +1253,6 @@ const BLACKLIST_DATA = {
                         <div class="client-list" id="all-clients-list"></div>
                     </div>
 
-                    <!-- (Notificaciones sin cambios) -->
                     <div id="notifications-view" class="view container">
                          <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-purple);">
                             <span data-lang-key="navNotifications" style="font-size: 1.3em; font-weight: 600; padding-bottom: 10px;"></span>
@@ -1260,7 +1264,6 @@ const BLACKLIST_DATA = {
                          <div class="notification-list" id="notifications-list-container"></div>
                     </div>
 
-                     <!-- (Gastos sin cambios) -->
                      <div id="expenses-view" class="view container">
                          <h2 class="section-title" data-lang-key="myExpenses"></h2>
                          <div class="filter-buttons">
@@ -1299,19 +1302,16 @@ const BLACKLIST_DATA = {
                             <p style="margin: 5px 0 0; color: var(--text-secondary);" data-lang-key="collector"></p>
                         </div>
 
-                        <!-- KPI 3: Capital Total (Patrimônio) - OCULTO -->
                         <div class="kpi-card" style="display: none !important; margin-bottom: 20px; text-align: center; border-color: var(--accent-purple); border-width: 2px;">
                             <h3 class="kpi-title" style="justify-content: center; color: var(--accent-purple);"><i data-lucide="gem"></i> Capital Total (Patrimônio)</h3>
                             <p class="kpi-value" id="kpi-total-patrimonio" style="color: var(--accent-purple); font-size: 1.8em;"></p>
                         </div>
 
-                        <!-- KPI 1: Capital em Mãos (Efectivo) - VISIBLE -->
                         <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-green); border-width: 2px;">
                             <h3 class="kpi-title" style="justify-content: center; color: var(--accent-green);"><i data-lucide="banknote"></i> Capital em Mãos</h3>
                             <p class="kpi-value" id="kpi-capital-total"></p>
                         </div>
 
-                        <!-- KPI 2: Capital Distribuido (en la Calle) - OCULTO -->
                         <div class="kpi-card" style="display: none !important; margin-bottom: 20px; text-align: center; border-color: var(--accent-orange);">
                             <h3 class="kpi-title" style="justify-content: center; color: var(--accent-orange);"><i data-lucide="briefcase"></i> Capital Distribuído</h3>
                             <p class="kpi-value" id="kpi-distributed-capital" style="color: var(--accent-orange);"></p>
@@ -1662,72 +1662,84 @@ async function showRefinanceModal(clientId, notificationId) {
             const client = allClients.find(c => c.id === clientId);
             
             const loan = client?.loans ? client.loans[loanIndex] : null; 
-            const payment = loan?.history ? loan.history[historyIndex] : null; // Buscamos en el historial del préstamo
+            const payment = loan?.history ? loan.history[historyIndex] : null;
 
-            if (!client || !loan || !payment) { // Verifica cliente, préstamo y pago
-                console.error("Error al buscar detalle de pago:", { clientId, loanIndex, historyIndex, client, loan, payment });
+            if (!client || !loan || !payment) { 
+                console.error("Error: Datos no encontrados", { clientId, loanIndex, historyIndex });
                 showToast('Detalhe do pagamento não encontrado.', true);
                 return;
             }
             
-            let dateStr = 'N/A';
-            let timeStr = 'N/A';
+            // --- 1. NORMALIZACIÓN DE FECHAS (La corrección clave) ---
+            // Convertimos la fecha del pago a un objeto Date estándar, venga de donde venga
+            let paymentDateObj = null;
+            if (payment.date?.seconds) {
+                paymentDateObj = new Date(payment.date.seconds * 1000); // Es Timestamp de Firestore
+            } else if (payment.date instanceof Date) {
+                paymentDateObj = payment.date; // Es fecha local (recién creado)
+            } else {
+                paymentDateObj = new Date(payment.date); // Intento de fallback
+            }
+
+            const dateStr = paymentDateObj.toLocaleDateString('pt-BR');
+            const timeStr = paymentDateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             
-            // --- [INICIO FASE 3: LÓGICA DE EXCLUSÃO] ---
+            // --- 2. LÓGICA DE EXCLUSIÓN ROBUSTA ---
             let canDelete = false;
             let deleteTitle = "Exclusão não permitida";
-            let deleteButtonHtml = '';
+            
+            // Obtenemos fecha de hoy sin hora para comparar
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const paymentDay = new Date(paymentDateObj);
+            paymentDay.setHours(0, 0, 0, 0);
 
-            if (payment.date?.seconds) {
-                const paymentDate = new Date(payment.date.seconds * 1000);
-                const today = new Date();
-                
-                dateStr = paymentDate.toLocaleDateString('pt-BR');
-                timeStr = paymentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            // A. ¿Es el pago de HOY?
+            const isToday = paymentDay.getTime() === today.getTime();
 
-                // 1. Es de Hoy? (Compara 'YYYY-MM-DD' de ambas fechas)
-                const isToday = paymentDate.toDateString() === today.toDateString();
+            // B. ¿Es el ÚLTIMO pago registrado? (Para no romper la matemática)
+            // Ordenamos el historial temporalmente para verificar
+            const sortedHistory = [...loan.history].sort((a, b) => {
+                const timeA = a.date?.seconds ? a.date.seconds : (a.date instanceof Date ? a.date.getTime()/1000 : 0);
+                const timeB = b.date?.seconds ? b.date.seconds : (b.date instanceof Date ? b.date.getTime()/1000 : 0);
+                return timeA - timeB;
+            });
+            
+            const lastPayment = sortedHistory[sortedHistory.length - 1];
+            // Comparamos por referencia o por valor exacto y fecha
+            const isLastPayment = (payment === lastPayment) || 
+                                  (payment.amount === lastPayment.amount && paymentDateObj.getTime() === (lastPayment.date?.seconds ? lastPayment.date.seconds*1000 : lastPayment.date.getTime()));
 
-                // 2. Es el Último Pago? (Compara el timestamp en segundos)
-                // Ordenamos el historial para encontrar el pago más reciente
-                const sortedHistory = [...loan.history].sort((a, b) => (a.date?.seconds || 0) - (b.date?.seconds || 0));
-                const lastPaymentInHistory = sortedHistory[sortedHistory.length - 1];
-                const isLastPayment = (payment.date.seconds === lastPaymentInHistory.date.seconds && payment.amount === lastPaymentInHistory.amount);
-                
-                // 3. Define si se puede eliminar
-                if (isToday && isLastPayment) {
-                    canDelete = true;
-                    deleteTitle = "Excluir este pagamento";
-                } else if (!isToday) {
-                    deleteTitle = "Não é possível excluir: O pagamento não foi feito hoje.";
-                } else if (!isLastPayment) {
-                    deleteTitle = "Não é possível excluir: Este não é o último pagamento. Contate o admin.";
-                }
+            // C. Decisión final
+            if (isToday && isLastPayment) {
+                canDelete = true;
+                deleteTitle = "Excluir este pagamento permanentemente";
+            } else if (!isToday) {
+                deleteTitle = "Só é possível excluir pagamentos feitos HOJE.";
+            } else if (!isLastPayment) {
+                deleteTitle = "Só é possível excluir o ÚLTIMO pagamento lançado.";
             }
             
-            // 4. Prepara el HTML del botón de eliminar
-            deleteButtonHtml = `
+            // --- 3. BOTONES ---
+            let deleteButtonHtml = `
                 <button id="delete-payment-btn" class="btn-danger" 
                     ${canDelete ? '' : 'disabled'} 
                     title="${deleteTitle}" 
-                    style="${canDelete ? '' : 'flex-grow: 1; background-color: var(--text-secondary); border-color: var(--text-secondary); opacity: 0.7;'}">
+                    style="${canDelete ? '' : 'opacity: 0.5; cursor: not-allowed; background-color: var(--text-secondary); border-color: var(--text-secondary);'}">
                     <i data-lucide="trash-2"></i> Excluir Pagamento
                 </button>`;
-            // --- [FIN FASE 3: LÓGICA DE EXCLUSÃO] ---
-
 
             let receiptPreviewHtml = `<p class="no-items">Nenhum comprovante anexado.</p>`;
-            if (payment.receiptUrl) {
-                receiptPreviewHtml = `<img src="${payment.receiptUrl}" alt="Comprovante de Pagamento" style="width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">`;
-            }
-
             let receiptButtonHtml = '';
+
             if (payment.receiptUrl) {
-                 receiptButtonHtml = `<a href="${payment.receiptUrl}" target="_blank" download="comprovante-${client.name.replace(/\s/g, '_')}-${dateStr}.jpg" class="btn-primary"><i data-lucide="download"></i> Baixar Comprovante</a>`;
+                receiptPreviewHtml = `<img src="${payment.receiptUrl}" alt="Comprovante" style="width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">`;
+                receiptButtonHtml = `<a href="${payment.receiptUrl}" target="_blank" class="btn-primary" style="flex-grow:1;"><i data-lucide="download"></i> Baixar</a>`;
             }
-            const invoiceButtonHtml = `<button id="generate-invoice-btn" class="btn-secondary"><i data-lucide="receipt"></i> Emitir Fatura</button>`;
 
+            const invoiceButtonHtml = `<button id="generate-invoice-btn" class="btn-secondary" style="flex-grow:1;"><i data-lucide="receipt"></i> Fatura</button>`;
 
+            // --- 4. RENDERIZADO ---
             modal.innerHTML = `
                 <header class="modal-header">
                     <button id="closePaymentDetailModal"><i data-lucide="arrow-left"></i></button>
@@ -1745,16 +1757,19 @@ async function showRefinanceModal(clientId, notificationId) {
                                 <p class="kpi-value green" style="font-size: 1.4em;">${money(payment.amount)}</p>
                             </div>
                         </div>
+                        ${!canDelete ? `<p style="font-size:0.85em; color:var(--text-secondary); text-align:center; background:#f0f0f0; padding:5px; border-radius:4px;">${deleteTitle}</p>` : ''}
                     </div>
                     <h3 class="section-title" style="border: none;">Comprovante</h3>
                     <div class="kpi-card">
                         ${receiptPreviewHtml}
                     </div>
                 </div>
-                <div class="action-buttons">
-                    ${receiptButtonHtml}
-                    ${invoiceButtonHtml}
-                    ${deleteButtonHtml} <!-- Botón de eliminar añadido aquí -->
+                <div class="action-buttons" style="flex-wrap: wrap;">
+                    <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 10px;">
+                        ${receiptButtonHtml}
+                        ${invoiceButtonHtml}
+                    </div>
+                    ${deleteButtonHtml} <!-- El botón de borrar ocupa todo el ancho abajo -->
                 </div>
             `;
 
@@ -1766,16 +1781,15 @@ async function showRefinanceModal(clientId, notificationId) {
             modal.querySelector('#closePaymentDetailModal').addEventListener('click', () => window.history.back());
             modal.querySelector('#generate-invoice-btn').addEventListener('click', () => generateInvoicePDF(client, payment));
             
-            // --- [INICIO FASE 3: LISTENER DE EXCLUSÃO] ---
-            if (canDelete) {
-                modal.querySelector('#delete-payment-btn').addEventListener('click', async () => {
-                    // 1. Pedir Confirmación
+            // --- 5. LISTENER DE BORRADO ---
+            const deleteBtn = modal.querySelector('#delete-payment-btn');
+            if (deleteBtn && canDelete) {
+                deleteBtn.addEventListener('click', async () => {
                     showConfirmationModal(
                         'Excluir Pagamento?',
-                        'Esta ação é irreversível e irá recalcular o saldo deste cliente. Tem certeza?',
+                        'Esta ação removerá o pagamento do saldo e do histórico. O valor da dívida aumentará. Tem certeza?',
                         async () => {
-                            // Usuario confirmó...
-                            const deleteBtn = document.getElementById('delete-payment-btn');
+                            // Bloqueamos el botón
                             if(deleteBtn) {
                                 deleteBtn.disabled = true;
                                 deleteBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Excluindo...`;
@@ -1785,30 +1799,29 @@ async function showRefinanceModal(clientId, notificationId) {
                             try {
                                 const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
                                 
-                                // 2. Obtenemos los datos más frescos (por si acaso)
-                                const currentClientData = allClients.find(c => c.id === clientId);
+                                // Recargamos datos frescos para evitar conflictos
+                                const clientIdx = allClients.findIndex(c => c.id === clientId);
+                                if (clientIdx === -1) throw new Error("Cliente no encontrado en memoria");
+                                const currentClientData = allClients[clientIdx];
                                 const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
                                 const currentLoan = updatedLoans[loanIndex];
 
-                                // 3. Eliminar el pago del array
+                                // Borramos el pago del array
                                 currentLoan.history.splice(historyIndex, 1);
                                 
-                                // 4. Recalcular la contabilidad (La lógica MÁS IMPORTANTE)
-                                // (Esta lógica es la misma que usamos en Fase 2 y 3, es la lógica unificada)
+                                // RECALCULAMOS SALDOS (Lógica contable unificada)
                                 const historyPaid = (currentLoan.history || [])
                                     .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
                                     .reduce((sum, h) => sum + (h.amount || 0), 0);
                                 
                                 const initialPaid = currentLoan.initialMigratedAmount || 0;
                                 const newTotalPaid = historyPaid + initialPaid;
-                                const installmentValue = currentLoan.originalInstallmentAmount || 1; // Evita división por cero
+                                const installmentValue = currentLoan.originalInstallmentAmount || 1;
                                 const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
                                 const totalInstallments = parseInt(totalInstallmentsStr, 10);
                                 
                                 let paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
-                                if (paidInstallmentsCount > totalInstallments) {
-                                    paidInstallmentsCount = totalInstallments; // No puede pagar más cuotas de las que existen
-                                }
+                                if (paidInstallmentsCount > totalInstallments) paidInstallmentsCount = totalInstallments;
                                 
                                 const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
 
@@ -1816,14 +1829,14 @@ async function showRefinanceModal(clientId, notificationId) {
                                 currentLoan.paymentBalance = newBalance;
                                 currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
 
-                                // 5. Guardar en Firestore
+                                // Guardamos en Firebase
                                 await updateDoc(clientRef, { loans: updatedLoans });
 
                                 showToast('Pagamento excluído com sucesso!');
-                                window.history.back(); // Cierra el modal de confirmación
-                                window.history.back(); // Cierra el modal de detalles del pago
+                                window.history.back(); // Cierra confirmación
+                                window.history.back(); // Cierra detalle
                                 
-                                // 6. Refrescar la vista de detalles del cliente
+                                // Refrescamos vista
                                 showClientDetails(clientId, loanIndex); 
                                 
                             } catch (error) {
@@ -1834,13 +1847,12 @@ async function showRefinanceModal(clientId, notificationId) {
                                     deleteBtn.innerHTML = `<i data-lucide="trash-2"></i> Excluir Pagamento`;
                                     lucide.createIcons({nodes: [deleteBtn.querySelector('i')]});
                                 }
-                                window.history.back(); // Cierra el modal de confirmación
+                                window.history.back(); // Cierra confirmación
                             }
                         }
                     );
                 });
             }
-            // --- [FIN FASE 3: LISTENER DE EXCLUSÃO] ---
         }    
 
         async function generateInvoicePDF(client, payment) {
@@ -2044,25 +2056,25 @@ async function showRefinanceModal(clientId, notificationId) {
         function updateRouteProgress() {
             const todaysTotalClientsList = getAllTodaysClients();
 
-            // 1. Contar clientes ÚNICOS totales para hoy (Sin cambios)
-            const uniqueClientIds = new Set(todaysTotalClientsList.map(item => item.client.id));
+            // --- CORRECCIÓN: FILTRAR SOLO ACTIVOS ---
+            // Solo contamos para la ruta los clientes que NO están finalizados.
+            // Si el cálculo dice 'finished', lo sacamos del total de la barra.
+            const activeRouteClients = todaysTotalClientsList.filter(item => item.loan.status !== 'finished');
+
+            // 1. Contar clientes ÚNICOS activos
+            const uniqueClientIds = new Set(activeRouteClients.map(item => item.client.id));
             const totalClients = uniqueClientIds.size;
 
-            // 2. Definir "Hoy" (NUEVO)
+            // 2. Definir "Hoy"
             let paidClients = 0;
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
-            // 3. Función auxiliar de fecha (NUEVO)
+            // 3. Función auxiliar de fecha
             const getPaymentDate = (dateObj) => {
                 if (!dateObj) return null;
-                if (typeof dateObj.toDate === 'function') {
-                    return dateObj.toDate(); // Es un Timestamp de Firestore
-                }
-                if (dateObj instanceof Date) {
-                    return dateObj; // Es un JS Date (pago local recién hecho o migración)
-                }
-                // Fallback para strings
+                if (typeof dateObj.toDate === 'function') return dateObj.toDate();
+                if (dateObj instanceof Date) return dateObj;
                 if (typeof dateObj === 'string') {
                     const d = new Date(dateObj);
                     if (!isNaN(d.getTime())) return d;
@@ -2070,20 +2082,19 @@ async function showRefinanceModal(clientId, notificationId) {
                 return null;
             };
 
-            // 4. Lógica de conteo de "Pagados" (¡CORREGIDO!)
+            // 4. Lógica de conteo de "Completados/Pagados"
             uniqueClientIds.forEach(clientId => {
-                // Obtenemos todos los préstamos de ESTE cliente para HOY
-                const clientLoansForToday = todaysTotalClientsList.filter(item => item.client.id === clientId);
+                // Filtramos también aquí para usar solo los préstamos activos
+                const clientLoansForToday = activeRouteClients.filter(item => item.client.id === clientId);
                 
-                // Regla 1: ¿El cliente todavía tiene préstamos pendientes/atrasados?
+                // Regla 1: ¿Tiene préstamos pendientes o atrasados?
                 const hasUnpaidLoan = clientLoansForToday.some(item => item.loan.status === 'pending' || item.loan.status === 'late');
 
-                // Regla 2: ¿El cliente HA PAGADO HOY? (Itera sobre CADA préstamo del día)
+                // Regla 2: ¿Pagó hoy?
                 const hasPaidToday = clientLoansForToday.some(item => {
                     const loan = item.loan;
                     if (!loan.history || loan.history.length === 0) return false;
                     
-                    // Comprueba si CUALQUIER pago en el historial de ESE préstamo fue hoy
                     return loan.history.some(h => {
                         if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') {
                             return false; 
@@ -2093,16 +2104,13 @@ async function showRefinanceModal(clientId, notificationId) {
                     });
                 });
 
-                // Lógica Final de Conteo:
-                // Si NO tiene préstamos sin pagar (ej: 'paid' o 'finished')
-                // O SI ha pagado hoy (aunque siga 'late')
-                // -> se cuenta como "pagado" para la barra de progreso.
+                // Si NO debe nada pendiente O Si ya pagó hoy -> Cuenta como avance
                 if (!hasUnpaidLoan || hasPaidToday) {
                     paidClients++;
                 }
             });
 
-            // 5. Renderizar (Sin cambios)
+            // 5. Renderizar
             const progressPercentage = totalClients > 0 ? (paidClients / totalClients) * 100 : 0;
             const progressBar = document.getElementById('route-progress-bar');
             const progressText = document.getElementById('route-progress-text');
@@ -2117,78 +2125,119 @@ async function showRefinanceModal(clientId, notificationId) {
 
         
 
-        function updateDashboard(clientsForDashboard) { // 'clientsForDashboard' ahora es una lista de items [{ client, loan, ... }]
+        function updateDashboard(clientsForDashboard) { 
             const kpiGoal = document.getElementById('kpi-goal');
             const kpiReceived = document.getElementById('kpi-received');
             const kpiRemaining = document.getElementById('kpi-remaining');
+            
             if (!kpiGoal) return;
+
+            // --- VARIABLES DE CÁLCULO UNIFICADO ---
+            let calculatedDailyGoal = 0;      
             
-            // 1. Lógica de "Meta Diaria" (¡CORREGIDA!)
-            if (!clientsForDashboard || clientsForDashboard.length === 0) {
-                 kpiGoal.textContent = money(0);
-                 kpiRemaining.textContent = 0;
-            } else {
-                
-                // 1.A. Definir "Hoy" y la función auxiliar de fecha (NUEVO)
-                const todayStart = new Date();
-                todayStart.setHours(0, 0, 0, 0);
-                const getPaymentDate = (dateObj) => {
-                    if (!dateObj) return null;
-                    if (typeof dateObj.toDate === 'function') {
-                        return dateObj.toDate();
-                    }
-                    if (dateObj instanceof Date) {
-                        return dateObj;
-                    }
-                    if (typeof dateObj === 'string') {
-                        const d = new Date(dateObj);
-                        if (!isNaN(d.getTime())) return d;
-                    }
-                    return null;
-                };
+            const today = new Date();
+            const dayOfWeek = today.getDay(); // 0 (Dom) a 6 (Sab)
+            const dayOfMonth = today.getDate();
+            const todayStr = today.toLocaleDateString('pt-BR');
 
-                // 1.B. Calcular "Meta Diária" (Daily Goal)
-                // Suma el valor de todos los préstamos NO pagados
-                const dailyGoal = clientsForDashboard
-                    .filter(item => item.loan.status !== 'paid')
-                    .reduce((sum, item) => sum + (item.loan.amount || 0), 0);
-                
-                // 2. Calcular "Clientes Restantes" (Remaining Clients)
-                // ¡AQUÍ ESTÁ LA LÓGICA CORREGIDA!
-                
-                // Filtramos los *items* que están pendientes/atrasados Y NO han pagado hoy
-                const remainingItems = clientsForDashboard.filter(item => {
-                    const loan = item.loan;
-                    const isStatusPendingOrLate = (loan.status === 'pending' || loan.status === 'late');
+            // Función auxiliar para verificar si un pago es de hoy
+            const checkIsToday = (timestamp) => {
+                if (!timestamp) return false;
+                let d;
+                if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
+                else if (timestamp instanceof Date) d = timestamp;
+                else d = new Date(timestamp);
+                return !isNaN(d) && d.toLocaleDateString('pt-BR') === todayStr;
+            };
 
-                    // ¿HA PAGADO HOY?
-                    let hasPaidToday = false;
-                    if (loan.history && loan.history.length > 0) {
-                        hasPaidToday = loan.history.some(h => {
-                            if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') {
-                                return false; 
-                            }
-                            const paymentDate = getPaymentDate(h.date);
-                            return paymentDate && paymentDate >= todayStart;
-                        });
+            // Recorremos TODOS los clientes
+            allClients.forEach(client => {
+                (client.loans || []).forEach(loan => {
+                    // Ignoramos finalizados si no pagaron hoy
+                    const isFinished = loan.status === 'finished';
+
+                    // 1. Calcular cuánto ha pagado HOY este préstamo
+                    const paidToday = (loan.history || []).reduce((sum, h) => {
+                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
+                            return sum + (parseFloat(h.amount) || 0);
+                        }
+                        return sum;
+                    }, 0);
+
+                    if (isFinished && paidToday === 0) return;
+
+                    // 2. Determinar si hoy es día de cobro (CONVERSIÓN SEGURA A NÚMERO)
+                    let isPaymentDay = false;
+                    const frequency = loan.paymentFrequency || 'daily';
+                    const paymentDays = loan.paymentDays || [];
+
+                    if (frequency === 'daily') {
+                        isPaymentDay = paymentDays.some(d => parseInt(d) === dayOfWeek);
+                    } else if (frequency === 'weekly') {
+                        // Verificamos si el arreglo tiene datos y si el primer día coincide con hoy
+                        isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+                    } else if (frequency === 'monthly') {
+                        isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
                     }
+
+                    // 3. Valor de la cuota (Aseguramos que sea número)
+                    let installmentValue = parseFloat(loan.amount) || 0;
+                    if (installmentValue === 0 && loan.originalInstallmentAmount) {
+                        installmentValue = parseFloat(loan.originalInstallmentAmount);
+                    }
+
+                    // 4. Calcular deuda al inicio del día para no pedir de más
+                    const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
+                        (h.status === 'approved' || h.method === 'migration') ? sum + (h.amount || 0) : sum, 0
+                    );
+                    const totalLoan = parseFloat(loan.totalLoan) || 0;
+                    const remainingBalanceTotal = Math.max(0, totalLoan - totalPaidAllTime);
                     
-                    // Regla Final:
-                    return isStatusPendingOrLate && !hasPaidToday;
-                });
-                
-                // Creamos un Set (lista única) de los IDs de clientes de esos items
-                const uniqueRemainingClientIds = new Set(remainingItems.map(item => item.client.id));
-                const remainingClientsCount = uniqueRemainingClientIds.size;
+                    // Ajuste: La deuda al empezar el día era (SaldoActual + LoQuePagóHoy)
+                    const debtAtStartOfDay = remainingBalanceTotal + paidToday;
+                    
+                    // Si la cuota es mayor que la deuda total, la meta es solo la deuda restante
+                    if (installmentValue > debtAtStartOfDay) {
+                        installmentValue = debtAtStartOfDay;
+                    }
 
-                kpiGoal.textContent = money(dailyGoal);
-                // Asignamos el nuevo conteo de CLIENTES ÚNICOS
-                kpiRemaining.textContent = remainingClientsCount; 
-            }
+                    // --- SUMA UNIFICADA ---
+                    // Sumamos a la meta si:
+                    // A) Hoy le toca pagar (sea diario, semanal o mensual).
+                    // B) Ya pagó algo hoy (adelanto).
+                    // Se toma el mayor entre (Lo que pagó) y (Lo que debía).
+                    if (isPaymentDay || paidToday > 0) {
+                        calculatedDailyGoal += Math.max(paidToday, installmentValue);
+                    }
+                });
+            });
+
+            // --- 4. RENDERIZAR EN PANTALLA ---
             
-            // 3. Lógica de "Recebido Hoje" (Sin cambios, ya era correcta)
+            kpiGoal.textContent = money(calculatedDailyGoal);
+            
+            // Total Recibido Hoy
             const { dailyTotal } = calculateDailyTotals();
             kpiReceived.textContent = money(dailyTotal);
+
+            // Clientes Restantes
+            if (!clientsForDashboard || clientsForDashboard.length === 0) {
+                 kpiRemaining.textContent = 0;
+            } else {
+                const remainingItems = clientsForDashboard.filter(item => {
+                    const loan = item.loan;
+                    const paidTodayVal = (loan.history || []).reduce((sum, h) => {
+                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
+                            return sum + (h.amount || 0);
+                        }
+                        return sum;
+                    }, 0);
+                    // Solo contamos como "restante" si NO ha pagado nada hoy
+                    return paidTodayVal === 0;
+                });
+                const uniqueRemainingIds = new Set(remainingItems.map(i => i.client.id));
+                kpiRemaining.textContent = uniqueRemainingIds.size;
+            }
         }
         
         
@@ -2316,14 +2365,14 @@ async function showRefinanceModal(clientId, notificationId) {
                amountDueToday: 0 
            };
 
-           // 1. OBTENER TOTAL PAGADO (Esto es correcto, incluye migración)
+           // 1. Obtener TOTAL PAGADO (Incluye migración)
            const currentTotalPaid = (loan.history || [])
                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                .reduce((sum, h) => sum + (h.amount || 0), 0);
             
-           // OBTENER TOTAL PAGADO (SIN MIGRACIÓN) - (Esto es nuevo, para calcular atrasos)
+           // 2. Obtener TOTAL PAGADO (SIN MIGRACIÓN)
            const currentTotalPaid_NoMigration = (loan.history || [])
-               .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') // <-- IGNORA MIGRACIÓN
+               .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') 
                .reduce((sum, h) => sum + (h.amount || 0), 0);
 
            if (!loan || !loan.totalLoan || loan.status === 'finished' || (currentTotalPaid >= loan.totalLoan)) {
@@ -2334,32 +2383,35 @@ async function showRefinanceModal(clientId, notificationId) {
            const today = new Date();
            today.setHours(0, 0, 0, 0);
            
-           // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (1/4)] ---
-           // ¡EL BUG ESTÁ AQUÍ! No podemos usar 'lastRelevantDate'. 
-           // Debemos calcular el atraso SIEMPRE desde la 'startDate' del préstamo.
-           if (!loan.startDate?.seconds) {
-                console.warn("No se puede calcular el estado: falta fecha de inicio (startDate).");
-                return details; // No podemos calcular nada sin la fecha de inicio
-           }
-           let checkDate = new Date(loan.startDate.seconds * 1000); 
-           checkDate.setHours(0, 0, 0, 0);
-           // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA (1/4)] ---
+           if (!loan.startDate?.seconds) { return details; }
+           
+           let startDateObj = new Date(loan.startDate.seconds * 1000);
+           startDateObj.setHours(0, 0, 0, 0);
+
+           let checkDate = new Date(startDateObj); 
            
            let accumulatedLateDays = 0;
            let accumulatedLateFees = 0;
            const dailyLateRate = (loan.lateFeeRate || 0) / 100;
            const installmentAmount = loan.originalInstallmentAmount || 0;
-           let installmentsDueCount = 0; // Cuotas debidas HASTA AYER
+           let installmentsDueCount = 0; 
            let nextDueDateFound = false;
            
            let stopDate = new Date(today);
            stopDate.setDate(stopDate.getDate() + 35); 
 
            while (checkDate <= stopDate) {
+               // Protección: Saltamos el día de creación del préstamo
+               if (checkDate.getTime() === startDateObj.getTime()) {
+                   checkDate.setDate(checkDate.getDate() + 1);
+                   continue;
+               }
+
                const dayOfWeek = checkDate.getDay();
                const dayOfMonth = checkDate.getDate();
                const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
-               const isHoliday = nationalHolidays.includes(formattedDate);
+               const isHoliday = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(formattedDate) : false;
+               
                const frequency = loan.paymentFrequency || 'daily';
                let isPaymentDay = false;
 
@@ -2368,43 +2420,33 @@ async function showRefinanceModal(clientId, notificationId) {
                else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
 
                if (!isHoliday && isPaymentDay) {
-                   
-                   // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (2/4)] ---
-                   // Lógica del PASADO (hasta ayer)
+                   // PASADO
                    if (checkDate < today) {
-                       installmentsDueCount++; // Contamos esta cuota como debida
-                       
-                       // Calculamos el total esperado HASTA ESTE DÍA
+                       installmentsDueCount++; 
                        const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                       
-                       // Comparamos con lo pagado (sin migración)
                        const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid_NoMigration);
 
                        if (outstandingDueAmount > 0) {
-                           accumulatedLateDays++; // ¡Está atrasado este día!
+                           accumulatedLateDays++; 
                            if (dailyLateRate > 0) {
-                               const dailyFee = outstandingDueAmount * dailyLateRate;
-                               accumulatedLateFees += dailyFee;
+                               accumulatedLateFees += (outstandingDueAmount * dailyLateRate);
                            }
                        }
-                   // Lógica de HOY
+                   // HOY
                    } else if (checkDate.getTime() === today.getTime()) {
                        details.amountDueToday = installmentAmount;
                        if (!nextDueDateFound) {
                            details.nextDueDate = new Date(checkDate);
                            nextDueDateFound = true;
                        }
-                   // Lógica del FUTURO
+                   // FUTURO
                    } else if (checkDate > today && !nextDueDateFound) {
                        details.nextDueDate = new Date(checkDate);
                        nextDueDateFound = true;
                    }
-                   // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA (2/4)] ---
                }
                
-               if (nextDueDateFound && checkDate > today) {
-                    break;
-               }
+               if (nextDueDateFound && checkDate > today) break;
                checkDate.setDate(checkDate.getDate() + 1);
            }
            
@@ -2414,58 +2456,27 @@ async function showRefinanceModal(clientId, notificationId) {
            const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
            const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
 
-           // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (3/4)] ---
-           // Lógica de STATUS revisada
            if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
                details.status = 'finished';
-           
            } else if (accumulatedLateDays > 0) { 
-                // ¡ESTA ES LA CORRECCIÓN CLAVE!
-                // Si tiene 1 o más días de atraso (calculado desde el INICIO),
-                // SIEMPRE está 'late', incluso en domingo.
                details.status = 'late';
-
-           } else if (details.amountDueToday > 0) { // Hoy es día de pago (y no está atrasado)
-                
-                // Calculamos el total esperado HOY (cuotas de ayer + cuota de hoy)
+           } else if (details.amountDueToday > 0) { 
                 const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
                 let expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
-                
-                // Verificamos si es un cliente migrado HOY
-                let isMigratedToday = false;
-                if (loan.migrationDate?.seconds) {
-                    const migrationDt = new Date(loan.migrationDate.seconds * 1000);
-                    migrationDt.setHours(0, 0, 0, 0);
-                    if (migrationDt.getTime() === today.getTime()) {
-                        isMigratedToday = true;
-                    }
-                }
-
-                // Ajuste para el primer día de un cliente migrado
-                if (isMigratedToday && installmentsDueCount === 0) {
-                    // El "esperado" es el monto migrado + la cuota de hoy
-                    expectedTotalIncludingToday = (loan.initialMigratedAmount || 0) + installmentAmount;
-                    // Comparamos con el PAGO TOTAL (que incluye la migración)
-                    if (currentTotalPaid < expectedTotalIncludingToday) {
-                        details.status = 'pending';
-                    } else {
-                        details.status = 'paid';
-                    }
+                if (currentTotalPaid_NoMigration < expectedTotalIncludingToday) {
+                    details.status = 'pending';
                 } else {
-                    // Cliente normal: comparamos lo pagado (sin migración) con lo esperado
-                    if (currentTotalPaid_NoMigration < expectedTotalIncludingToday) {
-                        details.status = 'pending';
-                    } else {
-                        details.status = 'paid';
-                    }
+                    details.status = 'paid';
                 }
-           
            } else {
-                // --- [INICIO DE LA CORRECCIÓN QUIRÚRGICA (4/4)] ---
-                // Si NO está 'finished', NO está 'late', y NO paga hoy...
-                // significa que está "Al día".
-                details.status = 'paid'; // Se considera 'paid' (Pagado/Al día)
-                // --- [FIN DE LA CORRECCIÓN QUIRÚRGICA (4/4)] ---
+                // AQUÍ ESTÁ EL CAMBIO IMPORTANTE:
+                // Si es Semanal y no es día de pago, lo marcamos 'pending' para que no salga 'paid'.
+                const frequency = loan.paymentFrequency || 'daily';
+                if (frequency === 'weekly') {
+                    details.status = 'pending';
+                } else {
+                    details.status = 'paid'; 
+                }
            }
            
            return details;
@@ -2481,6 +2492,10 @@ async function showRefinanceModal(clientId, notificationId) {
             }
             container.innerHTML = ''; 
 
+            // 1. Definimos el inicio del día ACTUAL (00:00:00 local) una sola vez para todos
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
             // Agrupa los préstamos por cliente ID
             const clientsMap = new Map();
             clientsData.forEach(item => {
@@ -2494,11 +2509,13 @@ async function showRefinanceModal(clientId, notificationId) {
             // Itera sobre cada cliente único
             clientsMap.forEach(({ client, loans }) => { 
                 
-                // Recalculamos el estado de cada préstamo al vuelo
+                // --- CÁLCULO DE ESTADO AL VUELO ---
                 loans.forEach(l => {
                     const details = calculateLoanDetails(l);
                     l.status = details.status; 
                     l.lateDays = details.lateDays;
+                    // IMPORTANTE: Guardamos si HOY debe pagar algo
+                    l.amountDueToday = details.amountDueToday || 0; 
                 });
 
                 // Seleccionamos el préstamo más relevante para mostrar
@@ -2511,10 +2528,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 const activeLoansCount = loans.filter(l => l.status !== 'finished').length;
                 const hasMultipleActive = activeLoansCount > 1;
 
-                // --- LÓGICA DE VERIFICACIÓN DE PAGO HOY ---
-                const todayStart = new Date();
-                todayStart.setHours(0, 0, 0, 0);
-
+                // --- VERIFICACIÓN ROBUSTA DE PAGO HOY ---
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
                     if (typeof dateObj.toDate === 'function') return dateObj.toDate();
@@ -2522,9 +2536,8 @@ async function showRefinanceModal(clientId, notificationId) {
                     return null;
                 };
 
-                // Verificamos si hay algún pago válido con fecha de HOY
+                // Verificamos si hay algún pago válido con fecha mayor o igual a las 00:00 de HOY
                 const hasPaidToday = (displayLoan.history || []).some(h => {
-                    // Ignorar pagos rechazados, pospuestos o migraciones
                     if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') {
                         return false; 
                     }
@@ -2532,10 +2545,9 @@ async function showRefinanceModal(clientId, notificationId) {
                     return paymentDate && paymentDate >= todayStart;
                 });
 
-                // --- DEFINICIÓN DE ETIQUETAS ---
+                // --- ETIQUETAS VISUALES ---
 
-                // 1. Etiqueta debajo del NOMBRE (Atrasado / Finalizado)
-                // Esta se mantiene igual: indica el estado GENERAL de la cuenta
+                // 1. Etiqueta debajo del Nombre (Estado general)
                 let statusLabelUnderName = '';
                 if (displayLoan.status === 'late') {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO</span>`;
@@ -2543,30 +2555,46 @@ async function showRefinanceModal(clientId, notificationId) {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: #4338ca; font-weight: 700; margin-top: 2px;">🏁 FINALIZADO</span>`;
                 }
 
-                // 2. Etiqueta debajo del DINERO (Pago / Falta por pagar)
-                // AQUÍ ESTÁ EL CAMBIO: Priorizamos si pagó hoy
+                // 2. Frecuencia en MAYÚSCULAS debajo del monto
+                const freqMap = { 'daily': 'DIÁRIO', 'weekly': 'SEMANAL', 'monthly': 'MENSAL' };
+                const rawFreq = displayLoan.paymentFrequency || 'daily';
+                const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
+                
+                const frequencyHtml = `<div style="font-size: 0.7em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 2px;">${freqText}</div>`;
+
+                // 3. Etiqueta Inferior (Lógica 00:00 Horas)
                 let bottomStatusText = '';
-                let bottomStatusClass = '';
+                let bottomStatusStyle = ''; 
 
                 if (displayLoan.status === 'finished') {
+                    // Si ya terminó de pagar todo el préstamo
                     bottomStatusText = '-'; 
-                    bottomStatusClass = 'status-finished'; // Azul
+                    bottomStatusStyle = 'color: #4338ca; background-color: #e0e7ff;';
                 } else if (hasPaidToday) {
-                    // ¡SI PAGÓ HOY, SALE VERDE! (Sin importar si está atrasado globalmente)
-                    bottomStatusText = 'Pago';
-                    bottomStatusClass = 'status-paid'; 
-                } else if (displayLoan.status === 'paid') {
-                     // Caso raro: no pagó hoy, pero está al día (ej. pagó ayer adelantado)
-                    bottomStatusText = 'Pago';
-                    bottomStatusClass = 'status-paid';
+                    // SI PAGÓ HOY (Verde) -> Prioridad máxima
+                    bottomStatusText = 'PAGO';
+                    bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700;'; 
                 } else {
-                    // Si no ha pagado hoy y no está finalizado
-                    bottomStatusText = 'Falta por pagar';
-                    // Usamos rojo si está atrasado general, o amarillo si solo está pendiente
-                    bottomStatusClass = displayLoan.status === 'late' ? 'status-late' : 'status-pending';
+                    // NO HA PAGADO HOY (Pasadas las 00:00 se reinicia a esto)
+                    
+                    // ¿Toca pagar HOY? (Calculado por calculateLoanDetails según el día de la semana)
+                    if (displayLoan.amountDueToday > 0) {
+                        // SI TOCA HOY (Diario o es el día de la semana correcto) -> ROJO
+                        bottomStatusText = 'FALTA POR PAGAR';
+                        bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
+                    } else {
+                        // NO TOCA HOY (Ej: Semanal y es martes, pero paga viernes) -> AMARILLO
+                        if (displayLoan.paymentFrequency === 'weekly' || displayLoan.paymentFrequency === 'monthly') {
+                            bottomStatusText = 'PENDIENTE';
+                            bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
+                        } else {
+                            // Fallback para diarios (siempre tocan, salvo feriados)
+                            bottomStatusText = 'FALTA POR PAGAR';
+                            bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
+                        }
+                    }
                 }
-
-                // --- FIN LÓGICA ---
+                // --------------------------
 
                 const card = document.createElement('div');
                 card.className = 'client-card';
@@ -2581,7 +2609,7 @@ async function showRefinanceModal(clientId, notificationId) {
                     ? `<span style="font-size: 0.75em; color: var(--accent-purple); font-weight: 600; margin-left: 5px;">(${activeLoansCount})</span>` 
                     : '';
 
-                // Construcción del HTML de la tarjeta actualizado
+                // Construcción del HTML
                 card.innerHTML = `
                     <img src="${photoUrl}" alt="Foto" class="client-avatar">
                     <div class="client-info">
@@ -2591,7 +2619,8 @@ async function showRefinanceModal(clientId, notificationId) {
                     </div>
                     <div class="payment-info">
                         <span class="payment-amount">${money(displayLoan.amount)}</span> 
-                        <span class="payment-status ${bottomStatusClass}" style="margin-top: 6px; display: block; text-align: right; font-size: 0.85em;">
+                        ${frequencyHtml} 
+                        <span class="payment-status" style="margin-top: 6px; display: block; text-align: right; font-size: 0.75em; padding: 4px 8px; border-radius: 4px; ${bottomStatusStyle}">
                             ${bottomStatusText}
                         </span>
                     </div>`;
@@ -2601,13 +2630,12 @@ async function showRefinanceModal(clientId, notificationId) {
 
             lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
             
-            // Re-agregamos los eventos de clic
             container.querySelectorAll('.client-card').forEach(card => card.addEventListener('click', (e) => {
                 const clientId = e.currentTarget.dataset.clientId;
                 const loanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10); 
                 showClientDetails(clientId, loanIndex); 
             }));
-        } // Fin de renderClientCards
+        }// Fin de renderClientCards
 
         const PAYMENT_CONFIGS = {
             // Suramérica
@@ -6760,156 +6788,191 @@ getDocs(collectorQuery).then(snapshot => {
 
         
         function init() {
-    // --- Service Worker Registration (SEM ALTERAÇÕES) ---
-    if ('serviceWorker' in navigator) {
-        if (window.location.protocol === 'blob:') {
-            console.warn("Service Worker: Registro ignorado. O ambiente de pré-visualização ('blob:') não suporta Service Workers...");
-        } else {
-            navigator.serviceWorker.register('firebase-messaging-sw.js')
-            .then(reg => {
-                console.log('Service Worker: Registro iniciado.');
-                // ... (resto do código do SW sem alterações) ...
-                return navigator.serviceWorker.ready;
-            })
-            .then(registration => {
-                console.log('Service Worker: Ativo e pronto para ser usado após o login.');
-            })
-            .catch(error => {
-                console.error('Service Worker: Falha no registro ou na ativação.', error);
+            // --- SISTEMA DE SEGURANÇA HORÁRIA (00:00 - 07:00) ---
+            // Verifica a cada segundo se estamos no horário proibido
+            setInterval(() => {
+                const now = new Date();
+                const hour = now.getHours();
+                const minutes = now.getMinutes();
+                
+                // BLOQUEIO: Das 00:00 até às 06:59 (às 07:00 libera)
+                const isRestricted = hour >= 0 && hour < 7;
+                
+                const lockScreenId = 'security-lock-overlay';
+                let lockScreen = document.getElementById(lockScreenId);
+
+                if (isRestricted) {
+                    // Si estamos en hora prohibida y no hay pantalla de bloqueo, la creamos
+                    if (!lockScreen) {
+                        lockScreen = document.createElement('div');
+                        lockScreen.id = lockScreenId;
+                        // Estilo de bloqueo total (pantalla negra/roja encima de todo)
+                        lockScreen.style.cssText = `
+                            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                            background-color: #020617; z-index: 100000;
+                            display: flex; flex-direction: column;
+                            justify-content: center; align-items: center;
+                            text-align: center; padding: 30px; color: white;
+                        `;
+                        lockScreen.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            <h2 style="margin: 25px 0 10px; font-size: 1.8em; font-weight: 700;">Sistema Bloqueado</h2>
+                            <p style="color: #94a3b8; font-size: 1.1em; max-width: 400px; line-height: 1.5;">
+                                Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.
+                            </p>
+                            <div style="margin-top: 30px; padding: 10px 20px; background-color: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid #ef4444;">
+                                <span style="color: #ef4444; font-weight: bold; font-size: 1.2em;" id="lock-clock">--:--</span>
+                            </div>
+                        `;
+                        document.body.appendChild(lockScreen);
+                    }
+                    // Actualizamos el reloj de la pantalla de bloqueo
+                    const clockEl = document.getElementById('lock-clock');
+                    if (clockEl) {
+                        clockEl.textContent = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                    }
+                } else {
+                    // Si estamos en horario permitido, quitamos el bloqueo si existe
+                    if (lockScreen) {
+                        lockScreen.remove();
+                    }
+                }
+            }, 1000); // Ejecutar cada segundo
+
+            // --- FIN SISTEMA DE SEGURANÇA ---
+
+            // --- Service Worker Registration (SEM ALTERAÇÕES) ---
+            if ('serviceWorker' in navigator) {
+                if (window.location.protocol === 'blob:') {
+                    console.warn("Service Worker: Registro ignorado. O ambiente de pré-visualização ('blob:') não suporta Service Workers...");
+                } else {
+                    navigator.serviceWorker.register('firebase-messaging-sw.js')
+                    .then(reg => {
+                        console.log('Service Worker: Registro iniciado.');
+                        return navigator.serviceWorker.ready;
+                    })
+                    .then(registration => {
+                        console.log('Service Worker: Ativo e pronto para ser usado após o login.');
+                    })
+                    .catch(error => {
+                        console.error('Service Worker: Falha no registro ou na ativação.', error);
+                    });
+                }
+            }
+
+            document.body.classList.add('dark-mode');
+
+            // --- Lógica do Banner PWA (SEM ALTERAÇÕES) ---
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                const installBanner = document.getElementById('install-banner');
+                if (installBanner) installBanner.style.display = 'block';
             });
-            // ... (resto do código do SW 'controllerchange' sem alterações) ...
+
+            const installBtn = document.getElementById('install-btn');
+            if (installBtn) {
+                installBtn.addEventListener('click', async () => {
+                    if (deferredPrompt) {
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        if (outcome === 'accepted') {
+                            console.log('Usuário aceitou a instalação');
+                        }
+                        deferredPrompt = null; 
+                        document.getElementById('install-banner').style.display = 'none';
+                    }
+                });
+            }
+            
+            const closeInstallBanner = document.getElementById('close-install-banner');
+            if (closeInstallBanner) {
+                closeInstallBanner.addEventListener('click', () => {
+                    document.getElementById('install-banner').style.display = 'none';
+                });
+            }
+
+            // --- INÍCIO TAREFA C1: NOVA LÓGICA DE AUTENTICAÇÃO ---
+            const splash = document.getElementById('splash-screen');
+
+            onAuthStateChanged(auth, async (user) => {
+                // Oculta o splash imediatamente
+                splash.style.opacity = '0';
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                }, 500);
+
+                if (user) {
+                    try {
+                        console.log("Verificando permissões do cobrador...");
+                        const tokenResult = await user.getIdTokenResult(true); 
+                        const claims = tokenResult.claims; 
+                        console.log("Claims do usuário:", claims);
+
+                        if (claims.role !== 'collector' || !claims.companyId) {
+                            const errorMsg = "Sua conta não tem permissões de cobrador ou não está associada a uma empresa. Contate o administrador.";
+                            console.error(errorMsg, claims);
+                            showBlockedView(errorMsg);
+                            await signOut(auth); 
+                            return; 
+                        }
+
+                        currentCollectorUid = user.uid; 
+                        currentCompanyId = claims.companyId; 
+                        console.log(`Cobrador verificado. AuthUID: ${currentCollectorUid}, CompanyID: ${currentCompanyId}`);
+
+                        const companyRef = doc(db, 'companies', currentCompanyId);
+                        const companySnap = await getDoc(companyRef);
+
+                        if (!companySnap.exists()) {
+                            const errorMsg = `Erro crítico: A empresa (${currentCompanyId}) não foi encontrada.`;
+                            console.error(errorMsg);
+                            showBlockedView(errorMsg);
+                            await signOut(auth);
+                            return;
+                        }
+
+                        currentCompanyData = companySnap.data(); 
+
+                        if (currentCompanyData.status === 'suspended') {
+                            const errorMsg = `A conta da sua empresa (${currentCompanyData.name || 'Nome não disponível'}) está suspensa. Contate o administrador.`;
+                            console.warn(errorMsg);
+                            showBlockedView(errorMsg); 
+                            return;
+                        }
+
+                        console.log(`Acesso concedido para Empresa: ${currentCompanyData.name} (Status: ${currentCompanyData.status})`);
+                        document.getElementById('login-view').style.display = 'none'; 
+
+                        loadGlobalSettings(currentCompanyData); 
+                        showMainApp(currentCollectorUid); 
+
+                    } catch (error) {
+                        console.error("Erro crítico durante a verificação de acesso do cobrador:", error);
+                        showBlockedView(`Ocorreu um erro ao verificar sua conta: ${error.message}`);
+                        await signOut(auth);
+                    }
+
+                } else {
+                    document.getElementById('app-container').style.display = 'none'; 
+                    document.getElementById('login-view').style.display = 'flex'; 
+                    loadGlobalSettings({}); 
+
+                    const loginForm = document.getElementById('login-form');
+                    if (loginForm) {
+                        loginForm.removeEventListener('submit', handleLogin); 
+                        loginForm.addEventListener('submit', handleLogin); 
+                    }
+                }
+            });
+            // --- FIM TAREFA C1 ---
         }
-    }
-
-    document.body.classList.add('dark-mode');
-
-    // --- Lógica do Banner PWA (SEM ALTERAÇÕES) ---
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        const installBanner = document.getElementById('install-banner');
-        if (installBanner) installBanner.style.display = 'block';
-    });
-
-    const installBtn = document.getElementById('install-btn');
-    if (installBtn) {
-        installBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    console.log('Usuário aceitou a instalação');
-                }
-                deferredPrompt = null; // O prompt só pode ser usado uma vez
-                document.getElementById('install-banner').style.display = 'none';
-            }
-        });
-    }
-    
-    const closeInstallBanner = document.getElementById('close-install-banner');
-    if (closeInstallBanner) {
-        closeInstallBanner.addEventListener('click', () => {
-            document.getElementById('install-banner').style.display = 'none';
-        });
-    }
-
-    // --- INÍCIO TAREFA C1: NOVA LÓGICA DE AUTENTICAÇÃO ---
-    const splash = document.getElementById('splash-screen');
-
-    onAuthStateChanged(auth, async (user) => {
-        // Oculta o splash imediatamente
-        splash.style.opacity = '0';
-        setTimeout(() => {
-            splash.style.display = 'none';
-        }, 500);
-
-        if (user) {
-            // Usuário está logado (potencialmente um cobrador)
-            // Inicia a verificação...
-            try {
-                console.log("Verificando permissões do cobrador...");
-                const tokenResult = await user.getIdTokenResult(true); // Força atualização
-                const claims = tokenResult.claims; // Os 'selos'
-                console.log("Claims do usuário:", claims);
-
-                // Validação de ROL e COMPANY ID
-                if (claims.role !== 'collector' || !claims.companyId) {
-                    const errorMsg = "Sua conta não tem permissões de cobrador ou não está associada a uma empresa. Contate o administrador.";
-                    console.error(errorMsg, claims);
-                    showBlockedView(errorMsg);
-                    await signOut(auth); // Desloga usuário inválido
-                    return; // Para a execução
-                }
-
-                // Guarda os IDs importantes
-                currentCollectorUid = user.uid; // ID de Auth
-                currentCompanyId = claims.companyId; // ID da Empresa
-                // O 'username' (ID de Firestore) não está nos claims, precisaremos lê-lo do doc 'collectors'
-                // Faremos isso dentro de showMainApp onde já lemos o doc do cobrador
-                console.log(`Cobrador verificado. AuthUID: ${currentCollectorUid}, CompanyID: ${currentCompanyId}`);
-
-                // TAREFA C0: Verificar status da EMPRESA
-                const companyRef = doc(db, 'companies', currentCompanyId);
-                const companySnap = await getDoc(companyRef);
-
-                if (!companySnap.exists()) {
-                    const errorMsg = `Erro crítico: A empresa (${currentCompanyId}) não foi encontrada.`;
-                    console.error(errorMsg);
-                    showBlockedView(errorMsg);
-                    await signOut(auth);
-                    return;
-                }
-
-                currentCompanyData = companySnap.data(); // Guarda dados da empresa
-
-                // VERIFICAÇÃO DE STATUS
-                if (currentCompanyData.status === 'suspended') {
-                    const errorMsg = `A conta da sua empresa (${currentCompanyData.name || 'Nome não disponível'}) está suspensa. Contate o administrador.`;
-                    console.warn(errorMsg);
-                    showBlockedView(errorMsg); // Bloqueia a app, mas não desloga
-                    return;
-                }
-
-                // TUDO OK! Empresa ativa e cobrador válido.
-                console.log(`Acesso concedido para Empresa: ${currentCompanyData.name} (Status: ${currentCompanyData.status})`);
-                document.getElementById('login-view').style.display = 'none'; // Oculta login
-
-                // Aplica logo/nome da empresa (substitui loadGlobalSettings)
-                loadGlobalSettings(currentCompanyData); 
-
-                // Chama a função principal da app
-                showMainApp(currentCollectorUid); // Passa o UID para showMainApp
-
-            } catch (error) {
-                console.error("Erro crítico durante a verificação de acesso do cobrador:", error);
-                showBlockedView(`Ocorreu um erro ao verificar sua conta: ${error.message}`);
-                await signOut(auth);
-            }
-
-        } else {
-            // Usuário NÃO está logado
-            document.getElementById('app-container').style.display = 'none'; // Oculta app
-            document.getElementById('login-view').style.display = 'flex'; // Mostra login
-
-            // Aplica logo/nome padrão ou da última sessão (se houver)
-            loadGlobalSettings({}); 
-
-            const loginForm = document.getElementById('login-form');
-            if (loginForm) {
-                // Remove listener antigo para evitar duplicação
-                loginForm.removeEventListener('submit', handleLogin); 
-                // Adiciona o listener UMA VEZ
-                loginForm.addEventListener('submit', handleLogin); 
-            }
-        }
-    });
-    // --- FIM TAREFA C1 ---
-}
 
         init();
     </script>
 </body>
 </html>
+
 
 
 
