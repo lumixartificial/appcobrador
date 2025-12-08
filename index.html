@@ -4540,34 +4540,45 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         });
                         newUploadedDocuments = await Promise.all(uploadPromises);
                     }
-                    const finalDocuments = isNewLoan ? client.documents : [...existingDocs, ...newUploadedDocuments];
-
-                    // --- CÓDIGO CORREGIDO ---
+                    // --- INICIO BLOQUE CORREGIDO (PEGAR AQUÍ) ---
                     const loanAmount = parseFloat(document.getElementById('client-loan-amount').value) || 0;
                     const interest = parseFloat(document.getElementById('client-interest').value);
                     const installments = parseInt(document.getElementById('client-installments').value);
                     
-                    // --- CÁLCULO FINANCIERO PERFECTO (CORREGIDO) ---
                     // 1. Calculamos un total preliminar con interés
                     let rawTotal = loanAmount * (1 + (interest / 100));
 
-                    // 2. Calculamos la cuota y la REDONDEAMOS a 2 decimales (para que coincida con la moneda real)
+                    // 2. Calculamos la cuota y la REDONDEAMOS a 2 decimales
                     let rawInstallment = installments > 0 ? rawTotal / installments : 0;
                     const installmentValue = Math.round(rawInstallment * 100) / 100;
 
-                    // 3. RECALCULAMOS el Total exacto basado en las cuotas redondeadas.
-                    // Esto evita el error de "Falta 1 centavo" (Ej: 33.33 * 3 = 99.99, no 100).
+                    // 3. RECALCULAMOS el Total exacto basado en las cuotas redondeadas
                     const totalToPay = installmentValue * installments;
                     
                     const principalAmount = loanAmount;
-                    // -----------------------------------------------
-                    // ------------------------
-                    let paymentDaysValue = [];
-                    if (paymentFrequency === 'daily') paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
-                    else if (paymentFrequency === 'weekly') paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
-                    else if (paymentFrequency === 'monthly') paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
 
-                    const clientGeneralData = {
+                    // 4. Obtenemos la frecuencia (ESTA ERA LA VARIABLE QUE FALTABA)
+                    const paymentFrequency = document.getElementById('payment-frequency').value;
+
+                    // 5. Definimos los días de pago según la frecuencia
+                    let paymentDaysValue = [];
+                    if (paymentFrequency === 'daily') {
+                        paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
+                    } else if (paymentFrequency === 'weekly') {
+                        paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
+                    } else if (paymentFrequency === 'monthly') {
+                        paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
+                    }
+                    // --- FIN BLOQUE CORREGIDO ---
+                       // 1. Obtener valores de los campos de acceso
+                    const username = document.getElementById('client-username').value.trim();
+                    const password = document.getElementById('client-password').value.trim();
+                    const email = `${username}@gmail.com`; // Generamos el email automáticamente
+
+                    // 2. Preparar la lista final de documentos
+                    const finalDocuments = [...existingDocs, ...newUploadedDocuments];
+                       const clientGeneralData = {
+                       
                         name: document.getElementById('client-name').value,
                         documentNumber: document.getElementById('client-document').value,
                         address: document.getElementById('client-address').value,
@@ -7026,6 +7037,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
