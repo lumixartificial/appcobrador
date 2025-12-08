@@ -1549,9 +1549,18 @@ async function showRefinanceModal(clientId, notificationId) {
             // 1. Construir el objeto del nuevo préstamo (lógica de showClientFormModal)
             const loanAmount = parseFloat(request.amount);
             const installments = parseInt(request.installments, 10);
-            const interest = parseFloat(client.interestRate || '20'); // Usar la tasa guardada en el cliente
-            const totalToPay = loanAmount * (1 + (interest / 100));
-            const installmentValue = installments > 0 ? totalToPay / installments : 0;
+            const interest = parseFloat(client.interestRate || '20'); 
+
+            // --- LÓGICA FINANCIERA PERFECTA (REDONDEO) ---
+            let rawTotal = loanAmount * (1 + (interest / 100));
+            
+            // Redondeamos la cuota a 2 decimales
+            let rawInstallment = installments > 0 ? rawTotal / installments : 0;
+            const installmentValue = Math.round(rawInstallment * 100) / 100;
+
+            // Recalculamos el Total exacto
+            const totalToPay = installmentValue * installments;
+            // ----------------------------------------------
             
             // Heredar la tasa de mora y la frecuencia del último préstamo (o usar defaults)
             const lastLoan = client.loans && client.loans.length > 0 ? client.loans[client.loans.length - 1] : {};
@@ -4453,8 +4462,18 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 const loanAmount = parseFloat(loanAmountInput.value) || 0;
                 const interest = parseFloat(interestInput.value) || 0;
                 const installments = parseInt(installmentsInput.value) || 0;
-                const totalToPay = loanAmount * (1 + (interest / 100));
-                const installmentValue = installments > 0 ? totalToPay / installments : 0;
+                
+                // 1. Cálculo base
+                let rawTotal = loanAmount * (1 + (interest / 100));
+                
+                // 2. Aplicamos EL MISMO redondeo que usas al guardar
+                let rawInstallment = installments > 0 ? rawTotal / installments : 0;
+                const installmentValue = Math.round(rawInstallment * 100) / 100;
+
+                // 3. Recalculamos el total real basado en la cuota redondeada
+                const totalToPay = installmentValue * installments;
+
+                // 4. Mostramos los valores exactos
                 totalToPayInput.value = money(totalToPay);
                 installmentValueInput.value = money(installmentValue);
             }
@@ -4523,12 +4542,26 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     }
                     const finalDocuments = isNewLoan ? client.documents : [...existingDocs, ...newUploadedDocuments];
 
+                    // --- CÓDIGO CORREGIDO ---
+                    const loanAmount = parseFloat(document.getElementById('client-loan-amount').value) || 0;
                     const interest = parseFloat(document.getElementById('client-interest').value);
                     const installments = parseInt(document.getElementById('client-installments').value);
-                    const totalToPay = loanAmount * (1 + (interest / 100));
-                    const installmentValue = installments > 0 ? totalToPay / installments : 0;
+                    
+                    // --- CÁLCULO FINANCIERO PERFECTO (CORREGIDO) ---
+                    // 1. Calculamos un total preliminar con interés
+                    let rawTotal = loanAmount * (1 + (interest / 100));
+
+                    // 2. Calculamos la cuota y la REDONDEAMOS a 2 decimales (para que coincida con la moneda real)
+                    let rawInstallment = installments > 0 ? rawTotal / installments : 0;
+                    const installmentValue = Math.round(rawInstallment * 100) / 100;
+
+                    // 3. RECALCULAMOS el Total exacto basado en las cuotas redondeadas.
+                    // Esto evita el error de "Falta 1 centavo" (Ej: 33.33 * 3 = 99.99, no 100).
+                    const totalToPay = installmentValue * installments;
+                    
                     const principalAmount = loanAmount;
-                    const paymentFrequency = document.getElementById('payment-frequency').value;
+                    // -----------------------------------------------
+                    // ------------------------
                     let paymentDaysValue = [];
                     if (paymentFrequency === 'daily') paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
                     else if (paymentFrequency === 'weekly') paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
@@ -6993,6 +7026,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
