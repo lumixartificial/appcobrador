@@ -2516,6 +2516,15 @@ async function showRefinanceModal(clientId, notificationId) {
                     amountDueToday: details.amountDueToday || 0
                 };
 
+                // --- FÓRMULA MATEMÁTICA: CALCULAR SALDO RESTANTE ---
+                const totalPaidSoFar = (loan.history || [])
+                    .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+                    .reduce((sum, h) => sum + (h.amount || 0), 0);
+
+                const totalDebt = (loan.totalLoan || 0) + (loan.lateFeesAccumulated || 0);
+                const remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
+                // ----------------------------------------------------
+
                 // Verificar pago hoy
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
@@ -2530,7 +2539,7 @@ async function showRefinanceModal(clientId, notificationId) {
                     return paymentDate && paymentDate >= todayStart;
                 });
 
-                // --- ETIQUETAS VISUALES MEJORADAS ---
+                // --- ETIQUETAS VISUALES ---
 
                 // 1. Estado
                 let statusLabelUnderName = '';
@@ -2561,7 +2570,6 @@ async function showRefinanceModal(clientId, notificationId) {
                         bottomStatusText = 'FALTA PAGAR';
                         bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
                     } else {
-                         // Si es semanal/mensual y no toca hoy
                         if (displayLoan.paymentFrequency === 'weekly' || displayLoan.paymentFrequency === 'monthly') {
                             bottomStatusText = 'PENDENTE';
                             bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
@@ -2572,12 +2580,12 @@ async function showRefinanceModal(clientId, notificationId) {
                     }
                 }
 
-                // 4. Identificador de Préstamo (CRÍTICO: Muestra el Total para diferenciar)
-                const loanTotalDisplay = money(loan.totalLoan || 0);
-                // Si tiene más de un préstamo, mostramos "Préstamo #X - Total: $..."
-                // Si tiene solo uno, mostramos solo "Total: $..."
-                const loanInfoLabel = `<span style="font-size: 0.75em; color: var(--accent-purple); font-weight: 600; display: block; margin-top:2px;">
-                    <i data-lucide="banknote" style="width: 10px; height: 10px;"></i> Total: ${loanTotalDisplay} ${client.loans.length > 1 ? `(#${loanIndex + 1})` : ''}
+                // 4. Identificador de RESTANTE (AUMENTADO DE TAMAÑO)
+                const remainingDisplay = money(remainingBalance);
+                
+                // CAMBIOS AQUÍ: font-size 0.95em (antes 0.75em), iconos más grandes (14px)
+                const loanInfoLabel = `<span style="font-size: 0.95em; color: #d97706; font-weight: 800; display: block; margin-top: 3px;">
+                    <i data-lucide="trending-down" style="width: 14px; height: 14px; vertical-align: text-bottom;"></i> Resta: ${remainingDisplay} ${client.loans.length > 1 ? `(#${loanIndex + 1})` : ''}
                 </span>`;
 
                 const card = document.createElement('div');
@@ -2615,7 +2623,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 const loanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10); 
                 showClientDetails(clientId, loanIndex); 
             }));
-        } // Fin de renderClientCards
+        }// Fin de renderClientCards
 
         const PAYMENT_CONFIGS = {
             // Suramérica
@@ -7061,6 +7069,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
