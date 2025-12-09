@@ -4512,6 +4512,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             
             const clientIdToSave = isEditMode || isNewLoan ? client.id : null; 
 
+            // --- BLOQUE CORREGIDO: Listener de Guardar Cliente ---
             saveButton.addEventListener('click', async (e) => {
                 const saveButton = e.currentTarget;
                 const originalButtonHTML = saveButton.innerHTML;
@@ -4526,12 +4527,17 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
 
                 try {
-                    // AQUÍ YA NO HAY BLOQUEO. El cobrador ya vio la alerta visual si aplicaba.
-                    
+                    // 1. [CORRECCIÓN] OBTENER VALORES PRIMERO (Movido al inicio para evitar error de inicialización)
+                    const username = document.getElementById('client-username').value.trim();
+                    const password = document.getElementById('client-password').value.trim();
+                    const email = `${username}@gmail.com`; // Generamos el email automáticamente
+
+                    // 2. Subida de Documentos (Ahora 'username' ya existe)
                     let newUploadedDocuments = [];
                     if (!isNewLoan && filesToUpload.length > 0) {
                         const uploadPromises = filesToUpload.map(async (file) => {
-                            const targetClientId = isEditMode ? clientId : username; 
+                            // Aquí es donde ocurría el error, ahora 'username' ya está definido
+                            const targetClientId = isEditMode ? clientIdToSave : username; 
                             const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
                             const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
                             await uploadBytes(storageRef, file);
@@ -4540,27 +4546,28 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         });
                         newUploadedDocuments = await Promise.all(uploadPromises);
                     }
-                    // --- INICIO BLOQUE CORREGIDO (PEGAR AQUÍ) ---
+
+                    // 3. Cálculos del Préstamo
                     const loanAmount = parseFloat(document.getElementById('client-loan-amount').value) || 0;
                     const interest = parseFloat(document.getElementById('client-interest').value);
                     const installments = parseInt(document.getElementById('client-installments').value);
                     
-                    // 1. Calculamos un total preliminar con interés
+                    // Calculamos un total preliminar con interés
                     let rawTotal = loanAmount * (1 + (interest / 100));
 
-                    // 2. Calculamos la cuota y la REDONDEAMOS a 2 decimales
+                    // Calculamos la cuota y la REDONDEAMOS a 2 decimales
                     let rawInstallment = installments > 0 ? rawTotal / installments : 0;
                     const installmentValue = Math.round(rawInstallment * 100) / 100;
 
-                    // 3. RECALCULAMOS el Total exacto basado en las cuotas redondeadas
+                    // RECALCULAMOS el Total exacto basado en las cuotas redondeadas
                     const totalToPay = installmentValue * installments;
                     
                     const principalAmount = loanAmount;
 
-                    // 4. Obtenemos la frecuencia (ESTA ERA LA VARIABLE QUE FALTABA)
+                    // Obtenemos la frecuencia
                     const paymentFrequency = document.getElementById('payment-frequency').value;
 
-                    // 5. Definimos los días de pago según la frecuencia
+                    // Definimos los días de pago según la frecuencia
                     let paymentDaysValue = [];
                     if (paymentFrequency === 'daily') {
                         paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
@@ -4569,16 +4576,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     } else if (paymentFrequency === 'monthly') {
                         paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
                     }
-                    // --- FIN BLOQUE CORREGIDO ---
-                       // 1. Obtener valores de los campos de acceso
-                    const username = document.getElementById('client-username').value.trim();
-                    const password = document.getElementById('client-password').value.trim();
-                    const email = `${username}@gmail.com`; // Generamos el email automáticamente
-
-                    // 2. Preparar la lista final de documentos
+                    
+                    // 4. Preparar la lista final de documentos
                     const finalDocuments = [...existingDocs, ...newUploadedDocuments];
-                       const clientGeneralData = {
-                       
+
+                    // 5. Construir objeto de datos generales del cliente
+                    const clientGeneralData = {
                         name: document.getElementById('client-name').value,
                         documentNumber: document.getElementById('client-document').value,
                         address: document.getElementById('client-address').value,
@@ -4593,6 +4596,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         interestRate: interest
                     };
 
+                    // 6. Construir objeto de datos del préstamo
                     const loanSpecificData = {
                         principalAmount: principalAmount,
                         lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
@@ -4610,6 +4614,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         collectionTime: document.getElementById('client-collection-time').value,
                     };
                     
+                    // Lógica de migración
                     if (migrationToggle && migrationToggle.checked) {
                         const initialPaidInstallments = parseInt(document.getElementById('client-initial-paid-installments').value, 10) || 0;
                         const initialPartialAmount = parseFloat(document.getElementById('client-initial-partial-payment').value) || 0.0;
@@ -4637,6 +4642,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         }
                     }
                     
+                    // 7. Guardado en Firebase
                     if (isNewLoan) {
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
                         console.log("Añadiendo nuevo préstamo al historial existente (arrayUnion)...");
@@ -4678,6 +4684,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         });
                     
                     } else { 
+                        // Crear Nuevo Cliente
                         console.log("[COBRADOR-APP] Creando cliente nuevo...");
                         let newClientAuthUid = null;
                         try {
@@ -7037,6 +7044,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
