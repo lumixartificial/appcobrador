@@ -2495,23 +2495,20 @@ async function showRefinanceModal(clientId, notificationId) {
 
         function renderClientCards(container, clientsData) {
             if (!container) return;
-            if (clientsData.length === 0) {
+            if (!clientsData || clientsData.length === 0) {
                 container.innerHTML = `<div class="no-items">Nenhum cliente encontrado.</div>`;
                 return;
             }
             container.innerHTML = ''; 
 
-            // 1. Definimos el inicio del día ACTUAL (00:00:00 local)
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
-            // --- CAMBIO CLAVE: NO AGRUPAMOS. Renderizamos cada préstamo individualmente ---
             clientsData.forEach(item => {
                 const { client, loan, loanIndex } = item;
                 
-                // Recalculamos detalles al vuelo para este préstamo específico
+                // Recalculamos detalles
                 const details = calculateLoanDetails(loan);
-                // Creamos un objeto displayLoan que combina los datos del préstamo con el estado calculado
                 const displayLoan = { 
                     ...loan, 
                     status: details.status,
@@ -2519,7 +2516,7 @@ async function showRefinanceModal(clientId, notificationId) {
                     amountDueToday: details.amountDueToday || 0
                 };
 
-                // --- VERIFICACIÓN DE PAGO HOY ---
+                // Verificar pago hoy
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
                     if (typeof dateObj.toDate === 'function') return dateObj.toDate();
@@ -2528,19 +2525,17 @@ async function showRefinanceModal(clientId, notificationId) {
                 };
 
                 const hasPaidToday = (displayLoan.history || []).some(h => {
-                    if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') {
-                        return false; 
-                    }
+                    if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false; 
                     const paymentDate = getPaymentDate(h.date);
                     return paymentDate && paymentDate >= todayStart;
                 });
 
-                // --- ETIQUETAS VISUALES ---
+                // --- ETIQUETAS VISUALES MEJORADAS ---
 
-                // 1. Etiqueta debajo del Nombre
+                // 1. Estado
                 let statusLabelUnderName = '';
                 if (displayLoan.status === 'late') {
-                    statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} días)</span>`;
+                    statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} dias)</span>`;
                 } else if (displayLoan.status === 'finished') {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: #4338ca; font-weight: 700; margin-top: 2px;">🏁 FINALIZADO</span>`;
                 }
@@ -2549,10 +2544,9 @@ async function showRefinanceModal(clientId, notificationId) {
                 const freqMap = { 'daily': 'DIÁRIO', 'weekly': 'SEMANAL', 'monthly': 'MENSAL' };
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
-                
                 const frequencyHtml = `<div style="font-size: 0.7em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 2px;">${freqText}</div>`;
 
-                // 3. Etiqueta Inferior (Estado del día)
+                // 3. Estado Inferior
                 let bottomStatusText = '';
                 let bottomStatusStyle = ''; 
 
@@ -2560,32 +2554,34 @@ async function showRefinanceModal(clientId, notificationId) {
                     bottomStatusText = '-'; 
                     bottomStatusStyle = 'color: #4338ca; background-color: #e0e7ff;';
                 } else if (hasPaidToday) {
-                    bottomStatusText = 'PAGO';
-                    bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700;'; 
+                    bottomStatusText = 'PAGO HOJE';
+                    bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700; border: 1px solid #c3e6cb;'; 
                 } else {
                     if (displayLoan.amountDueToday > 0) {
-                        bottomStatusText = 'FALTA POR PAGAR';
+                        bottomStatusText = 'FALTA PAGAR';
                         bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
                     } else {
+                         // Si es semanal/mensual y no toca hoy
                         if (displayLoan.paymentFrequency === 'weekly' || displayLoan.paymentFrequency === 'monthly') {
-                            bottomStatusText = 'PENDIENTE';
+                            bottomStatusText = 'PENDENTE';
                             bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
                         } else {
-                            bottomStatusText = 'FALTA POR PAGAR';
+                            bottomStatusText = 'FALTA PAGAR';
                             bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
                         }
                     }
                 }
 
-                // Identificador visual del número de préstamo si tiene varios
-                // (Aunque ahora saldrán separados, ayuda saber cuál es cuál)
-                const loanNumberLabel = (client.loans.length > 1) 
-                    ? `<span style="font-size: 0.75em; color: var(--text-secondary); margin-left: 5px;">(#${loanIndex + 1})</span>`
-                    : '';
+                // 4. Identificador de Préstamo (CRÍTICO: Muestra el Total para diferenciar)
+                const loanTotalDisplay = money(loan.totalLoan || 0);
+                // Si tiene más de un préstamo, mostramos "Préstamo #X - Total: $..."
+                // Si tiene solo uno, mostramos solo "Total: $..."
+                const loanInfoLabel = `<span style="font-size: 0.75em; color: var(--accent-purple); font-weight: 600; display: block; margin-top:2px;">
+                    <i data-lucide="banknote" style="width: 10px; height: 10px;"></i> Total: ${loanTotalDisplay} ${client.loans.length > 1 ? `(#${loanIndex + 1})` : ''}
+                </span>`;
 
                 const card = document.createElement('div');
                 card.className = 'client-card';
-                // Importante: Guardamos el ID y el índice específico de este préstamo
                 card.dataset.clientId = client.id;
                 card.dataset.loanIndex = loanIndex; 
 
@@ -2596,8 +2592,9 @@ async function showRefinanceModal(clientId, notificationId) {
                 card.innerHTML = `
                     <img src="${photoUrl}" alt="Foto" class="client-avatar">
                     <div class="client-info">
-                        <h4 class="client-name" style="margin-bottom: 2px;">${client.name}${loanNumberLabel}</h4> 
-                        ${statusLabelUnderName} 
+                        <h4 class="client-name" style="margin-bottom: 0px;">${client.name}</h4>
+                        ${loanInfoLabel} 
+                        ${statusLabelUnderName}
                         <p class="client-address" style="margin-top: 4px;"><i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${client.address}</p>
                     </div>
                     <div class="payment-info">
@@ -2618,7 +2615,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 const loanIndex = parseInt(e.currentTarget.dataset.loanIndex, 10); 
                 showClientDetails(clientId, loanIndex); 
             }));
-        }// Fin de renderClientCards
+        } // Fin de renderClientCards
 
         const PAYMENT_CONFIGS = {
             // Suramérica
@@ -2925,16 +2922,12 @@ async function showRefinanceModal(clientId, notificationId) {
     function updateAllClientsList() {
             const container = document.getElementById('all-clients-list');
             const searchInput = document.getElementById('client-search-input');
-            
-            // Intento robusto de encontrar el filtro activo
             let activeFilter = document.querySelector('.filter-buttons .filter-btn.active');
-            
-            // Si por alguna razón no hay filtro activo, forzamos 'TODOS'
             let filter = activeFilter ? activeFilter.dataset.filter : 'all';
 
             if (!container || !searchInput) return;
 
-            const searchTerm = searchInput.value.toLowerCase();
+            const searchTerm = searchInput.value.toLowerCase().trim();
             
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
@@ -2943,19 +2936,18 @@ async function showRefinanceModal(clientId, notificationId) {
                 if (!dateObj) return null;
                 if (typeof dateObj.toDate === 'function') return dateObj.toDate();
                 if (dateObj instanceof Date) return dateObj;
-                // Soporte extra para fechas en texto
-                if (typeof dateObj === 'string') {
-                    const d = new Date(dateObj);
-                    if (!isNaN(d.getTime())) return d;
-                }
+                if (typeof dateObj === 'string') { const d = new Date(dateObj); if (!isNaN(d.getTime())) return d; }
                 return null;
             };
 
             let clientsWithLoans = [];
+
+            // Iteramos TODOS los clientes
             allClients.forEach(client => {
-                // Si el cliente no tiene préstamos, lo saltamos o lo mostramos si es TODOS
+                // Si el cliente no tiene préstamos, ignorar
                 if (!client.loans || client.loans.length === 0) return;
 
+                // Iteramos TODOS los préstamos de ese cliente
                 client.loans.forEach((loan, loanIndex) => {
                     const details = calculateLoanDetails(loan);
                     const currentStatus = details.status; 
@@ -2968,13 +2960,12 @@ async function showRefinanceModal(clientId, notificationId) {
 
                     let passesFilter = true;
 
-                    // LÓGICA DE FILTROS
+                    // 1. Filtro de Categoría (Pestañas)
                     if (filter === 'weekly') {
-                        // Muestra solo si es 'weekly' y NO está finalizado
                         if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesFilter = false;
                     }
                     else if (filter === 'todo_today') {
-                        // Muestra si tiene deuda hoy (>0), NO pagó hoy y NO está finalizado
+                        // "Falta por Pagar": Debe tener deuda hoy, NO haber pagado y NO estar finalizado
                         if (details.amountDueToday <= 0 || hasPaidToday || currentStatus === 'finished') passesFilter = false;
                     }
                     else if (filter === 'paid') {
@@ -2986,11 +2977,27 @@ async function showRefinanceModal(clientId, notificationId) {
                     else if (filter === 'finished') {
                         if (currentStatus !== 'finished') passesFilter = false;
                     }
-                    // Si es 'all', passesFilter se queda en true
+                    // Si filter === 'all', pasa siempre por defecto.
 
-                    // BUSCADOR
-                    if (searchTerm && !(client.name.toLowerCase().includes(searchTerm) || (client.address && client.address.toLowerCase().includes(searchTerm)))) {
-                        passesFilter = false;
+                    // 2. Filtro de Búsqueda (Texto)
+                    // Si hay texto escrito, este tiene prioridad.
+                    if (searchTerm) {
+                        const nameMatch = client.name.toLowerCase().includes(searchTerm);
+                        const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
+                        
+                        // Si NO coincide ni nombre ni dirección, ocultar.
+                        if (!nameMatch && !addressMatch) {
+                            passesFilter = false;
+                        } else {
+                            // IMPORTANTE: Si coincide el nombre, mostramos TODOS sus préstamos, 
+                            // incluso si el filtro de pestaña (ej. 'late') lo ocultaría. 
+                            // Esto ayuda a encontrar préstamos "perdidos".
+                            if (filter !== 'all') {
+                                // Mantenemos el filtro de pestaña activo si el usuario lo quiere, 
+                                // pero si buscas específicamente un nombre, generalmente quieres ver todo de esa persona.
+                                // Dejaremos el filtro activo para respetar la UI, pero asegúrate de estar en la pestaña "TODOS".
+                            }
+                        }
                     }
                     
                     if(passesFilter) {
@@ -2999,7 +3006,9 @@ async function showRefinanceModal(clientId, notificationId) {
                 });
             });
             
+            // Ordenamos alfabéticamente
             clientsWithLoans.sort((a, b) => a.client.name.localeCompare(b.client.name));
+            
             renderClientCards(container, clientsWithLoans);
         }
         
@@ -7052,6 +7061,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
