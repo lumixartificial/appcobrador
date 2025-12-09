@@ -2501,43 +2501,25 @@ async function showRefinanceModal(clientId, notificationId) {
             }
             container.innerHTML = ''; 
 
-            // 1. Definimos el inicio del día ACTUAL (00:00:00 local) una sola vez para todos
+            // 1. Definimos el inicio del día ACTUAL (00:00:00 local)
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
-            // Agrupa los préstamos por cliente ID
-            const clientsMap = new Map();
+            // --- CAMBIO CLAVE: NO AGRUPAMOS. Renderizamos cada préstamo individualmente ---
             clientsData.forEach(item => {
                 const { client, loan, loanIndex } = item;
-                if (!clientsMap.has(client.id)) {
-                    clientsMap.set(client.id, { client: client, loans: [] });
-                }
-                clientsMap.get(client.id).loans.push({ ...loan, loanIndex });
-            });
-
-            // Itera sobre cada cliente único
-            clientsMap.forEach(({ client, loans }) => { 
                 
-                // --- CÁLCULO DE ESTADO AL VUELO ---
-                loans.forEach(l => {
-                    const details = calculateLoanDetails(l);
-                    l.status = details.status; 
-                    l.lateDays = details.lateDays;
-                    // IMPORTANTE: Guardamos si HOY debe pagar algo
-                    l.amountDueToday = details.amountDueToday || 0; 
-                });
+                // Recalculamos detalles al vuelo para este préstamo específico
+                const details = calculateLoanDetails(loan);
+                // Creamos un objeto displayLoan que combina los datos del préstamo con el estado calculado
+                const displayLoan = { 
+                    ...loan, 
+                    status: details.status,
+                    lateDays: details.lateDays,
+                    amountDueToday: details.amountDueToday || 0
+                };
 
-                // Seleccionamos el préstamo más relevante para mostrar
-                let displayLoan = loans.find(l => l.status === 'late') || 
-                                  loans.find(l => l.status === 'pending') || 
-                                  loans.find(l => l.status === 'paid') || 
-                                  loans[0]; 
-
-                const displayLoanIndex = displayLoan.loanIndex; 
-                const activeLoansCount = loans.filter(l => l.status !== 'finished').length;
-                const hasMultipleActive = activeLoansCount > 1;
-
-                // --- VERIFICACIÓN ROBUSTA DE PAGO HOY ---
+                // --- VERIFICACIÓN DE PAGO HOY ---
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
                     if (typeof dateObj.toDate === 'function') return dateObj.toDate();
@@ -2545,7 +2527,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     return null;
                 };
 
-                // Verificamos si hay algún pago válido con fecha mayor o igual a las 00:00 de HOY
                 const hasPaidToday = (displayLoan.history || []).some(h => {
                     if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') {
                         return false; 
@@ -2556,73 +2537,66 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 // --- ETIQUETAS VISUALES ---
 
-                // 1. Etiqueta debajo del Nombre (Estado general)
+                // 1. Etiqueta debajo del Nombre
                 let statusLabelUnderName = '';
                 if (displayLoan.status === 'late') {
-                    statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO</span>`;
+                    statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} días)</span>`;
                 } else if (displayLoan.status === 'finished') {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: #4338ca; font-weight: 700; margin-top: 2px;">🏁 FINALIZADO</span>`;
                 }
 
-                // 2. Frecuencia en MAYÚSCULAS debajo del monto
+                // 2. Frecuencia
                 const freqMap = { 'daily': 'DIÁRIO', 'weekly': 'SEMANAL', 'monthly': 'MENSAL' };
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
                 
                 const frequencyHtml = `<div style="font-size: 0.7em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 2px;">${freqText}</div>`;
 
-                // 3. Etiqueta Inferior (Lógica 00:00 Horas)
+                // 3. Etiqueta Inferior (Estado del día)
                 let bottomStatusText = '';
                 let bottomStatusStyle = ''; 
 
                 if (displayLoan.status === 'finished') {
-                    // Si ya terminó de pagar todo el préstamo
                     bottomStatusText = '-'; 
                     bottomStatusStyle = 'color: #4338ca; background-color: #e0e7ff;';
                 } else if (hasPaidToday) {
-                    // SI PAGÓ HOY (Verde) -> Prioridad máxima
                     bottomStatusText = 'PAGO';
                     bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700;'; 
                 } else {
-                    // NO HA PAGADO HOY (Pasadas las 00:00 se reinicia a esto)
-                    
-                    // ¿Toca pagar HOY? (Calculado por calculateLoanDetails según el día de la semana)
                     if (displayLoan.amountDueToday > 0) {
-                        // SI TOCA HOY (Diario o es el día de la semana correcto) -> ROJO
                         bottomStatusText = 'FALTA POR PAGAR';
                         bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
                     } else {
-                        // NO TOCA HOY (Ej: Semanal y es martes, pero paga viernes) -> AMARILLO
                         if (displayLoan.paymentFrequency === 'weekly' || displayLoan.paymentFrequency === 'monthly') {
                             bottomStatusText = 'PENDIENTE';
                             bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
                         } else {
-                            // Fallback para diarios (siempre tocan, salvo feriados)
                             bottomStatusText = 'FALTA POR PAGAR';
                             bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
                         }
                     }
                 }
-                // --------------------------
+
+                // Identificador visual del número de préstamo si tiene varios
+                // (Aunque ahora saldrán separados, ayuda saber cuál es cuál)
+                const loanNumberLabel = (client.loans.length > 1) 
+                    ? `<span style="font-size: 0.75em; color: var(--text-secondary); margin-left: 5px;">(#${loanIndex + 1})</span>`
+                    : '';
 
                 const card = document.createElement('div');
                 card.className = 'client-card';
+                // Importante: Guardamos el ID y el índice específico de este préstamo
                 card.dataset.clientId = client.id;
-                card.dataset.loanIndex = displayLoanIndex; 
+                card.dataset.loanIndex = loanIndex; 
 
                 const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
                 const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
                 const photoUrl = client.profilePictureUrl || placeholderUrl;
 
-                const multipleLoansIndicator = hasMultipleActive 
-                    ? `<span style="font-size: 0.75em; color: var(--accent-purple); font-weight: 600; margin-left: 5px;">(${activeLoansCount})</span>` 
-                    : '';
-
-                // Construcción del HTML
                 card.innerHTML = `
                     <img src="${photoUrl}" alt="Foto" class="client-avatar">
                     <div class="client-info">
-                        <h4 class="client-name" style="margin-bottom: 2px;">${client.name}${multipleLoansIndicator}</h4> 
+                        <h4 class="client-name" style="margin-bottom: 2px;">${client.name}${loanNumberLabel}</h4> 
                         ${statusLabelUnderName} 
                         <p class="client-address" style="margin-top: 4px;"><i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${client.address}</p>
                     </div>
@@ -7078,6 +7052,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
