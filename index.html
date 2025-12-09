@@ -2065,21 +2065,18 @@ async function showRefinanceModal(clientId, notificationId) {
         function updateRouteProgress() {
             const todaysTotalClientsList = getAllTodaysClients();
 
-            // --- CORRECCIÓN: FILTRAR SOLO ACTIVOS ---
-            // Solo contamos para la ruta los clientes que NO están finalizados.
-            // Si el cálculo dice 'finished', lo sacamos del total de la barra.
+            // 1. FILTRO DE ACTIVOS: Solo contamos clientes que NO esten finalizados
             const activeRouteClients = todaysTotalClientsList.filter(item => item.loan.status !== 'finished');
 
-            // 1. Contar clientes ÚNICOS activos
+            // 2. Contar clientes ÚNICOS activos para el denominador (el total de la barra)
             const uniqueClientIds = new Set(activeRouteClients.map(item => item.client.id));
             const totalClients = uniqueClientIds.size;
 
-            // 2. Definir "Hoy"
             let paidClients = 0;
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
-            // 3. Función auxiliar de fecha
+            // Función auxiliar de fecha
             const getPaymentDate = (dateObj) => {
                 if (!dateObj) return null;
                 if (typeof dateObj.toDate === 'function') return dateObj.toDate();
@@ -2091,15 +2088,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 return null;
             };
 
-            // 4. Lógica de conteo de "Completados/Pagados"
+            // 3. Lógica de conteo de "Completados/Pagados"
             uniqueClientIds.forEach(clientId => {
-                // Filtramos también aquí para usar solo los préstamos activos
                 const clientLoansForToday = activeRouteClients.filter(item => item.client.id === clientId);
                 
-                // Regla 1: ¿Tiene préstamos pendientes o atrasados?
-                const hasUnpaidLoan = clientLoansForToday.some(item => item.loan.status === 'pending' || item.loan.status === 'late');
-
-                // Regla 2: ¿Pagó hoy?
+                // Regla ESTRICTA: ¿Pagó hoy?
                 const hasPaidToday = clientLoansForToday.some(item => {
                     const loan = item.loan;
                     if (!loan.history || loan.history.length === 0) return false;
@@ -2113,13 +2106,14 @@ async function showRefinanceModal(clientId, notificationId) {
                     });
                 });
 
-                // Si NO debe nada pendiente O Si ya pagó hoy -> Cuenta como avance
-                if (!hasUnpaidLoan || hasPaidToday) {
+                // Solo cuenta si HA PAGADO HOY. 
+                // (Eliminada la condición '|| !hasUnpaidLoan' para que no cuente automáticos)
+                if (hasPaidToday) {
                     paidClients++;
                 }
             });
 
-            // 5. Renderizar
+            // 4. Renderizar
             const progressPercentage = totalClients > 0 ? (paidClients / totalClients) * 100 : 0;
             const progressBar = document.getElementById('route-progress-bar');
             const progressText = document.getElementById('route-progress-text');
@@ -2141,15 +2135,13 @@ async function showRefinanceModal(clientId, notificationId) {
             
             if (!kpiGoal) return;
 
-            // --- VARIABLES DE CÁLCULO UNIFICADO ---
             let calculatedDailyGoal = 0;      
             
             const today = new Date();
-            const dayOfWeek = today.getDay(); // 0 (Dom) a 6 (Sab)
+            const dayOfWeek = today.getDay(); 
             const dayOfMonth = today.getDate();
             const todayStr = today.toLocaleDateString('pt-BR');
 
-            // Función auxiliar para verificar si un pago es de hoy
             const checkIsToday = (timestamp) => {
                 if (!timestamp) return false;
                 let d;
@@ -2159,13 +2151,13 @@ async function showRefinanceModal(clientId, notificationId) {
                 return !isNaN(d) && d.toLocaleDateString('pt-BR') === todayStr;
             };
 
-            // Recorremos TODOS los clientes
+            // Iteramos sobre TODOS los clientes para calcular la Meta Global Fija
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
-                    // Ignoramos finalizados si no pagaron hoy
+                    // Si está finalizado y no pagó hoy, lo ignoramos para la meta
                     const isFinished = loan.status === 'finished';
 
-                    // 1. Calcular cuánto ha pagado HOY este préstamo
+                    // Cuánto ha pagado hoy
                     const paidToday = (loan.history || []).reduce((sum, h) => {
                         if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
                             return sum + (parseFloat(h.amount) || 0);
@@ -2175,7 +2167,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
                     if (isFinished && paidToday === 0) return;
 
-                    // 2. Determinar si hoy es día de cobro (CONVERSIÓN SEGURA A NÚMERO)
+                    // Verificar frecuencia
                     let isPaymentDay = false;
                     const frequency = loan.paymentFrequency || 'daily';
                     const paymentDays = loan.paymentDays || [];
@@ -2183,57 +2175,60 @@ async function showRefinanceModal(clientId, notificationId) {
                     if (frequency === 'daily') {
                         isPaymentDay = paymentDays.some(d => parseInt(d) === dayOfWeek);
                     } else if (frequency === 'weekly') {
-                        // Verificamos si el arreglo tiene datos y si el primer día coincide con hoy
                         isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
                     } else if (frequency === 'monthly') {
                         isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
                     }
 
-                    // 3. Valor de la cuota (Aseguramos que sea número)
+                    // Valor de la cuota
                     let installmentValue = parseFloat(loan.amount) || 0;
                     if (installmentValue === 0 && loan.originalInstallmentAmount) {
                         installmentValue = parseFloat(loan.originalInstallmentAmount);
                     }
 
-                    // 4. Calcular deuda al inicio del día para no pedir de más
+                    // --- CORRECCIÓN META FIJA ---
+                    // 1. Calcular deuda total actual
                     const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
                         (h.status === 'approved' || h.method === 'migration') ? sum + (h.amount || 0) : sum, 0
                     );
                     const totalLoan = parseFloat(loan.totalLoan) || 0;
-                    const remainingBalanceTotal = Math.max(0, totalLoan - totalPaidAllTime);
+                    const currentBalance = Math.max(0, totalLoan - totalPaidAllTime);
                     
-                    // Ajuste: La deuda al empezar el día era (SaldoActual + LoQuePagóHoy)
-                    const debtAtStartOfDay = remainingBalanceTotal + paidToday;
+                    // 2. Calcular deuda al INICIO del día (sumando lo que pagó hoy al saldo actual)
+                    // Esto hace que la meta no baje conforme pagan.
+                    const debtAtStartOfDay = currentBalance + paidToday;
                     
-                    // Si la cuota es mayor que la deuda total, la meta es solo la deuda restante
-                    if (installmentValue > debtAtStartOfDay) {
-                        installmentValue = debtAtStartOfDay;
+                    // 3. La meta para este cliente es la cuota, pero no puede ser mayor a lo que debía al amanecer.
+                    let goalForThisClient = installmentValue;
+                    if (goalForThisClient > debtAtStartOfDay) {
+                        goalForThisClient = debtAtStartOfDay;
                     }
 
-                    // --- SUMA UNIFICADA ---
-                    // Sumamos a la meta si:
-                    // A) Hoy le toca pagar (sea diario, semanal o mensual).
-                    // B) Ya pagó algo hoy (adelanto).
-                    // Se toma el mayor entre (Lo que pagó) y (Lo que debía).
-                    if (isPaymentDay || paidToday > 0) {
-                        calculatedDailyGoal += Math.max(paidToday, installmentValue);
+                    // Solo sumamos a la meta si hoy es día de pago.
+                    // Si pagó hoy pero no era día de pago (adelanto), NO subimos la meta (opcional, según tu preferencia).
+                    // Si quieres que los adelantos cuenten en la meta, usa: if (isPaymentDay || paidToday > 0)
+                    if (isPaymentDay) {
+                        calculatedDailyGoal += goalForThisClient;
                     }
                 });
             });
 
-            // --- 4. RENDERIZAR EN PANTALLA ---
-            
+            // Renderizar Meta
             kpiGoal.textContent = money(calculatedDailyGoal);
             
-            // Total Recibido Hoy
+            // Renderizar Recibido Hoy
             const { dailyTotal } = calculateDailyTotals();
             kpiReceived.textContent = money(dailyTotal);
 
-            // Clientes Restantes
+            // Renderizar Clientes Restantes
+            // Filtramos la lista para quitar finalizados y los que ya pagaron
             if (!clientsForDashboard || clientsForDashboard.length === 0) {
                  kpiRemaining.textContent = 0;
             } else {
                 const remainingItems = clientsForDashboard.filter(item => {
+                    // Primero, ignorar si el préstamo ya está finalizado
+                    if (item.loan.status === 'finished') return false;
+
                     const loan = item.loan;
                     const paidTodayVal = (loan.history || []).reduce((sum, h) => {
                         if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
@@ -2241,7 +2236,8 @@ async function showRefinanceModal(clientId, notificationId) {
                         }
                         return sum;
                     }, 0);
-                    // Solo contamos como "restante" si NO ha pagado nada hoy
+                    
+                    // Es restante si NO ha pagado nada hoy
                     return paidTodayVal === 0;
                 });
                 const uniqueRemainingIds = new Set(remainingItems.map(i => i.client.id));
@@ -7044,6 +7040,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
