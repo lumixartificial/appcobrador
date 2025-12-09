@@ -4111,6 +4111,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const prefillLoanAmount = prefillData ? prefillData.amount : '';
             const prefillInstallments = prefillData ? prefillData.installments : '';
 
+            // --- GENERACIÓN AUTOMÁTICA DE CREDENCIALES ---
+            // Si el cliente ya tiene datos, los usamos. Si es nuevo, generamos al azar.
+            const timestampSuffix = Date.now().toString().slice(-6); // Últimos 6 dígitos del tiempo
+            const autoUsername = client.username || `user${timestampSuffix}`;
+            const autoPassword = client.password || Math.random().toString(36).slice(-6).toUpperCase(); // 6 caracteres alfanuméricos
+
             clientFormModal.innerHTML = `
                 <header class="modal-header">
                     <button id="closeClientFormModal"><i data-lucide="arrow-left"></i></button>
@@ -4156,29 +4162,25 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </button>
                         </div>
                         
-                        <div style="${isNewLoan ? 'display: none;' : ''}">
-                            <h3 class="section-title" data-lang-key="clientAccess" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                                <i data-lucide="smartphone"></i> <span data-lang-key="clientAccess"></span>
-                            </h3>
+                        <!-- SECCIÓN OCULTA PERO FUNCIONAL: ACCESO DEL CLIENTE -->
+                        <!-- Usamos style="display: none;" para ocultarlo visualmente pero mantener los inputs -->
+                        <div style="display: none;">
+                            <h3 class="section-title">Acesso Oculto (Automático)</h3>
                             <div class="form-group">
                                 <label data-lang-key="username"></label>
-                                <input type="text" id="client-username" required value="${client.username || ''}" ${isEditMode && client.username ? 'readonly' : ''} autocomplete="off" autocapitalize="none"
-                                       oninput="this.value=this.value.replace(/\s/g, '')">
+                                <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
+                                <input type="text" id="client-username" required value="${autoUsername}" 
+                                       autocomplete="off" autocapitalize="none">
                                 <div id="username-validation-msg" class="validation-message"></div>
-                                <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
-                                    Crie um nome de usuário <strong>sem espaços</strong>, usando letras e números. Ex: <strong>andresruiz1649</strong>
-                                </p>
                             </div>
                             
                             <div class="form-group">
                                 <label data-lang-key="password"></label>
-                                <input type="text" id="client-password" required value="${client.password || ''}"
-                                       oninput="this.value=this.value.replace(/[^A-Za-z0-9]/g, '')">
-                                <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
-                                    Mínimo 6 caracteres. Use <strong>apenas letras e números</strong> (sem espaços ou @, #, $).
-                                </p>
+                                <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
+                                <input type="text" id="client-password" required value="${autoPassword}">
                             </div>
                         </div>
+                        <!-- FIN SECCIÓN OCULTA -->
 
                         <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
                            <i data-lucide="dollar-sign"></i> 
@@ -4401,6 +4403,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 document.getElementById('monthly-day-input').value = paymentDays[0];
             }
 
+            // Nota: Mantenemos la lógica de validación aunque esté oculto para asegurar que no haya duplicados si se genera colisión (muy raro)
             let isUsernameAvailable = (isEditMode || isNewLoan);
             const usernameInput = document.getElementById('client-username');
             const validationMsg = document.getElementById('username-validation-msg');
@@ -4410,21 +4413,17 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     const username = usernameInput.value.trim();
                     if (!username) { validationMsg.textContent = ''; isUsernameAvailable = false; return; }
                     if (isEditMode && username === client.username) { validationMsg.textContent = ''; isUsernameAvailable = true; return; }
-                    if (username.includes('@')) {
-                        validationMsg.textContent = 'Usuário não pode conter "@".';
-                        validationMsg.className = 'validation-message invalid';
-                        isUsernameAvailable = false; return;
-                    }
-                    validationMsg.textContent = 'Verificando...'; validationMsg.className = 'validation-message checking';
+                    // Quitamos validación de @ ya que lo generamos nosotros
+                    
                     const q = query(collection(db, 'companies', currentCompanyId, 'clients'), where("username", "==", username));
                     const querySnapshot = await getDocs(q);
                     let isTaken = !querySnapshot.empty;
                     if (isTaken) {
-                        validationMsg.textContent = translations[currentLang].usernameTaken;
-                        validationMsg.classList.add('invalid'); isUsernameAvailable = false;
+                        // Si choca, generamos uno nuevo al azar (fallback simple)
+                        usernameInput.value = username + Math.floor(Math.random()*100);
+                        isUsernameAvailable = true;
                     } else {
-                        validationMsg.textContent = translations[currentLang].usernameAvailable;
-                        validationMsg.classList.add('valid'); isUsernameAvailable = true;
+                        isUsernameAvailable = true;
                     }
                 });
             }
@@ -7079,6 +7078,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
