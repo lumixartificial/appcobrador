@@ -1239,19 +1239,23 @@ const BLACKLIST_DATA = {
                         <section class="route-section"><h2 class="section-title" data-lang-key="todaysRoute"></h2><div class="client-list" id="todays-route-list"><div class="loading">Carregando clientes...</div></div></section>
                     </div>
                     <div id="clients-view" class="view container">
-                        <div class="search-bar-wrapper">
-                            <i class="icon" data-lucide="search"></i>
-                            <input type="text" id="client-search-input">
-                        </div>
-                        <div class="filter-buttons">
-                            <button class="filter-btn active" data-filter="all" data-lang-key="all"></button>
-                            <button class="filter-btn" data-filter="pending" data-lang-key="pending"></button>
-                            <button class="filter-btn" data-filter="paid" data-lang-key="paid"></button>
-                            <button class="filter-btn" data-filter="late" data-lang-key="late"></button>
-                            <button class="filter-btn" data-filter="finished" data-lang-key="finished"></button>
-                        </div>
-                        <div class="client-list" id="all-clients-list"></div>
-                    </div>
+    <div class="search-bar-wrapper">
+        <i class="icon" data-lucide="search"></i>
+        <input type="text" id="client-search-input" placeholder="Buscar cliente...">
+    </div>
+
+    <div class="filter-buttons">
+        <button class="filter-btn active" data-filter="all">TODOS</button>
+        <button class="filter-btn" data-filter="weekly">SEMANALES</button>
+        <button class="filter-btn" data-filter="todo_today">FALTA POR PAGAR</button>
+        <button class="filter-btn" data-filter="paid">PAGO</button>
+        <button class="filter-btn" data-filter="late">ATRASADO</button>
+        <button class="filter-btn" data-filter="finished">FINALIZADO</button>
+    </div>
+
+    <!-- ESTE ES EL CONTENEDOR QUE FALTABA -->
+    <div class="client-list" id="all-clients-list"></div>
+</div>
 
                     <div id="notifications-view" class="view container">
                          <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-purple);">
@@ -2947,46 +2951,81 @@ async function showRefinanceModal(clientId, notificationId) {
     function updateAllClientsList() {
             const container = document.getElementById('all-clients-list');
             const searchInput = document.getElementById('client-search-input');
-            const activeFilter = document.querySelector('#clients-view .filter-btn.active');
-            if (!container || !searchInput || !activeFilter) return;
+            
+            // Intento robusto de encontrar el filtro activo
+            let activeFilter = document.querySelector('.filter-buttons .filter-btn.active');
+            
+            // Si por alguna razón no hay filtro activo, forzamos 'TODOS'
+            let filter = activeFilter ? activeFilter.dataset.filter : 'all';
+
+            if (!container || !searchInput) return;
 
             const searchTerm = searchInput.value.toLowerCase();
-            const filter = activeFilter.dataset.filter;
+            
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            const getPaymentDate = (dateObj) => {
+                if (!dateObj) return null;
+                if (typeof dateObj.toDate === 'function') return dateObj.toDate();
+                if (dateObj instanceof Date) return dateObj;
+                // Soporte extra para fechas en texto
+                if (typeof dateObj === 'string') {
+                    const d = new Date(dateObj);
+                    if (!isNaN(d.getTime())) return d;
+                }
+                return null;
+            };
 
             let clientsWithLoans = [];
             allClients.forEach(client => {
-                (client.loans || []).forEach((loan, loanIndex) => {
-                    
-                    // --- [INICIO DE LA CORRECCIÓN] ---
-                    // 1. Recalculamos el estado real del préstamo AHORA
+                // Si el cliente no tiene préstamos, lo saltamos o lo mostramos si es TODOS
+                if (!client.loans || client.loans.length === 0) return;
+
+                client.loans.forEach((loan, loanIndex) => {
                     const details = calculateLoanDetails(loan);
                     const currentStatus = details.status; 
-                    // --- [FIN DE LA CORRECCIÓN] ---
+                    
+                    const hasPaidToday = (loan.history || []).some(h => {
+                        if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false; 
+                        const pDate = getPaymentDate(h.date);
+                        return pDate && pDate >= todayStart;
+                    });
 
                     let passesFilter = true;
-                    
-                    // --- [INICIO DE LA CORRECCIÓN] ---
-                    // 2. Comparamos el filtro con el 'currentStatus' (el real), no con 'loan.status' (el obsoleto)
-                    if (filter !== 'all' && currentStatus !== filter) { 
-                        passesFilter = false;
-                    }
-                    // --- [FIN DE LA CORRECCIÓN] ---
 
-                    // La lógica del buscador (searchTerm) está bien y no cambia
+                    // LÓGICA DE FILTROS
+                    if (filter === 'weekly') {
+                        // Muestra solo si es 'weekly' y NO está finalizado
+                        if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesFilter = false;
+                    }
+                    else if (filter === 'todo_today') {
+                        // Muestra si tiene deuda hoy (>0), NO pagó hoy y NO está finalizado
+                        if (details.amountDueToday <= 0 || hasPaidToday || currentStatus === 'finished') passesFilter = false;
+                    }
+                    else if (filter === 'paid') {
+                        if (!hasPaidToday) passesFilter = false;
+                    }
+                    else if (filter === 'late') {
+                        if (currentStatus !== 'late') passesFilter = false;
+                    }
+                    else if (filter === 'finished') {
+                        if (currentStatus !== 'finished') passesFilter = false;
+                    }
+                    // Si es 'all', passesFilter se queda en true
+
+                    // BUSCADOR
                     if (searchTerm && !(client.name.toLowerCase().includes(searchTerm) || (client.address && client.address.toLowerCase().includes(searchTerm)))) {
                         passesFilter = false;
                     }
                     
                     if(passesFilter) {
-                        // Pasamos el préstamo original (loan)
                         clientsWithLoans.push({ client, loan, loanIndex }); 
                     }
                 });
             });
             
-            // Ordena a lista de clientes em ordem alfabética pelo nome
             clientsWithLoans.sort((a, b) => a.client.name.localeCompare(b.client.name));
-            
             renderClientCards(container, clientsWithLoans);
         }
         
@@ -7040,6 +7079,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
