@@ -2896,20 +2896,28 @@ if (displayLoan.status === 'finished') {
                return null;
            };
 
+           // [NUEVO HELPER] Para leer fecha de inicio correctamente (Timestamp o Date)
+           const getStartDate = (dateObj) => {
+               if (!dateObj) return null;
+               if (dateObj.seconds) return new Date(dateObj.seconds * 1000); // Firestore
+               if (dateObj instanceof Date) return dateObj; // Local JS Date (recién creado)
+               return null;
+           };
+
            let clientsForRoute = [];
 
            allClients.forEach(client => {
                if (!client.loans || client.loans.length === 0) return;
 
                client.loans.forEach((loan, index) => {
-                   // 1. Calculamos el estado actual (importante para detectar 'late')
+                   // 1. Calculamos el estado actual
                    const details = calculateLoanDetails(loan);
                    const currentStatus = details.status;
 
                    // 2. Descartamos los finalizados
                    if (currentStatus === 'finished') return;
 
-                   // 3. Verificamos si YA pagó hoy (para quitarlo de la lista si ya cumplió)
+                   // 3. Verificamos si YA pagó hoy
                    let hasPaidToday = false;
                    if (loan.history && loan.history.length > 0) {
                         hasPaidToday = loan.history.some(h => {
@@ -2919,17 +2927,25 @@ if (displayLoan.status === 'finished') {
                         });
                    }
 
-                   // 4. LÓGICA CLAVE: ¿Quién aparece en la Ruta?
-                   // A) isLate: Clientes ATRASADOS (deben de días anteriores).
-                   // B) isDueToday: Clientes que tienen pago programado para HOY.
-                   
+                   // 4. LÓGICA DE VISIBILIDAD MEJORADA
                    const isLate = currentStatus === 'late';
                    const isDueToday = details.amountDueToday > 0;
                    
-                   // Incluimos en la lista si (Está Atrasado O Toca Hoy) Y (No ha pagado hoy)
-                   if ((isLate || isDueToday) && !hasPaidToday) {
+                   // [CORRECCIÓN CRÍTICA] Detectamos si el préstamo se creó HOY.
+                   // Si es una renovación o préstamo nuevo de hoy, LO MOSTRAMOS,
+                   // independientemente de si la lógica de cálculo dice que la cuota es mañana.
+                   let isCreatedToday = false;
+                   const startDateObj = getStartDate(loan.startDate);
+                   if (startDateObj) {
+                       startDateObj.setHours(0,0,0,0);
+                       if (startDateObj.getTime() === todayStart.getTime()) {
+                           isCreatedToday = true;
+                       }
+                   }
+                   
+                   // Incluimos si: (Atrasado O Toca Hoy O ES NUEVO DE HOY) Y (No ha pagado hoy)
+                   if ((isLate || isDueToday || isCreatedToday) && !hasPaidToday) {
                        
-                       // Preparamos los datos visuales
                        const loanToRender = { 
                            ...loan, 
                            status: currentStatus,
@@ -2941,15 +2957,20 @@ if (displayLoan.status === 'finished') {
                });
            });
  
-           // 5. Ordenar: Damos prioridad visual a los ATRASADOS para que salgan primero
+           // 5. Ordenar
            clientsForRoute.sort((a, b) => {
-               if (a.loan.status === 'late' && b.loan.status !== 'late') return -1; // Atrasado primero
+               if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
                if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
-               return 0; // Si son iguales, dejamos que optimizeRoute decida por GPS
+               return 0;
            });
 
-           // 6. Optimizar ruta por GPS y renderizar
+           // 6. Optimizar ruta y Actualizar UI
            const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
+           updateDashboard(optimizedClients); 
+           
+           // Si el mapa está abierto, actualizamos los puntos
+           if (document.querySelector('#map-view.active')) plotClientsOnMap();
+
            renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
        }
 
@@ -7142,6 +7163,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
