@@ -5535,34 +5535,58 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             }
         }
 
-        async function exportDailyReport() {
+        // [FUNCIÓN ACTUALIZADA] Ahora acepta una fecha personalizada (customDate)
+        async function exportDailyReport(customDate = null) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const lang = currentLang;
-            const now = new Date();
-            const todayStr = now.toLocaleDateString('pt-BR');
+            
+            // Usamos la fecha personalizada o la de hoy si no se pasa ninguna
+            const reportDate = customDate || new Date();
+            const dateStr = reportDate.toLocaleDateString('pt-BR'); // String para comparación "DD/MM/AAAA"
 
             // Mostrar Toast de inicio
-            showToast('Gerando PDF...', false);
+            showToast(`Gerando PDF para ${dateStr}...`, false);
 
-            // --- 1. RECOPILAR DATOS ---
+            // --- 1. RECOPILAR DATOS FILTRADOS POR LA FECHA SELECCIONADA ---
 
-            // A. Pagos Recibidos Hoy
-            const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
+            // Función auxiliar para comparar fechas
+            const checkDateMatch = (timestamp) => {
+                if (!timestamp) return false;
+                let d;
+                if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
+                else if (timestamp instanceof Date) d = timestamp;
+                else d = new Date(timestamp);
+                
+                // Comparamos strings de fecha local
+                return d.toLocaleDateString('pt-BR') === dateStr;
+            };
+
+            // A. Pagos Recibidos en esa Fecha
+            // Nota: Recalculamos totales manualmente para esa fecha específica
+            let dailyTotal = 0;
+            let dailyTotalCash = 0;
+            let dailyTotalDigital = 0;
+
             const dailyPaymentsList = [];
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, loanIndex) => { 
                     (loan.history || []).forEach(h => {
-                        if (h.date && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
-                            let paymentDate = null;
-                            if (h.date.seconds) paymentDate = new Date(h.date.seconds * 1000);
-                            else if (h.date instanceof Date) paymentDate = h.date;
+                        if (h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
+                            if (checkDateMatch(h.date)) {
+                                const amt = h.amount || 0;
+                                dailyTotal += amt;
+                                if (h.method === 'dinheiro') dailyTotalCash += amt;
+                                else dailyTotalDigital += amt;
 
-                            if (paymentDate && paymentDate.toLocaleDateString('pt-BR') === todayStr) {
+                                let pTime = '00:00';
+                                if (h.date?.seconds) pTime = new Date(h.date.seconds*1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                                else if (h.date instanceof Date) pTime = h.date.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
                                 dailyPaymentsList.push({
                                     clientName: client.name,
-                                    amount: h.amount,
-                                    time: paymentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                                    amount: amt,
+                                    time: pTime,
                                     method: h.method || 'dinheiro', 
                                     loanIndex: loanIndex + 1
                                 });
@@ -5573,46 +5597,37 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             dailyPaymentsList.sort((a, b) => a.time.localeCompare(b.time));
 
-            // B. Gastos de Hoy
-            const dailyExpenses = allExpenses.filter(e => {
-                if (!e.date?.seconds) return false;
-                return new Date(e.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
-            });
+            // B. Gastos de esa Fecha
+            const dailyExpenses = allExpenses.filter(e => checkDateMatch(e.date));
             const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.value, 0);
             dailyExpenses.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
 
-            // C. Liquidaciones de Hoy
-            const dailySettlements = allSettlements.filter(s => {
-                if (!s.date?.seconds) return false;
-                return new Date(s.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
-            });
+            // C. Liquidaciones de esa Fecha
+            const dailySettlements = allSettlements.filter(s => checkDateMatch(s.date));
             const totalSettlements = dailySettlements.reduce((sum, s) => sum + s.amount, 0);
             
-            // D. Aportes de Hoy
-            const dailyInjections = allCapitalInjections.filter(i => {
-                if (!i.date?.seconds) return false; 
-                return new Date(i.date.seconds * 1000).toLocaleDateString('pt-BR') === todayStr;
-            });
+            // D. Aportes de esa Fecha
+            const dailyInjections = allCapitalInjections.filter(i => checkDateMatch(i.date));
             const totalInjections = dailyInjections.reduce((sum, i) => sum + i.amount, 0);
 
-            // E. Nuevos Préstamos de Hoy
+            // E. Nuevos Préstamos de esa Fecha
             const dailyNewLoans = [];
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
-                    let loanDate = null;
-                    if (loan.startDate?.seconds) loanDate = new Date(loan.startDate.seconds * 1000);
-                    else if (loan.startDate instanceof Date) loanDate = loan.startDate;
-
-                    if (loanDate && loanDate.toLocaleDateString('pt-BR') === todayStr && !loan.migrationDate) {
+                    if (checkDateMatch(loan.startDate) && !loan.migrationDate) {
                         let principal = loan.principalAmount;
                         if (!principal && loan.totalLoan) {
                              const rate = client.interestRate || 20;
                              principal = loan.totalLoan / (1 + (rate/100));
                         }
+                        
+                        let loanTime = '00:00';
+                        if (loan.startDate?.seconds) loanTime = new Date(loan.startDate.seconds*1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
                         dailyNewLoans.push({
                             clientName: client.name,
                             amount: principal || 0,
-                            time: loanDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                            time: loanTime,
                             loanIndex: index + 1
                         });
                     }
@@ -5620,14 +5635,13 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             const totalLoansOutflow = dailyNewLoans.reduce((sum, l) => sum + l.amount, 0);
 
-            // F. Recopilar Clientes Atrasados (CORREGIDO Y REFORZADO)
+            // F. Clientes Atrasados (ESTO SIEMPRE MUESTRA EL ESTADO ACTUAL)
+            // No podemos viajar en el tiempo para saber quién estaba atrasado hace 3 días fácilmente,
+            // así que mostraremos los atrasados ACTUALES como referencia informativa.
             const lateClientsList = [];
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
-                    // Calculamos el estado actual usando la misma lógica que la pantalla principal
                     const details = calculateLoanDetails(loan);
-                    
-                    // Si el estado es 'late' (atrasado), lo añadimos a la lista
                     if (details.status === 'late') {
                         lateClientsList.push({
                             clientName: client.name,
@@ -5638,31 +5652,27 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     }
                 });
             });
-            // Ordenamos: Los que deben más días primero
             lateClientsList.sort((a, b) => b.lateDays - a.lateDays);
             
-            console.log(`[PDF DEBUG] Clientes atrasados encontrados: ${lateClientsList.length}`);
-
             // Cálculo Neto Final
             const netBalance = (dailyTotal + totalInjections) - (totalExpenses + totalSettlements + totalLoansOutflow);
 
-            // --- 2. GENERAR PDF ---
+            // --- 2. GENERAR PDF (ESTRUCTURA IDÉNTICA) ---
             const pageMargin = 15;
             const pageWidth = doc.internal.pageSize.getWidth();
             const center = pageWidth / 2;
             let y = 0;
 
-            // --- Funciones Auxiliares de Diseño ---
             const checkPageBreak = () => {
                 if (y > 270) { 
                     doc.addPage();
-                    y = 20; // Margen superior en nueva página
+                    y = 20;
                 }
             };
 
             const addSectionHeader = (title) => {
                 checkPageBreak();
-                y += 10; // Espacio antes del título
+                y += 10;
                 doc.setFontSize(14);
                 doc.setFont(undefined, 'bold');
                 doc.setTextColor(0);
@@ -5671,10 +5681,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 doc.setLineWidth(0.5);
                 doc.setDrawColor(200);
                 doc.line(pageMargin, y, pageWidth - pageMargin, y);
-                y += 8; // Espacio después de la línea
+                y += 8;
             };
 
-            // --- Encabezado del Reporte ---
+            // Encabezado
             y = 25;
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
@@ -5683,7 +5693,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             doc.setFontSize(12);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(100);
-            doc.text(`Relatório Diário - ${todayStr}`, center, y, { align: 'center' });
+            // AQUÍ SE MUESTRA LA FECHA SELECCIONADA
+            doc.text(`Relatório Diário - ${dateStr}`, center, y, { align: 'center' });
 
             // Info Cobrador
             y += 15;
@@ -5716,7 +5727,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 doc.text(money(value), pageWidth - pageMargin - 5, y, { align: 'right' });
             };
 
-            addSummaryLine(`(+) Recebido Hoje:`, dailyTotal, '#28a745');
+            addSummaryLine(`(+) Recebido (${dateStr}):`, dailyTotal, '#28a745');
             addSummaryLine(`    Em Dinheiro:`, dailyTotalCash, '#6c757d');
             addSummaryLine(`    Digital/Recibo:`, dailyTotalDigital, '#6c757d');
             addSummaryLine(`(+) Aportes:`, totalInjections, '#28a745');
@@ -5732,17 +5743,17 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
             doc.setTextColor(netBalance >= 0 ? '#6f42c1' : '#dc3545');
-            doc.text('SALDO LÍQUIDO DO DIA:', pageMargin + 5, y);
+            doc.text('SALDO LÍQUIDO DO PERÍODO:', pageMargin + 5, y);
             doc.text(money(netBalance), pageWidth - pageMargin - 5, y, { align: 'right' });
             
             y += 8;
             doc.setTextColor(currentCapitalOnHand >= 0 ? '#000000' : '#dc3545');
-            doc.text('CAPITAL TOTAL EM MÃOS:', pageMargin + 5, y);
+            doc.text('CAPITAL TOTAL EM MÃOS (HOJE):', pageMargin + 5, y);
             doc.text(money(currentCapitalOnHand), pageWidth - pageMargin - 5, y, { align: 'right' });
 
             y += 10;
 
-            // --- Sección: Pagos Recibidos ---
+            // Listados detallados (Pagos, Gastos, Préstamos)
             if (dailyPaymentsList.length > 0) {
                 addSectionHeader('Pagamentos Recebidos');
                 dailyPaymentsList.forEach(p => {
@@ -5750,13 +5761,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     doc.setFontSize(10);
                     doc.setFont(undefined, 'normal');
                     doc.setTextColor(0);
-                    
-                    let methodDisplay = 'Dinheiro';
-                    if (p.method === 'pix') methodDisplay = 'PIX';
-                    if (p.method === 'cartao') methodDisplay = 'Cartão';
-                    
+                    let methodDisplay = p.method === 'pix' ? 'PIX' : (p.method === 'cartao' ? 'Cartão' : 'Dinheiro');
                     doc.text(`${p.time} - ${p.clientName} (${methodDisplay})`, pageMargin + 5, y);
-                    
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor('#28a745');
                     doc.text(money(p.amount), pageWidth - pageMargin - 5, y, { align: 'right' });
@@ -5764,7 +5770,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
 
-            // --- Sección: Gastos ---
             if (dailyExpenses.length > 0) {
                 addSectionHeader('Gastos do Dia');
                 dailyExpenses.forEach(e => {
@@ -5781,65 +5786,65 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
 
-            // --- Sección: Clientes Atrasados (LA PARTE QUE FALLABA) ---
-            addSectionHeader('Relatório de Inadimplência (Atrasados)');
+            if (dailyNewLoans.length > 0) {
+                addSectionHeader('Novos Empréstimos / Renovações');
+                dailyNewLoans.forEach(l => {
+                    checkPageBreak();
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(0);
+                    const displayText = `${l.time} - ${l.clientName}`;
+                    doc.text(displayText, pageMargin + 5, y);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor('#dc3545'); 
+                    doc.text(`-${money(l.amount)}`, pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
+            }
 
+            // Atrasados (informativo actual)
+            addSectionHeader('Relatório de Inadimplência (Atual)');
             if (lateClientsList.length > 0) {
-                // Encabezados de la tabla de atrasados
                 checkPageBreak();
                 doc.setFontSize(9);
                 doc.setTextColor(100);
-                doc.setFont(undefined, 'bold'); // Negrita para el encabezado
+                doc.setFont(undefined, 'bold'); 
                 doc.text('Cliente', pageMargin + 5, y);
                 doc.text('Dias de Atraso', pageMargin + 100, y);
-                doc.text('Status', pageMargin + 140, y); // Añadido status visual
+                doc.text('Status', pageMargin + 140, y);
                 y += 6;
 
-                // Lista de clientes
                 lateClientsList.forEach(c => {
                     checkPageBreak();
-                    
-                    // Nombre del cliente
                     doc.setFontSize(10);
                     doc.setTextColor(0);
                     doc.setFont(undefined, 'normal');
-                    
-                    // Cortar nombre si es muy largo
                     const name = c.clientName.length > 25 ? c.clientName.substring(0, 25) + '...' : c.clientName;
                     doc.text(name, pageMargin + 5, y);
-                    
-                    // Días de atraso y barra visual
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor('#dc3545'); 
                     doc.text(`${c.lateDays} dias`, pageMargin + 100, y);
                     
-                    // Dibujamos una pequeña barra roja proporcional
                     const maxBarWidth = 30; 
-                    const maxDaysScale = 30; // 30 días es barra llena
+                    const maxDaysScale = 30; 
                     const daysToDraw = Math.min(c.lateDays, maxDaysScale);
                     const currentBarWidth = (daysToDraw / maxDaysScale) * maxBarWidth;
 
-                    // Fondo de barra gris
                     doc.setFillColor(230, 230, 230);
                     doc.rect(pageMargin + 140, y - 3, maxBarWidth, 4, 'F');
-                    
-                    // Barra roja de progreso
                     doc.setFillColor(220, 53, 69); 
                     doc.rect(pageMargin + 140, y - 3, currentBarWidth, 4, 'F');
-
-                    y += 8; // Espacio para siguiente fila
+                    y += 8; 
                 });
             } else {
-                // Mensaje si no hay nadie atrasado
                 checkPageBreak();
                 doc.setFontSize(11);
-                doc.setTextColor('#28a745'); // Verde
+                doc.setTextColor('#28a745');
                 doc.setFont(undefined, 'bold');
-                doc.text('Parabéns! Nenhum cliente atrasado registrado.', pageMargin + 5, y);
+                doc.text('Parabéns! Nenhum cliente atrasado atualmente.', pageMargin + 5, y);
                 y += 10;
             }
 
-            // --- Pie de página ---
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
@@ -5848,52 +5853,59 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 doc.text(`Gerado por LUMIX Finanças - Página ${i} de ${pageCount}`, center, 285, { align: 'center' });
             }
 
-            // Descargar
-            doc.save(`relatorio-diario-${todayStr.replace(/\//g, '-')}.pdf`);
+            doc.save(`relatorio-${dateStr.replace(/\//g, '-')}.pdf`);
             showToast('Relatório PDF gerado com sucesso!');
         }
         
-        function showCropperModal(file) {
-            const cropperModal = document.getElementById('cropperModal');
-            cropperModal.innerHTML = `
-                <header class="modal-header">
-                    <button id="closeCropperModal"><i data-lucide="x"></i></button>
-                    <span class="modal-title" data-lang-key="cropImage"></span>
-                </header>
-                <div class="modal-content-wrapper">
-                    <div id="cropper-container" class="container">
-                        <img id="cropper-image">
-                    </div>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn-secondary" id="cancelCropBtn"><i data-lucide="x-circle"></i> <span data-lang-key="cancel"></span></button>
-                    <button class="btn-primary" id="confirmCropBtn"><i data-lucide="check-circle"></i> <span data-lang-key="confirmCrop"></span></button>
-                </div>
-            `;
-            history.pushState({ modal: 'cropperModal' }, 'Crop Image', '#crop');
-            cropperModal.classList.add('active');
-            lucide.createIcons({nodes: cropperModal.querySelectorAll('[data-lucide]')});
-            applyLanguage(currentLang);
+        // --- [NUEVA FUNCIÓN] Modal para seleccionar fecha del reporte ---
+function showReportDateModal() {
+    const modal = document.getElementById('reportOptionsModal');
+    if (!modal) return;
 
-            const image = document.getElementById('cropper-image');
-            const reader = new FileReader();
-            let cropper;
+    // Ponemos la fecha de hoy por defecto en el input
+    const now = new Date();
+    const todayISO = now.toISOString().split('T')[0];
 
-            reader.onload = (e) => {
-                image.src = e.target.result;
-                cropper = new Cropper(image, { aspectRatio: 1, viewMode: 1, background: false });
-            };
-            reader.readAsDataURL(file);
+    modal.classList.add('active');
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 350px; padding: 25px; background-color: var(--surface); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);"> 
+            <button class="close-modal-btn" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 28px; color: var(--text-secondary); cursor: pointer; line-height: 1;">&times;</button>
 
-            document.getElementById('closeCropperModal').addEventListener('click', () => window.history.back());
-            document.getElementById('cancelCropBtn').addEventListener('click', () => window.history.back());
-            document.getElementById('confirmCropBtn').addEventListener('click', () => {
-                cropper.getCroppedCanvas({ width: 256, height: 256, imageSmoothingQuality: 'high' }).toBlob((blob) => {
-                    handleProfilePictureChange(blob);
-                    window.history.back();
-                }, 'image/jpeg');
-            });
+            <h3 style="margin: 0 0 15px; text-align: center; font-size: 1.3em; font-weight: 600; color: var(--text-primary);">Gerar Relatório</h3>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 25px; font-size: 0.9em;">Selecione a data para gerar o PDF:</p>
+
+            <div class="form-group">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Data do Relatório</label>
+                <input type="date" id="report-date-input" value="${todayISO}" style="width: 100%; padding: 12px; font-size: 1.1em; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg); color: var(--text-primary); text-align: center;">
+            </div>
+
+            <button class="btn-primary" id="confirm-generate-report-btn" style="width: 100%; margin-top: 20px; padding: 15px; font-size: 1em;">
+                <i data-lucide="file-down"></i> Baixar PDF
+            </button>
+        </div>
+    `;
+
+    lucide.createIcons({nodes: modal.querySelectorAll('[data-lucide]')});
+
+    const closeModal = () => modal.classList.remove('active');
+    
+    // Evento Cerrar
+    modal.querySelector('.close-modal-btn').addEventListener('click', closeModal);
+
+    // Evento Confirmar
+    modal.querySelector('#confirm-generate-report-btn').addEventListener('click', () => {
+        const dateVal = document.getElementById('report-date-input').value;
+        if (dateVal) {
+            // Convertimos el string "YYYY-MM-DD" a un objeto Date local
+            const [year, month, day] = dateVal.split('-').map(Number);
+            const selectedDate = new Date(year, month - 1, day); // Mes es base 0 en JS
+            
+            closeModal();
+            // Llamamos a la función de exportar CON la fecha seleccionada
+            exportDailyReport(selectedDate);
         }
+    });
+}
 
         async function handleProfilePictureChange(blob) {
             if (!blob) return;
@@ -6062,7 +6074,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
         // --- [FIN DE LA MODIFICACIÓN] ---
 
         if (target.closest('#change-password-btn')) console.log("Mudar senha a ser implementado.");
-        if (target.closest('#export-report-btn')) exportDailyReport();
+        // Cámbialo por esto:
+        if (target.closest('#export-report-btn')) showReportDateModal();
         
         // Listener para el botón de Configuración de Pagos
         if (target.closest('#payment-settings-btn')) {
@@ -7163,6 +7176,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
