@@ -4229,12 +4229,15 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         
                         <!-- SECCIÓN OCULTA PERO FUNCIONAL: ACCESO DEL CLIENTE -->
                         <!-- Usamos style="display: none;" para ocultarlo visualmente pero mantener los inputs -->
+                        <!-- SECCIÓN OCULTA PERO FUNCIONAL: ACCESO DEL CLIENTE -->
+                        <!-- Usamos style="display: none;" para ocultarlo visualmente pero mantener los inputs -->
                         <div style="display: none;">
                             <h3 class="section-title">Acesso Oculto (Automático)</h3>
                             <div class="form-group">
                                 <label data-lang-key="username"></label>
                                 <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
-                                <input type="text" id="client-username" required value="${autoUsername}" 
+                                <!-- CORRECCIÓN: Quitamos 'required' para evitar bloqueos fantasma -->
+                                <input type="text" id="client-username" value="${autoUsername}" 
                                        autocomplete="off" autocapitalize="none">
                                 <div id="username-validation-msg" class="validation-message"></div>
                             </div>
@@ -4242,7 +4245,17 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             <div class="form-group">
                                 <label data-lang-key="password"></label>
                                 <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
-                                <input type="text" id="client-password" required value="${autoPassword}">
+                                <!-- CORRECCIÓN: Quitamos 'required' para evitar bloqueos fantasma -->
+                                <input type="text" id="client-password" value="${autoPassword}">
+                            </div>
+                        </div>
+                        <!-- FIN SECCIÓN OCULTA -->
+                            
+                            <div class="form-group">
+                                <label data-lang-key="password"></label>
+                                <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
+                                <!-- CORRECCIÓN: Quitamos 'required' para evitar bloqueos fantasma -->
+                                <input type="text" id="client-password" value="${autoPassword}">
                             </div>
                         </div>
                         <!-- FIN SECCIÓN OCULTA -->
@@ -7218,6 +7231,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html>
+
 
 
 
