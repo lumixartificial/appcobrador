@@ -4177,10 +4177,9 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const prefillInstallments = prefillData ? prefillData.installments : '';
 
             // --- GENERACIÓN AUTOMÁTICA DE CREDENCIALES ---
-            // Si el cliente ya tiene datos, los usamos. Si es nuevo, generamos al azar.
-            const timestampSuffix = Date.now().toString().slice(-6); // Últimos 6 dígitos del tiempo
+            const timestampSuffix = Date.now().toString().slice(-6);
             const autoUsername = client.username || `user${timestampSuffix}`;
-            const autoPassword = client.password || Math.random().toString(36).slice(-6).toUpperCase(); // 6 caracteres alfanuméricos
+            const autoPassword = client.password || Math.random().toString(36).slice(-6).toUpperCase();
 
             clientFormModal.innerHTML = `
                 <header class="modal-header">
@@ -4198,20 +4197,16 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
                         <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}" ${isNewLoan ? 'readonly' : ''}></div>
                         
-                        <!-- CAMPO DOCUMENTO -->
                         <div class="form-group">
                             <label data-lang-key="documentNumber"></label>
                             <input type="text" id="client-document" value="${client.documentNumber || ''}" ${isNewLoan ? 'readonly' : ''} placeholder="Digite apenas números">
                         </div>
 
-                        <!-- NUEVA CAJA DE ALERTA DE RIESGO (INICIALMENTE OCULTA) -->
                         <div id="blacklist-alert-box" style="display: none; background-color: #fee2e2; border: 1px solid #ef4444; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                             <h4 style="color: #b91c1c; margin: 0 0 5px; display: flex; align-items: center; gap: 8px; font-size: 1em;">
                                 <i data-lucide="alert-triangle"></i> ALERTA DE LISTA DE ADVERTÊNCIA
                             </h4>
-                            <p id="blacklist-alert-msg" style="color: #7f1d1d; margin: 0; font-size: 0.9em; line-height: 1.4;">
-                                <!-- El mensaje se inyectará aquí -->
-                            </p>
+                            <p id="blacklist-alert-msg" style="color: #7f1d1d; margin: 0; font-size: 0.9em; line-height: 1.4;"></p>
                         </div>
 
                         <div id="system-verification-results" style="margin-bottom: 20px;"></div>
@@ -4227,16 +4222,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </button>
                         </div>
                         
-                        <!-- SECCIÓN OCULTA PERO FUNCIONAL: ACCESO DEL CLIENTE -->
-                        <!-- Usamos style="display: none;" para ocultarlo visualmente pero mantener los inputs -->
-                        <!-- SECCIÓN OCULTA PERO FUNCIONAL: ACCESO DEL CLIENTE -->
-                        <!-- Usamos style="display: none;" para ocultarlo visualmente pero mantener los inputs -->
+                        <!-- SECCIÓN OCULTA DE ACCESO (CORREGIDA: SIN DUPLICADOS Y SIN REQUIRED) -->
                         <div style="display: none;">
                             <h3 class="section-title">Acesso Oculto (Automático)</h3>
                             <div class="form-group">
                                 <label data-lang-key="username"></label>
-                                <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
-                                <!-- CORRECCIÓN: Quitamos 'required' para evitar bloqueos fantasma -->
                                 <input type="text" id="client-username" value="${autoUsername}" 
                                        autocomplete="off" autocapitalize="none">
                                 <div id="username-validation-msg" class="validation-message"></div>
@@ -4244,17 +4234,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             
                             <div class="form-group">
                                 <label data-lang-key="password"></label>
-                                <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
-                                <!-- CORRECCIÓN: Quitamos 'required' para evitar bloqueos fantasma -->
-                                <input type="text" id="client-password" value="${autoPassword}">
-                            </div>
-                        </div>
-                        <!-- FIN SECCIÓN OCULTA -->
-                            
-                            <div class="form-group">
-                                <label data-lang-key="password"></label>
-                                <!-- Pre-llenamos con el valor existente o el generado automáticamente -->
-                                <!-- CORRECCIÓN: Quitamos 'required' para evitar bloqueos fantasma -->
                                 <input type="text" id="client-password" value="${autoPassword}">
                             </div>
                         </div>
@@ -4392,41 +4371,32 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 <div class="action-buttons">
                     <button class="btn-primary" id="saveClientBtn"><i data-lucide="save"></i> <span data-lang-key="${saveButtonKey}"></span></button>
                 </div>`;
+            
             history.pushState({ modal: 'clientFormModal' }, 'Client Form', '#client-form');
             clientFormModal.classList.add('active');
             
-            // --- INICIO: LÓGICA DE VERIFICACIÓN DE RIESGO EN TIEMPO REAL ---
+            // LÓGICA DE VERIFICACIÓN DE RIESGO
             const docInput = document.getElementById('client-document');
             const alertBox = document.getElementById('blacklist-alert-box');
             const alertMsg = document.getElementById('blacklist-alert-msg');
 
-            // Función que consulta Firestore
             const checkBlacklist = async () => {
                 const cpfRaw = docInput.value.trim();
-                const cpfClean = cpfRaw.replace(/\D/g, ''); // Limpiar para comparar
-
+                const cpfClean = cpfRaw.replace(/\D/g, ''); 
                 if (cpfClean.length < 5) {
-                    alertBox.style.display = 'none'; // Muy corto para ser real
+                    alertBox.style.display = 'none';
                     return;
                 }
-
                 try {
-                    // Consulta a la colección global 'blacklisted_customers'
                     const q = query(collection(db, 'blacklisted_customers'), where('cpf', '==', cpfClean));
                     const snap = await getDocs(q);
-
                     if (!snap.empty) {
                         const data = snap.docs[0].data();
                         const reason = data.reason || "Sem motivo especificado.";
-                        
-                        // Mostramos la caja roja
                         alertBox.style.display = 'block';
                         alertMsg.innerHTML = `<strong>ATENÇÃO!</strong> O documento <strong>${cpfRaw}</strong> está na lista de advertência.<br><br><strong>Motivo:</strong> ${reason}`;
-                        
-                        // Refrescamos iconos dentro de la caja
                         lucide.createIcons({ nodes: [alertBox.querySelector('i')] });
                     } else {
-                        // Si no está, ocultamos la caja
                         alertBox.style.display = 'none';
                     }
                 } catch (err) {
@@ -4435,16 +4405,10 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             };
 
             if (docInput) {
-                // Evento 'blur': Se dispara cuando el usuario termina de escribir y sale del campo
                 docInput.addEventListener('blur', checkBlacklist);
-                
-                // Si estamos editando y ya hay un documento, verificamos de inmediato
                 if (docInput.value) checkBlacklist();
             }
-            // --- FIN: LÓGICA DE VERIFICACIÓN ---
 
-
-            // --- (Lógica de UI, Frecuencia, Cálculo, etc. - SIN CAMBIOS) ---
             const paymentFrequencySelect = document.getElementById('payment-frequency');
             const dailySelector = document.getElementById('daily-payment-selector');
             const weeklySelector = document.getElementById('weekly-payment-selector');
@@ -4481,7 +4445,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 document.getElementById('monthly-day-input').value = paymentDays[0];
             }
 
-            // Nota: Mantenemos la lógica de validación aunque esté oculto para asegurar que no haya duplicados si se genera colisión (muy raro)
             let isUsernameAvailable = (isEditMode || isNewLoan);
             const usernameInput = document.getElementById('client-username');
             const validationMsg = document.getElementById('username-validation-msg');
@@ -4491,13 +4454,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     const username = usernameInput.value.trim();
                     if (!username) { validationMsg.textContent = ''; isUsernameAvailable = false; return; }
                     if (isEditMode && username === client.username) { validationMsg.textContent = ''; isUsernameAvailable = true; return; }
-                    // Quitamos validación de @ ya que lo generamos nosotros
                     
                     const q = query(collection(db, 'companies', currentCompanyId, 'clients'), where("username", "==", username));
                     const querySnapshot = await getDocs(q);
                     let isTaken = !querySnapshot.empty;
                     if (isTaken) {
-                        // Si choca, generamos uno nuevo al azar (fallback simple)
                         usernameInput.value = username + Math.floor(Math.random()*100);
                         isUsernameAvailable = true;
                     } else {
@@ -4575,17 +4536,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 const interest = parseFloat(interestInput.value) || 0;
                 const installments = parseInt(installmentsInput.value) || 0;
                 
-                // 1. Cálculo base
                 let rawTotal = loanAmount * (1 + (interest / 100));
-                
-                // 2. Aplicamos EL MISMO redondeo que usas al guardar
                 let rawInstallment = installments > 0 ? rawTotal / installments : 0;
                 const installmentValue = Math.round(rawInstallment * 100) / 100;
-
-                // 3. Recalculamos el total real basado en la cuota redondeada
                 const totalToPay = installmentValue * installments;
 
-                // 4. Mostramos los valores exactos
                 totalToPayInput.value = money(totalToPay);
                 installmentValueInput.value = money(installmentValue);
             }
@@ -4617,14 +4572,10 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             
             document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
             
-            
-            // --- (Listener de Guardar - LIMPIO DE BLOQUEOS) ---
             const saveButton = document.getElementById('saveClientBtn');
             saveButton.dataset.isRefinance = prefillData ? 'true' : 'false';
-            
             const clientIdToSave = isEditMode || isNewLoan ? client.id : null; 
 
-            // --- BLOQUE CORREGIDO: Listener de Guardar Cliente ---
             saveButton.addEventListener('click', async (e) => {
                 const saveButton = e.currentTarget;
                 const originalButtonHTML = saveButton.innerHTML;
@@ -4639,16 +4590,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
 
                 try {
-                    // 1. [CORRECCIÓN] OBTENER VALORES PRIMERO (Movido al inicio para evitar error de inicialización)
                     const username = document.getElementById('client-username').value.trim();
                     const password = document.getElementById('client-password').value.trim();
-                    const email = `${username}@gmail.com`; // Generamos el email automáticamente
+                    const email = `${username}@gmail.com`;
 
-                    // 2. Subida de Documentos (Ahora 'username' ya existe)
                     let newUploadedDocuments = [];
                     if (!isNewLoan && filesToUpload.length > 0) {
                         const uploadPromises = filesToUpload.map(async (file) => {
-                            // Aquí es donde ocurría el error, ahora 'username' ya está definido
                             const targetClientId = isEditMode ? clientIdToSave : username; 
                             const uniqueFileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
                             const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${targetClientId}/docs/${uniqueFileName}`);
@@ -4659,27 +4607,17 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         newUploadedDocuments = await Promise.all(uploadPromises);
                     }
 
-                    // 3. Cálculos del Préstamo
                     const loanAmount = parseFloat(document.getElementById('client-loan-amount').value) || 0;
                     const interest = parseFloat(document.getElementById('client-interest').value);
                     const installments = parseInt(document.getElementById('client-installments').value);
                     
-                    // Calculamos un total preliminar con interés
                     let rawTotal = loanAmount * (1 + (interest / 100));
-
-                    // Calculamos la cuota y la REDONDEAMOS a 2 decimales
                     let rawInstallment = installments > 0 ? rawTotal / installments : 0;
                     const installmentValue = Math.round(rawInstallment * 100) / 100;
-
-                    // RECALCULAMOS el Total exacto basado en las cuotas redondeadas
                     const totalToPay = installmentValue * installments;
-                    
                     const principalAmount = loanAmount;
 
-                    // Obtenemos la frecuencia
                     const paymentFrequency = document.getElementById('payment-frequency').value;
-
-                    // Definimos los días de pago según la frecuencia
                     let paymentDaysValue = [];
                     if (paymentFrequency === 'daily') {
                         paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
@@ -4689,10 +4627,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
                     }
                     
-                    // 4. Preparar la lista final de documentos
                     const finalDocuments = [...existingDocs, ...newUploadedDocuments];
 
-                    // 5. Construir objeto de datos generales del cliente
                     const clientGeneralData = {
                         name: document.getElementById('client-name').value,
                         documentNumber: document.getElementById('client-document').value,
@@ -4708,7 +4644,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         interestRate: interest
                     };
 
-                    // 6. Construir objeto de datos del préstamo
                     const loanSpecificData = {
                         principalAmount: principalAmount,
                         lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
@@ -4726,7 +4661,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         collectionTime: document.getElementById('client-collection-time').value,
                     };
                     
-                    // Lógica de migración
                     if (migrationToggle && migrationToggle.checked) {
                         const initialPaidInstallments = parseInt(document.getElementById('client-initial-paid-installments').value, 10) || 0;
                         const initialPartialAmount = parseFloat(document.getElementById('client-initial-partial-payment').value) || 0.0;
@@ -4754,17 +4688,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         }
                     }
                     
-                    // 7. Guardado en Firebase
                     if (isNewLoan) {
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
-                        console.log("Añadiendo nuevo préstamo al historial existente (arrayUnion)...");
                         await updateDoc(clientRef, {
                             loans: arrayUnion(loanSpecificData)
                         });
-                    
                     } else if (isEditMode) {
                         if (password && password !== client.password) {
-                            console.log(`[COBRADOR] Solicitando alteração de senha...`);
                             showToast("Atualizando senha...", false);
                             if (!auth.currentUser) throw new Error("Cobrador não está autenticado.");
                             const idToken = await auth.currentUser.getIdToken(true);
@@ -4794,10 +4724,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                              loans: updatedLoans,
                              ...clientGeneralData
                         });
-                    
                     } else { 
-                        // Crear Nuevo Cliente
-                        console.log("[COBRADOR-APP] Creando cliente nuevo...");
                         let newClientAuthUid = null;
                         try {
                             if (!auth.currentUser) throw new Error("Cobrador não autenticado.");
@@ -4855,7 +4782,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             lucide.createIcons({ nodes: clientFormModal.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
 
-            // (Lógica de verificación de cliente - sin cambios)
             const docInput2 = document.getElementById('client-document');
             const nameInput = document.getElementById('client-name');
             const editingId = isEditMode ? clientId : null;
@@ -7230,7 +7156,8 @@ getDocs(collectorQuery).then(snapshot => {
         init();
     </script>
 </body>
-</html>
+</html> 
+
 
 
 
