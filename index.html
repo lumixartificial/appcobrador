@@ -2523,7 +2523,7 @@ async function showRefinanceModal(clientId, notificationId) {
             clientsData.forEach(item => {
                 const { client, loan, loanIndex } = item;
                 
-                // Recalculamos detalles
+                // Recalculamos detalles del estado
                 const details = calculateLoanDetails(loan);
                 const displayLoan = { 
                     ...loan, 
@@ -2541,7 +2541,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 const remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
                 // ----------------------------------------------------
 
-                // Verificar pago hoy
+                // Helper para obtener fecha
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
                     if (typeof dateObj.toDate === 'function') return dateObj.toDate();
@@ -2549,15 +2549,89 @@ async function showRefinanceModal(clientId, notificationId) {
                     return null;
                 };
 
-                const hasPaidToday = (displayLoan.history || []).some(h => {
-                    if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false; 
-                    const paymentDate = getPaymentDate(h.date);
-                    return paymentDate && paymentDate >= todayStart;
-                });
+                // --- [LÓGICA DE PAGO DEL DÍA] ---
+                let amountPaidToday = 0;
+                
+                if (displayLoan.history && displayLoan.history.length > 0) {
+                     amountPaidToday = displayLoan.history.reduce((sum, h) => {
+                        if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return sum;
+                        
+                        const paymentDate = getPaymentDate(h.date);
+                        if (paymentDate && paymentDate >= todayStart) {
+                            return sum + (parseFloat(h.amount) || 0);
+                        }
+                        return sum;
+                    }, 0);
+                }
 
-                // --- ETIQUETAS VISUALES ---
+                const hasPaidToday = amountPaidToday > 0;
+                const originalInstallmentValue = displayLoan.amount || 0;
+                
+                // --- [DISEÑO UNIFICADO: LÓGICA DE VISUALIZACIÓN] ---
+                let mainValueToDisplay = 0;
+                let topLabelHtml = '';
+                let mainValueColor = 'var(--accent-green)'; // Verde por defecto
+                let bottomStatusText = '';
+                let bottomStatusStyle = '';
 
-                // 1. Estado
+                // Frecuencia texto base
+                const freqMap = { 'daily': 'DIÁRIO', 'weekly': 'SEMANAL', 'monthly': 'MENSAL' };
+                const rawFreq = displayLoan.paymentFrequency || 'daily';
+                const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
+
+                if (displayLoan.status === 'finished') {
+                    mainValueToDisplay = 0; 
+                    topLabelHtml = `<span style="font-size: 0.7em; color: var(--text-secondary); font-weight: 700;">FINALIZADO</span>`;
+                    bottomStatusText = '-';
+                    bottomStatusStyle = 'color: #4338ca; background-color: #e0e7ff;';
+                    mainValueColor = '#4338ca';
+
+                } else if (hasPaidToday) {
+                    // CASO: YA PAGÓ HOY
+                    mainValueToDisplay = amountPaidToday;
+                    
+                    // Etiqueta superior: Muestra cuánto era la cuota original para comparar
+                    topLabelHtml = `<span style="font-size: 0.7em; color: var(--text-secondary); font-weight: 600;">PARCELA: ${money(originalInstallmentValue)}</span>`;
+                    
+                    bottomStatusText = translations[currentLang].statusPaidToday;
+
+                    // Semáforo de color
+                    if (amountPaidToday < (originalInstallmentValue - 0.05)) {
+                        // ROJO: Pago Parcial
+                        mainValueColor = '#dc3545'; // Texto Rojo
+                        bottomStatusStyle = 'color: #ffffff; background-color: #ff0000; font-weight: 800; border: 2px solid #b30000; box-shadow: 0 2px 5px rgba(255,0,0,0.4);';
+                    } else {
+                        // VERDE: Pago Completo
+                        mainValueColor = '#198754'; // Texto Verde Oscuro
+                        bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700; border: 1px solid #c3e6cb;';
+                    }
+
+                } else {
+                    // CASO: NO HA PAGADO HOY (Pendiente)
+                    mainValueToDisplay = originalInstallmentValue;
+                    
+                    // Etiqueta superior: Muestra la frecuencia
+                    topLabelHtml = `<span style="font-size: 0.7em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase;">${freqText}</span>`;
+                    
+                    // Color por defecto (verde para dinero)
+                    mainValueColor = 'var(--accent-green)';
+
+                    if (displayLoan.amountDueToday > 0) {
+                        bottomStatusText = translations[currentLang].statusToPay;
+                        bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
+                    } else {
+                        if (displayLoan.paymentFrequency === 'weekly' || displayLoan.paymentFrequency === 'monthly') {
+                            bottomStatusText = translations[currentLang].statusPending;
+                            bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
+                        } else {
+                            bottomStatusText = translations[currentLang].statusToPay;
+                            bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
+                        }
+                    }
+                }
+                // -----------------------------------------------------------
+
+                // --- ETIQUETAS VISUALES IZQUIERDA ---
                 let statusLabelUnderName = '';
                 if (displayLoan.status === 'late') {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} dias)</span>`;
@@ -2565,48 +2639,7 @@ async function showRefinanceModal(clientId, notificationId) {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: #4338ca; font-weight: 700; margin-top: 2px;">🏁 FINALIZADO</span>`;
                 }
 
-                // 2. Frecuencia
-                const freqMap = { 'daily': 'DIÁRIO', 'weekly': 'SEMANAL', 'monthly': 'MENSAL' };
-                const rawFreq = displayLoan.paymentFrequency || 'daily';
-                const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
-                const frequencyHtml = `<div style="font-size: 0.7em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 2px;">${freqText}</div>`;
-
-                // 3. Estado Inferior
-                // ... código anterior de la función renderClientCards ...
-
-// --- ESTADO INFERIOR Y COLORES ---
-let bottomStatusText = '';
-let bottomStatusStyle = ''; 
-
-if (displayLoan.status === 'finished') {
-    bottomStatusText = '-'; 
-    bottomStatusStyle = 'color: #4338ca; background-color: #e0e7ff;';
-} else if (hasPaidToday) {
-    // CAMBIO AQUI: Usamos translations[currentLang]
-    bottomStatusText = translations[currentLang].statusPaidToday; 
-    bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700; border: 1px solid #c3e6cb;'; 
-} else {
-    if (displayLoan.amountDueToday > 0) {
-        // CAMBIO AQUI
-        bottomStatusText = translations[currentLang].statusToPay;
-        bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
-    } else {
-        if (displayLoan.paymentFrequency === 'weekly' || displayLoan.paymentFrequency === 'monthly') {
-            // CAMBIO AQUI
-            bottomStatusText = translations[currentLang].statusPending;
-            bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
-        } else {
-            // CAMBIO AQUI
-            bottomStatusText = translations[currentLang].statusToPay;
-            bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
-        }
-    }
-}
-
-                // 4. Identificador de RESTANTE (AUMENTADO DE TAMAÑO)
                 const remainingDisplay = money(remainingBalance);
-                
-                // CAMBIOS AQUÍ: font-size 0.95em (antes 0.75em), iconos más grandes (14px)
                 const loanInfoLabel = `<span style="font-size: 0.95em; color: #d97706; font-weight: 800; display: block; margin-top: 3px;">
                     <i data-lucide="trending-down" style="width: 14px; height: 14px; vertical-align: text-bottom;"></i> Resta: ${remainingDisplay} ${client.loans.length > 1 ? `(#${loanIndex + 1})` : ''}
                 </span>`;
@@ -2628,10 +2661,14 @@ if (displayLoan.status === 'finished') {
                         ${statusLabelUnderName}
                         <p class="client-address" style="margin-top: 4px;"><i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${client.address}</p>
                     </div>
-                    <div class="payment-info">
-                        <span class="payment-amount">${money(displayLoan.amount)}</span> 
-                        ${frequencyHtml} 
-                        <span class="payment-status" style="margin-top: 6px; display: block; text-align: right; font-size: 0.75em; padding: 4px 8px; border-radius: 4px; ${bottomStatusStyle}">
+                    
+                    <!-- COLUMNA DERECHA UNIFICADA -->
+                    <div class="payment-info" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+                        ${topLabelHtml}
+                        <span class="payment-amount" style="color: ${mainValueColor}; font-size: 1.3em; line-height: 1.1;">
+                            ${money(mainValueToDisplay)}
+                        </span> 
+                        <span class="payment-status" style="margin-top: 4px; display: block; text-align: right; font-size: 0.75em; padding: 4px 8px; border-radius: 4px; ${bottomStatusStyle}">
                             ${bottomStatusText}
                         </span>
                     </div>`;
@@ -7157,6 +7194,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html> 
+
 
 
 
