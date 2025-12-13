@@ -2523,7 +2523,6 @@ async function showRefinanceModal(clientId, notificationId) {
             clientsData.forEach(item => {
                 const { client, loan, loanIndex } = item;
                 
-                // Recalculamos detalles del estado
                 const details = calculateLoanDetails(loan);
                 const displayLoan = { 
                     ...loan, 
@@ -2532,16 +2531,13 @@ async function showRefinanceModal(clientId, notificationId) {
                     amountDueToday: details.amountDueToday || 0
                 };
 
-                // --- FÓRMULA MATEMÁTICA: CALCULAR SALDO RESTANTE ---
                 const totalPaidSoFar = (loan.history || [])
                     .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                     .reduce((sum, h) => sum + (h.amount || 0), 0);
 
                 const totalDebt = (loan.totalLoan || 0) + (loan.lateFeesAccumulated || 0);
                 const remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
-                // ----------------------------------------------------
 
-                // Helper para obtener fecha
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
                     if (typeof dateObj.toDate === 'function') return dateObj.toDate();
@@ -2549,13 +2545,11 @@ async function showRefinanceModal(clientId, notificationId) {
                     return null;
                 };
 
-                // --- [LÓGICA DE PAGO DEL DÍA] ---
+                // --- LÓGICA DE PAGO DEL DÍA ---
                 let amountPaidToday = 0;
-                
                 if (displayLoan.history && displayLoan.history.length > 0) {
                      amountPaidToday = displayLoan.history.reduce((sum, h) => {
                         if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return sum;
-                        
                         const paymentDate = getPaymentDate(h.date);
                         if (paymentDate && paymentDate >= todayStart) {
                             return sum + (parseFloat(h.amount) || 0);
@@ -2567,21 +2561,20 @@ async function showRefinanceModal(clientId, notificationId) {
                 const hasPaidToday = amountPaidToday > 0;
                 const originalInstallmentValue = displayLoan.amount || 0;
                 
-                // --- [DISEÑO UNIFICADO: LÓGICA DE VISUALIZACIÓN] ---
+                // --- [DISEÑO VISUAL ACTUALIZADO] ---
                 let mainValueToDisplay = 0;
-                let topLabelHtml = '';
-                let mainValueColor = 'var(--accent-green)'; // Verde por defecto
+                let secondaryLabelHtml = ''; 
+                let mainValueColor = 'var(--accent-green)'; 
                 let bottomStatusText = '';
                 let bottomStatusStyle = '';
 
-                // Frecuencia texto base
                 const freqMap = { 'daily': 'DIÁRIO', 'weekly': 'SEMANAL', 'monthly': 'MENSAL' };
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
 
                 if (displayLoan.status === 'finished') {
                     mainValueToDisplay = 0; 
-                    topLabelHtml = `<span style="font-size: 0.7em; color: var(--text-secondary); font-weight: 700;">FINALIZADO</span>`;
+                    secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 700;">FINALIZADO</span>`;
                     bottomStatusText = '-';
                     bottomStatusStyle = 'color: #4338ca; background-color: #e0e7ff;';
                     mainValueColor = '#4338ca';
@@ -2590,30 +2583,26 @@ async function showRefinanceModal(clientId, notificationId) {
                     // CASO: YA PAGÓ HOY
                     mainValueToDisplay = amountPaidToday;
                     
-                    // Etiqueta superior: Muestra cuánto era la cuota original para comparar
-                    topLabelHtml = `<span style="font-size: 0.7em; color: var(--text-secondary); font-weight: 600;">PARCELA: ${money(originalInstallmentValue)}</span>`;
+                    // [AJUSTE] Margin-top cambiado a 4px para separar
+                    secondaryLabelHtml = `<span style="font-size: 0.85em; color: var(--text-secondary); font-weight: 700; margin-top: 4px;">PARCELA: ${money(originalInstallmentValue)}</span>`;
                     
                     bottomStatusText = translations[currentLang].statusPaidToday;
 
-                    // Semáforo de color
                     if (amountPaidToday < (originalInstallmentValue - 0.05)) {
-                        // ROJO: Pago Parcial
-                        mainValueColor = '#dc3545'; // Texto Rojo
+                        mainValueColor = '#dc3545'; // Rojo
                         bottomStatusStyle = 'color: #ffffff; background-color: #ff0000; font-weight: 800; border: 2px solid #b30000; box-shadow: 0 2px 5px rgba(255,0,0,0.4);';
                     } else {
-                        // VERDE: Pago Completo
-                        mainValueColor = '#198754'; // Texto Verde Oscuro
+                        mainValueColor = '#198754'; // Verde
                         bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700; border: 1px solid #c3e6cb;';
                     }
 
                 } else {
-                    // CASO: NO HA PAGADO HOY (Pendiente)
+                    // CASO: PENDIENTE
                     mainValueToDisplay = originalInstallmentValue;
                     
-                    // Etiqueta superior: Muestra la frecuencia
-                    topLabelHtml = `<span style="font-size: 0.7em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase;">${freqText}</span>`;
+                    // [AJUSTE] Margin-top cambiado a 4px para separar
+                    secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 4px;">${freqText}</span>`;
                     
-                    // Color por defecto (verde para dinero)
                     mainValueColor = 'var(--accent-green)';
 
                     if (displayLoan.amountDueToday > 0) {
@@ -2629,9 +2618,8 @@ async function showRefinanceModal(clientId, notificationId) {
                         }
                     }
                 }
-                // -----------------------------------------------------------
 
-                // --- ETIQUETAS VISUALES IZQUIERDA ---
+                // Etiquetas visuales izquierda
                 let statusLabelUnderName = '';
                 if (displayLoan.status === 'late') {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} dias)</span>`;
@@ -2662,13 +2650,14 @@ async function showRefinanceModal(clientId, notificationId) {
                         <p class="client-address" style="margin-top: 4px;"><i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${client.address}</p>
                     </div>
                     
-                    <!-- COLUMNA DERECHA UNIFICADA -->
                     <div class="payment-info" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
-                        ${topLabelHtml}
-                        <span class="payment-amount" style="color: ${mainValueColor}; font-size: 1.3em; line-height: 1.1;">
+                        <span class="payment-amount" style="color: ${mainValueColor}; font-size: 1.5em; line-height: 1;">
                             ${money(mainValueToDisplay)}
                         </span> 
-                        <span class="payment-status" style="margin-top: 4px; display: block; text-align: right; font-size: 0.75em; padding: 4px 8px; border-radius: 4px; ${bottomStatusStyle}">
+                        
+                        ${secondaryLabelHtml}
+                        
+                        <span class="payment-status" style="margin-top: 6px; display: block; text-align: right; font-size: 0.75em; padding: 4px 8px; border-radius: 4px; ${bottomStatusStyle}">
                             ${bottomStatusText}
                         </span>
                     </div>`;
@@ -2968,9 +2957,10 @@ async function showRefinanceModal(clientId, notificationId) {
                    const isLate = currentStatus === 'late';
                    const isDueToday = details.amountDueToday > 0;
                    
-                   // [CORRECCIÓN CRÍTICA] Detectamos si el préstamo se creó HOY.
-                   // Si es una renovación o préstamo nuevo de hoy, LO MOSTRAMOS,
-                   // independientemente de si la lógica de cálculo dice que la cuota es mañana.
+                   // [CORRECCIÓN 1] Detectamos si es Semanal y está pendiente (para mostrarlo siempre)
+                   const isWeeklyPending = (loan.paymentFrequency === 'weekly' && currentStatus === 'pending');
+
+                   // [CORRECCIÓN 2] Detectamos si el préstamo se creó HOY (nuevo o renovación)
                    let isCreatedToday = false;
                    const startDateObj = getStartDate(loan.startDate);
                    if (startDateObj) {
@@ -2980,8 +2970,8 @@ async function showRefinanceModal(clientId, notificationId) {
                        }
                    }
                    
-                   // Incluimos si: (Atrasado O Toca Hoy O ES NUEVO DE HOY) Y (No ha pagado hoy)
-                   if ((isLate || isDueToday || isCreatedToday) && !hasPaidToday) {
+                   // REGLA FINAL: Incluimos si (Atrasado O Toca Hoy O Es Nuevo O Es Semanal Pendiente) Y (No ha pagado hoy)
+                   if ((isLate || isDueToday || isCreatedToday || isWeeklyPending) && !hasPaidToday) {
                        
                        const loanToRender = { 
                            ...loan, 
@@ -2994,7 +2984,7 @@ async function showRefinanceModal(clientId, notificationId) {
                });
            });
  
-           // 5. Ordenar
+           // 5. Ordenar (Prioridad a Atrasados)
            clientsForRoute.sort((a, b) => {
                if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
                if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
@@ -7194,6 +7184,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html> 
+
 
 
 
