@@ -2390,48 +2390,51 @@ async function showRefinanceModal(clientId, notificationId) {
                amountDueToday: 0 
            };
 
-           // 1. Obtener TOTAL PAGADO (Incluye migración)
+           // --- 1. CALCULAR TOTAL PAGADO REAL ---
            const currentTotalPaid = (loan.history || [])
                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                .reduce((sum, h) => sum + (h.amount || 0), 0);
-            
-           // 2. Obtener TOTAL PAGADO (SIN MIGRACIÓN)
-           const currentTotalPaid_NoMigration = (loan.history || [])
-               .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') 
-               .reduce((sum, h) => sum + (h.amount || 0), 0);
 
-           if (!loan || !loan.totalLoan || loan.status === 'finished' || (currentTotalPaid >= loan.totalLoan)) {
+           // Si ya cubrió el total, finalizado
+           if (!loan || !loan.totalLoan || loan.status === 'finished' || (currentTotalPaid >= loan.totalLoan - 0.1)) {
                details.status = 'finished';
                return details;
            }
 
+           // --- 2. CONFIGURAR FECHAS ---
            const today = new Date();
-           today.setHours(0, 0, 0, 0);
+           today.setHours(0, 0, 0, 0); // Hoy a las 00:00
            
-           if (!loan.startDate?.seconds) { return details; }
-           
-           let startDateObj = new Date(loan.startDate.seconds * 1000);
-           startDateObj.setHours(0, 0, 0, 0);
+           let startDateObj = null;
+           if (loan.startDate) {
+               if (loan.startDate.seconds) startDateObj = new Date(loan.startDate.seconds * 1000);
+               else if (loan.startDate instanceof Date) startDateObj = loan.startDate;
+               else if (typeof loan.startDate === 'string') startDateObj = new Date(loan.startDate);
+           }
 
+           if (!startDateObj || isNaN(startDateObj.getTime())) return details;
+           
+           startDateObj.setHours(0, 0, 0, 0);
+           
+           // --- CORRECCIÓN CLAVE: EMPEZAR A CONTAR DESDE EL DÍA SIGUIENTE ---
+           // El día que se crea el préstamo NO se cobra. El primer cobro posible es mañana.
            let checkDate = new Date(startDateObj); 
+           checkDate.setDate(checkDate.getDate() + 1); 
            
            let accumulatedLateDays = 0;
            let accumulatedLateFees = 0;
            const dailyLateRate = (loan.lateFeeRate || 0) / 100;
            const installmentAmount = loan.originalInstallmentAmount || 0;
            let installmentsDueCount = 0; 
-           let nextDueDateFound = false;
            
+           // Límite de seguridad
            let stopDate = new Date(today);
-           stopDate.setDate(stopDate.getDate() + 35); 
+           stopDate.setDate(stopDate.getDate() + 60);
 
+           if (checkDate > stopDate) return details;
+
+           // --- 3. BUCLE DE COMPROBACIÓN ---
            while (checkDate <= stopDate) {
-               // Protección: Saltamos el día de creación del préstamo
-               if (checkDate.getTime() === startDateObj.getTime()) {
-                   checkDate.setDate(checkDate.getDate() + 1);
-                   continue;
-               }
-
                const dayOfWeek = checkDate.getDay();
                const dayOfMonth = checkDate.getDate();
                const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
@@ -2439,69 +2442,69 @@ async function showRefinanceModal(clientId, notificationId) {
                
                const frequency = loan.paymentFrequency || 'daily';
                let isPaymentDay = false;
+               const pDays = loan.paymentDays || [];
+               
+               if (frequency === 'daily') isPaymentDay = pDays.some(d => String(d) === String(dayOfWeek));
+               else if (frequency === 'weekly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfWeek);
+               else if (frequency === 'monthly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfMonth);
 
-               if (frequency === 'daily') isPaymentDay = (loan.paymentDays || []).includes(dayOfWeek);
-               else if (frequency === 'weekly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfWeek;
-               else if (frequency === 'monthly') isPaymentDay = (loan.paymentDays || [])[0] === dayOfMonth;
-
-               if (!isHoliday && isPaymentDay) {
-                   // PASADO
-                   if (checkDate < today) {
+               if (isPaymentDay && !isHoliday) {
+                   
+                   // === ANÁLISIS DEL PASADO (AYER HACIA ATRÁS) ===
+                   if (checkDate.getTime() < today.getTime()) {
                        installmentsDueCount++; 
                        const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid_NoMigration);
+                       
+                       // Compara deuda acumulada vs pagado total
+                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
 
-                       if (outstandingDueAmount > 0) {
+                       // Si debe algo del pasado, suma un día de atraso
+                       if (outstandingDueAmount > 0.9) { 
                            accumulatedLateDays++; 
-                           if (dailyLateRate > 0) {
-                               accumulatedLateFees += (outstandingDueAmount * dailyLateRate);
-                           }
+                           if (dailyLateRate > 0) accumulatedLateFees += (outstandingDueAmount * dailyLateRate);
                        }
-                   // HOY
-                   } else if (checkDate.getTime() === today.getTime()) {
-                       details.amountDueToday = installmentAmount;
-                       if (!nextDueDateFound) {
-                           details.nextDueDate = new Date(checkDate);
-                           nextDueDateFound = true;
+                   } 
+                   
+                   // === ANÁLISIS DEL PRESENTE (HOY) ===
+                   else if (checkDate.getTime() === today.getTime()) {
+                       const expectedTotalIncludingToday = (installmentsDueCount + 1) * installmentAmount;
+                       
+                       // Si debe la cuota de HOY, se marca el monto, pero NO aumenta 'accumulatedLateDays'
+                       if (currentTotalPaid < expectedTotalIncludingToday - 0.1) {
+                           details.amountDueToday = installmentAmount;
                        }
-                   // FUTURO
-                   } else if (checkDate > today && !nextDueDateFound) {
+                       
+                       if (!details.nextDueDate) details.nextDueDate = new Date(checkDate);
+                   } 
+                   
+                   // === FUTURO ===
+                   else if (checkDate > today && !details.nextDueDate) {
                        details.nextDueDate = new Date(checkDate);
-                       nextDueDateFound = true;
                    }
                }
                
-               if (nextDueDateFound && checkDate > today) break;
+               if (details.nextDueDate && checkDate > today) break;
                checkDate.setDate(checkDate.getDate() + 1);
            }
            
            details.lateDays = accumulatedLateDays;
            details.lateFeesAccumulated = accumulatedLateFees;
-
-           const totalInstallments = parseInt((loan.installments || '0/0').split('/')[1]);
-           const paidInstallmentsCalculated = installmentAmount > 0 ? Math.floor(currentTotalPaid / installmentAmount) : 0;
-
-           if (paidInstallmentsCalculated >= totalInstallments || currentTotalPaid >= loan.totalLoan) {
+           
+           // --- 4. DETERMINAR ESTADO FINAL ---
+           if (currentTotalPaid >= loan.totalLoan - 0.1) {
                details.status = 'finished';
-           } else if (accumulatedLateDays > 0) { 
+           } 
+           else if (accumulatedLateDays > 0) { 
+               // Solo si debe días del PASADO (ayer o antes) se pone ROJO (Atrasado)
                details.status = 'late';
-           } else if (details.amountDueToday > 0) { 
-                const expectedInstallmentsIncludingToday = installmentsDueCount + 1;
-                let expectedTotalIncludingToday = expectedInstallmentsIncludingToday * installmentAmount;
-                if (currentTotalPaid_NoMigration < expectedTotalIncludingToday) {
-                    details.status = 'pending';
-                } else {
-                    details.status = 'paid';
-                }
-           } else {
-                // AQUÍ ESTÁ EL CAMBIO IMPORTANTE:
-                // Si es Semanal y no es día de pago, lo marcamos 'pending' para que no salga 'paid'.
-                const frequency = loan.paymentFrequency || 'daily';
-                if (frequency === 'weekly') {
-                    details.status = 'pending';
-                } else {
-                    details.status = 'paid'; 
-                }
+           } 
+           else if (details.amountDueToday > 0) { 
+               // Si debe HOY pero está al día con el pasado -> AMARILLO (Pendiente)
+               details.status = 'pending'; 
+           } 
+           else {
+               // Al día (o pagado hoy)
+               details.status = 'pending'; 
            }
            
            return details;
@@ -2910,7 +2913,6 @@ async function showRefinanceModal(clientId, notificationId) {
          * con este bloque de código completo.
          */
         function updateTodaysRouteList() {
-           // Define el inicio del día para saber quién ya pagó hoy
            const todayStart = new Date();
            todayStart.setHours(0, 0, 0, 0);
 
@@ -2922,28 +2924,20 @@ async function showRefinanceModal(clientId, notificationId) {
                return null;
            };
 
-           // [NUEVO HELPER] Para leer fecha de inicio correctamente (Timestamp o Date)
-           const getStartDate = (dateObj) => {
-               if (!dateObj) return null;
-               if (dateObj.seconds) return new Date(dateObj.seconds * 1000); // Firestore
-               if (dateObj instanceof Date) return dateObj; // Local JS Date (recién creado)
-               return null;
-           };
-
            let clientsForRoute = [];
 
            allClients.forEach(client => {
                if (!client.loans || client.loans.length === 0) return;
 
                client.loans.forEach((loan, index) => {
-                   // 1. Calculamos el estado actual
+                   // 1. Recalcular estado fresco con la nueva lógica
                    const details = calculateLoanDetails(loan);
                    const currentStatus = details.status;
 
-                   // 2. Descartamos los finalizados
+                   // 2. Si está finalizado, lo ignoramos siempre
                    if (currentStatus === 'finished') return;
 
-                   // 3. Verificamos si YA pagó hoy
+                   // 3. Verificar si PAGÓ HOY
                    let hasPaidToday = false;
                    if (loan.history && loan.history.length > 0) {
                         hasPaidToday = loan.history.some(h => {
@@ -2953,51 +2947,48 @@ async function showRefinanceModal(clientId, notificationId) {
                         });
                    }
 
-                   // 4. LÓGICA DE VISIBILIDAD MEJORADA
-                   const isLate = currentStatus === 'late';
-                   const isDueToday = details.amountDueToday > 0;
+                   // --- FILTRO DEFINITIVO (PARA QUE APAREZCAN LOS 18) ---
+                   // Si el préstamo está ACTIVO (no finished) y NO HA PAGADO HOY -> A LA LISTA.
+                   // No importa si es semanal y hoy no toca, o si adelantó cuotas.
+                   // Si debe dinero en general, debe aparecer para control.
                    
-                   // [CORRECCIÓN 1] Detectamos si es Semanal y está pendiente (para mostrarlo siempre)
-                   const isWeeklyPending = (loan.paymentFrequency === 'weekly' && currentStatus === 'pending');
-
-                   // [CORRECCIÓN 2] Detectamos si el préstamo se creó HOY (nuevo o renovación)
-                   let isCreatedToday = false;
-                   const startDateObj = getStartDate(loan.startDate);
-                   if (startDateObj) {
-                       startDateObj.setHours(0,0,0,0);
-                       if (startDateObj.getTime() === todayStart.getTime()) {
-                           isCreatedToday = true;
-                       }
-                   }
-                   
-                   // REGLA FINAL: Incluimos si (Atrasado O Toca Hoy O Es Nuevo O Es Semanal Pendiente) Y (No ha pagado hoy)
-                   if ((isLate || isDueToday || isCreatedToday || isWeeklyPending) && !hasPaidToday) {
+                   if (!hasPaidToday) {
                        
+                       // Preparamos el objeto para mostrar
                        const loanToRender = { 
                            ...loan, 
-                           status: currentStatus,
+                           status: currentStatus, 
                            lateDays: details.lateDays, 
                            amountDueToday: details.amountDueToday 
                        };
+                       
                        clientsForRoute.push({ client, loan: loanToRender, loanIndex: index });
                    }
                });
            });
  
-           // 5. Ordenar (Prioridad a Atrasados)
+           // Ordenar: Primero los Atrasados (Rojos), luego los demás
            clientsForRoute.sort((a, b) => {
+               // Prioridad 1: Estado Late
                if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
                if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
-               return 0;
+               
+               // Prioridad 2: Mayor cantidad de días de atraso
+               const daysA = a.loan.lateDays || 0;
+               const daysB = b.loan.lateDays || 0;
+               if (daysA > daysB) return -1;
+               if (daysA < daysB) return 1;
+               
+               // Prioridad 3: Alfabético
+               return a.client.name.localeCompare(b.client.name);
            });
 
-           // 6. Optimizar ruta y Actualizar UI
            const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
+           
+           // Actualizar contadores
            updateDashboard(optimizedClients); 
            
-           // Si el mapa está abierto, actualizamos los puntos
            if (document.querySelector('#map-view.active')) plotClientsOnMap();
-
            renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
        }
 
@@ -3031,7 +3022,7 @@ async function showRefinanceModal(clientId, notificationId) {
         allClients.forEach(client => {
             if (!client.loans || client.loans.length === 0) return;
 
-            // Verificamos si tiene préstamos activos (para lógica de refinanciación)
+            // Verificamos si tiene préstamos activos (para evitar duplicados en 'finished')
             const hasActiveLoan = client.loans.some(l => {
                 const s = calculateLoanDetails(l).status;
                 return s !== 'finished';
@@ -3049,37 +3040,36 @@ async function showRefinanceModal(clientId, notificationId) {
                     return pDate && pDate >= todayStart;
                 });
 
-                // --- 1. LÓGICA DE FILTROS (PESTAÑAS) ---
+                // --- 1. LÓGICA DE FILTROS (CORREGIDA) ---
                 let passesCategory = true;
 
                 if (filter === 'weekly') {
+                    // Pestaña "Semanales": Solo semanales activos
                     if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                 }
                 else if (filter === 'todo_today') {
-                    // Pestaña "Falta por Pagar": Solo mostramos si DEBE y NO ha pagado hoy
-                    if (details.amountDueToday <= 0 || hasPaidToday || currentStatus === 'finished') passesCategory = false;
+                    // --- CORRECCIÓN AQUÍ ---
+                    // Pestaña "Falta por Pagar": Ahora mostramos a TODOS los que no han pagado hoy.
+                    // (Igualamos la lógica con la Ruta principal para que aparezcan los 16)
+                    if (currentStatus === 'finished' || hasPaidToday) passesCategory = false;
                 }
                 else if (filter === 'paid') {
                     // Pestaña "Pago": Solo si ya pagó hoy
                     if (!hasPaidToday) passesCategory = false;
                 }
                 else if (filter === 'late') {
+                    // Pestaña "Atrasado": Solo estado rojo
                     if (currentStatus !== 'late') passesCategory = false;
                 }
                 else if (filter === 'finished') {
+                    // Pestaña "Finalizado"
                     if (currentStatus !== 'finished') passesCategory = false;
                     else if (hasActiveLoan) passesCategory = false; // Ocultar duplicados si ya renovó
                 }
                 else {
-                    // --- PESTAÑA 'TODOS' (all) ---
-                    // AQUÍ ESTÁ EL CAMBIO QUE PEDISTE:
-                    
-                    // A. Ocultamos finalizados (para no ensuciar)
+                    // Pestaña "TODOS" (Por defecto)
+                    // Muestra solo lo pagado para mantener limpieza visual, o ajusta según prefieras.
                     if (currentStatus === 'finished') passesCategory = false;
-                    
-                    // B. Ocultamos a los que NO han pagado hoy.
-                    // Así, esta lista solo muestra el "Trabajo Realizado" (Pagados).
-                    // Los pendientes se quedan en "Inicio de Ruta".
                     if (!hasPaidToday) passesCategory = false;
                 }
 
@@ -3094,20 +3084,16 @@ async function showRefinanceModal(clientId, notificationId) {
                 // --- 3. DECISIÓN FINAL ---
                 
                 if (searchTerm) {
-                    // EXCEPCIÓN INTELIGENTE:
-                    // Si estás escribiendo en el buscador, IGNORAMOS la regla de "Solo Pagados".
-                    // Esto te permite encontrar a cualquier cliente rápidamente si lo necesitas buscar,
-                    // aunque no haya pagado todavía.
+                    // Si buscas, ignoramos filtros estrictos para que encuentres a quien sea
                     if (matchesSearch) {
-                        // Solo respetamos la regla de ocultar finalizados para evitar duplicados visuales
                         if (filter === 'all' && currentStatus === 'finished') {
-                            // No mostrar
+                            // Ocultar finalizados en búsqueda general
                         } else {
                             clientsWithLoans.push({ client, loan, loanIndex });
                         }
                     }
                 } else {
-                    // Si NO estás buscando, aplicamos tus reglas estrictas (solo pagados en la lista principal)
+                    // Si NO buscas, aplicamos el filtro de la pestaña
                     if (passesCategory) {
                         clientsWithLoans.push({ client, loan, loanIndex }); 
                     }
@@ -5508,10 +5494,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             
-            // 1. Definir la etiqueta de "HOY" según el idioma actual
             const todayLabel = currentLang === 'es' ? '(HOY)' : (currentLang === 'en' ? '(TODAY)' : '(HOJE)');
 
-            // Textos traducidos dinámicos
             const t = {
                 title: currentLang === 'es' ? 'Reporte Diario' : (currentLang === 'en' ? 'Daily Report' : 'Relatório Diário'),
                 collector: translations[currentLang].reportCollector || 'Cobrador',
@@ -5528,7 +5512,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 paymentsSection: currentLang === 'es' ? 'Pagos Recibidos' : (currentLang === 'en' ? 'Received Payments' : 'Pagamentos Recebidos'),
                 expensesSection: currentLang === 'es' ? 'Gastos del Día' : (currentLang === 'en' ? 'Daily Expenses' : 'Gastos do Dia'),
                 newLoansSection: currentLang === 'es' ? 'Nuevos Préstamos / Renovaciones' : (currentLang === 'en' ? 'New Loans / Renewals' : 'Novos Empréstimos / Renovações'),
-                lateSection: currentLang === 'es' ? 'Reporte de Morosidad (Actual)' : (currentLang === 'en' ? 'Delinquency Report (Current)' : 'Relatório de Inadimplência (Atual)'),
+                missedSection: currentLang === 'es' ? 'Restantes por Cobrar (Pendientes/Atrasados)' : (currentLang === 'en' ? 'Remaining to Collect' : 'Restantes a Receber (Pendentes/Atrasados)'),
+                lateSection: currentLang === 'es' ? 'Reporte de Morosidad (Detalle)' : (currentLang === 'en' ? 'Delinquency Report' : 'Relatório de Inadimplência (Detalhe)'),
                 daysLate: currentLang === 'es' ? 'días' : 'dias',
                 generatedBy: currentLang === 'es' ? 'Generado por LUMIX Finanzas' : (currentLang === 'en' ? 'Generated by LUMIX Finance' : 'Gerado por LUMIX Finanças'),
                 page: currentLang === 'es' ? 'Página' : (currentLang === 'en' ? 'Page' : 'Página'),
@@ -5536,16 +5521,9 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 noLate: currentLang === 'es' ? '¡Felicidades! Ningún cliente atrasado actualmente.' : (currentLang === 'en' ? 'Congrats! No late clients currently.' : 'Parabéns! Nenhum cliente atrasado atualmente.')
             };
             
-            // Usamos la fecha personalizada o la de hoy si no se pasa ninguna
             const reportDate = customDate || new Date();
-            // Formateamos la fecha según el idioma
             const dateStr = reportDate.toLocaleDateString(currentLang === 'pt' ? 'pt-BR' : 'es-ES');
-
-            // Mostrar Toast de inicio
-            const msg = currentLang === 'es' ? `Generando PDF para ${dateStr}...` : `Gerando PDF para ${dateStr}...`;
-            showToast(msg, false);
-
-            // --- 1. RECOPILAR DATOS FILTRADOS POR LA FECHA SELECCIONADA ---
+            showToast(currentLang === 'es' ? `Generando PDF para ${dateStr}...` : `Gerando PDF para ${dateStr}...`, false);
 
             const checkDateMatch = (timestamp) => {
                 if (!timestamp) return false;
@@ -5553,22 +5531,26 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
                 else if (timestamp instanceof Date) d = timestamp;
                 else d = new Date(timestamp);
-                
-                // Comparamos strings de fecha local (usando el formato BR/ES que es DD/MM/AAAA)
                 return d.toLocaleDateString('pt-BR') === reportDate.toLocaleDateString('pt-BR');
             };
 
-            // A. Pagos
             let dailyTotal = 0;
             let dailyTotalCash = 0;
             let dailyTotalDigital = 0;
-
             const dailyPaymentsList = [];
+            const missedPaymentsList = [];
+
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, loanIndex) => { 
+                    // Usamos la nueva lógica de cálculo de estado para que coincida con la APP
+                    const details = calculateLoanDetails(loan);
+                    
+                    // A. Verificar si PAGÓ HOY
+                    let hasPaidToday = false;
                     (loan.history || []).forEach(h => {
                         if (h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
                             if (checkDateMatch(h.date)) {
+                                hasPaidToday = true;
                                 const amt = h.amount || 0;
                                 dailyTotal += amt;
                                 if (h.method === 'dinheiro') dailyTotalCash += amt;
@@ -5588,37 +5570,50 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                             }
                         }
                     });
+
+                    // B. LÓGICA DE INCLUSIÓN TOTAL (VERIFICADA)
+                    // Si el préstamo sigue ACTIVO y NO ha pagado hoy -> VA A LA LISTA DEL PDF.
+                    // Esto garantiza que nadie se oculte.
+                    if (details.status !== 'finished' && !hasPaidToday) {
+                        missedPaymentsList.push({
+                            clientName: client.name,
+                            loanIndex: loanIndex + 1,
+                            expectedAmount: loan.originalInstallmentAmount || 0,
+                            // Muestra el estado real (Atrasado o Pendiente) calculado con la regla de +1 día
+                            status: details.status === 'late' ? 'ATRASADO' : 'PENDENTE'
+                        });
+                    }
                 });
             });
+            
+            // Ordenar alfabéticamente
+            missedPaymentsList.sort((a, b) => a.clientName.localeCompare(b.clientName));
             dailyPaymentsList.sort((a, b) => a.time.localeCompare(b.time));
 
-            // B. Gastos
             const dailyExpenses = allExpenses.filter(e => checkDateMatch(e.date));
             const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.value, 0);
             dailyExpenses.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
 
-            // C. Liquidaciones
             const dailySettlements = allSettlements.filter(s => checkDateMatch(s.date));
             const totalSettlements = dailySettlements.reduce((sum, s) => sum + s.amount, 0);
             
-            // D. Aportes
             const dailyInjections = allCapitalInjections.filter(i => checkDateMatch(i.date));
             const totalInjections = dailyInjections.reduce((sum, i) => sum + i.amount, 0);
 
-            // E. Nuevos Préstamos
+            // --- LÓGICA DE RENOVACIONES (VERIFICADA) ---
             const dailyNewLoans = [];
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
+                    // Si la fecha de inicio es HOY y no es migración -> ES UN NUEVO PRÉSTAMO / RENOVACIÓN
                     if (checkDateMatch(loan.startDate) && !loan.migrationDate) {
                         let principal = loan.principalAmount;
                         if (!principal && loan.totalLoan) {
                              const rate = client.interestRate || 20;
                              principal = loan.totalLoan / (1 + (rate/100));
                         }
-                        
                         let loanTime = '00:00';
                         if (loan.startDate?.seconds) loanTime = new Date(loan.startDate.seconds*1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-
+                        
                         dailyNewLoans.push({
                             clientName: client.name,
                             amount: principal || 0,
@@ -5630,7 +5625,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             const totalLoansOutflow = dailyNewLoans.reduce((sum, l) => sum + l.amount, 0);
 
-            // F. Clientes Atrasados
             const lateClientsList = [];
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
@@ -5647,20 +5641,16 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             lateClientsList.sort((a, b) => b.lateDays - a.lateDays);
             
-            // Cálculo Neto
             const netBalance = (dailyTotal + totalInjections) - (totalExpenses + totalSettlements + totalLoansOutflow);
 
-            // --- 2. GENERAR PDF ---
+            // --- 2. GENERAR PDF (LAYOUT) ---
             const pageMargin = 15;
             const pageWidth = doc.internal.pageSize.getWidth();
             const center = pageWidth / 2;
             let y = 0;
 
             const checkPageBreak = () => {
-                if (y > 270) { 
-                    doc.addPage();
-                    y = 20;
-                }
+                if (y > 270) { doc.addPage(); y = 20; }
             };
 
             const addSectionHeader = (title) => {
@@ -5677,7 +5667,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 y += 8;
             };
 
-            // Encabezado
             y = 25;
             doc.setFontSize(16);
             doc.setFont(undefined, 'bold');
@@ -5686,11 +5675,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             doc.setFontSize(12);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(100);
-            
-            // TITULO TRADUCIDO
             doc.text(`${t.title} - ${dateStr}`, center, y, { align: 'center' });
 
-            // Info Cobrador
             y += 15;
             doc.setFontSize(10);
             doc.setTextColor(150);
@@ -5700,7 +5686,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             doc.setFont(undefined, 'bold');
             doc.text(currentCollectorData?.name || 'N/A', pageMargin + 25, y); 
 
-            // Resumen Financiero
             y += 15;
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
@@ -5742,14 +5727,11 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             
             y += 8;
             doc.setTextColor(currentCapitalOnHand >= 0 ? '#000000' : '#dc3545');
-            // --- [CORRECCIÓN APLICADA AQUÍ] ---
-            // Usamos la variable 'todayLabel' que definimos al inicio de la función
             doc.text(`${t.capitalHand} ${todayLabel}:`, pageMargin + 5, y);
             doc.text(money(currentCapitalOnHand), pageWidth - pageMargin - 5, y, { align: 'right' });
 
             y += 10;
 
-            // Listados detallados (Pagos, Gastos, Préstamos)
             if (dailyPaymentsList.length > 0) {
                 addSectionHeader(t.paymentsSection);
                 dailyPaymentsList.forEach(p => {
@@ -5762,6 +5744,28 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     doc.setFont(undefined, 'bold');
                     doc.setTextColor('#28a745');
                     doc.text(money(p.amount), pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
+            }
+            
+            // --- SECCIÓN DE RESTANTES (TODOS LOS PENDIENTES/ATRASADOS) ---
+            if (missedPaymentsList.length > 0) {
+                addSectionHeader(t.missedSection);
+                missedPaymentsList.forEach(p => {
+                    checkPageBreak();
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(0);
+                    doc.text(p.clientName, pageMargin + 5, y);
+                    
+                    doc.setFont(undefined, 'bold');
+                    if (p.status === 'ATRASADO') doc.setTextColor('#dc3545'); // Rojo
+                    else doc.setTextColor('#d97706'); // Naranja (Pendiente)
+                    
+                    doc.text(p.status, pageMargin + 100, y);
+                    
+                    doc.setTextColor('#000000');
+                    doc.text(money(p.expectedAmount), pageWidth - pageMargin - 5, y, { align: 'right' });
                     y += 7;
                 });
             }
@@ -5782,6 +5786,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
 
+            // --- SECCIÓN DE NUEVOS PRÉSTAMOS / RENOVACIONES ---
             if (dailyNewLoans.length > 0) {
                 addSectionHeader(t.newLoansSection);
                 dailyNewLoans.forEach(l => {
@@ -5798,7 +5803,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
 
-            // Atrasados
             addSectionHeader(t.lateSection);
             if (lateClientsList.length > 0) {
                 checkPageBreak();
@@ -7184,6 +7188,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
 </html> 
+
 
 
 
