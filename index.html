@@ -2524,7 +2524,7 @@ async function showRefinanceModal(clientId, notificationId) {
             todayStart.setHours(0, 0, 0, 0);
 
             clientsData.forEach(item => {
-                const { client, loan, loanIndex } = item;
+               const { client, loan, loanIndex } = item;
                 
                 const details = calculateLoanDetails(loan);
                 const displayLoan = { 
@@ -2548,7 +2548,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     return null;
                 };
 
-                // --- LÓGICA DE PAGO DEL DÍA ---
                 let amountPaidToday = 0;
                 if (displayLoan.history && displayLoan.history.length > 0) {
                      amountPaidToday = displayLoan.history.reduce((sum, h) => {
@@ -2564,7 +2563,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 const hasPaidToday = amountPaidToday > 0;
                 const originalInstallmentValue = displayLoan.amount || 0;
                 
-                // --- [DISEÑO VISUAL ACTUALIZADO] ---
                 let mainValueToDisplay = 0;
                 let secondaryLabelHtml = ''; 
                 let mainValueColor = 'var(--accent-green)'; 
@@ -2575,6 +2573,31 @@ async function showRefinanceModal(clientId, notificationId) {
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
 
+                // --- INICIO: LÓGICA DE COLORES Y ESTADO (TU PEDIDO) ---
+                const daysLate = displayLoan.lateDays || 0;
+                let avatarHex = '6f42c1'; // Morado por defecto
+                let reputationLabel = '';
+                let reputationColor = '#6f42c1';
+
+                if (displayLoan.status === 'finished') {
+                    avatarHex = '4338ca'; // Azul Indigo
+                    reputationLabel = 'Finalizado';
+                    reputationColor = '#4338ca';
+                } else if (daysLate === 0) {
+                    avatarHex = '28a745'; // Verde
+                    reputationLabel = 'Excelente';
+                    reputationColor = '#28a745';
+                } else if (daysLate <= 4) {
+                    avatarHex = 'f59e0b'; // Amarillo/Naranja
+                    reputationLabel = 'Médio';
+                    reputationColor = '#d97706';
+                } else {
+                    avatarHex = 'dc3545'; // Rojo
+                    reputationLabel = 'Ruim'; // Malo
+                    reputationColor = '#dc3545';
+                }
+                // --- FIN LÓGICA DE COLORES ---
+
                 if (displayLoan.status === 'finished') {
                     mainValueToDisplay = 0; 
                     secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 700;">FINALIZADO</span>`;
@@ -2583,29 +2606,21 @@ async function showRefinanceModal(clientId, notificationId) {
                     mainValueColor = '#4338ca';
 
                 } else if (hasPaidToday) {
-                    // CASO: YA PAGÓ HOY
                     mainValueToDisplay = amountPaidToday;
-                    
-                    // [AJUSTE] Margin-top cambiado a 4px para separar
                     secondaryLabelHtml = `<span style="font-size: 0.85em; color: var(--text-secondary); font-weight: 700; margin-top: 4px;">PARCELA: ${money(originalInstallmentValue)}</span>`;
-                    
                     bottomStatusText = translations[currentLang].statusPaidToday;
 
                     if (amountPaidToday < (originalInstallmentValue - 0.05)) {
-                        mainValueColor = '#dc3545'; // Rojo
+                        mainValueColor = '#dc3545'; 
                         bottomStatusStyle = 'color: #ffffff; background-color: #ff0000; font-weight: 800; border: 2px solid #b30000; box-shadow: 0 2px 5px rgba(255,0,0,0.4);';
                     } else {
-                        mainValueColor = '#198754'; // Verde
+                        mainValueColor = '#198754'; 
                         bottomStatusStyle = 'color: #155724; background-color: #d4edda; font-weight: 700; border: 1px solid #c3e6cb;';
                     }
 
                 } else {
-                    // CASO: PENDIENTE
                     mainValueToDisplay = originalInstallmentValue;
-                    
-                    // [AJUSTE] Margin-top cambiado a 4px para separar
                     secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 4px;">${freqText}</span>`;
-                    
                     mainValueColor = 'var(--accent-green)';
 
                     if (displayLoan.amountDueToday > 0) {
@@ -2622,7 +2637,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     }
                 }
 
-                // Etiquetas visuales izquierda
                 let statusLabelUnderName = '';
                 if (displayLoan.status === 'late') {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} dias)</span>`;
@@ -2641,11 +2655,18 @@ async function showRefinanceModal(clientId, notificationId) {
                 card.dataset.loanIndex = loanIndex; 
 
                 const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
-                const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+                // AQUI USAMOS EL COLOR DINÁMICO (avatarHex)
+                const placeholderUrl = `https://placehold.co/80x80/${avatarHex}/FFFFFF?text=${nameInitial}`;
                 const photoUrl = client.profilePictureUrl || placeholderUrl;
+                // Si tiene foto real, le ponemos borde de color
+                const borderStyle = client.profilePictureUrl ? `border: 3px solid ${reputationColor};` : '';
 
                 card.innerHTML = `
-                    <img src="${photoUrl}" alt="Foto" class="client-avatar">
+                    <div style="display: flex; flex-direction: column; align-items: center; margin-right: 15px; min-width: 55px;">
+                        <img src="${photoUrl}" alt="Foto" class="client-avatar" style="${borderStyle} width: 50px; height: 50px;">
+                        <span style="font-size: 0.65em; font-weight: 800; color: ${reputationColor}; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${reputationLabel}</span>
+                    </div>
+
                     <div class="client-info">
                         <h4 class="client-name" style="margin-bottom: 0px;">${client.name}</h4>
                         ${loanInfoLabel} 
@@ -2665,7 +2686,7 @@ async function showRefinanceModal(clientId, notificationId) {
                         </span>
                     </div>`;
                 
-                container.appendChild(card);
+                container.appendChild(card); 
             }); 
 
             lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
@@ -3484,22 +3505,40 @@ async function showRefinanceModal(clientId, notificationId) {
                     );
                 });
                 
+                // --- INICIO: SOLUCIÓN BOTÓN IR ---
                 const startRouteBtn = document.getElementById('startRouteBtn');
-                if (client.location) {
+                let navigationUrl = client.location;
+
+                // Si no hay GPS, intentamos construir la búsqueda con la dirección
+                if (!navigationUrl || navigationUrl.trim() === '') {
+                    if (client.address && client.address.trim() !== '') {
+                        const fullAddress = `${client.address}, ${client.city || ''}`;
+                        navigationUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+                    }
+                }
+
+                if (navigationUrl) {
+                     startRouteBtn.disabled = false;
+                     startRouteBtn.style.opacity = '1';
+                     startRouteBtn.title = 'Navegar até o cliente'; 
+                     
                      startRouteBtn.addEventListener('click', () => {
                          const notifTitle = translations[currentLang].collectorOnTheWayTitle;
                          const notifBody = translations[currentLang].collectorOnTheWayBody;
                          sendNotificationToClient(clientId, notifTitle, notifBody, 'on_the_way', 'navigation');
-                         showToast('Notificação enviada ao cliente!');
-                         window.open(client.location, '_blank');
+                         
+                         showToast('Abrindo mapa...', false);
+                         window.open(navigationUrl, '_blank');
                      });
                  } else {
                      startRouteBtn.disabled = true;
                      startRouteBtn.style.opacity = '0.5';
-                     startRouteBtn.title = 'Localização GPS não disponível';
+                     startRouteBtn.title = 'Endereço não disponível';
                  }
-            }
+                 // --- FIN: SOLUCIÓN BOTÓN IR ---
+            } // <--- ¡ESTA ES LA LLAVE QUE FALTABA! Cierra el 'else'
 
+            // --- Lógica del Historial de Pagos (Fuera del if/else) ---
             clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
@@ -3522,6 +3561,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 });
             });
         }
+                
 
 
 
@@ -7187,7 +7227,8 @@ getDocs(collectorQuery).then(snapshot => {
         init();
     </script>
 </body>
-</html> 
+    </html>
+
 
 
 
