@@ -3136,10 +3136,32 @@ async function showRefinanceModal(clientId, notificationId) {
             const clientDetailView = document.getElementById('clientDetailView');
             const client = allClients.find(c => c.id == clientId);
 
-            // --- WhatsApp (Sin Cambios) ---
+            // --- WhatsApp (INTELIGENTE GLOBAL v2) ---
             const whatsappString = (client.whatsapp || '').toString(); 
-            const cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
+            let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
+
+            // 1. Mapa de Moneda -> Código de País (DDI)
+            const currencyToDDI = {
+                'BRL': '55', 'ARS': '54', 'BOB': '591', 'CLP': '56', 'COP': '57', 
+                'USD_EC': '593', 'PYG': '595', 'PEN': '51', 'UYU': '598', 'VES': '58',
+                'CRC': '506', 'GTQ': '502', 'HNL': '504', 'NIO': '505', 'PAB': '507', 
+                'USD_SV': '503', 'USD': '1', 'MXN': '52', 'CAD': '1'
+            };
+
+            // 2. Detectar DDI
+            const collectorCurrency = currentCollectorData?.paymentSettings?.currency || 'BRL';
+            const countryDDI = currencyToDDI[collectorCurrency] || '55';
+
+            // 3. Lógica de Prefijo Automático
+            const isNorthAmerica = (countryDDI === '1');
+            const maxLocalLength = isNorthAmerica ? 10 : 11;
+
+            if (cleanedWhatsapp.length >= 8 && cleanedWhatsapp.length <= maxLocalLength) {
+                cleanedWhatsapp = countryDDI + cleanedWhatsapp;
+            }
+
             const whatsappLogoUrl = "https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO%20WHATSAPP%20OFI.png?alt=media&token=e022ad51-a151-4812-bb3d-9be867dac891";
+            
             const whatsappButtonHtml = cleanedWhatsapp
                 ? `<a id="whatsappClientBtn" href="https://api.whatsapp.com/send?phone=${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp">
                        <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px;">
@@ -3147,6 +3169,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível">
                        <img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px; opacity: 0.5;">
                    </button>`;
+        
 
             // --- LÓGICA DE SELECCIÓN DE PRÉSTAMO Y PESTAÑAS (CORREGIDA) ---
             // 1. No filtramos nada. Mostramos TODOS los préstamos. Historial Ilimitado.
@@ -7228,6 +7251,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
