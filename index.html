@@ -2573,23 +2573,27 @@ async function showRefinanceModal(clientId, notificationId) {
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
 
-                // --- INICIO: LÓGICA DE COLORES Y ESTADO (CORREGIDA IDIOMAS) ---
+                // --- INICIO: LÓGICA DE COLORES Y ESTADO (CORREGIDO) ---
                 const daysLate = displayLoan.lateDays || 0;
                 let avatarHex = '6f42c1'; // Morado por defecto
                 let reputationLabel = '';
                 let reputationColor = '#6f42c1';
 
-                // Definimos los textos para cada idioma aquí mismo
+                // 1. Detectamos el idioma actual (si no existe, usa portugués)
+                const langCode = (typeof currentLang !== 'undefined' && currentLang) ? currentLang : 'pt';
+
+                // 2. Diccionario de textos
                 const statusLabels = {
                     pt: { exc: 'Excelente', med: 'Médio', bad: 'Ruim', fin: 'Finalizado' },
                     es: { exc: 'Excelente', med: 'Regular', bad: 'Malo', fin: 'Finalizado' },
                     en: { exc: 'Excellent', med: 'Medium', bad: 'Bad', fin: 'Finished' }
                 };
-                // Seleccionamos el texto según el idioma actual (currentLang)
-                const txt = statusLabels[currentLang] || statusLabels.pt;
+
+                // 3. Seleccionamos el texto correcto
+                const txt = statusLabels[langCode] || statusLabels.pt;
 
                 if (displayLoan.status === 'finished') {
-                    // Estado Finalizado (Azul)
+                    // Estado Finalizado
                     avatarHex = '4338ca'; 
                     reputationLabel = txt.fin;
                     reputationColor = '#4338ca';
@@ -7253,6 +7257,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
