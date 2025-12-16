@@ -5920,20 +5920,32 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const successMsg = currentLang === 'es' ? '¡Reporte PDF generado con éxito!' : (currentLang === 'en' ? 'PDF report generated successfully!' : 'Relatório PDF gerado com sucesso!');
             showToast(successMsg);
 
-            // --- BLOQUEO AUTOMÁTICO AL ENVIAR REPORTE ---
-            // CORRECCIÓN: Verificamos si es un reporte de HOY (automático o seleccionado manualmente)
+            // --- BLOQUEO AUTOMÁTICO (VERSIÓN ROBUSTA) ---
             const isTodayReport = !customDate || (customDate.toDateString() === new Date().toDateString());
 
             if (isTodayReport) { 
+                console.log("Reporte de HOJE. Ativando cronômetro de bloqueio...");
+                
+                // 1. TRUCO CLAVE: Actualizamos la variable local INMEDIATAMENTE
+                // Esto hace que el contador empiece ya, sin esperar a internet/firebase.
+                if (typeof currentCollectorData !== 'undefined' && currentCollectorData) {
+                    currentCollectorData.lastReportDate = new Date(); // Marca la hora local actual
+                }
+
+                // 2. Guardamos en la nube para respaldo (en segundo plano)
                 try {
-                    console.log("Reporte de HOY generado. Activando bloqueo en 5 min...");
-                    // Guardamos la hora exacta del reporte en la base de datos
                     const collectorRef = doc(db, 'collectors', currentCollectorUsername);
                     updateDoc(collectorRef, {
                         lastReportDate: serverTimestamp()
+                    }).then(() => {
+                        console.log("Bloqueio sincronizado na nuvem.");
                     });
+                    
+                    // Aviso visual para que sepas que funcionó
+                    showToast("Bloqueio automático ativado (5 min).", false);
+                    
                 } catch (err) {
-                    console.error("Error guardando hora reporte:", err);
+                    console.error("Erro ao salvar bloqueio na nuvem:", err);
                 }
             }
         }
@@ -6514,20 +6526,27 @@ function showReportDateModal() {
         
         
         function stopRealtimeGeolocation() {
+            // 1. Detener el proceso del navegador
             if (locationWatchId) {
                 navigator.geolocation.clearWatch(locationWatchId);
                 locationWatchId = null;
             }
-            // Apaga el interruptor en la interfaz si el seguimiento se detiene por cualquier motivo.
+            
+            // 2. Apagar visualmente el interruptor (SOLO VISUAL)
+            // CORRECCIÓN IMPORTANTE: YA NO TOCAMOS LA BASE DE DATOS AQUÍ.
+            // Esto evita que un error de conexión apague el sistema.
             const trackingToggle = document.getElementById('realtime-tracking-toggle');
-            if (trackingToggle && trackingToggle.checked) {
-                trackingToggle.checked = false;
-                // También actualiza el estado en la base de datos para que sea consistente.
-                updateDoc(doc(db, 'collectors', currentCollectorUsername), { isRealtimeTrackingActive: false });
+            if (trackingToggle) {
+                // Solo lo desmarcamos si la base de datos realmente dice que está apagado
+                // (Esto lo maneja el onSnapshot, así que aquí solo limpiamos variables)
+                if (!currentCollectorData?.isRealtimeTrackingActive) {
+                    trackingToggle.checked = false;
+                }
             }
+            
             collectorCurrentLocation = null;
-            console.log('Rastreo en tiempo real detenido.');
-            updateTodaysRouteList(); // Reordena una última vez sin ubicación
+            console.log('GPS detenido localmente.');
+            // No llamamos a updateTodaysRouteList() para evitar parpadeos innecesarios al salir
         }
 
         // --- FIN: LÓGICA DE OPTIMIZACIÓN DE RUTA ---
@@ -6537,20 +6556,17 @@ function showReportDateModal() {
 
 
 async function startRealtimeGeolocation() {
-            // 1. Verificaciones iniciales
             if (locationWatchId) return; // Ya está activo
             
             if (!('geolocation' in navigator)) {
-                showToast('GPS não suportado neste dispositivo.', true);
-                // NO llamamos a stop() aquí para no apagar el switch visualmente
+                showToast('GPS não suportado.', true);
                 return;
             }
 
             try {
-                // 2. Iniciamos el rastreo
                 locationWatchId = navigator.geolocation.watchPosition(
                     (position) => {
-                        // --- ÉXITO: Tenemos señal ---
+                        // --- ÉXITO ---
                         collectorCurrentLocation = {
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
@@ -6558,54 +6574,45 @@ async function startRealtimeGeolocation() {
                         console.log('GPS OK:', collectorCurrentLocation);
                         
                         const now = Date.now();
-                        // Guardar en DB cada 30 segundos para ahorrar batería
+                        // Guardar en DB cada 30 segundos
                         if (now - lastLocationUpdateTime > 30000) { 
                             lastLocationUpdateTime = now;
-                            
                             const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+                            // Enviamos actualización silenciosa
                             updateDoc(collectorRef, {
                                 lastLocation: {
                                     latitude: position.coords.latitude,
                                     longitude: position.coords.longitude
                                 },
                                 lastLocationUpdate: serverTimestamp()
-                            }).catch(e => console.warn("Fallo menor GPS DB:", e));
+                            }).catch(e => console.warn("Ping GPS fallido (sin importancia):", e));
 
-                            // Actualizar lista visualmente
                             updateTodaysRouteList(); 
                         }
 
-                        // Actualizar mapa suavemente
+                        // Actualizar mapa
                         if (mapInstance && collectorMarker) {
                             const newLatLng = [collectorCurrentLocation.lat, collectorCurrentLocation.lng];
                             collectorMarker.setLatLng(newLatLng);
-                            if (document.getElementById('map-view').classList.contains('active')) {
-                                mapInstance.panTo(newLatLng);
-                            }
                         }
                     },
                     (error) => {
-                        // --- MANEJO DE ERRORES ROBUSTO ---
-                        console.warn("Aviso GPS:", error.message);
+                        console.warn("Aviso GPS:", error.code, error.message);
                         
-                        // CÓDIGO 1 = PERMISO DENEGADO (El usuario dijo NO explícitamente)
-                        // Solo en este caso apagamos el interruptor.
+                        // ÚNICO CASO DE APAGADO REAL: EL USUARIO DIJO "NO" AL PERMISO
                         if (error.code === 1) {
-                            showToast('Permissão de GPS negada. O rastreamento será desligado.', true);
+                            showToast('Permissão negada. Desligando no sistema.', true);
+                            // Aquí sí mandamos la orden de apagado a la base de datos
+                            updateDoc(doc(db, 'collectors', currentCollectorUsername), { isRealtimeTrackingActive: false });
                             stopRealtimeGeolocation();
-                        } 
-                        // Si es error de señal o tiempo de espera, NO hacemos nada.
-                        // El navegador seguirá intentando reconectar automáticamente.
+                        }
+                        // Cualquier otro error (señal, timeout, desconocido) SE IGNORA y el botón sigue prendido.
                     },
-                    { 
-                        enableHighAccuracy: true, 
-                        maximumAge: 0, 
-                        timeout: 60000 // Esperar hasta 60 segundos antes de dar error
-                    }
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 }
                 );
 
             } catch (err) {
-                console.error("Error crítico GPS:", err);
+                console.error("Error al iniciar GPS:", err);
             }
         }
 
@@ -6845,38 +6852,34 @@ getDocs(collectorQuery).then(snapshot => {
             if (profileImg) profileImg.src = imageUrl || placeholderUrl;
 
             const realtimeToggle = document.getElementById('realtime-tracking-toggle');
-            // ★★★ CORRECCIÓN: Usa el global
-            if(realtimeToggle) realtimeToggle.checked = currentCollectorData.isRealtimeTrackingActive || false; 
-
-            // ★★★ CORRECCIÓN: Usa el global
-            if (currentCollectorData.isRealtimeTrackingActive && !locationWatchId) { 
-                startRealtimeGeolocation();
-            } else if (!currentCollectorData.isRealtimeTrackingActive && locationWatchId) { 
-                stopRealtimeGeolocation();
-            }
-
-            const paymentSettingsBtn = document.getElementById('payment-settings-btn');
-            if (paymentSettingsBtn) {
-                paymentSettingsBtn.replaceWith(paymentSettingsBtn.cloneNode(true));
-                // ★★★ CORRECCIÓN: Pasa el global al listener
-                document.getElementById('payment-settings-btn').addEventListener('click', () => showPaymentSettingsModal(currentCollectorData));
-            }
-
-            // ★★★ CORRECCIÓN: Pasa el global
-            updateProfileView(currentCollectorData); 
-
-            if (isFirstLoad) {
-                console.log('[COBRADOR-APP] Carga inicial completa. Configurando FCM...');
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.ready.then(registration => {
-                        console.log('[COBRADOR-APP] Service Worker está ativo. Configurando FCM.');
-                        setupFCM(currentCollectorUsername, registration);
-                    }).catch(err => {
-                        console.error('[COBRADOR-APP] ERROR: Service Worker não pronto.', err);
-                    });
+    if(realtimeToggle) {
+        realtimeToggle.addEventListener('change', async (e) => {
+            const isActive = e.target.checked;
+            
+            // Bloqueo visual temporal para evitar rebotes
+            realtimeToggle.disabled = true;
+            
+            try {
+                const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+                // 1. Primero actualizamos la base de datos (La Autoridad)
+                await updateDoc(collectorRef, { isRealtimeTrackingActive: isActive });
+                
+                // 2. Luego actuamos localmente
+                if (isActive) {
+                    startRealtimeGeolocation();
+                } else {
+                    stopRealtimeGeolocation();
                 }
-                isFirstLoad = false;
+            } catch (error) {
+                console.error("Error al actualizar switch:", error);
+                showToast('Erro de conexão ao mudar GPS.', true);
+                // Si falló, revertimos el switch visualmente
+                realtimeToggle.checked = !isActive;
+            } finally {
+                realtimeToggle.disabled = false;
             }
+        });
+    }
             // --- Fim do código movido ---
 
         } else {
@@ -7253,6 +7256,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
