@@ -2573,27 +2573,34 @@ async function showRefinanceModal(clientId, notificationId) {
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
 
-                // --- INICIO: LÓGICA DE COLORES Y ESTADO (TU PEDIDO) ---
+                // --- INICIO: LÓGICA DE COLORES Y ESTADO (ACTUALIZADA) ---
                 const daysLate = displayLoan.lateDays || 0;
                 let avatarHex = '6f42c1'; // Morado por defecto
                 let reputationLabel = '';
                 let reputationColor = '#6f42c1';
 
                 if (displayLoan.status === 'finished') {
-                    avatarHex = '4338ca'; // Azul Indigo
+                    // Estado Finalizado (Azul)
+                    avatarHex = '4338ca'; 
                     reputationLabel = 'Finalizado';
                     reputationColor = '#4338ca';
-                } else if (daysLate === 0) {
-                    avatarHex = '28a745'; // Verde
+
+                } else if (daysLate < 2) { 
+                    // 0 o 1 día de atraso -> EXCELENTE (Verde)
+                    avatarHex = '28a745'; 
                     reputationLabel = 'Excelente';
                     reputationColor = '#28a745';
-                } else if (daysLate <= 4) {
-                    avatarHex = 'f59e0b'; // Amarillo/Naranja
+
+                } else if (daysLate < 5) { 
+                    // 2, 3 o 4 días de atraso -> REGULAR/MEDIO (Naranja)
+                    avatarHex = 'f59e0b'; 
                     reputationLabel = 'Médio';
                     reputationColor = '#d97706';
-                } else {
-                    avatarHex = 'dc3545'; // Rojo
-                    reputationLabel = 'Ruim'; // Malo
+
+                } else { 
+                    // 5 días o más -> MALO/RUIM (Rojo)
+                    avatarHex = 'dc3545'; 
+                    reputationLabel = 'Ruim'; 
                     reputationColor = '#dc3545';
                 }
                 // --- FIN LÓGICA DE COLORES ---
@@ -7238,6 +7245,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
