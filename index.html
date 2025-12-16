@@ -6512,84 +6512,7 @@ function showReportDateModal() {
             return optimizedRoute;
         }
         
-        async function startRealtimeGeolocation() {
-            if (locationWatchId) return; // Ya está activo
-            if (!('geolocation' in navigator)) {
-                showToast('Geolocalização não é suportada.', true);
-                stopRealtimeGeolocation();
-                return;
-            }
-
-            try {
-                // Verificamos permisos
-                const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
-                if (permissionStatus.state === 'denied') {
-                    showToast('Permissão de localização bloqueada.', true);
-                    stopRealtimeGeolocation();
-                    return;
-                }
-
-                locationWatchId = navigator.geolocation.watchPosition(
-                    (position) => {
-                        // --- ÉXITO: Se encontró ubicación ---
-                        collectorCurrentLocation = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-                        console.log('Ubicación actualizada:', collectorCurrentLocation);
-                        
-                        const now = Date.now();
-                        // Solo guardamos en base de datos cada 30 segundos
-                        if (now - lastLocationUpdateTime > 30000) { 
-                            lastLocationUpdateTime = now;
-                            
-                            const collectorRef = doc(db, 'collectors', currentCollectorUsername);
-                            updateDoc(collectorRef, {
-                                lastLocation: {
-                                    latitude: position.coords.latitude,
-                                    longitude: position.coords.longitude
-                                },
-                                lastLocationUpdate: serverTimestamp()
-                            }).catch(err => console.error("Error envío GPS:", err));
-
-                            updateTodaysRouteList(); // Refresca la lista visualmente
-                        }
-
-                        // El mapa se actualiza suavemente siempre
-                        if (mapInstance && collectorMarker) {
-                            const newLatLng = [collectorCurrentLocation.lat, collectorCurrentLocation.lng];
-                            collectorMarker.setLatLng(newLatLng);
-                            if (document.getElementById('map-view').classList.contains('active')) {
-                                mapInstance.panTo(newLatLng);
-                            }
-                        }
-                    },
-                    (error) => {
-                        // --- AQUÍ ESTÁ EL ARREGLO ---
-                        console.warn("Aviso de GPS:", error.message);
-                        
-                        // Solo nos desconectamos si el usuario PROHÍBE el permiso (Código 1)
-                        if (error.code === 1) {
-                            showToast('Permissão negada pelo usuário. Desconectando.', true);
-                            stopRealtimeGeolocation(); 
-                        } else {
-                            // Si es error de señal (2) o tiempo de espera (3), NO HACEMOS NADA.
-                            // El navegador seguirá intentando reconectar automáticamente.
-                            console.log("Señal débil, intentando reconectar...");
-                        }
-                    },
-                    // Opciones más flexibles:
-                    // timeout: 60000 (Espera hasta 60 segundos antes de quejarse, antes eran 20)
-                    // maximumAge: 0 (Intenta obtener datos frescos)
-                    { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 }
-                );
-
-            } catch (error) {
-                console.error("Error al iniciar GPS:", error);
-                showToast('Erro ao iniciar GPS.', true);
-                stopRealtimeGeolocation();
-            }
-        }
+        
         function stopRealtimeGeolocation() {
             if (locationWatchId) {
                 navigator.geolocation.clearWatch(locationWatchId);
@@ -6613,54 +6536,78 @@ function showReportDateModal() {
 
 
 
-async function sendNotificationToClient(clientId, title, body, type, icon = 'info') {
-    // Verifica que tengamos los IDs necesarios (companyId y clientId)
-    if (!clientId || !currentCompanyId) {
-        console.error(`[COBRADOR->CLIENTE] Error: Falta clientId (${clientId}) o currentCompanyId (${currentCompanyId}) para enviar notificación/ticket.`);
-        return;
-    }
-    try {
-        // Referencia al documento del cliente (ruta anidada correcta)
-        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientId);
+async function startRealtimeGeolocation() {
+            // 1. Verificaciones iniciales
+            if (locationWatchId) return; // Ya está activo
+            
+            if (!('geolocation' in navigator)) {
+                showToast('GPS não suportado neste dispositivo.', true);
+                // NO llamamos a stop() aquí para no apagar el switch visualmente
+                return;
+            }
 
-        // 1. Notificación INTERNA (para ver dentro de la app del cliente)
-        const internalNotif = {
-            title: title,
-            body: body,
-            icon: icon,
-            read: false,
-            timestamp: new Date(), // Usar new Date() en cliente es más simple que serverTimestamp
-            id: `${type}_${Date.now()}` // ID único simple
-        };
-        // Usamos setDoc con merge:true para asegurar que el campo 'notifications' exista
-        // y arrayUnion para añadir la nueva notificación sin borrar las antiguas.
-        await setDoc(clientRef, { notifications: arrayUnion(internalNotif) }, { merge: true });
-        console.log(`[COBRADOR->CLIENTE] Notificación INTERNA para cliente [${clientId}] creada.`);
+            try {
+                // 2. Iniciamos el rastreo
+                locationWatchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        // --- ÉXITO: Tenemos señal ---
+                        collectorCurrentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        console.log('GPS OK:', collectorCurrentLocation);
+                        
+                        const now = Date.now();
+                        // Guardar en DB cada 30 segundos para ahorrar batería
+                        if (now - lastLocationUpdateTime > 30000) { 
+                            lastLocationUpdateTime = now;
+                            
+                            const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+                            updateDoc(collectorRef, {
+                                lastLocation: {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude
+                                },
+                                lastLocationUpdate: serverTimestamp()
+                            }).catch(e => console.warn("Fallo menor GPS DB:", e));
 
-        // 2. Ticket para la notificación PUSH (Cloud Function)
-        
-        // [CAMBIO CLAVE] La ruta ahora es la ANIDADA MULTI-TENANT, igual que en la app cliente
-        // Antes era: collection(db, 'clients', clientId, 'pushNotificationTickets');
-        const ticketRef = collection(db, 'companies', currentCompanyId, 'clients', clientId, 'pushNotificationTickets');
-        
-        await addDoc(ticketRef, {
-            // Ya no necesitamos 'target' ni 'userId' porque la ruta los define implícitamente.
-            title: title,
-            body: body,
-            type: type, // Ej: 'payment_approved', 'payment_rejected', etc.
-            icon: icon, // Puedes pasar el icono también si tu Cloud Function lo usa
-            // [ADICIÓN IMPORTANTE] Tus SW esperan un campo 'url' en 'payload.data'.
-            // Debemos añadirlo al ticket para que la Cloud Function pueda pasarlo.
-            url: `https://lumix-financas-app.web.app/client/index.html?page=history`, // O la URL que quieras
-            createdAt: serverTimestamp() // Fecha/hora del servidor para la creación del ticket
-        });
-        console.log(`[COBRADOR->CLIENTE] Ticket PUSH para cliente [${clientId}] enviado a su cola específica (ruta anidada).`);
-    } catch (error) {
-        console.error(`[COBRADOR->CLIENTE] Error al enviar notificación/ticket al cliente [${clientId}]:`, error);
-        // Considera mostrar un toast si este error es crítico para el flujo
-        // showToast('Falha ao notificar o cliente.', true);
-    }
-}
+                            // Actualizar lista visualmente
+                            updateTodaysRouteList(); 
+                        }
+
+                        // Actualizar mapa suavemente
+                        if (mapInstance && collectorMarker) {
+                            const newLatLng = [collectorCurrentLocation.lat, collectorCurrentLocation.lng];
+                            collectorMarker.setLatLng(newLatLng);
+                            if (document.getElementById('map-view').classList.contains('active')) {
+                                mapInstance.panTo(newLatLng);
+                            }
+                        }
+                    },
+                    (error) => {
+                        // --- MANEJO DE ERRORES ROBUSTO ---
+                        console.warn("Aviso GPS:", error.message);
+                        
+                        // CÓDIGO 1 = PERMISO DENEGADO (El usuario dijo NO explícitamente)
+                        // Solo en este caso apagamos el interruptor.
+                        if (error.code === 1) {
+                            showToast('Permissão de GPS negada. O rastreamento será desligado.', true);
+                            stopRealtimeGeolocation();
+                        } 
+                        // Si es error de señal o tiempo de espera, NO hacemos nada.
+                        // El navegador seguirá intentando reconectar automáticamente.
+                    },
+                    { 
+                        enableHighAccuracy: true, 
+                        maximumAge: 0, 
+                        timeout: 60000 // Esperar hasta 60 segundos antes de dar error
+                    }
+                );
+
+            } catch (err) {
+                console.error("Error crítico GPS:", err);
+            }
+        }
 
 
     async function performClientChecks(editingClientId = null) {
@@ -7085,69 +7032,64 @@ getDocs(collectorQuery).then(snapshot => {
             // --- SISTEMA DE SEGURANÇA HORÁRIA (00:00 - 07:00) ---
             // Verifica a cada segundo se estamos no horário proibido
             // Revisamos el bloqueo cada segundo
+            // --- SISTEMA DE SEGURANÇA (BLOQUEO) ---
             setInterval(() => {
                 const now = new Date();
                 const hour = now.getHours();
                 
-                // 1. REGLA: Bloqueo nocturno normal (00:00 a 07:00)
+                // 1. REGLA: Bloqueo nocturno (00:00 a 07:00)
                 let isRestricted = hour >= 0 && hour < 7;
                 let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
 
-                // 2. REGLA: Bloqueo 5 minutos después del reporte
-                // Solo verificamos si no está ya bloqueado por horario y si tenemos datos del cobrador
-                if (!isRestricted && typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
-                    
+                // 2. REGLA: Bloqueo 5 minutos después del reporte (Lógica Matemática)
+                if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
                     let reportDate = null;
                     const rawDate = currentCollectorData.lastReportDate;
 
-                    // Convertimos la fecha de Firestore a fecha real de JS
                     if (rawDate && rawDate.seconds) {
                         reportDate = new Date(rawDate.seconds * 1000);
                     } else if (rawDate instanceof Date) {
                         reportDate = rawDate;
                     }
 
-                    // Si tenemos fecha válida...
                     if (reportDate) {
-                        // Verificamos si el reporte se hizo HOY (comparando día/mes/año)
-                        if (reportDate.toLocaleDateString() === now.toLocaleDateString()) {
-                            
-                            // Calculamos minutos pasados
-                            const diffMs = now - reportDate;
-                            const diffMinutes = diffMs / 1000 / 60;
+                        // Calculamos la diferencia en milisegundos
+                        const diffMs = now.getTime() - reportDate.getTime();
+                        const diffMinutes = diffMs / 1000 / 60;
+                        const diffHours = diffMinutes / 60;
 
-                            // Si pasaron más de 5 minutos, bloqueamos
-                            if (diffMinutes > 5) {
-                                isRestricted = true;
-                                lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente 5 minutos após o envio do Relatório Diário.";
-                            }
+                        // CONDICIÓN:
+                        // 1. Han pasado más de 5 minutos (> 5)
+                        // 2. Han pasado menos de 18 horas (< 18) (Para que no se bloquee mañana si no saca reporte nuevo)
+                        if (diffMinutes > 5 && diffHours < 18) {
+                            isRestricted = true;
+                            lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente após o envio do Relatório Diário.";
                         }
                     }
                 }
-                // --- [NUEVO] VERIFICACIÓN DE DESBLOQUEO DE EMERGENCIA ---
+
+                // 3. EXCEPCIÓN: Desbloqueo de Administrador (Botón Naranja)
                 let isAdminUnlocked = false;
-                // Verificamos si existe una fecha de desbloqueo en los datos del cobrador
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.tempUnlockUntil) {
                     let unlockDate = null;
-                    // Convertimos Timestamp de Firestore a Date de Javascript
                     if (currentCollectorData.tempUnlockUntil.seconds) {
                         unlockDate = new Date(currentCollectorData.tempUnlockUntil.seconds * 1000);
                     } else if (currentCollectorData.tempUnlockUntil instanceof Date) {
                         unlockDate = currentCollectorData.tempUnlockUntil;
                     }
 
-                    // Si la fecha existe y AÚN NO HA PASADO, concedemos acceso
+                    // Si la fecha de desbloqueo es FUTURA, permitimos entrar
                     if (unlockDate && now < unlockDate) {
                         isAdminUnlocked = true;
                     }
                 }
-                // --- [FIN NUEVO] ---
-                // LÓGICA DE PANTALLA DE BLOQUEO (UI)
+
+                // --- APLICAR BLOQUEO ---
                 const lockScreenId = 'security-lock-overlay';
                 let lockScreen = document.getElementById(lockScreenId);
 
-                // Si está restringido PERO NO tiene permiso de administrador -> Bloquear
-if (isRestricted && !isAdminUnlocked) {
+                // Bloqueamos SI (está restringido) Y (NO tiene permiso de admin)
+                if (isRestricted && !isAdminUnlocked) {
                     if (!lockScreen) {
                         lockScreen = document.createElement('div');
                         lockScreen.id = lockScreenId;
@@ -7158,35 +7100,24 @@ if (isRestricted && !isAdminUnlocked) {
                             justify-content: center; align-items: center;
                             text-align: center; padding: 30px; color: white;
                         `;
-                        // Insertamos el mensaje dinámico
                         lockScreen.innerHTML = `
                             <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                             <h2 style="margin: 25px 0 10px; font-size: 1.8em; font-weight: 700;">Sistema Bloqueado</h2>
-                            <p style="color: #94a3b8; font-size: 1.1em; max-width: 400px; line-height: 1.5;" id="lock-msg-text">
-                                ${lockMessage}
-                            </p>
-                            <div style="margin-top: 30px; padding: 10px 20px; background-color: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid #ef4444;">
-                                <span style="color: #ef4444; font-weight: bold; font-size: 1.2em;" id="lock-clock">--:--</span>
+                            <p style="color: #94a3b8; font-size: 1.1em; max-width: 400px; line-height: 1.5;">${lockMessage}</p>
+                            <div style="margin-top: 30px;">
+                                <span style="color: #ef4444; font-weight: bold; font-size: 1.2em;">${now.toLocaleTimeString()}</span>
                             </div>
                         `;
                         document.body.appendChild(lockScreen);
                     } else {
-                        // Si ya existe, nos aseguramos que tenga el mensaje correcto
-                         const msgEl = document.getElementById('lock-msg-text');
-                         if(msgEl && msgEl.innerHTML !== lockMessage) msgEl.innerHTML = lockMessage;
-                    }
-
-                    // Actualizar reloj
-                    const clockEl = document.getElementById('lock-clock');
-                    if (clockEl) {
-                        clockEl.textContent = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                        // Actualizamos el reloj si ya está visible
+                        const timeSpan = lockScreen.querySelector('div span');
+                        if(timeSpan) timeSpan.textContent = now.toLocaleTimeString();
                     }
                 } else {
-                    // Si no está restringido, quitamos la pantalla
-                    if (lockScreen) {
-                        lockScreen.remove();
-                    }
+                    if (lockScreen) lockScreen.remove();
                 }
+
             }, 1000);
 
             // --- FIN SISTEMA DE SEGURANÇA ---
@@ -7322,6 +7253,7 @@ if (isRestricted && !isAdminUnlocked) {
     </script>
 </body>
     </html>
+
 
 
 
