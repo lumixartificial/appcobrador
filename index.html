@@ -5921,8 +5921,12 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             showToast(successMsg);
 
             // --- BLOQUEO AUTOMÁTICO AL ENVIAR REPORTE ---
-            if (!customDate) { 
+            // CORRECCIÓN: Verificamos si es un reporte de HOY (automático o seleccionado manualmente)
+            const isTodayReport = !customDate || (customDate.toDateString() === new Date().toDateString());
+
+            if (isTodayReport) { 
                 try {
+                    console.log("Reporte de HOY generado. Activando bloqueo en 5 min...");
                     // Guardamos la hora exacta del reporte en la base de datos
                     const collectorRef = doc(db, 'collectors', currentCollectorUsername);
                     updateDoc(collectorRef, {
@@ -7314,6 +7318,7 @@ if (isRestricted && !isAdminUnlocked) {
     </script>
 </body>
     </html>
+
 
 
 
