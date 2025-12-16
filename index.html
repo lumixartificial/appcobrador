@@ -7116,12 +7116,30 @@ getDocs(collectorQuery).then(snapshot => {
                         }
                     }
                 }
-                
+                // --- [NUEVO] VERIFICACIÓN DE DESBLOQUEO DE EMERGENCIA ---
+                let isAdminUnlocked = false;
+                // Verificamos si existe una fecha de desbloqueo en los datos del cobrador
+                if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.tempUnlockUntil) {
+                    let unlockDate = null;
+                    // Convertimos Timestamp de Firestore a Date de Javascript
+                    if (currentCollectorData.tempUnlockUntil.seconds) {
+                        unlockDate = new Date(currentCollectorData.tempUnlockUntil.seconds * 1000);
+                    } else if (currentCollectorData.tempUnlockUntil instanceof Date) {
+                        unlockDate = currentCollectorData.tempUnlockUntil;
+                    }
+
+                    // Si la fecha existe y AÚN NO HA PASADO, concedemos acceso
+                    if (unlockDate && now < unlockDate) {
+                        isAdminUnlocked = true;
+                    }
+                }
+                // --- [FIN NUEVO] ---
                 // LÓGICA DE PANTALLA DE BLOQUEO (UI)
                 const lockScreenId = 'security-lock-overlay';
                 let lockScreen = document.getElementById(lockScreenId);
 
-                if (isRestricted) {
+                // Si está restringido PERO NO tiene permiso de administrador -> Bloquear
+if (isRestricted && !isAdminUnlocked) {
                     if (!lockScreen) {
                         lockScreen = document.createElement('div');
                         lockScreen.id = lockScreenId;
@@ -7296,6 +7314,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
