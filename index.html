@@ -7020,29 +7020,35 @@ getDocs(collectorQuery).then(snapshot => {
                 let isRestricted = hour >= 0 && hour < 7;
                 let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
 
-                // 2. REGLA: Bloqueo 5 minutos después del reporte (Lógica Matemática)
+                // 2. REGLA CORREGIDA: Bloqueo 5 minutos después del reporte (Lógica Estricta de HOY)
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
-                    let reportDate = null;
+                    let lastReport = null;
                     const rawDate = currentCollectorData.lastReportDate;
 
+                    // A. Normalizar fecha (Timestamp de Firestore o Date de JS)
                     if (rawDate && rawDate.seconds) {
-                        reportDate = new Date(rawDate.seconds * 1000);
+                        lastReport = new Date(rawDate.seconds * 1000);
                     } else if (rawDate instanceof Date) {
-                        reportDate = rawDate;
+                        lastReport = rawDate;
                     }
 
-                    if (reportDate) {
-                        // Calculamos la diferencia en milisegundos
-                        const diffMs = now.getTime() - reportDate.getTime();
-                        const diffMinutes = diffMs / 1000 / 60;
-                        const diffHours = diffMinutes / 60;
+                    if (lastReport) {
+                        // B. Verificar si el reporte es estrictamente de HOY
+                        // Compara Día, Mes y Año con la fecha actual ("now")
+                        const isReportFromToday = 
+                            lastReport.getDate() === now.getDate() &&
+                            lastReport.getMonth() === now.getMonth() &&
+                            lastReport.getFullYear() === now.getFullYear();
 
-                        // CONDICIÓN:
-                        // 1. Han pasado más de 5 minutos (> 5)
-                        // 2. Han pasado menos de 18 horas (< 18) (Para que no se bloquee mañana si no saca reporte nuevo)
-                        if (diffMinutes > 5 && diffHours < 18) {
-                            isRestricted = true;
-                            lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente após o envio do Relatório Diário.";
+                        if (isReportFromToday) {
+                            // C. Si es de hoy, calculamos si pasaron 5 minutos
+                            const diffMs = now.getTime() - lastReport.getTime();
+                            const diffMinutes = diffMs / 1000 / 60;
+
+                            if (diffMinutes > 5) {
+                                isRestricted = true; // ¡Bloqueo activado!
+                                lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente 5 minutos após o envio do Relatório Diário.";
+                            }
                         }
                     }
                 }
@@ -7232,6 +7238,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
