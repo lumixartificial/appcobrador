@@ -5920,34 +5920,30 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const successMsg = currentLang === 'es' ? '¡Reporte PDF generado con éxito!' : (currentLang === 'en' ? 'PDF report generated successfully!' : 'Relatório PDF gerado com sucesso!');
             showToast(successMsg);
 
-            // --- BLOQUEO AUTOMÁTICO (VERSIÓN ROBUSTA) ---
-            const isTodayReport = !customDate || (customDate.toDateString() === new Date().toDateString());
+            // --- INICIO BLOQUEO AUTOMÁTICO ---
+    // Verificamos si el reporte es de HOY
+    const isTodayReport = !customDate || (customDate.toDateString() === new Date().toDateString());
 
-            if (isTodayReport) { 
-                console.log("Reporte de HOJE. Ativando cronômetro de bloqueio...");
-                
-                // 1. TRUCO CLAVE: Actualizamos la variable local INMEDIATAMENTE
-                // Esto hace que el contador empiece ya, sin esperar a internet/firebase.
-                if (typeof currentCollectorData !== 'undefined' && currentCollectorData) {
-                    currentCollectorData.lastReportDate = new Date(); // Marca la hora local actual
-                }
+    if (isTodayReport) {
+        console.log("Reporte de HOJE gerado. Ativando bloqueio...");
+        
+        // 1. Actualización Local Inmediata (Para que sea instantáneo)
+        if (typeof currentCollectorData !== 'undefined' && currentCollectorData) {
+            currentCollectorData.lastReportDate = new Date(); 
+        }
 
-                // 2. Guardamos en la nube para respaldo (en segundo plano)
-                try {
-                    const collectorRef = doc(db, 'collectors', currentCollectorUsername);
-                    updateDoc(collectorRef, {
-                        lastReportDate: serverTimestamp()
-                    }).then(() => {
-                        console.log("Bloqueio sincronizado na nuvem.");
-                    });
-                    
-                    // Aviso visual para que sepas que funcionó
-                    showToast("Bloqueio automático ativado (5 min).", false);
-                    
-                } catch (err) {
-                    console.error("Erro ao salvar bloqueio na nuvem:", err);
-                }
-            }
+        // 2. Guardar en Base de Datos
+        try {
+            const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+            updateDoc(collectorRef, {
+                lastReportDate: serverTimestamp()
+            });
+            showToast("Bloqueio ativado (5 min).", false);
+        } catch (err) {
+            console.error("Erro ao salvar bloqueio:", err);
+        }
+    }
+    // --- FIN BLOQUEO AUTOMÁTICO ---
         }
         
         // --- [NUEVA FUNCIÓN] Modal para seleccionar fecha del reporte ---
@@ -6220,7 +6216,34 @@ function showReportDateModal() {
         showView(viewName);
     });
     
-    document.body.addEventListener('change', e => {
+    // --- NUEVO BLOQUE UNIFICADO (PEGA ESTO REEMPLAZANDO EL ANTERIOR) ---
+    document.body.addEventListener('change', async e => {
+        
+        // 1. LÓGICA DEL GPS (Ahora en lugar seguro)
+        if (e.target.id === 'realtime-tracking-toggle') {
+            const isActive = e.target.checked;
+            const toggle = e.target;
+            toggle.disabled = true; // Evitar clics dobles
+            
+            try {
+                // Actualizamos base de datos
+                const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+                await updateDoc(collectorRef, { isRealtimeTrackingActive: isActive });
+                
+                // Activamos/Desactivamos localmente
+                if (isActive) startRealtimeGeolocation();
+                else stopRealtimeGeolocation();
+                
+            } catch (error) {
+                console.error("Error GPS:", error);
+                showToast('Erro de conexão ao mudar GPS.', true);
+                toggle.checked = !isActive; // Si falla, regresa el botón a su estado
+            } finally {
+                toggle.disabled = false;
+            }
+        }
+
+        // 2. LÓGICA DE FOTO DE PERFIL
         if (e.target.id === 'profile-pic-input') {
             const file = e.target.files[0];
             if (file) showCropperModal(file);
@@ -6254,25 +6277,7 @@ function showReportDateModal() {
              }
         });
     }
-    const realtimeToggle = document.getElementById('realtime-tracking-toggle');
-    if(realtimeToggle) {
-        realtimeToggle.addEventListener('change', async (e) => {
-            const isActive = e.target.checked;
-            try {
-                // [CAMBIO] Usa currentCollectorUsername (el ID del doc)
-                const collectorRef = doc(db, 'collectors', currentCollectorUsername);
-                await updateDoc(collectorRef, { isRealtimeTrackingActive: isActive });
-                if (isActive) {
-                    startRealtimeGeolocation();
-                } else {
-                    stopRealtimeGeolocation();
-                }
-            } catch (error) {
-                console.error("Error al actualizar el estado de rastreo:", error);
-                showToast('Falha ao atualizar preferência de rastreamento.', true);
-            }
-        });
-    }
+    
 }
 
 
@@ -6601,11 +6606,11 @@ async function startRealtimeGeolocation() {
                         
                         // ÚNICO CASO DE APAGADO REAL: EL USUARIO DIJO "NO" AL PERMISO
                         if (error.code === 1) {
-                            showToast('Permissão negada. Desligando no sistema.', true);
-                            // Aquí sí mandamos la orden de apagado a la base de datos
-                            updateDoc(doc(db, 'collectors', currentCollectorUsername), { isRealtimeTrackingActive: false });
-                            stopRealtimeGeolocation();
-                        }
+        // Solo mostramos el aviso, PERO NO APAGAMOS NADA
+        showToast('Aviso: Permissão de GPS negada pelo celular.', true);
+        console.warn("GPS sem permissão, mas mantendo switch ligado visualmente.");
+        // stopRealtimeGeolocation(); // <--- COMENTADO O BORRADO
+    }
                         // Cualquier otro error (señal, timeout, desconocido) SE IGNORA y el botón sigue prendido.
                     },
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 }
@@ -6851,35 +6856,6 @@ getDocs(collectorQuery).then(snapshot => {
             if (headerImg) headerImg.src = imageUrl || placeholderUrl.replace('120x120', '80x80');
             if (profileImg) profileImg.src = imageUrl || placeholderUrl;
 
-            const realtimeToggle = document.getElementById('realtime-tracking-toggle');
-    if(realtimeToggle) {
-        realtimeToggle.addEventListener('change', async (e) => {
-            const isActive = e.target.checked;
-            
-            // Bloqueo visual temporal para evitar rebotes
-            realtimeToggle.disabled = true;
-            
-            try {
-                const collectorRef = doc(db, 'collectors', currentCollectorUsername);
-                // 1. Primero actualizamos la base de datos (La Autoridad)
-                await updateDoc(collectorRef, { isRealtimeTrackingActive: isActive });
-                
-                // 2. Luego actuamos localmente
-                if (isActive) {
-                    startRealtimeGeolocation();
-                } else {
-                    stopRealtimeGeolocation();
-                }
-            } catch (error) {
-                console.error("Error al actualizar switch:", error);
-                showToast('Erro de conexão ao mudar GPS.', true);
-                // Si falló, revertimos el switch visualmente
-                realtimeToggle.checked = !isActive;
-            } finally {
-                realtimeToggle.disabled = false;
-            }
-        });
-    }
             // --- Fim do código movido ---
 
         } else {
@@ -7256,6 +7232,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
