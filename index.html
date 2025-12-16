@@ -5916,9 +5916,22 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 doc.text(`${t.generatedBy} - ${t.page} ${i} ${t.of} ${pageCount}`, center, 285, { align: 'center' });
             }
 
-            doc.save(`relatorio-${dateStr.replace(/\//g, '-')}.pdf`);
+           doc.save(`relatorio-${dateStr.replace(/\//g, '-')}.pdf`);
             const successMsg = currentLang === 'es' ? '¡Reporte PDF generado con éxito!' : (currentLang === 'en' ? 'PDF report generated successfully!' : 'Relatório PDF gerado com sucesso!');
             showToast(successMsg);
+
+            // --- BLOQUEO AUTOMÁTICO AL ENVIAR REPORTE ---
+            if (!customDate) { 
+                try {
+                    // Guardamos la hora exacta del reporte en la base de datos
+                    const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+                    updateDoc(collectorRef, {
+                        lastReportDate: serverTimestamp()
+                    });
+                } catch (err) {
+                    console.error("Error guardando hora reporte:", err);
+                }
+            }
         }
         
         // --- [NUEVA FUNCIÓN] Modal para seleccionar fecha del reporte ---
@@ -6504,31 +6517,28 @@ function showReportDateModal() {
             }
 
             try {
-                // 1. Verifica el estado del permiso ANTES de solicitar la ubicación
                 const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
 
                 if (permissionStatus.state === 'denied') {
-                    // Si el permiso ya fue denegado, informa al usuario cómo solucionarlo.
                     showToast('Permissão de localização bloqueada. Ative-a nas configurações do seu dispositivo para este site.', true);
-                    stopRealtimeGeolocation(); // Asegura que el interruptor se apague.
+                    stopRealtimeGeolocation();
                     return;
                 }
 
-                // Si el estado es 'granted' o 'prompt', procede a solicitar la ubicación.
-                // El navegador pedirá permiso si es 'prompt'.
                 locationWatchId = navigator.geolocation.watchPosition(
                     (position) => {
-                        // Éxito: se obtuvo la ubicación
                         collectorCurrentLocation = {
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
                         };
                         console.log('Ubicación actualizada:', collectorCurrentLocation);
                         
-                        // [REPARACIÓN] Envía la ubicación a Firestore periódicamente.
                         const now = Date.now();
-                        if (now - lastLocationUpdateTime > 30000) { // Actualiza cada 30 segundos
+                        // Verificamos si han pasado 30 segundos
+                        if (now - lastLocationUpdateTime > 30000) { 
                             lastLocationUpdateTime = now;
+                            
+                            // 1. Guardar en Firestore
                             const collectorRef = doc(db, 'collectors', currentCollectorUsername);
                             updateDoc(collectorRef, {
                                 lastLocation: {
@@ -6541,31 +6551,28 @@ function showReportDateModal() {
                             }).catch(error => {
                                 console.error("Error al enviar localización a Firestore:", error);
                             });
+
+                            // 2. ACTUALIZAR LA LISTA (SOLUCIÓN)
+                            // Al moverlo aquí dentro, la lista solo se reordena cada 30 segundos,
+                            // evitando que la pantalla parpadee o se congele.
+                            updateTodaysRouteList();
                         }
 
-                        // --- INICIO: Actualización en tiempo real del marcador del cobrador ---
+                        // Actualización del marcador del mapa (esto sí se queda fuera para que el icono se mueva suave)
                         if (mapInstance && collectorMarker) {
                             const newLatLng = [collectorCurrentLocation.lat, collectorCurrentLocation.lng];
                             collectorMarker.setLatLng(newLatLng);
                             
-                            // Si la vista del mapa está activa, centra el mapa en la nueva ubicación
                             if (document.getElementById('map-view').classList.contains('active')) {
                                 mapInstance.panTo(newLatLng);
                             }
                         }
-                        // --- FIN: Actualización en tiempo real del marcador ---
-
-                        updateTodaysRouteList();
                     },
                     (error) => {
-                        // Error: El usuario negó el permiso en el pop-up o hubo un fallo del GPS.
                         console.error("Error durante el seguimiento en tiempo real:", error);
                         showToast('Não foi possível obter a localização. Permissão negada ou GPS indisponível.', true);
                         stopRealtimeGeolocation(); 
                     },
-                    // [CORRECCIÓN] Se aumentó el timeout a 20 segundos (20000ms) para dar más tiempo al dispositivo
-                    // para obtener una señal de GPS, especialmente en el primer intento. El valor anterior de 5 segundos
-                    // era muy bajo y podía causar que la función fallara prematuramente, desactivando el interruptor.
                     { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
                 );
 
@@ -7069,23 +7076,55 @@ getDocs(collectorQuery).then(snapshot => {
         function init() {
             // --- SISTEMA DE SEGURANÇA HORÁRIA (00:00 - 07:00) ---
             // Verifica a cada segundo se estamos no horário proibido
+            // Revisamos el bloqueo cada segundo
             setInterval(() => {
                 const now = new Date();
                 const hour = now.getHours();
-                const minutes = now.getMinutes();
                 
-                // BLOQUEIO: Das 00:00 até às 06:59 (às 07:00 libera)
-                const isRestricted = hour >= 0 && hour < 7;
+                // 1. REGLA: Bloqueo nocturno normal (00:00 a 07:00)
+                let isRestricted = hour >= 0 && hour < 7;
+                let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
+
+                // 2. REGLA: Bloqueo 5 minutos después del reporte
+                // Solo verificamos si no está ya bloqueado por horario y si tenemos datos del cobrador
+                if (!isRestricted && typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
+                    
+                    let reportDate = null;
+                    const rawDate = currentCollectorData.lastReportDate;
+
+                    // Convertimos la fecha de Firestore a fecha real de JS
+                    if (rawDate && rawDate.seconds) {
+                        reportDate = new Date(rawDate.seconds * 1000);
+                    } else if (rawDate instanceof Date) {
+                        reportDate = rawDate;
+                    }
+
+                    // Si tenemos fecha válida...
+                    if (reportDate) {
+                        // Verificamos si el reporte se hizo HOY (comparando día/mes/año)
+                        if (reportDate.toLocaleDateString() === now.toLocaleDateString()) {
+                            
+                            // Calculamos minutos pasados
+                            const diffMs = now - reportDate;
+                            const diffMinutes = diffMs / 1000 / 60;
+
+                            // Si pasaron más de 5 minutos, bloqueamos
+                            if (diffMinutes > 5) {
+                                isRestricted = true;
+                                lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente 5 minutos após o envio do Relatório Diário.";
+                            }
+                        }
+                    }
+                }
                 
+                // LÓGICA DE PANTALLA DE BLOQUEO (UI)
                 const lockScreenId = 'security-lock-overlay';
                 let lockScreen = document.getElementById(lockScreenId);
 
                 if (isRestricted) {
-                    // Si estamos en hora prohibida y no hay pantalla de bloqueo, la creamos
                     if (!lockScreen) {
                         lockScreen = document.createElement('div');
                         lockScreen.id = lockScreenId;
-                        // Estilo de bloqueo total (pantalla negra/roja encima de todo)
                         lockScreen.style.cssText = `
                             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                             background-color: #020617; z-index: 100000;
@@ -7093,30 +7132,36 @@ getDocs(collectorQuery).then(snapshot => {
                             justify-content: center; align-items: center;
                             text-align: center; padding: 30px; color: white;
                         `;
+                        // Insertamos el mensaje dinámico
                         lockScreen.innerHTML = `
                             <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                             <h2 style="margin: 25px 0 10px; font-size: 1.8em; font-weight: 700;">Sistema Bloqueado</h2>
-                            <p style="color: #94a3b8; font-size: 1.1em; max-width: 400px; line-height: 1.5;">
-                                Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.
+                            <p style="color: #94a3b8; font-size: 1.1em; max-width: 400px; line-height: 1.5;" id="lock-msg-text">
+                                ${lockMessage}
                             </p>
                             <div style="margin-top: 30px; padding: 10px 20px; background-color: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid #ef4444;">
                                 <span style="color: #ef4444; font-weight: bold; font-size: 1.2em;" id="lock-clock">--:--</span>
                             </div>
                         `;
                         document.body.appendChild(lockScreen);
+                    } else {
+                        // Si ya existe, nos aseguramos que tenga el mensaje correcto
+                         const msgEl = document.getElementById('lock-msg-text');
+                         if(msgEl && msgEl.innerHTML !== lockMessage) msgEl.innerHTML = lockMessage;
                     }
-                    // Actualizamos el reloj de la pantalla de bloqueo
+
+                    // Actualizar reloj
                     const clockEl = document.getElementById('lock-clock');
                     if (clockEl) {
                         clockEl.textContent = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
                     }
                 } else {
-                    // Si estamos en horario permitido, quitamos el bloqueo si existe
+                    // Si no está restringido, quitamos la pantalla
                     if (lockScreen) {
                         lockScreen.remove();
                     }
                 }
-            }, 1000); // Ejecutar cada segundo
+            }, 1000);
 
             // --- FIN SISTEMA DE SEGURANÇA ---
 
@@ -7251,6 +7296,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
