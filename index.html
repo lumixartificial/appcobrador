@@ -2573,38 +2573,46 @@ async function showRefinanceModal(clientId, notificationId) {
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
 
-                // --- INICIO: LÓGICA DE COLORES Y ESTADO (ACTUALIZADA) ---
+                // --- INICIO: LÓGICA DE COLORES Y ESTADO (CORREGIDA IDIOMAS) ---
                 const daysLate = displayLoan.lateDays || 0;
                 let avatarHex = '6f42c1'; // Morado por defecto
                 let reputationLabel = '';
                 let reputationColor = '#6f42c1';
 
+                // Definimos los textos para cada idioma aquí mismo
+                const statusLabels = {
+                    pt: { exc: 'Excelente', med: 'Médio', bad: 'Ruim', fin: 'Finalizado' },
+                    es: { exc: 'Excelente', med: 'Regular', bad: 'Malo', fin: 'Finalizado' },
+                    en: { exc: 'Excellent', med: 'Medium', bad: 'Bad', fin: 'Finished' }
+                };
+                // Seleccionamos el texto según el idioma actual (currentLang)
+                const txt = statusLabels[currentLang] || statusLabels.pt;
+
                 if (displayLoan.status === 'finished') {
                     // Estado Finalizado (Azul)
                     avatarHex = '4338ca'; 
-                    reputationLabel = 'Finalizado';
+                    reputationLabel = txt.fin;
                     reputationColor = '#4338ca';
 
                 } else if (daysLate < 2) { 
                     // 0 o 1 día de atraso -> EXCELENTE (Verde)
                     avatarHex = '28a745'; 
-                    reputationLabel = 'Excelente';
+                    reputationLabel = txt.exc;
                     reputationColor = '#28a745';
 
                 } else if (daysLate < 5) { 
                     // 2, 3 o 4 días de atraso -> REGULAR/MEDIO (Naranja)
                     avatarHex = 'f59e0b'; 
-                    reputationLabel = 'Médio';
+                    reputationLabel = txt.med;
                     reputationColor = '#d97706';
 
                 } else { 
                     // 5 días o más -> MALO/RUIM (Rojo)
                     avatarHex = 'dc3545'; 
-                    reputationLabel = 'Ruim'; 
+                    reputationLabel = txt.bad; 
                     reputationColor = '#dc3545';
                 }
                 // --- FIN LÓGICA DE COLORES ---
-
                 if (displayLoan.status === 'finished') {
                     mainValueToDisplay = 0; 
                     secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 700;">FINALIZADO</span>`;
@@ -7245,6 +7253,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
