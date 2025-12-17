@@ -6910,7 +6910,14 @@ getDocs(collectorQuery).then(snapshot => {
          signOut(auth);
     }); // Fim do onSnapshot interno
 
-    onSnapshot(collection(db, 'companies', currentCompanyId, "clients"), (snapshot) => {
+    // --- CORRECCIÓN DE SEGURIDAD: FILTRO POR COBRADOR ---
+    const clientsQuery = query(
+        collection(db, 'companies', currentCompanyId, "clients"), 
+        where("collectorId", "==", currentCollectorUsername) // <--- ESTA ES LA CLAVE
+    );
+
+    onSnapshot(clientsQuery, (snapshot) => {
+        // ... (el resto del código sigue igual)
 
                 console.log("[COBRADOR-APP][DIAG] Client onSnapshot disparado! Processando clientes...");
                 allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -7279,6 +7286,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
