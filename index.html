@@ -2254,25 +2254,37 @@ async function showRefinanceModal(clientId, notificationId) {
         
 
     function updateProfileView(collectorData = null) {
+    console.log("%c>>> EJECUTANDO UPDATEPROFILEVIEW <<<", "background: #222; color: #bada55");
+
     const dailyTotalEl = document.getElementById('kpi-daily-total');
     const capitalTotalEl = document.getElementById('kpi-capital-total'); 
     const dailyCashEl = document.getElementById('kpi-daily-cash');
     const dailyDigitalEl = document.getElementById('kpi-daily-digital');
 
-    if (!dailyTotalEl || !capitalTotalEl) return;
+    if (!dailyTotalEl || !capitalTotalEl) {
+        console.warn("Elementos de UI no encontrados en el DOM.");
+        return;
+    }
 
-    // Usar datos globales del cobrador
+    // 1. Validar Datos del Cobrador
     const data = collectorData || currentCollectorData;
-    if (!data) return; 
+    if (!data) {
+        console.warn("Esperando datos del cobrador (currentCollectorData es null)...");
+        return; 
+    }
 
-    let totalLoansOutflow = 0;       // Dinero que SALIÓ de la caja (Préstamos nuevos)
-    let totalCashReceived = 0;       // Dinero que ENTRÓ en efectivo (Cobros)
-    let totalDigitalReceived = 0;    // Dinero que ENTRÓ por PIX/Tarjeta
+    console.log("Datos del cobrador detectados:", data.name);
 
-    // 1. Analizar Clientes y Préstamos
+    let totalLoansOutflow = 0;       
+    let totalCashReceived = 0;       
+    let totalDigitalReceived = 0;    
+    let totalInjected = 0;         
+
+    // 2. CÁLCULO DE COBROS Y PRÉSTAMOS
     allClients.forEach(client => {
         (client.loans || []).forEach(loan => {
-            // ENTRADAS: Solo sumamos cobros aprobados
+            
+            // ENTRADAS: Cobros aprobados (Solo efectivo para la caja física)
             (loan.history || []).forEach(h => {
                 if (h.status === 'approved' && h.method !== 'migration') {
                     if (h.method === 'dinheiro') {
@@ -2283,8 +2295,8 @@ async function showRefinanceModal(clientId, notificationId) {
                 }
             });
 
-            // SALIDAS: Solo restamos préstamos que NO sean migración
-            // Si el préstamo tiene 'migrationDate', el cobrador no entregó ese dinero hoy, ya estaba en la calle.
+            // SALIDAS: Préstamos realizados por el cobrador
+            // REGLA: Si el préstamo es migración, NO se resta de la caja (el dinero ya estaba fuera)
             if (!loan.migrationDate) {
                 let principal = Number(loan.principalAmount || 0);
                 if (principal === 0 && loan.totalLoan) {
@@ -2296,34 +2308,44 @@ async function showRefinanceModal(clientId, notificationId) {
         });
     });
 
-    // 2. SALIDAS DE CAJA (Gastos y Entregas al Admin)
+    // 3. GASTOS Y RETIROS (Salidas)
     const totalExpenses = allExpenses.reduce((sum, e) => sum + Number(e.value || 0), 0);
     const totalSettled = allSettlements
         .filter(s => s.status === 'approved' || s.status === 'pending_verification')
         .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
-    // 3. ENTRADAS DE CAJA (Base inicial y Aportes del Admin)
-    const totalInjected = allCapitalInjections
+    // 4. APORTES E INYECCIONES (Entradas)
+    totalInjected = allCapitalInjections
         .filter(i => i.status === 'approved')
         .reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
-    // Capital base asignado al cobrador en Firestore
+    // 5. CAPITAL INICIAL (Base de la caja)
+    // Buscamos 'startingCapital' o 'initialCapital'
     const startingCapital = Number(data.startingCapital || data.initialCapital || 0);
 
-    // --- FÓRMULA DE CAJA FINAL (Sincronizada con Admin) ---
-    // La caja es: Lo que tenía + lo que me dieron + lo que cobré en EFECTIVO
-    // MENOS: Lo que presté + mis gastos + lo que ya le entregué al admin
+    // --- CÁLCULO FINAL ---
+    // Caja = (Base + Aportes + Cobros Efectivo) - (Préstamos Nuevos + Gastos + Retiros)
     const capitalOnHand = (startingCapital + totalInjected + totalCashReceived) - (totalLoansOutflow + totalExpenses + totalSettled);
     
     currentCapitalOnHand = capitalOnHand; 
 
-    // 4. Actualizar Interfaz
+    // TABLA DE DIAGNÓSTICO EN CONSOLA
+    console.table({
+        "Capital Inicial (Base)": startingCapital,
+        "Aportes Admin (+)": totalInjected,
+        "Cobros Efectivo (+)": totalCashReceived,
+        "Préstamos Nuevos (-)": totalLoansOutflow,
+        "Gastos (-)": totalExpenses,
+        "Retiros al Admin (-)": totalSettled,
+        "RESULTADO CAJA": capitalOnHand
+    });
+
+    // 6. RENDERIZADO
     const { dailyTotal } = calculateDailyTotals();
     
     dailyTotalEl.textContent = money(dailyTotal);
     capitalTotalEl.textContent = money(capitalOnHand);
     
-    // Color según estado de la caja
     capitalTotalEl.style.color = (capitalOnHand < 0) ? "var(--danger-color)" : "var(--accent-green)";
 
     if(dailyCashEl) dailyCashEl.textContent = money(totalCashReceived);
@@ -6752,6 +6774,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
