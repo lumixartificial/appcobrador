@@ -2180,119 +2180,76 @@ async function showRefinanceModal(clientId, notificationId) {
         
 
         function updateDashboard(clientsForDashboard) { 
-            const kpiGoal = document.getElementById('kpi-goal');
-            const kpiReceived = document.getElementById('kpi-received');
-            const kpiRemaining = document.getElementById('kpi-remaining');
-            
-            if (!kpiGoal) return;
+    const kpiGoal = document.getElementById('kpi-goal');
+    const kpiReceived = document.getElementById('kpi-received');
+    const kpiRemaining = document.getElementById('kpi-remaining');
+    
+    if (!kpiGoal) return;
 
-            let calculatedDailyGoal = 0;      
-            
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const dayOfWeek = today.getDay(); 
-            const dayOfMonth = today.getDate();
-            const todayStr = today.toLocaleDateString('pt-BR');
+    let calculatedDailyGoal = 0;      
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayOfWeek = today.getDay(); 
+    const dayOfMonth = today.getDate();
+    const todayStr = today.toLocaleDateString('pt-BR');
 
-            const checkIsToday = (timestamp) => {
-                if (!timestamp) return false;
-                let d;
-                if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
-                else if (timestamp instanceof Date) d = timestamp;
-                else d = new Date(timestamp);
-                return !isNaN(d) && d.toLocaleDateString('pt-BR') === todayStr;
-            };
+    const checkIsToday = (timestamp) => {
+        if (!timestamp) return false;
+        let d;
+        if (timestamp.seconds) d = new Date(timestamp.seconds * 1000);
+        else if (timestamp instanceof Date) d = timestamp;
+        else d = new Date(timestamp);
+        return !isNaN(d) && d.toLocaleDateString('pt-BR') === todayStr;
+    };
 
-            // Iteramos sobre TODOS los clientes para calcular la Meta Global Fija
-            allClients.forEach(client => {
-                (client.loans || []).forEach(loan => {
-                    const isFinished = loan.status === 'finished';
+    allClients.forEach(client => {
+        (client.loans || []).forEach(loan => {
+            const details = calculateLoanDetails(loan);
+            if (details.status === 'finished') return;
 
-                    // Cuánto ha pagado hoy
-                    const paidToday = (loan.history || []).reduce((sum, h) => {
-                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
-                            return sum + (parseFloat(h.amount) || 0);
-                        }
-                        return sum;
-                    }, 0);
+            // Verificar si hoy toca cobrar según frecuencia
+            let isPaymentDay = false;
+            const frequency = loan.paymentFrequency || 'daily';
+            const paymentDays = loan.paymentDays || [];
 
-                    if (isFinished && paidToday === 0) return;
-
-                    // Verificar frecuencia
-                    let isPaymentDay = false;
-                    const frequency = loan.paymentFrequency || 'daily';
-                    const paymentDays = loan.paymentDays || [];
-
-                    if (frequency === 'daily') {
-                        isPaymentDay = paymentDays.some(d => parseInt(d) === dayOfWeek);
-                    } else if (frequency === 'weekly') {
-                        isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
-                    } else if (frequency === 'monthly') {
-                        isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
-                    } 
-                    // --- NUEVA LÓGICA QUINCENAL PARA LA META ---
-                    else if (frequency === 'biweekly') {
-                        let startDate = null;
-                        if (loan.startDate?.seconds) startDate = new Date(loan.startDate.seconds * 1000);
-                        else if (loan.startDate instanceof Date) startDate = loan.startDate;
-                        else startDate = new Date(loan.startDate);
-                        
-                        if (startDate) {
-                            startDate.setHours(0, 0, 0, 0);
-                            const diffTime = Math.abs(today - startDate);
-                            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                            isPaymentDay = (diffDays > 0 && diffDays % 14 === 0);
-                        }
-                    }
-
-                    // Valor de la cuota
-                    let installmentValue = parseFloat(loan.amount) || 0;
-                    if (installmentValue === 0 && loan.originalInstallmentAmount) {
-                        installmentValue = parseFloat(loan.originalInstallmentAmount);
-                    }
-
-                    // Calcular deuda al INICIO del día para la meta fija
-                    const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
-                        (h.status === 'approved' || h.method === 'migration') ? sum + (h.amount || 0) : sum, 0
-                    );
-                    const totalLoan = parseFloat(loan.totalLoan) || 0;
-                    const currentBalance = Math.max(0, totalLoan - totalPaidAllTime);
-                    const debtAtStartOfDay = currentBalance + paidToday;
-                    
-                    let goalForThisClient = installmentValue;
-                    if (goalForThisClient > debtAtStartOfDay) {
-                        goalForThisClient = debtAtStartOfDay;
-                    }
-
-                    // Solo sumamos a la meta si hoy es día de pago (incluye quincenales ahora)
-                    if (isPaymentDay) {
-                        calculatedDailyGoal += goalForThisClient;
-                    }
-                });
-            });
-
-            // Renderizar resultados
-            kpiGoal.textContent = money(calculatedDailyGoal);
-            const { dailyTotal } = calculateDailyTotals();
-            kpiReceived.textContent = money(dailyTotal);
-
-            if (!clientsForDashboard || clientsForDashboard.length === 0) {
-                 kpiRemaining.textContent = 0;
-            } else {
-                const remainingItems = clientsForDashboard.filter(item => {
-                    if (item.loan.status === 'finished') return false;
-                    const paidTodayVal = (item.loan.history || []).reduce((sum, h) => {
-                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
-                            return sum + (h.amount || 0);
-                        }
-                        return sum;
-                    }, 0);
-                    return paidTodayVal === 0;
-                });
-                const uniqueRemainingIds = new Set(remainingItems.map(i => i.client.id));
-                kpiRemaining.textContent = uniqueRemainingIds.size;
+            if (frequency === 'daily') {
+                isPaymentDay = paymentDays.some(d => parseInt(d) === dayOfWeek);
+            } else if (frequency === 'weekly') {
+                isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+            } else if (frequency === 'monthly') {
+                isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+            } else if (frequency === 'biweekly') {
+                // Lógica quincenal estricta: Cada 14 días desde el inicio
+                let startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                if (startDate) {
+                    startDate.setHours(0,0,0,0);
+                    const diffDays = Math.round(Math.abs(today - startDate) / (1000 * 60 * 60 * 24));
+                    isPaymentDay = (diffDays > 0 && diffDays % 14 === 0);
+                }
             }
-        }
+
+            if (isPaymentDay) {
+                let installmentValue = parseFloat(loan.amount) || parseFloat(loan.originalInstallmentAmount) || 0;
+                // No pedir más de lo que el cliente debe en total
+                const totalPaid = (loan.history || []).reduce((s, h) => (h.status === 'approved' || h.method === 'migration') ? s + (h.amount || 0) : s, 0);
+                const remainingDebt = Math.max(0, (loan.totalLoan || 0) - totalPaid);
+                calculatedDailyGoal += Math.min(installmentValue, remainingDebt);
+            }
+        });
+    });
+
+    kpiGoal.textContent = money(calculatedDailyGoal);
+    const { dailyTotal } = calculateDailyTotals();
+    kpiReceived.textContent = money(dailyTotal);
+
+    if (clientsForDashboard) {
+        const remainingCount = clientsForDashboard.filter(item => {
+            const hasPaidToday = (item.loan.history || []).some(h => h.status === 'approved' && h.method !== 'migration' && checkIsToday(h.date));
+            return !hasPaidToday && calculateLoanDetails(item.loan).status !== 'finished';
+        }).length;
+        kpiRemaining.textContent = remainingCount;
+    }
+}
         
         
 
@@ -2306,7 +2263,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
     if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return;
 
-    // Usar datos globales si no se pasan
+    // Usar datos globales (currentCollectorData) si no se pasan por parámetro
     const data = collectorData || currentCollectorData;
     if (!data) return; 
 
@@ -2314,22 +2271,24 @@ async function showRefinanceModal(clientId, notificationId) {
     let totalPaymentsReceived = 0; 
     let totalDistributedBalance = 0; 
 
-    // 1. Analizar todos los clientes y préstamos
+    // 1. Recorremos TODOS los clientes y sus préstamos
     allClients.forEach(client => {
         (client.loans || []).forEach(loan => {
             const loanDetails = calculateLoanDetails(loan);
 
-            // ENTRADA: Todos los cobros aprobados (Dinero que entró a la mano del cobrador)
+            // ENTRADAS: Cobros aprobados (Dinero que entró a la mano del cobrador)
+            // Filtramos para NO sumar migraciones, ya que ese dinero no entró físicamente hoy
             (loan.history || []).forEach(h => {
                 if (h.status === 'approved' && h.method !== 'migration') {
                     totalPaymentsReceived += Number(h.amount || 0);
                 }
             });
 
-            // SALIDA: Capital de Préstamos ENTREGADOS por el cobrador
-            // Solo restamos préstamos que NO sean migración (porque los migrados ya estaban fuera)
+            // SALIDAS: Capital de Préstamos ENTREGADOS (Dinero que salió de la mano del cobrador)
+            // REGLA CRÍTICA: Solo restamos si NO es migración.
             if (!loan.migrationDate) {
                 let principal = Number(loan.principalAmount || 0);
+                // Si el principal es 0, lo calculamos reversando el interés
                 if (principal === 0 && loan.totalLoan) {
                     const rate = Number(client.interestRate || 20);
                     principal = loan.totalLoan / (1 + (rate / 100));
@@ -2337,55 +2296,46 @@ async function showRefinanceModal(clientId, notificationId) {
                 totalLoansMade += principal;
             }
 
-            // CAPITAL EN LA CALLE (Para el patrimonio total)
+            // CAPITAL EN LA CALLE (Para información, no afecta la caja física)
             if (loanDetails.status !== 'finished') {
                 const paidForThisLoan = (loan.history || [])
                     .filter(h => h.status !== 'rejected' && h.status !== 'postponed' && h.status !== 'pending_verification')
                     .reduce((sum, h) => sum + Number(h.amount || 0), 0);
                 
-                const outstanding = Number(loan.totalLoan || 0) - paidForThisLoan;
+                const initialPaid = Number(loan.initialMigratedAmount || 0);
+                const outstanding = Number(loan.totalLoan || 0) - (paidForThisLoan + initialPaid);
                 totalDistributedBalance += Math.max(0, outstanding);
             }
         });
     });
 
-    // 2. SALIDAS: Gastos y Retiros (Dinero que el cobrador ya no tiene)
+    // 2. SALIDAS ADICIONALES: Gastos y Retiros (Dinero que el cobrador ya entregó al admin)
     const totalExpenses = allExpenses.reduce((sum, e) => sum + Number(e.value || 0), 0);
     const totalSettled = allSettlements
         .filter(s => s.status === 'approved' || s.status === 'pending_verification')
         .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
-    // 3. ENTRADAS: Capital Inicial y Aportes del Administrador
+    // 3. ENTRADAS ADICIONALES: Aportes del Administrador (Inyecciones de capital)
     const totalInjected = allCapitalInjections
         .filter(i => i.status === 'approved')
         .reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
-    // Capital base que el admin le dio al cobrador (Se saca del documento del cobrador en Firestore)
+    // 4. CAPITAL INICIAL: Lo que el cobrador tenía al empezar
     const startingCapital = Number(data.startingCapital || data.initialCapital || 0);
 
-    // --- LÓGICA CONTABLE FINAL ---
-    // CAJA = (Capital Inicial + Aportes Admin + Cobros) - (Préstamos Entregados + Gastos + Retiros)
+    // --- CÁLCULO FINAL DE CAJA ---
+    // CAJA = (Capital Inicial + Aportes + Cobros) - (Préstamos Entregados + Gastos + Retiros)
     const capitalOnHand = (startingCapital + totalInjected + totalPaymentsReceived) - (totalLoansMade + totalExpenses + totalSettled);
     
     currentCapitalOnHand = capitalOnHand; 
 
-    // Debug para consola (Solo para que tú veas de donde salen los números)
-    console.log("--- DESGLOSE DE CAJA ---");
-    console.log("(+) Capital Inicial:", startingCapital);
-    console.log("(+) Aportes Admin:", totalInjected);
-    console.log("(+) Cobros Realizados:", totalPaymentsReceived);
-    console.log("(-) Préstamos Entregados:", totalLoansMade);
-    console.log("(-) Gastos Realizados:", totalExpenses);
-    console.log("(-) Retiros al Admin:", totalSettled);
-    console.log("(=) TOTAL EN CAJA:", capitalOnHand);
-
-    // 4. Renderizar en la UI
+    // Renderizado en la interfaz
     const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
     
     dailyTotalEl.textContent = money(dailyTotal);
     capitalTotalEl.textContent = money(capitalOnHand);
     
-    // Color rojo si es negativo, verde si es positivo
+    // Alerta visual si la caja es negativa
     capitalTotalEl.style.color = (capitalOnHand < 0) ? "var(--danger-color)" : "var(--accent-green)";
 
     distributedCapitalEl.textContent = money(totalDistributedBalance);
@@ -6817,6 +6767,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
