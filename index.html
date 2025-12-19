@@ -3083,6 +3083,12 @@ async function showRefinanceModal(clientId, notificationId) {
         allClients.forEach(client => {
             if (!client.loans || client.loans.length === 0) return;
 
+            // --- NUEVA LÓGICA: Verificar si el cliente tiene ALGÚN préstamo activo/atrasado ---
+            const hasActiveLoan = client.loans.some(l => {
+                const s = calculateLoanDetails(l).status;
+                return s !== 'finished';
+            });
+
             client.loans.forEach((loan, loanIndex) => {
                 const details = calculateLoanDetails(loan);
                 const currentStatus = details.status; 
@@ -3095,7 +3101,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 let passesCategory = true;
 
-                // --- LÓGICA DE FILTROS ---
+                // --- LÓGICA DE FILTROS MEJORADA ---
                 if (filter === 'weekly') {
                     if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                 }
@@ -3112,11 +3118,15 @@ async function showRefinanceModal(clientId, notificationId) {
                     if (currentStatus !== 'late') passesCategory = false;
                 }
                 else if (filter === 'finished') {
-                    if (currentStatus !== 'finished') passesCategory = false;
+                    // REGLA: Solo entra si el préstamo actual está finalizado...
+                    // Y el cliente NO tiene ningún otro préstamo activo (no renovó)...
+                    // Y solo mostramos el último préstamo del historial para no repetir el nombre.
+                    if (currentStatus !== 'finished' || hasActiveLoan || loanIndex !== client.loans.length - 1) {
+                        passesCategory = false;
+                    }
                 }
                 else {
-                    // Pestaña TODOS: Solo mostramos los que ya PAGARON hoy (regla solicitada)
-                    // Si el cliente no ha pagado y no está finalizado, no aparece en "TODOS" (está en Ruta)
+                    // Pestaña TODOS: Solo mostramos los que ya PAGARON hoy
                     if (!hasPaidToday || currentStatus === 'finished') passesCategory = false;
                 }
 
@@ -3127,7 +3137,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
                     if (!nameMatch && !addressMatch) matchesSearch = false;
                     
-                    // Si estamos buscando, ignoramos el filtro de "solo pagados" para poder encontrar al cliente
                     if (matchesSearch && currentStatus !== 'finished') passesCategory = true;
                 }
 
@@ -5616,8 +5625,11 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                         });
                     }
 
-                    // C. NUEVA LÓGICA (Finalizados)
-                    if (details.status === 'finished') {
+                    // C. LÓGICA DE FINALIZADOS (CORREGIDA)
+                    // Solo incluimos en la sección de finalizados si el cliente NO tiene préstamos activos actualmente
+                    const hasActiveLoan = client.loans.some(l => calculateLoanDetails(l).status !== 'finished');
+                    
+                    if (details.status === 'finished' && !hasActiveLoan && loanIndex === client.loans.length - 1) {
                         finishedClientsList.push({
                             clientName: client.name,
                             loanIndex: loanIndex + 1,
@@ -7238,6 +7250,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
