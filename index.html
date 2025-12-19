@@ -2254,6 +2254,9 @@ async function showRefinanceModal(clientId, notificationId) {
         
 
     function updateProfileView(collectorData = null) {
+    // LOG DE ACTIVACIÓN INMEDIATA (Para confirmar que la función corre)
+    console.log("%c>>> SISTEMA CONTABLE LUMIX ACTIVADO <<<", "background: #000; color: #0f0; font-size: 12px; font-weight: bold;");
+
     const dailyTotalEl = document.getElementById('kpi-daily-total');
     const capitalTotalEl = document.getElementById('kpi-capital-total'); 
     const dailyCashEl = document.getElementById('kpi-daily-cash');
@@ -2261,21 +2264,24 @@ async function showRefinanceModal(clientId, notificationId) {
 
     if (!dailyTotalEl || !capitalTotalEl) return;
 
-    // 1. Obtener los datos del cobrador (usamos la variable global currentCollectorData)
+    // Obtener datos del cobrador
     const data = collectorData || currentCollectorData;
-    if (!data) return; 
+    if (!data) {
+        console.error("ERROR: No se detectan datos del cobrador (currentCollectorData es null)");
+        return; 
+    }
 
-    let totalLoansOutflow = 0;       // Capital de préstamos entregados (Salidas)
-    let totalCashReceived = 0;       // Cobros en EFECTIVO (Entradas)
-    let totalDigitalReceived = 0;    // Cobros Digitales (Entradas)
-    let totalSettled = 0;            // Retiros entregados al admin (Salidas)
-    let totalInjected = 0;           // Aportes extras del admin (Entradas)
+    let totalLoansOutflow = 0;       // Lo que el cobrador sacó de su caja para prestar
+    let totalCashReceived = 0;       // Cobros en efectivo (Entra a caja)
+    let totalDigitalReceived = 0;    // Cobros digitales (No entra a caja física)
+    let totalSettled = 0;            // Retiros entregados al admin (Sale de caja)
+    let totalInjected = 0;           // Aportes extras del admin (Entra a caja)
 
-    // 2. ANALIZAR TODOS LOS PRÉSTAMOS Y COBROS
+    // 1. CÁLCULO DE ENTRADAS Y SALIDAS DE PRÉSTAMOS
     allClients.forEach(client => {
         (client.loans || []).forEach(loan => {
             
-            // --- ENTRADAS (COBROS) ---
+            // SUMAR COBROS APROBADOS
             (loan.history || []).forEach(h => {
                 if (h.status === 'approved' && h.method !== 'migration') {
                     if (h.method === 'dinheiro') {
@@ -2286,9 +2292,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 }
             });
 
-            // --- SALIDAS (PRÉSTAMOS ENTREGADOS) ---
-            // Solo restamos de la caja si el préstamo NO fue migrado.
-            // Si el préstamo es "en vivo", el dinero salió de la mano del cobrador.
+            // RESTAR PRÉSTAMOS ENTREGADOS (Solo si NO son migración)
             if (!loan.migrationDate) {
                 let principal = Number(loan.principalAmount || 0);
                 if (principal === 0 && loan.totalLoan) {
@@ -2300,19 +2304,20 @@ async function showRefinanceModal(clientId, notificationId) {
         });
     });
 
-    // 3. ANALIZAR GASTOS, RETIROS E INYECCIONES
+    // 2. SALIDAS ADICIONALES (Gastos y Liquidaciones)
     const totalExpenses = allExpenses.reduce((sum, e) => sum + Number(e.value || 0), 0);
     
     totalSettled = allSettlements
         .filter(s => s.status === 'approved' || s.status === 'pending_verification')
         .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
+    // 3. ENTRADAS ADICIONALES (Aportes del Admin)
     totalInjected = allCapitalInjections
         .filter(i => i.status === 'approved')
         .reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
-    // 4. EL SECRETO: BÚSQUEDA EXHAUSTIVA DEL CAPITAL INICIAL
-    // Intentamos leer todos los nombres de campo posibles que el Admin pudo usar
+    // 4. EL PUNTO CRÍTICO: CAPITAL INICIAL
+    // El administrador guarda este valor en un campo. Probamos todos los nombres posibles.
     const startingCapital = Number(
         data.startingCapital || 
         data.initialCapital || 
@@ -2322,30 +2327,34 @@ async function showRefinanceModal(clientId, notificationId) {
         0
     );
 
-    // --- LÓGICA CONTABLE MAESTRA ---
-    // Caja = (Base Inicial + Aportes Admin + Cobros Efectivo) - (Préstamos Realizados + Gastos + Retiros)
+    // 5. FÓRMULA FINAL (IDÉNTICA AL ADMINISTRADOR)
+    // Caja = (Base + Aportes + Cobros Efectivo) - (Préstamos + Gastos + Retiros)
     const capitalOnHand = (startingCapital + totalInjected + totalCashReceived) - (totalLoansOutflow + totalExpenses + totalSettled);
     
     currentCapitalOnHand = capitalOnHand; 
 
-    // 5. RENDERIZADO EN PANTALLA
+    // TABLA DE DIAGNÓSTICO OBLIGATORIA EN CONSOLA
+    console.table({
+        "VALOR_BASE_INICIAL": startingCapital,
+        "COBROS_EFECTIVO_SUMA": totalCashReceived,
+        "APORTES_ADMIN_SUMA": totalInjected,
+        "PRESTAMOS_NUEVOS_RESTA": totalLoansOutflow,
+        "GASTOS_RESTA": totalExpenses,
+        "RETIROS_AL_ADMIN_RESTA": totalSettled,
+        "TOTAL_FINAL_CAJA": capitalOnHand
+    });
+
+    // 6. ACTUALIZAR INTERFAZ
     const { dailyTotal } = calculateDailyTotals();
     
     dailyTotalEl.textContent = money(dailyTotal);
     capitalTotalEl.textContent = money(capitalOnHand);
     
-    // Color según estado (Rojo si falta dinero, Verde si hay)
+    // Si la caja sigue negativa, el color será rojo
     capitalTotalEl.style.color = (capitalOnHand < 0) ? "var(--danger-color)" : "var(--accent-green)";
 
     if(dailyCashEl) dailyCashEl.textContent = money(totalCashReceived);
     if(dailyDigitalEl) dailyDigitalEl.textContent = money(totalDigitalReceived);
-
-    // LOG DE CONTROL (Para que verifiques en la consola F12)
-    console.log("--- ANALISIS DE CAJA ---");
-    console.log("Base Inicial:", startingCapital);
-    console.log("Cobros (+):", totalCashReceived);
-    console.log("Préstamos (-):", totalLoansOutflow);
-    console.log("Diferencia actual:", capitalOnHand);
 }
 
 
@@ -6770,6 +6779,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
