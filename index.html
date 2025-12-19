@@ -2306,28 +2306,37 @@ async function showRefinanceModal(clientId, notificationId) {
 
             if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return;
 
-            let totalLoansMade = 0; // Capital de préstamos nuevos (Salida)
-            let totalPaymentsReceived = 0; // Cobros de clientes (Entrada)
-            let totalDistributedBalance = 0; // Saldo pendiente en la calle
+            let totalLoansMade = 0; // Salida: Capital entregado
+            let totalPaymentsReceived = 0; // Entrada: Cobros realizados
+            let totalDistributedBalance = 0; // Dinero en la calle
 
             // 1. Procesar Clientes y Préstamos
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     const loanDetails = calculateLoanDetails(loan);
 
-                    // A. Capital que salió de la caja para nuevos préstamos
+                    // --- LÓGICA DE SALIDA DE CAPITAL ---
+                    // Solo restamos de la caja si NO es una migración
                     if (!loan.migrationDate) {
-                        totalLoansMade += Number(loan.principalAmount || 0);
+                        let principal = Number(loan.principalAmount || 0);
+                        
+                        // CORRECCIÓN CRÍTICA: Si el capital es 0 (préstamos viejos), lo calculamos
+                        if (principal === 0 && loan.totalLoan) {
+                            const rate = Number(client.interestRate || 20);
+                            principal = loan.totalLoan / (1 + (rate / 100));
+                        }
+                        totalLoansMade += principal;
                     }
 
-                    // B. Cobros realizados (Entrada)
+                    // --- LÓGICA DE ENTRADA (COBROS) ---
                     (loan.history || []).forEach(h => {
+                        // IMPORTANTE: Solo sumamos a la caja cobros APROBADOS que NO sean migración
                         if (h.status === 'approved' && h.method !== 'migration') {
                             totalPaymentsReceived += Number(h.amount || 0);
                         }
                     });
 
-                    // C. Calcular saldo en la calle para el KPI de Capital Distribuido
+                    // --- DINERO EN LA CALLE ---
                     if (loanDetails.status !== 'finished') {
                         const paidForThisLoan = (loan.history || [])
                             .filter(h => h.status !== 'rejected' && h.status !== 'postponed' && h.status !== 'pending_verification')
@@ -2339,16 +2348,17 @@ async function showRefinanceModal(clientId, notificationId) {
                 });
             });
 
-            // 2. Procesar Gastos (Salida definitiva)
+            // 2. Procesar Gastos (Salida)
             const totalExpenses = allExpenses.reduce((sum, e) => sum + Number(e.value || 0), 0);
 
-            // 3. Procesar Liquidaciones al Admin (Salida inmediata de la mano del cobrador)
-            // IMPORTANTE: Restamos aprobadas Y pendientes, porque el cobrador ya no tiene ese dinero.
+            // 3. Procesar Retiros de Caja (Salida)
+            // Aquí suele estar la diferencia con el admin:
+            // Nosotros restamos PENDIENTES porque el cobrador ya no tiene ese dinero.
             const totalSettled = allSettlements
                 .filter(s => s.status === 'approved' || s.status === 'pending_verification')
                 .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
-            // 4. Procesar Aportes del Admin (Entrada)
+            // 4. Procesar Aportes / Inyecciones (Entrada)
             const totalInjected = allCapitalInjections
                 .filter(i => i.status === 'approved')
                 .reduce((sum, i) => sum + Number(i.amount || 0), 0);
@@ -2356,8 +2366,8 @@ async function showRefinanceModal(clientId, notificationId) {
             // 5. Capital Inicial Base
             const startingCapital = Number(currentCollectorData?.startingCapital || 0);
 
-            // --- FÓRMULA FINAL DE CAJA (Capital en Mano) ---
-            // (Base + Aportes + Cobros) - (Nuevos Préstamos + Gastos + Liquidaciones)
+            // --- FÓRMULA FINAL ---
+            // (Base + Aportes + Cobros) - (Capital de Préstamos + Gastos + Retiros)
             const capitalOnHand = (startingCapital + totalInjected + totalPaymentsReceived) - (totalLoansMade + totalExpenses + totalSettled);
             
             currentCapitalOnHand = capitalOnHand; 
@@ -2366,18 +2376,16 @@ async function showRefinanceModal(clientId, notificationId) {
             const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
             
             dailyTotalEl.textContent = money(dailyTotal);
-            
-            // Valor y Color del Capital en Mano
             capitalTotalEl.textContent = money(capitalOnHand);
+            
+            // Color dinámico
             if (capitalOnHand < 0) {
-                capitalTotalEl.style.color = "var(--danger-color)"; // Rojo si es negativo
+                capitalTotalEl.style.color = "var(--danger-color)";
             } else {
-                capitalTotalEl.style.color = "var(--accent-green)"; // Verde si es positivo
+                capitalTotalEl.style.color = "var(--accent-green)";
             }
 
             distributedCapitalEl.textContent = money(totalDistributedBalance);
-            
-            // Patrimonio = Efectivo que tengo + Lo que me deben
             const patrimonioTotal = capitalOnHand + totalDistributedBalance;
             totalPatrimonioEl.textContent = money(patrimonioTotal);
 
@@ -6816,6 +6824,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
