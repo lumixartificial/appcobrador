@@ -2308,18 +2308,18 @@ async function showRefinanceModal(clientId, notificationId) {
 
             // --- SEGURIDAD: USAR DATOS GLOBALES SI NO SE PASAN POR PARÁMETRO ---
             const data = collectorData || currentCollectorData;
-            if (!data) return; // Si aún no hay datos del cobrador, no calculamos nada para evitar errores
+            if (!data) return; // Si no hay datos del cobrador, no calculamos para no dar valores falsos
 
-            let totalLoansMade = 0;       // Salida de efectivo
-            let totalPaymentsReceived = 0; // Entrada de efectivo
-            let totalDistributedBalance = 0; // Lo que falta por cobrar
+            let totalLoansMade = 0;       
+            let totalPaymentsReceived = 0; 
+            let totalDistributedBalance = 0; 
 
-            // 1. Procesar TODOS los Clientes y Préstamos (Independiente de filtros)
+            // 1. Procesar TODOS los Clientes y Préstamos
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     const loanDetails = calculateLoanDetails(loan);
 
-                    // A. SALIDA: Restamos el capital entregado (Solo si NO es migración)
+                    // A. SALIDA: Capital de Préstamos (Solo si NO es migración)
                     if (!loan.migrationDate) {
                         let principal = Number(loan.principalAmount || 0);
                         if (principal === 0 && loan.totalLoan) {
@@ -2329,8 +2329,7 @@ async function showRefinanceModal(clientId, notificationId) {
                         totalLoansMade += principal;
                     }
 
-                    // B. ENTRADA: Sumamos TODOS los cobros aprobados de la historia
-                    // No importa si es quincenal o semanal, si el dinero entró, se suma a la caja.
+                    // B. ENTRADA: Todos los cobros aprobados (Sin importar si son quincenales o no)
                     (loan.history || []).forEach(h => {
                         if (h.status === 'approved' && h.method !== 'migration') {
                             totalPaymentsReceived += Number(h.amount || 0);
@@ -2349,23 +2348,22 @@ async function showRefinanceModal(clientId, notificationId) {
                 });
             });
 
-            // 2. SALIDA: Gastos
+            // 2. SALIDA: Gastos y Retiros
             const totalExpenses = allExpenses.reduce((sum, e) => sum + Number(e.value || 0), 0);
-
-            // 3. SALIDA: Retiros de Caja (Aprobados y Pendientes)
             const totalSettled = allSettlements
                 .filter(s => s.status === 'approved' || s.status === 'pending_verification')
                 .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
-            // 4. ENTRADA: Aportes / Inyecciones (Aprobadas)
+            // 3. ENTRADA: Aportes / Inyecciones
             const totalInjected = allCapitalInjections
                 .filter(i => i.status === 'approved')
                 .reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
-            // 5. BASE: Capital Inicial (El valor de 20.000 que faltaba)
-            const startingCapital = Number(data.startingCapital || 0);
+            // 4. BASE: Capital Inicial (Aquí estaban los 20.000 que faltaban)
+            // Verificamos dos nombres de campo por si acaso
+            const startingCapital = Number(data.startingCapital || data.initialCapital || 0);
 
-            // --- FÓRMULA FINAL (IDÉNTICA AL ADMINISTRADOR) ---
+            // --- FÓRMULA FINAL ---
             const capitalOnHand = (startingCapital + totalInjected + totalPaymentsReceived) - (totalLoansMade + totalExpenses + totalSettled);
             
             currentCapitalOnHand = capitalOnHand; 
@@ -2376,7 +2374,7 @@ async function showRefinanceModal(clientId, notificationId) {
             dailyTotalEl.textContent = money(dailyTotal);
             capitalTotalEl.textContent = money(capitalOnHand);
             
-            // Color dinámico: Rojo si es negativo, verde si es positivo
+            // Color dinámico
             capitalTotalEl.style.color = (capitalOnHand < 0) ? "var(--danger-color)" : "var(--accent-green)";
 
             distributedCapitalEl.textContent = money(totalDistributedBalance);
@@ -6410,31 +6408,25 @@ getDocs(collectorQuery).then(snapshot => {
                 if (docSnap.exists()) {
                     currentCollectorData = docSnap.data(); 
                     
-                    console.log("Dados do cobrador atualizados:", currentCollectorData);
-
-                    // Actualizamos nombres e imágenes en la interfaz
+                    // Actualizar UI
                     document.querySelectorAll('.profile-name').forEach(el => el.textContent = currentCollectorData.name || 'Cobrador'); 
-
                     const imageUrl = currentCollectorData.profilePictureUrl; 
                     const nameInitial = (currentCollectorData.name || 'C').charAt(0).toUpperCase();
                     const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${nameInitial}`;
-
                     const headerImg = document.getElementById('header-profile-img');
                     const profileImg = document.getElementById('profile-view-img');
                     if (headerImg) headerImg.src = imageUrl || placeholderUrl.replace('120x120', '80x80');
                     if (profileImg) profileImg.src = imageUrl || placeholderUrl;
 
-                    // [ESTA ES LA LÍNEA CLAVE]
-                    // Recalculamos la caja inmediatamente cuando se recibe el Capital Inicial (los 20.000)
+                    // [LÍNEA CRÍTICA] Forzamos el cálculo de la caja con el Capital Inicial recién cargado
                     updateProfileView(currentCollectorData); 
 
                 } else {
-                     console.error(`Documento do cobrador ${currentCollectorUsername} não encontrado.`);
-                     showBlockedView("Erro: Seus dados de cobrador não puderam ser carregados.");
+                     showBlockedView("Erro: Dados do cobrador não carregados.");
                      signOut(auth);
                 }
             }, (error) => { 
-                 console.error(`Erro ao escutar dados do cobrador:`, error);
+                 console.error(`Erro ao carregar dados:`, error);
             });
             // --- FIN DEL REEMPLAZO --- 
 
@@ -6814,6 +6806,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
