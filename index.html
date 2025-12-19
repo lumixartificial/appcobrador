@@ -2306,21 +2306,22 @@ async function showRefinanceModal(clientId, notificationId) {
 
             if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return;
 
-            let totalLoansMade = 0; // Salida: Capital entregado
-            let totalPaymentsReceived = 0; // Entrada: Cobros realizados
-            let totalDistributedBalance = 0; // Dinero en la calle
+            // --- SEGURIDAD: USAR DATOS GLOBALES SI NO SE PASAN POR PARÁMETRO ---
+            const data = collectorData || currentCollectorData;
+            if (!data) return; // Si aún no hay datos del cobrador, no calculamos nada para evitar errores
 
-            // 1. Procesar Clientes y Préstamos
+            let totalLoansMade = 0;       // Salida de efectivo
+            let totalPaymentsReceived = 0; // Entrada de efectivo
+            let totalDistributedBalance = 0; // Lo que falta por cobrar
+
+            // 1. Procesar TODOS los Clientes y Préstamos (Independiente de filtros)
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     const loanDetails = calculateLoanDetails(loan);
 
-                    // --- LÓGICA DE SALIDA DE CAPITAL ---
-                    // Solo restamos de la caja si NO es una migración
+                    // A. SALIDA: Restamos el capital entregado (Solo si NO es migración)
                     if (!loan.migrationDate) {
                         let principal = Number(loan.principalAmount || 0);
-                        
-                        // CORRECCIÓN CRÍTICA: Si el capital es 0 (préstamos viejos), lo calculamos
                         if (principal === 0 && loan.totalLoan) {
                             const rate = Number(client.interestRate || 20);
                             principal = loan.totalLoan / (1 + (rate / 100));
@@ -2328,15 +2329,15 @@ async function showRefinanceModal(clientId, notificationId) {
                         totalLoansMade += principal;
                     }
 
-                    // --- LÓGICA DE ENTRADA (COBROS) ---
+                    // B. ENTRADA: Sumamos TODOS los cobros aprobados de la historia
+                    // No importa si es quincenal o semanal, si el dinero entró, se suma a la caja.
                     (loan.history || []).forEach(h => {
-                        // IMPORTANTE: Solo sumamos a la caja cobros APROBADOS que NO sean migración
                         if (h.status === 'approved' && h.method !== 'migration') {
                             totalPaymentsReceived += Number(h.amount || 0);
                         }
                     });
 
-                    // --- DINERO EN LA CALLE ---
+                    // C. DINERO EN LA CALLE
                     if (loanDetails.status !== 'finished') {
                         const paidForThisLoan = (loan.history || [])
                             .filter(h => h.status !== 'rejected' && h.status !== 'postponed' && h.status !== 'pending_verification')
@@ -2348,26 +2349,23 @@ async function showRefinanceModal(clientId, notificationId) {
                 });
             });
 
-            // 2. Procesar Gastos (Salida)
+            // 2. SALIDA: Gastos
             const totalExpenses = allExpenses.reduce((sum, e) => sum + Number(e.value || 0), 0);
 
-            // 3. Procesar Retiros de Caja (Salida)
-            // Aquí suele estar la diferencia con el admin:
-            // Nosotros restamos PENDIENTES porque el cobrador ya no tiene ese dinero.
+            // 3. SALIDA: Retiros de Caja (Aprobados y Pendientes)
             const totalSettled = allSettlements
                 .filter(s => s.status === 'approved' || s.status === 'pending_verification')
                 .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
-            // 4. Procesar Aportes / Inyecciones (Entrada)
+            // 4. ENTRADA: Aportes / Inyecciones (Aprobadas)
             const totalInjected = allCapitalInjections
                 .filter(i => i.status === 'approved')
                 .reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
-            // 5. Capital Inicial Base
-            const startingCapital = Number(currentCollectorData?.startingCapital || 0);
+            // 5. BASE: Capital Inicial (El valor de 20.000 que faltaba)
+            const startingCapital = Number(data.startingCapital || 0);
 
-            // --- FÓRMULA FINAL ---
-            // (Base + Aportes + Cobros) - (Capital de Préstamos + Gastos + Retiros)
+            // --- FÓRMULA FINAL (IDÉNTICA AL ADMINISTRADOR) ---
             const capitalOnHand = (startingCapital + totalInjected + totalPaymentsReceived) - (totalLoansMade + totalExpenses + totalSettled);
             
             currentCapitalOnHand = capitalOnHand; 
@@ -2378,16 +2376,11 @@ async function showRefinanceModal(clientId, notificationId) {
             dailyTotalEl.textContent = money(dailyTotal);
             capitalTotalEl.textContent = money(capitalOnHand);
             
-            // Color dinámico
-            if (capitalOnHand < 0) {
-                capitalTotalEl.style.color = "var(--danger-color)";
-            } else {
-                capitalTotalEl.style.color = "var(--accent-green)";
-            }
+            // Color dinámico: Rojo si es negativo, verde si es positivo
+            capitalTotalEl.style.color = (capitalOnHand < 0) ? "var(--danger-color)" : "var(--accent-green)";
 
             distributedCapitalEl.textContent = money(totalDistributedBalance);
-            const patrimonioTotal = capitalOnHand + totalDistributedBalance;
-            totalPatrimonioEl.textContent = money(patrimonioTotal);
+            totalPatrimonioEl.textContent = money(capitalOnHand + totalDistributedBalance);
 
             if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
@@ -6412,41 +6405,38 @@ getDocs(collectorQuery).then(snapshot => {
     console.log(`Documento do cobrador encontrado. Username (Firestore ID): ${currentCollectorUsername}`);
 
     // AGORA, podemos usar onSnapshot com o ID correto (username) para escutar mudanças
-    onSnapshot(doc(db, 'collectors', currentCollectorUsername), (docSnap) => {
-        if (docSnap.exists()) {
-            
-            // --- [INICIO DE LA CORRECCIÓN] ---
-            // ANTES: collectorData = docSnap.data();
-            currentCollectorData = docSnap.data(); // ★★★ CORRECCIÓN: Asigna al global
-            
-            console.log("Dados do cobrador atualizados:", currentCollectorData); // Log añadido
+    // --- REEMPLAZO DEL PASO 2 ---
+            onSnapshot(doc(db, 'collectors', currentCollectorUsername), (docSnap) => {
+                if (docSnap.exists()) {
+                    currentCollectorData = docSnap.data(); 
+                    
+                    console.log("Dados do cobrador atualizados:", currentCollectorData);
 
-            // --- O código que estava dentro do onSnapshot antigo vai AQUI ---
-            // ★★★ CORRECCIÓN: Usa el global
-            document.querySelectorAll('.profile-name').forEach(el => el.textContent = currentCollectorData.name || 'Cobrador'); 
+                    // Actualizamos nombres e imágenes en la interfaz
+                    document.querySelectorAll('.profile-name').forEach(el => el.textContent = currentCollectorData.name || 'Cobrador'); 
 
-            // ★★★ CORRECCIÓN: Usa el global
-            const imageUrl = currentCollectorData.profilePictureUrl; 
-            const nameInitial = (currentCollectorData.name || 'C').charAt(0).toUpperCase();
-            const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${nameInitial}`;
+                    const imageUrl = currentCollectorData.profilePictureUrl; 
+                    const nameInitial = (currentCollectorData.name || 'C').charAt(0).toUpperCase();
+                    const placeholderUrl = `https://placehold.co/120x120/6f42c1/FFFFFF?text=${nameInitial}`;
 
-            const headerImg = document.getElementById('header-profile-img');
-            const profileImg = document.getElementById('profile-view-img');
-            if (headerImg) headerImg.src = imageUrl || placeholderUrl.replace('120x120', '80x80');
-            if (profileImg) profileImg.src = imageUrl || placeholderUrl;
+                    const headerImg = document.getElementById('header-profile-img');
+                    const profileImg = document.getElementById('profile-view-img');
+                    if (headerImg) headerImg.src = imageUrl || placeholderUrl.replace('120x120', '80x80');
+                    if (profileImg) profileImg.src = imageUrl || placeholderUrl;
 
-            // --- Fim do código movido ---
+                    // [ESTA ES LA LÍNEA CLAVE]
+                    // Recalculamos la caja inmediatamente cuando se recibe el Capital Inicial (los 20.000)
+                    updateProfileView(currentCollectorData); 
 
-        } else {
-             console.error(`Documento do cobrador ${currentCollectorUsername} foi excluído ou inacessível?`);
-             showBlockedView("Erro: Seus dados de cobrador não puderam ser carregados.");
-             signOut(auth);
-        }
-    }, (error) => { 
-         console.error(`Erro ao escutar dados do cobrador ${currentCollectorUsername}:`, error);
-         showBlockedView("Erro de conexão ao carregar seus dados.");
-         signOut(auth);
-    }); // Fim do onSnapshot interno
+                } else {
+                     console.error(`Documento do cobrador ${currentCollectorUsername} não encontrado.`);
+                     showBlockedView("Erro: Seus dados de cobrador não puderam ser carregados.");
+                     signOut(auth);
+                }
+            }, (error) => { 
+                 console.error(`Erro ao escutar dados do cobrador:`, error);
+            });
+            // --- FIN DEL REEMPLAZO --- 
 
     // --- CORRECCIÓN DE SEGURIDAD: FILTRO POR COBRADOR ---
     const clientsQuery = query(
@@ -6824,6 +6814,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
