@@ -942,7 +942,7 @@ const BLACKLIST_DATA = {
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         const translations = {
             pt: { 
-                biweekly: 'QUINZENAL',
+                biweekly: 'QUINZENAL', registerOutflow: 'Registrar Nova Saída', addExpenseOption: 'Adicionar Gasto', expenseOptionDesc: 'Registrar combustível, alimentação, etc.', cashWithdrawal: 'Retirada de Caixa', withdrawalOptionDesc: 'Enviar dinheiro entregue ao admin.', amountDeliveredAdmin: 'Valor entregue ao Admin:', sendForApproval: 'Enviar para Aprovação',
                 postponePayment: 'Adiar Pagamento', postponeConfirmTitle: 'Confirmar Adiamento', postponeConfirmMsg: 'Isso moverá a data de vencimento do cliente em um dia útil, sem gerar atraso. Deseja continuar?', confirm: 'Confirmar', paymentApproved: 'Pagamento aprovado com sucesso!', paymentRejected: 'Pagamento rejeitado.', approve: 'Aprovar', reject: 'Rejeitar', paymentReceipt: 'Comprovante de Pagamento', sentAmount: 'Valor Enviado', paymentVerification: 'Verificação de Pagamento', reputation: 'Reputação', reputationScore: 'Pontuação de Reputação', reputationPerfect: 'Excelente', reputationGood: 'Bom', reputationRegular: 'Regular', reputationBad: 'Ruim', reputationInfo: 'Mantenha seus pagamentos em dia para uma boa reputação.', collector: 'Cobrador', dailyGoal: 'Meta Diária', receivedToday: 'Recebido Hoje', clientsRemaining: 'Clientes Restantes', 
                 todaysRoute: 'Ruta de Cobro (Ativos)', 
                 navHome: 'Rota', 
@@ -968,7 +968,7 @@ const BLACKLIST_DATA = {
                 statusPending: 'PENDENTE'
             },
             es: { 
-                biweekly: 'QUINCENAL',
+                biweekly: 'QUINCENAL', registerOutflow: 'Registrar Nueva Salida', addExpenseOption: 'Añadir Gasto', expenseOptionDesc: 'Registrar combustible, comida, etc.', cashWithdrawal: 'Retiro de Caja', withdrawalOptionDesc: 'Enviar dinero entregado al admin.', amountDeliveredAdmin: 'Monto entregado al Admin:', sendForApproval: 'Enviar para Aprobación',
                 postponePayment: 'Aplazar Pago', postponeConfirmTitle: 'Confirmar Aplazamiento', postponeConfirmMsg: 'Esto moverá la fecha de vencimiento del cliente un día hábil, sin generar atraso. ¿Desea continuar?', confirm: 'Confirmar', paymentApproved: '¡Pago aprobado con éxito!', paymentRejected: 'Pago rechazado.', approve: 'Aprobar', reject: 'Rechazar', paymentReceipt: 'Comprobante de Pago', sentAmount: 'Monto Enviado', paymentVerification: 'Verificación de Pago', reputation: 'Reputación', reputationScore: 'Puntuación de Reputación', reputationPerfect: 'Excelente', reputationGood: 'Bueno', reputationRegular: 'Regular', reputationBad: 'Mala', reputationInfo: 'Mantén tus pagos al día para tener una buena reputación.', collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', 
                 todaysRoute: 'Ruta de Cobro (Ativos)', 
                 navHome: 'Ruta', 
@@ -994,11 +994,11 @@ const BLACKLIST_DATA = {
                 statusPending: 'PENDIENTE'
             },
             en: { 
-                biweekly: 'BI-WEEKLY',
+                biweekly: 'BI-WEEKLY', registerOutflow: 'Register New Outflow', addExpenseOption: 'Add Expense', expenseOptionDesc: 'Register fuel, food, etc.', cashWithdrawal: 'Cash Withdrawal', withdrawalOptionDesc: 'Send money delivered to admin.', amountDeliveredAdmin: 'Amount delivered to Admin:', sendForApproval: 'Send for Approval',
                 postponePayment: 'Postpone Payment', postponeConfirmTitle: 'Confirm Postponement', postponeConfirmMsg: 'This will move the client\'s due date by one business day without generating a late status. Do you wish to continue?', confirm: 'Confirm', paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments up to date for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', remainingClients: 'Remaining Clients', 
                 todaysRoute: 'Collection Route (Active)', 
                 navHome: 'Route', 
-                navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Total of Month', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', attachReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Details', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', biweekly: 'Bi-weekly', monthly: 'Monthly', dayOfWeek: 'Day of the Week', dayOfMonth: 'Day of the Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching the system...', clientClean: 'Clean Client', clientCleanMsg: 'No other active loans were found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinancing Approved', refinanceApprovedClientBody: 'Your refinancing request has been successfully approved.', refinanceRejectedClientTitle: 'Refinancing Rejected', refinanceRejectedClientBody: 'Your refinancing request has been rejected.', realtimeTracking: 'Real-time Tracking', 
+                navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Total of Month', accountSettings: 'Account Settings', changePassword: 'Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', attachReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Details', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', biweekly: 'Bi-weekly', monthly: 'Monthly', dayOfWeek: 'Day of the Week', dayOfMonth: 'Day of the Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching the system...', clientClean: 'Clean Client', clientCleanMsg: 'No other active loans were found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinancing Approved', refinanceApprovedClientBody: 'Your refinancing request has been successfully approved.', refinanceRejectedClientTitle: 'Refinancing Rejected', refinanceRejectedClientBody: 'Your refinancing request has been rejected.', realtimeTracking: 'Real-time Tracking', 
                 paymentTitle: 'Installment Payment #{start}', 
                 paymentTitleRange: 'Installment Payments #{start} - #{end}', 
                 paymentDescFull: 'Installment #{start} paid in full.', 
@@ -5124,213 +5124,170 @@ if (startDate || endDate) { // Si hay al menos una fecha
 
 
         function showOutflowTypeModal() {
-    console.log("Función showOutflowTypeModal iniciada."); // <-- AÑADE ESTA LÍNEA
-    // Reutilizamos el modal genérico...
-     const modal = document.getElementById('reportOptionsModal');
-     console.log("Modal #reportOptionsModal encontrado:", modal ? 'Sí' : 'No');
-     if (!modal) {
-         console.error("Modal #reportOptionsModal não encontrado para seleção de tipo de saída!");
-         return;
-     }
+            const modal = document.getElementById('reportOptionsModal');
+            if (!modal) return;
 
-     console.log("Intentando activar modal (añadir clase 'active')... Estado display ANTES:", window.getComputedStyle(modal).display);
-     modal.classList.add('active');
-     console.log("Clase 'active' añadida. Estado display DESPUÉS:", window.getComputedStyle(modal).display);
+            modal.classList.add('active');
 
-     modal.innerHTML = `
-<div class="modal-content" style="max-width: 380px; padding: 25px; background-color: var(--surface); border-radius: 16px;"> 
-    <button class="close-modal-btn" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 28px; color: var(--text-secondary); cursor: pointer; line-height: 1;">&times;</button>
+            const t = translations[currentLang];
+            const selectTypeLabel = currentLang === 'es' ? 'Selecciona el tipo de registro:' : (currentLang === 'en' ? 'Select record type:' : 'Selecione o tipo de registro:');
 
-    <h3 style="margin: 0 0 20px; text-align: center; font-size: 1.3em; font-weight: 600; color: var(--text-primary);">Registrar Nova Saída</h3>
-    <p style="text-align: center; color: var(--text-secondary); margin: -10px 0 30px; font-size: 0.95em;">Selecione o tipo de registro que deseja criar:</p>
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 380px; padding: 25px; background-color: var(--surface); border-radius: 16px;"> 
+                    <button class="close-modal-btn" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 28px; color: var(--text-secondary); cursor: pointer; line-height: 1;">&times;</button>
 
-    <div style="display: grid; grid-template-columns: 1fr; gap: 15px;"> 
+                    <h3 style="margin: 0 0 20px; text-align: center; font-size: 1.3em; font-weight: 600; color: var(--text-primary);">${t.registerOutflow}</h3>
+                    <p style="text-align: center; color: var(--text-secondary); margin: -10px 0 30px; font-size: 0.95em;">${selectTypeLabel}</p>
 
-        <button class="btn-primary" id="add-expense-option-btn" style="padding: 18px 15px; text-align: left; display: flex; align-items: center; gap: 12px; font-size: 1em; background-color: color-mix(in srgb, var(--accent-purple) 90%, black);"> 
-            <i data-lucide="receipt" style="width: 28px; height: 28px; flex-shrink: 0;"></i> 
-            <div>
-                <span style="font-weight: 600;">Adicionar Gasto</span>
-                <span style="display: block; font-size: 0.8em; opacity: 0.8;">Registrar combustível, alimentação, etc.</span>
-            </div>
-        </button>
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 15px;"> 
 
-        <button class="btn-secondary" id="add-settlement-option-btn" style="padding: 18px 15px; text-align: left; display: flex; align-items: center; gap: 12px; font-size: 1em; border-width: 2px;"> 
-            <i data-lucide="arrow-down-circle" style="width: 28px; height: 28px; flex-shrink: 0;"></i> 
-            <div>
-                <span style="font-weight: 600;">Registrar Liquidação</span>
-                <span style="display: block; font-size: 0.8em; opacity: 0.8;">Enviar dinheiro entregue ao admin para aprovação.</span>
-            </div>
-        </button>
+                        <button class="btn-primary" id="add-expense-option-btn" style="padding: 18px 15px; text-align: left; display: flex; align-items: center; gap: 12px; font-size: 1em; background-color: color-mix(in srgb, var(--accent-purple) 90%, black);"> 
+                            <i data-lucide="receipt" style="width: 28px; height: 28px; flex-shrink: 0;"></i> 
+                            <div>
+                                <span style="font-weight: 600;">${t.addExpenseOption}</span>
+                                <span style="display: block; font-size: 0.8em; opacity: 0.8;">${t.expenseOptionDesc}</span>
+                            </div>
+                        </button>
 
-    </div>
-</div>
-`;
+                        <button class="btn-secondary" id="add-settlement-option-btn" style="padding: 18px 15px; text-align: left; display: flex; align-items: center; gap: 12px; font-size: 1em; border-width: 2px;"> 
+                            <i data-lucide="arrow-down-circle" style="width: 28px; height: 28px; flex-shrink: 0;"></i> 
+                            <div>
+                                <span style="font-weight: 600;">${t.cashWithdrawal}</span>
+                                <span style="display: block; font-size: 0.8em; opacity: 0.8;">${t.withdrawalOptionDesc}</span>
+                            </div>
+                        </button>
 
-     console.log("innerHTML asignado al modal.");
+                    </div>
+                </div>
+            `;
 
-     try { // Añadimos try/catch alrededor de lucide
-         lucide.createIcons({nodes: modal.querySelectorAll('[data-lucide]')}); 
-         console.log("Íconos Lucide creados."); // <-- NUEVO LOG
-     } catch (lucideError) {
-         console.error("ERROR al crear íconos Lucide:", lucideError); // <-- NUEVO LOG DE ERROR
-     }
+            lucide.createIcons({nodes: modal.querySelectorAll('[data-lucide]')}); 
 
-     const closeModal = () => modal.classList.remove('active');
+            const closeModal = () => modal.classList.remove('active');
 
-     try { // Añadimos try/catch alrededor de los listeners
-         modal.querySelector('.close-modal-btn').addEventListener('click', closeModal);
-         modal.querySelector('#add-expense-option-btn').addEventListener('click', () => {
-             closeModal();
-             showExpenseFormModal(); 
-         });
-         modal.querySelector('#add-settlement-option-btn').addEventListener('click', () => {
-              closeModal();
-              showSettlementFormModal(); 
-         });
-         console.log("Event listeners añadidos a los botones del modal."); // <-- NUEVO LOG
-     } catch (listenerError) {
-          console.error("ERROR al añadir event listeners:", listenerError); // <-- NUEVO LOG DE ERROR
-     }
-}
+            modal.querySelector('.close-modal-btn').addEventListener('click', closeModal);
+            modal.querySelector('#add-expense-option-btn').addEventListener('click', () => {
+                closeModal();
+                showExpenseFormModal(); 
+            });
+            modal.querySelector('#add-settlement-option-btn').addEventListener('click', () => {
+                 closeModal();
+                 showSettlementFormModal(); 
+            });
+        }
 
         // Pega esta NUEVA función aquí
 function showSettlementFormModal() {
-    const modal = document.getElementById('settlementFormModal'); // Necesitarás añadir <div id="settlementFormModal" class="modal-view"></div> al HTML principal (línea 330 aprox)
-    if (!modal) {
-         console.error("Modal #settlementFormModal no encontrado!");
-         showToast('Erro: Modal de liquidação não encontrado.', true); // Informa al usuario
-         return; 
-    }
-    let receiptFile = null; // Variable para guardar el archivo adjunto
+            const modal = document.getElementById('settlementFormModal');
+            if (!modal) return; 
 
-    modal.innerHTML = `
-        <header class="modal-header">
-            <button id="closeSettlementFormModal"><i data-lucide="arrow-left"></i></button>
-            <span class="modal-title">Registrar Liquidação</span> 
-        </header>
-        <div class="modal-content-wrapper container">
-            <div class="form-group">
-                <label for="settlement-form-amount">Valor Entregue ao Admin:</label>
-                <input type="number" id="settlement-form-amount" step="0.01" placeholder="0.00" required style="font-size: 1.5em; text-align: center; padding: 15px;">
-            </div>
-            <div class="form-group">
-                <label for="settlement-form-notes">Observações (Opcional):</label>
-                <textarea id="settlement-form-notes" rows="2" placeholder="Ex: Entrega do dia..."></textarea>
-            </div>
-            <div class="form-group">
-                <label>Comprovante (Opcional):</label>
-                <div id="settlement-receipt-preview-container" style="margin-bottom: 15px;">
-                    <!-- La vista previa de la imagen aparecerá aquí -->
+            let receiptFile = null;
+            const t = translations[currentLang];
+            const receiptLabel = currentLang === 'es' ? 'Comprobante (Opcional):' : (currentLang === 'en' ? 'Receipt (Optional):' : 'Comprovante (Opcional):');
+            const attachLabel = currentLang === 'es' ? 'Anexar Comprobante' : (currentLang === 'en' ? 'Attach Receipt' : 'Anexar Comprovante');
+
+            modal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closeSettlementFormModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title">${t.cashWithdrawal}</span> 
+                </header>
+                <div class="modal-content-wrapper container">
+                    <div class="form-group">
+                        <label for="settlement-form-amount">${t.amountDeliveredAdmin}</label>
+                        <input type="number" id="settlement-form-amount" step="0.01" placeholder="0.00" required style="font-size: 1.5em; text-align: center; padding: 15px;">
+                    </div>
+                    <div class="form-group">
+                        <label for="settlement-form-notes" data-lang-key="observations"></label>
+                        <textarea id="settlement-form-notes" rows="2" placeholder="..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>${receiptLabel}</label>
+                        <div id="settlement-receipt-preview-container" style="margin-bottom: 15px;"></div>
+                        <button type="button" class="btn-secondary" id="upload-settlement-receipt-btn" style="width: 100%;">
+                            <i data-lucide="camera"></i> ${attachLabel}
+                        </button>
+                        <input type="file" id="settlement-receipt-file-input" accept="image/*" style="display: none;">
+                    </div>
                 </div>
-                <button type="button" class="btn-secondary" id="upload-settlement-receipt-btn" style="width: 100%;">
-                    <i data-lucide="camera"></i> Anexar Comprovante
-                </button>
-                <input type="file" id="settlement-receipt-file-input" accept="image/*" style="display: none;">
-            </div>
-        </div>
-        <div class="action-buttons">
-            <button class="btn-primary" id="saveSettlementBtn"><i data-lucide="send"></i> Enviar para Aprovação</button>
-        </div>
-    `;
-    // Navegación y activación del modal
-    history.pushState({ modal: 'settlementFormModal' }, 'Settlement Form', '#settlement-form');
-    modal.classList.add('active');
-    lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
+                <div class="action-buttons">
+                    <button class="btn-primary" id="saveSettlementBtn"><i data-lucide="send"></i> ${t.sendForApproval}</button>
+                </div>
+            `;
 
-    // Event listener para cerrar el modal
-    modal.querySelector('#closeSettlementFormModal').addEventListener('click', () => window.history.back());
+            history.pushState({ modal: 'settlementFormModal' }, 'Settlement Form', '#settlement-form');
+            modal.classList.add('active');
+            lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
+            applyLanguage(currentLang);
 
-    // Event listener para el botón de subir archivo
-    modal.querySelector('#upload-settlement-receipt-btn').addEventListener('click', () => {
-        document.getElementById('settlement-receipt-file-input').click();
-    });
+            modal.querySelector('#closeSettlementFormModal').addEventListener('click', () => window.history.back());
 
-    // Event listener para cuando se selecciona un archivo
-    modal.querySelector('#settlement-receipt-file-input').addEventListener('change', e => {
-        receiptFile = e.target.files[0];
-        if (receiptFile) {
-            const previewContainer = document.getElementById('settlement-receipt-preview-container');
-            // Mostramos nombre y una pequeña vista previa
-            previewContainer.innerHTML = `
-                <div class="preview-item" style="display: flex; align-items: center; justify-content: space-between; background-color: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 0.9em;">
-                    <span>${receiptFile.name}</span>
-                    <img id="settlement-receipt-preview" style="max-height: 40px; border-radius: 4px; margin-left: 10px;">
-                </div>`;
-            const previewImg = document.getElementById('settlement-receipt-preview');
-            previewImg.src = URL.createObjectURL(receiptFile); // Muestra la imagen seleccionada
-        } else {
-             document.getElementById('settlement-receipt-preview-container').innerHTML = ''; // Limpia si no hay archivo
+            modal.querySelector('#upload-settlement-receipt-btn').addEventListener('click', () => {
+                document.getElementById('settlement-receipt-file-input').click();
+            });
+
+            modal.querySelector('#settlement-receipt-file-input').addEventListener('change', e => {
+                receiptFile = e.target.files[0];
+                if (receiptFile) {
+                    const previewContainer = document.getElementById('settlement-receipt-preview-container');
+                    previewContainer.innerHTML = `
+                        <div class="preview-item" style="display: flex; align-items: center; justify-content: space-between; background-color: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 0.9em;">
+                            <span>${receiptFile.name}</span>
+                            <img id="settlement-receipt-preview" style="max-height: 40px; border-radius: 4px; margin-left: 10px;">
+                        </div>`;
+                    const previewImg = document.getElementById('settlement-receipt-preview');
+                    previewImg.src = URL.createObjectURL(receiptFile);
+                }
+            });
+
+            modal.querySelector('#saveSettlementBtn').addEventListener('click', async (e) => {
+                 const saveButton = e.currentTarget;
+                 const amountInput = document.getElementById('settlement-form-amount');
+                 const amount = parseFloat(amountInput.value);
+
+                 if (isNaN(amount) || amount <= 0) {
+                     showToast('Valor inválido', true);
+                     return;
+                 }
+
+                 saveButton.disabled = true;
+                 saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i>...`;
+                 lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+
+                 try {
+                    let receiptUrl = '';
+                    if (receiptFile) {
+                         const tempSettlementId = `settlement_${Date.now()}`;
+                         const storageRef = ref(storage, `companies/${currentCompanyId}/settlements/${currentCollectorUsername}/${tempSettlementId}/${receiptFile.name.replace(/\s+/g, '_')}`)
+                         await uploadBytes(storageRef, receiptFile);
+                         receiptUrl = await getDownloadURL(storageRef);
+                    }
+
+                    const collectorName = document.querySelector('.profile-name')?.textContent || currentCollectorUsername; 
+
+                    const settlementData = {
+                        type: 'settlement',
+                        collectorId: currentCollectorUsername,
+                        collectorName: collectorName, 
+                        amount: amount,
+                        notes: document.getElementById('settlement-form-notes').value.trim(),
+                        receiptUrl: receiptUrl,
+                        date: serverTimestamp(),
+                        status: 'pending_verification'
+                    };
+
+                    await addDoc(collection(db, 'companies', currentCompanyId, 'settlements'), settlementData);
+                    window.history.back();
+                    showToast('Liquidação enviada!');
+                 } catch (err) {
+                     console.error(err);
+                     showToast('Erro ao enviar', true);
+                 } finally {
+                     saveButton.disabled = false;
+                     saveButton.innerHTML = `<i data-lucide="send"></i> ${t.sendForApproval}`;
+                     lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
+                 }
+            });
         }
-    });
-
-    // Event listener para el botón de guardar/enviar
-    modal.querySelector('#saveSettlementBtn').addEventListener('click', async (e) => {
-         const saveButton = e.currentTarget;
-         const amountInput = document.getElementById('settlement-form-amount');
-         const amount = parseFloat(amountInput.value);
-
-         // Validación simple del monto
-         if (isNaN(amount) || amount <= 0) {
-             showToast('Por favor, insira um valor válido para a liquidação.', true);
-             amountInput.style.borderColor = 'var(--danger-color)';
-             setTimeout(() => { amountInput.style.borderColor = ''; }, 2500);
-             return;
-         }
-
-         // Deshabilitar botón y mostrar carga
-         saveButton.disabled = true;
-         saveButton.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Enviando...`;
-         lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
-
-         try {
-            let receiptUrl = ''; // Inicializa receiptUrl
-if (receiptFile) {
-     // Usaremos un ID temporal para la ruta
-     const tempSettlementId = `settlement_${Date.now()}`;
-     // 1. Crear referencia (settlements/ID_COBRADOR/ID_LIQUIDACION/receipt.ext)
-     const storageRef = ref(storage, `companies/${currentCompanyId}/settlements/${currentCollectorUsername}/${tempSettlementId}/${receiptFile.name.replace(/\s+/g, '_')}`)
-
-     // 2. Subir archivo
-     await uploadBytes(storageRef, receiptFile);
-
-     // 3. Obtener URL
-     receiptUrl = await getDownloadURL(storageRef); // Asigna la URL
-}
-
-            // Obtenemos el nombre del cobrador (puedes ajustarlo si lo guardas diferente)
-            const collectorName = document.querySelector('.profile-name')?.textContent || collectorId; 
-
-            // Datos a guardar en Firestore
-            const settlementData = {
-                type: 'settlement', // Identifica este registro como liquidación
-                collectorId: currentCollectorUsername, // Asegúrate que collectorId está disponible globalmente
-                collectorName: collectorName, 
-                amount: amount,
-                notes: document.getElementById('settlement-form-notes').value.trim(),
-                receiptUrl: receiptUrl, // 
-                date: serverTimestamp(), // Fecha del servidor
-                status: 'pending_verification' // Estado inicial PENDIENTE
-            };
-
-            // Guardamos en la colección 'settlements'
-            await addDoc(collection(db, 'companies', currentCompanyId, 'settlements'), settlementData)
-
-            window.history.back(); // Cierra el modal
-            showToast('Liquidação enviada para aprovação!');
-
-            // Aquí podríamos añadir lógica para enviar una notificación al admin
-
-         } catch (err) {
-             console.error("Falha ao enviar liquidação:", err);
-             showToast('Falha ao enviar a liquidação.', true);
-         } finally {
-             // Rehabilita el botón
-             saveButton.disabled = false;
-             saveButton.innerHTML = `<i data-lucide="send"></i> Enviar para Aprovação`;
-             lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
-         }
-    });
-} 
 
 
 
@@ -7281,6 +7238,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
