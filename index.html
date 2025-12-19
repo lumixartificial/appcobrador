@@ -942,16 +942,17 @@ const BLACKLIST_DATA = {
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         const translations = {
             pt: { 
+                biweekly: 'QUINZENAL',
                 postponePayment: 'Adiar Pagamento', postponeConfirmTitle: 'Confirmar Adiamento', postponeConfirmMsg: 'Isso moverá a data de vencimento do cliente em um dia útil, sem gerar atraso. Deseja continuar?', confirm: 'Confirmar', paymentApproved: 'Pagamento aprovado com sucesso!', paymentRejected: 'Pagamento rejeitado.', approve: 'Aprovar', reject: 'Rejeitar', paymentReceipt: 'Comprovante de Pagamento', sentAmount: 'Valor Enviado', paymentVerification: 'Verificação de Pagamento', reputation: 'Reputação', reputationScore: 'Pontuação de Reputação', reputationPerfect: 'Excelente', reputationGood: 'Bom', reputationRegular: 'Regular', reputationBad: 'Ruim', reputationInfo: 'Mantenha seus pagamentos em dia para uma boa reputação.', collector: 'Cobrador', dailyGoal: 'Meta Diária', receivedToday: 'Recebido Hoje', clientsRemaining: 'Clientes Restantes', 
                 todaysRoute: 'Ruta de Cobro (Ativos)', 
-                navHome: 'Rota', // <--- CAMBIO AQUÍ (Corto y estético)
-                navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamento de', reviewRequest: 'Revisar solicitação.', installAppMsg: 'Instale o app para uma melhor experiência!', installBtn: 'Instalar', receivedInCash: 'Recebido em Dinheiro', receivedInDigital: 'Recebido em PIX/Cartão', finished: 'Finalizado', createNewLoan: 'Criar Novo Empréstimo', updateClientData: 'Atualizar Dados', paymentFrequency: 'Forma de Pagamento', daily: 'Diário', weekly: 'Semanal', monthly: 'Mensal', dayOfWeek: 'Dia da Semana', dayOfMonth: 'Dia do Mês', sunday: 'Domingo', monday: 'Segunda-feira', tuesday: 'Terça-feira', wednesday: 'Quarta-feira', thursday: 'Quinta-feira', friday: 'Sexta-feira', saturday: 'Sábado', collectionTimeLabel: 'Horário de Cobrança Preferencial', documentNumber: 'Número do Documento', systemHistory: 'Histórico no Sistema', verifySystem: 'Verificar no Sistema', searchingSystem: 'Buscando no sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'Nenhum outro empréstimo ativo encontrado para este documento no sistema.', loansFound: 'Empréstimos Encontrados', loansFoundMsg: 'Os seguintes empréstimos ativos foram encontrados para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Status', loanDetails: 'Detalhes do Empréstimo', amountPaid: 'Valor Pago', paymentApprovedClientTitle: 'Pagamento Aprovado', paymentApprovedClientBody: 'Seu pagamento de {amount} foi aprovado!', paymentRejectedClientTitle: 'Pagamento Rejeitado', paymentRejectedClientBody: 'Seu comprovante foi rejeitado. Entre em contato com seu cobrador.', refinanceApprovedClientTitle: 'Refinanciamento Aprovado', refinanceApprovedClientBody: 'Sua solicitação de refinanciamento foi aprovada com sucesso.', refinanceRejectedClientTitle: 'Refinanciamento Rejeitado', refinanceRejectedClientBody: 'Sua solicitação de refinanciamento foi rejeitada.', realtimeTracking: 'Rastreamento em Tempo Real', 
+                navHome: 'Rota', 
+                navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamiento de', reviewRequest: 'Revisar solicitação.', installAppMsg: 'Instale o app para uma melhor experiência!', installBtn: 'Instalar', receivedInCash: 'Recebido em Dinheiro', receivedInDigital: 'Recebido em PIX/Cartão', finished: 'Finalizado', createNewLoan: 'Criar Novo Empréstimo', updateClientData: 'Atualizar Dados', paymentFrequency: 'Forma de Pagamento', daily: 'Diário', weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal', dayOfWeek: 'Dia da Semana', dayOfMonth: 'Dia do Mês', sunday: 'Domingo', monday: 'Segunda-feira', tuesday: 'Terça-feira', wednesday: 'Quarta-feira', thursday: 'Quinta-feira', friday: 'Sexta-feira', saturday: 'Sábado', collectionTimeLabel: 'Horário de Cobrança Preferencial', documentNumber: 'Número do Documento', systemHistory: 'Histórico no Sistema', verifySystem: 'Verificar no Sistema', searchingSystem: 'Buscando no sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'Nenhum outro empréstimo ativo encontrado para este documento no sistema.', loansFound: 'Empréstimos Encontrados', loansFoundMsg: 'Os seguintes empréstimos ativos foram encontrados para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Status', loanDetails: 'Detalhes do Empréstimo', amountPaid: 'Valor Pago', paymentApprovedClientTitle: 'Pagamento Aprovado', paymentApprovedClientBody: 'Seu pagamento de {amount} foi aprovado!', paymentRejectedClientTitle: 'Pagamento Rejeitado', paymentRejectedClientBody: 'Seu comprovante foi rejeitado. Entre em contato com seu cobrador.', refinanceApprovedClientTitle: 'Refinanciamento Aprovado', refinanceApprovedClientBody: 'Sua solicitação de refinanciamento foi aprovada com sucesso.', refinanceRejectedClientTitle: 'Refinanciamento Rejeitado', refinanceRejectedClientBody: 'Sua solicitação de refinanciamento foi rejeitada.', realtimeTracking: 'Rastreamento em Tempo Real', 
                 paymentTitle: 'Pagamento Parcela #{start}', 
                 paymentTitleRange: 'Pagamento Parcelas #{start} - #{end}', 
                 paymentDescFull: 'Parcela #{start} paga integralmente.', 
                 paymentDescPartial: 'Pagamento parcial ({percent}%) da parcela.', 
                 paymentDescMultiple: 'Cobre {fullInstallments} parcela(s) e {percent}% da próxima.', 
-                paymentDescOverpay: 'Cobre a parcela #{start} e adianta {overpayAmount} para a próxima.',
+                paymentDescOverpay: 'Cobre a parcela #{start} e adianta {overpayAmount} para la próxima.',
                 paymentInstallmentTitle: 'Pagamento Parcela #{installment}',
                 paymentInstallmentsTitle: 'Pagamento Parcelas #{start} - #{end}',
                 fullPaymentDesc: 'Parcela #{installment} paga integralmente.',
@@ -960,17 +961,18 @@ const BLACKLIST_DATA = {
                 multipleFullPaymentDesc: 'Cobre {count} parcela(s) integralmente.',
                 emailLogin: 'Email (Login)',
                 username: 'Usuário (Login)',
-                collectorOnTheWayTitle: 'Cobrador a caminho!', collectorOnTheWayBody: 'Nosso cobrador está a caminho e chegará em alguns minutos.', paymentSettings: 'Configurações de Pagamento', currency: 'Moeda de Operação', paymentMethods: 'Métodos de Pagamento', 
+                collectorOnTheWayTitle: 'Cobrador a caminho!', collectorOnTheWayBody: 'Nosso cobrador está a caminho e chegará em alguns minutos.', paymentSettings: 'Configurações de Pagamento', currency: 'Moeda de Operación', paymentMethods: 'Métodos de Pagamento', 
                 save: 'Salvar',
                 statusPaidToday: 'PAGO HOJE',
                 statusToPay: 'FALTA PAGAR',
                 statusPending: 'PENDENTE'
             },
             es: { 
+                biweekly: 'QUINCENAL',
                 postponePayment: 'Aplazar Pago', postponeConfirmTitle: 'Confirmar Aplazamiento', postponeConfirmMsg: 'Esto moverá la fecha de vencimiento del cliente un día hábil, sin generar atraso. ¿Desea continuar?', confirm: 'Confirmar', paymentApproved: '¡Pago aprobado con éxito!', paymentRejected: 'Pago rechazado.', approve: 'Aprobar', reject: 'Rechazar', paymentReceipt: 'Comprobante de Pago', sentAmount: 'Monto Enviado', paymentVerification: 'Verificación de Pago', reputation: 'Reputación', reputationScore: 'Puntuación de Reputación', reputationPerfect: 'Excelente', reputationGood: 'Bueno', reputationRegular: 'Regular', reputationBad: 'Mala', reputationInfo: 'Mantén tus pagos al día para tener una buena reputación.', collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', 
-                todaysRoute: 'Ruta de Cobro (Activos)', 
-                navHome: 'Ruta', // <--- CAMBIO AQUÍ (Corto y estético)
-                navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', monthly: 'Mensal', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida', documentNumber: 'Número de Documento', systemHistory: 'Historial en el Sistema', verifySystem: 'Verificar en el Sistema', searchingSystem: 'Buscando en el sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'No se encontraron otros préstamos activos para este documento en el sistema.', loansFound: 'Préstamos Encontrados', loansFoundMsg: 'Se encontraron los siguientes préstamos activos para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Estado', loanDetails: 'Detalles del Préstamo', amountPaid: 'Monto Pagado', paymentApprovedClientTitle: 'Pago Aprobado', paymentApprovedClientBody: '¡Tu pago de {amount} ha sido aprobado!', paymentRejectedClientTitle: 'Pago Rechazado', paymentRejectedClientBody: 'Tu comprobante fue rechazado. Por favor, contacta a tu cobrador.', refinanceApprovedClientTitle: 'Refinanciación Aprobada', refinanceApprovedClientBody: 'Tu solicitud de refinanciación ha sido aprobada con éxito.', refinanceRejectedClientTitle: 'Refinanciación Rechazada', refinanceRejectedClientBody: 'Tu solicitud de refinanciación ha sido rechazada.', realtimeTracking: 'Seguimiento en Tiempo Real', 
+                todaysRoute: 'Ruta de Cobro (Ativos)', 
+                navHome: 'Ruta', 
+                navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', navExpenses: 'Gastos', myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensal', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida', documentNumber: 'Número de Documento', systemHistory: 'Historial en el Sistema', verifySystem: 'Verificar en el Sistema', searchingSystem: 'Buscando en el sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'No se encontraron otros préstamos activos para este documento en el sistema.', loansFound: 'Préstamos Encontrados', loansFoundMsg: 'Se encontraron los siguientes préstamos activos para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Estado', loanDetails: 'Detalles del Préstamo', amountPaid: 'Monto Pagado', paymentApprovedClientTitle: 'Pago Aprobado', paymentApprovedClientBody: '¡Tu pago de {amount} ha sido aprobado!', paymentRejectedClientTitle: 'Pago Rechazado', paymentRejectedClientBody: 'Tu comprobante fue rechazado. Por favor, contacta a tu cobrador.', refinanceApprovedClientTitle: 'Refinanciación Aprobada', refinanceApprovedClientBody: 'Tu solicitud de refinanciación ha sido aprobada con éxito.', refinanceRejectedClientTitle: 'Refinanciación Rechazada', refinanceRejectedClientBody: 'Tu solicitud de refinanciación ha sido rechazada.', realtimeTracking: 'Seguimiento en Tiempo Real', 
                 paymentTitle: 'Pago Cuota #{start}', 
                 paymentTitleRange: 'Pago Cuotas #{start} - #{end}', 
                 paymentDescFull: 'Cuota #{start} pagada en su totalidad.', 
@@ -992,10 +994,11 @@ const BLACKLIST_DATA = {
                 statusPending: 'PENDIENTE'
             },
             en: { 
+                biweekly: 'BI-WEEKLY',
                 postponePayment: 'Postpone Payment', postponeConfirmTitle: 'Confirm Postponement', postponeConfirmMsg: 'This will move the client\'s due date by one business day without generating a late status. Do you wish to continue?', confirm: 'Confirm', paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments up to date for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', remainingClients: 'Remaining Clients', 
                 todaysRoute: 'Collection Route (Active)', 
-                navHome: 'Route', // <--- CAMBIO AQUÍ
-                navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', attachReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Details', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', dayOfWeek: 'Day of the Week', dayOfMonth: 'Day of the Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching the system...', clientClean: 'Clean Client', clientCleanMsg: 'No other active loans were found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinancing Approved', refinanceApprovedClientBody: 'Your refinancing request has been successfully approved.', refinanceRejectedClientTitle: 'Refinancing Rejected', refinanceRejectedClientBody: 'Your refinancing request has been rejected.', realtimeTracking: 'Real-time Tracking', 
+                navHome: 'Route', 
+                navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Total of Month', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', attachReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Details', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', biweekly: 'Bi-weekly', monthly: 'Monthly', dayOfWeek: 'Day of the Week', dayOfMonth: 'Day of the Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching the system...', clientClean: 'Clean Client', clientCleanMsg: 'No other active loans were found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinancing Approved', refinanceApprovedClientBody: 'Your refinancing request has been successfully approved.', refinanceRejectedClientTitle: 'Refinancing Rejected', refinanceRejectedClientBody: 'Your refinancing request has been rejected.', realtimeTracking: 'Real-time Tracking', 
                 paymentTitle: 'Installment Payment #{start}', 
                 paymentTitleRange: 'Installment Payments #{start} - #{end}', 
                 paymentDescFull: 'Installment #{start} paid in full.', 
@@ -1131,6 +1134,7 @@ const BLACKLIST_DATA = {
         function getAllTodaysClients() {
            const clientsForToday = [];
            const today = new Date();
+           today.setHours(0, 0, 0, 0);
            const dayOfWeek = today.getDay();
            const dayOfMonth = today.getDate();
 
@@ -1146,21 +1150,28 @@ const BLACKLIST_DATA = {
                        isPaymentDay = paymentDays.includes(dayOfWeek);
                    } else if (frequency === 'weekly') {
                        isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfWeek;
+                   } else if (frequency === 'biweekly') {
+                       // LÓGICA QUINCENAL: Mismo día de la semana cada 14 días
+                       if (paymentDays.length > 0 && paymentDays[0] === dayOfWeek) {
+                           const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                           startDate.setHours(0,0,0,0);
+                           
+                           const diffTime = Math.abs(today - startDate);
+                           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                           
+                           // Verificamos si han pasado semanas pares (0, 2, 4...) desde el inicio
+                           if (Math.floor(diffDays / 7) % 2 === 0) {
+                               isPaymentDay = true;
+                           }
+                       }
                    } else if (frequency === 'monthly') {
                        isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfMonth;
                    }
 
                    if (isPaymentDay) {
-                        // --- INICIO DE LA CORRECCIÓN ---
-                        // ¡El 'loan.status' está obsoleto! Lo recalculamos AHORA.
                         const loanDetails = calculateLoanDetails(loan);
-                        
-                        // Creamos un nuevo objeto de préstamo con el estado FRESCO
                         const updatedLoan = { ...loan, status: loanDetails.status };
-                        
-                        // Añadimos el préstamo con el estado correcto
                         clientsForToday.push({ client, loan: updatedLoan, loanIndex: index });
-                        // --- FIN DE LA CORRECCIÓN ---
                    }
                });
            });
@@ -1261,14 +1272,15 @@ const BLACKLIST_DATA = {
         <input type="text" id="client-search-input" placeholder="Buscar cliente...">
     </div>
 
-    <div class="filter-buttons">
-        <button class="filter-btn active" data-filter="all">TODOS</button>
-        <button class="filter-btn" data-filter="weekly">SEMANALES</button>
-        <button class="filter-btn" data-filter="todo_today">FALTA POR PAGAR</button>
-        <button class="filter-btn" data-filter="paid">PAGO</button>
-        <button class="filter-btn" data-filter="late">ATRASADO</button>
-        <button class="filter-btn" data-filter="finished">FINALIZADO</button>
-    </div>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" data-filter="all">TODOS</button>
+                        <button class="filter-btn" data-filter="weekly">SEMANALES</button>
+                        <button class="filter-btn" data-filter="biweekly">QUINCENAL</button>
+                        <button class="filter-btn" data-filter="todo_today">FALTA POR PAGAR</button>
+                        <button class="filter-btn" data-filter="paid">PAGADOS</button>
+                        <button class="filter-btn" data-filter="late">ATRASADOS</button>
+                        <button class="filter-btn" data-filter="finished">FINALIZADOS</button>
+                    </div>
 
     <!-- ESTE ES EL CONTENEDOR QUE FALTABA -->
     <div class="client-list" id="all-clients-list"></div>
@@ -2158,6 +2170,7 @@ async function showRefinanceModal(clientId, notificationId) {
             let calculatedDailyGoal = 0;      
             
             const today = new Date();
+            today.setHours(0, 0, 0, 0);
             const dayOfWeek = today.getDay(); 
             const dayOfMonth = today.getDate();
             const todayStr = today.toLocaleDateString('pt-BR');
@@ -2174,7 +2187,6 @@ async function showRefinanceModal(clientId, notificationId) {
             // Iteramos sobre TODOS los clientes para calcular la Meta Global Fija
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
-                    // Si está finalizado y no pagó hoy, lo ignoramos para la meta
                     const isFinished = loan.status === 'finished';
 
                     // Cuánto ha pagado hoy
@@ -2187,7 +2199,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
                     if (isFinished && paidToday === 0) return;
 
-                    // Verificar frecuencia
+                    // --- LÓGICA DE FRECUENCIA PARA LA META ---
                     let isPaymentDay = false;
                     const frequency = loan.paymentFrequency || 'daily';
                     const paymentDays = loan.paymentDays || [];
@@ -2196,6 +2208,18 @@ async function showRefinanceModal(clientId, notificationId) {
                         isPaymentDay = paymentDays.some(d => parseInt(d) === dayOfWeek);
                     } else if (frequency === 'weekly') {
                         isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+                    } else if (frequency === 'biweekly') {
+                        // LÓGICA QUINCENAL PARA LA META: Mismo día de la semana cada 14 días
+                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
+                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                            startDate.setHours(0,0,0,0);
+                            const diffTime = Math.abs(today - startDate);
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            // Si han pasado semanas pares (0, 2, 4...) desde el inicio
+                            if (Math.floor(diffDays / 7) % 2 === 0) {
+                                isPaymentDay = true;
+                            }
+                        }
                     } else if (frequency === 'monthly') {
                         isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
                     }
@@ -2206,7 +2230,6 @@ async function showRefinanceModal(clientId, notificationId) {
                         installmentValue = parseFloat(loan.originalInstallmentAmount);
                     }
 
-                    // --- CORRECCIÓN META FIJA ---
                     // 1. Calcular deuda total actual
                     const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
                         (h.status === 'approved' || h.method === 'migration') ? sum + (h.amount || 0) : sum, 0
@@ -2214,19 +2237,16 @@ async function showRefinanceModal(clientId, notificationId) {
                     const totalLoan = parseFloat(loan.totalLoan) || 0;
                     const currentBalance = Math.max(0, totalLoan - totalPaidAllTime);
                     
-                    // 2. Calcular deuda al INICIO del día (sumando lo que pagó hoy al saldo actual)
-                    // Esto hace que la meta no baje conforme pagan.
+                    // 2. Calcular deuda al INICIO del día
                     const debtAtStartOfDay = currentBalance + paidToday;
                     
-                    // 3. La meta para este cliente es la cuota, pero no puede ser mayor a lo que debía al amanecer.
+                    // 3. La meta es la cuota, pero no puede ser mayor a lo que debía al amanecer.
                     let goalForThisClient = installmentValue;
                     if (goalForThisClient > debtAtStartOfDay) {
                         goalForThisClient = debtAtStartOfDay;
                     }
 
-                    // Solo sumamos a la meta si hoy es día de pago.
-                    // Si pagó hoy pero no era día de pago (adelanto), NO subimos la meta (opcional, según tu preferencia).
-                    // Si quieres que los adelantos cuenten en la meta, usa: if (isPaymentDay || paidToday > 0)
+                    // Solo sumamos a la meta si hoy es día de pago según la frecuencia
                     if (isPaymentDay) {
                         calculatedDailyGoal += goalForThisClient;
                     }
@@ -2241,23 +2261,18 @@ async function showRefinanceModal(clientId, notificationId) {
             kpiReceived.textContent = money(dailyTotal);
 
             // Renderizar Clientes Restantes
-            // Filtramos la lista para quitar finalizados y los que ya pagaron
             if (!clientsForDashboard || clientsForDashboard.length === 0) {
                  kpiRemaining.textContent = 0;
             } else {
                 const remainingItems = clientsForDashboard.filter(item => {
-                    // Primero, ignorar si el préstamo ya está finalizado
                     if (item.loan.status === 'finished') return false;
-
                     const loan = item.loan;
                     const paidTodayVal = (loan.history || []).reduce((sum, h) => {
                         if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
-                            return sum + (h.amount || 0);
+                            return sum + (parseFloat(h.amount) || 0);
                         }
                         return sum;
                     }, 0);
-                    
-                    // Es restante si NO ha pagado nada hoy
                     return paidTodayVal === 0;
                 });
                 const uniqueRemainingIds = new Set(remainingItems.map(i => i.client.id));
@@ -2569,9 +2584,16 @@ async function showRefinanceModal(clientId, notificationId) {
                 let bottomStatusText = '';
                 let bottomStatusStyle = '';
 
-                const freqMap = { 'daily': 'DIÁRIO', 'weekly': 'SEMANAL', 'monthly': 'MENSAL' };
+                // --- INICIO DEL BLOQUE ACTUALIZADO PARA FRECUENCIA DINÁMICA ---
+                const freqMap = { 
+                    'daily': translations[currentLang].daily, 
+                    'weekly': translations[currentLang].weekly, 
+                    'biweekly': translations[currentLang].biweekly,
+                    'monthly': translations[currentLang].monthly 
+                };
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
+                // --- FIN DEL BLOQUE ACTUALIZADO ---
 
                 // --- INICIO: LÓGICA DE COLORES Y ESTADO (CORREGIDO) ---
                 const daysLate = displayLoan.lateDays || 0;
@@ -3058,92 +3080,64 @@ async function showRefinanceModal(clientId, notificationId) {
 
         let clientsWithLoans = [];
 
-        // Iteramos TODOS los clientes
         allClients.forEach(client => {
             if (!client.loans || client.loans.length === 0) return;
 
-            // Verificamos si tiene préstamos activos (para evitar duplicados en 'finished')
-            const hasActiveLoan = client.loans.some(l => {
-                const s = calculateLoanDetails(l).status;
-                return s !== 'finished';
-            });
-
-            // Iteramos TODOS los préstamos de ese cliente
             client.loans.forEach((loan, loanIndex) => {
                 const details = calculateLoanDetails(loan);
                 const currentStatus = details.status; 
                 
-                // Verificamos si PAGÓ HOY
                 const hasPaidToday = (loan.history || []).some(h => {
                     if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false; 
                     const pDate = getPaymentDate(h.date);
                     return pDate && pDate >= todayStart;
                 });
 
-                // --- 1. LÓGICA DE FILTROS (CORREGIDA) ---
                 let passesCategory = true;
 
+                // --- LÓGICA DE FILTROS ---
                 if (filter === 'weekly') {
-                    // Pestaña "Semanales": Solo semanales activos
                     if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                 }
+                else if (filter === 'biweekly') {
+                    if (loan.paymentFrequency !== 'biweekly' || currentStatus === 'finished') passesCategory = false;
+                }
                 else if (filter === 'todo_today') {
-                    // --- CORRECCIÓN AQUÍ ---
-                    // Pestaña "Falta por Pagar": Ahora mostramos a TODOS los que no han pagado hoy.
-                    // (Igualamos la lógica con la Ruta principal para que aparezcan los 16)
                     if (currentStatus === 'finished' || hasPaidToday) passesCategory = false;
                 }
                 else if (filter === 'paid') {
-                    // Pestaña "Pago": Solo si ya pagó hoy
                     if (!hasPaidToday) passesCategory = false;
                 }
                 else if (filter === 'late') {
-                    // Pestaña "Atrasado": Solo estado rojo
                     if (currentStatus !== 'late') passesCategory = false;
                 }
                 else if (filter === 'finished') {
-                    // Pestaña "Finalizado"
                     if (currentStatus !== 'finished') passesCategory = false;
-                    else if (hasActiveLoan) passesCategory = false; // Ocultar duplicados si ya renovó
                 }
                 else {
-                    // Pestaña "TODOS" (Por defecto)
-                    // Muestra solo lo pagado para mantener limpieza visual, o ajusta según prefieras.
-                    if (currentStatus === 'finished') passesCategory = false;
-                    if (!hasPaidToday) passesCategory = false;
+                    // Pestaña TODOS: Solo mostramos los que ya PAGARON hoy (regla solicitada)
+                    // Si el cliente no ha pagado y no está finalizado, no aparece en "TODOS" (está en Ruta)
+                    if (!hasPaidToday || currentStatus === 'finished') passesCategory = false;
                 }
 
-                // --- 2. LÓGICA DE BÚSQUEDA ---
+                // La búsqueda siempre debe encontrar a cualquier cliente activo
                 let matchesSearch = true;
                 if (searchTerm) {
                     const nameMatch = client.name.toLowerCase().includes(searchTerm);
                     const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
                     if (!nameMatch && !addressMatch) matchesSearch = false;
+                    
+                    // Si estamos buscando, ignoramos el filtro de "solo pagados" para poder encontrar al cliente
+                    if (matchesSearch && currentStatus !== 'finished') passesCategory = true;
                 }
 
-                // --- 3. DECISIÓN FINAL ---
-                
-                if (searchTerm) {
-                    // Si buscas, ignoramos filtros estrictos para que encuentres a quien sea
-                    if (matchesSearch) {
-                        if (filter === 'all' && currentStatus === 'finished') {
-                            // Ocultar finalizados en búsqueda general
-                        } else {
-                            clientsWithLoans.push({ client, loan, loanIndex });
-                        }
-                    }
-                } else {
-                    // Si NO buscas, aplicamos el filtro de la pestaña
-                    if (passesCategory) {
-                        clientsWithLoans.push({ client, loan, loanIndex }); 
-                    }
+                if (passesCategory) {
+                    clientsWithLoans.push({ client, loan, loanIndex }); 
                 }
             });
         });
         
-        // Ordenamos alfabéticamente
         clientsWithLoans.sort((a, b) => a.client.name.localeCompare(b.client.name));
-        
         renderClientCards(container, clientsWithLoans);
     }
         
@@ -4413,6 +4407,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             <select id="payment-frequency" class="form-control">
                                 <option value="daily" data-lang-key="daily"></option>
                                 <option value="weekly" data-lang-key="weekly"></option>
+                                <option value="biweekly" data-lang-key="biweekly"></option>
                                 <option value="monthly" data-lang-key="monthly"></option>
                             </select>
                         </div>
@@ -7286,6 +7281,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
