@@ -2584,7 +2584,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 let bottomStatusText = '';
                 let bottomStatusStyle = '';
 
-                // --- INICIO DEL BLOQUE ACTUALIZADO PARA FRECUENCIA DINÁMICA ---
                 const freqMap = { 
                     'daily': translations[currentLang].daily, 
                     'weekly': translations[currentLang].weekly, 
@@ -2593,52 +2592,65 @@ async function showRefinanceModal(clientId, notificationId) {
                 };
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
-                // --- FIN DEL BLOQUE ACTUALIZADO ---
 
-                // --- INICIO: LÓGICA DE COLORES Y ESTADO (CORREGIDO) ---
+                // --- LÓGICA DE COLORES DE ESTADO ---
                 const daysLate = displayLoan.lateDays || 0;
-                let avatarHex = '6f42c1'; // Morado por defecto
+                let avatarHex = '6f42c1'; 
                 let reputationLabel = '';
                 let reputationColor = '#6f42c1';
 
-                // 1. Detectamos el idioma actual (si no existe, usa portugués)
                 const langCode = (typeof currentLang !== 'undefined' && currentLang) ? currentLang : 'pt';
-
-                // 2. Diccionario de textos
                 const statusLabels = {
                     pt: { exc: 'Excelente', med: 'Médio', bad: 'Ruim', fin: 'Finalizado' },
                     es: { exc: 'Excelente', med: 'Regular', bad: 'Malo', fin: 'Finalizado' },
                     en: { exc: 'Excellent', med: 'Medium', bad: 'Bad', fin: 'Finished' }
                 };
-
-                // 3. Seleccionamos el texto correcto
                 const txt = statusLabels[langCode] || statusLabels.pt;
 
                 if (displayLoan.status === 'finished') {
-                    // Estado Finalizado
-                    avatarHex = '4338ca'; 
-                    reputationLabel = txt.fin;
-                    reputationColor = '#4338ca';
-
+                    avatarHex = '4338ca'; reputationLabel = txt.fin; reputationColor = '#4338ca';
                 } else if (daysLate < 2) { 
-                    // 0 o 1 día de atraso -> EXCELENTE (Verde)
-                    avatarHex = '28a745'; 
-                    reputationLabel = txt.exc;
-                    reputationColor = '#28a745';
-
+                    avatarHex = '28a745'; reputationLabel = txt.exc; reputationColor = '#28a745';
                 } else if (daysLate < 5) { 
-                    // 2, 3 o 4 días de atraso -> REGULAR/MEDIO (Naranja)
-                    avatarHex = 'f59e0b'; 
-                    reputationLabel = txt.med;
-                    reputationColor = '#d97706';
-
+                    avatarHex = 'f59e0b'; reputationLabel = txt.med; reputationColor = '#d97706';
                 } else { 
-                    // 5 días o más -> MALO/RUIM (Rojo)
-                    avatarHex = 'dc3545'; 
-                    reputationLabel = txt.bad; 
-                    reputationColor = '#dc3545';
+                    avatarHex = 'dc3545'; reputationLabel = txt.bad; reputationColor = '#dc3545';
                 }
-                // --- FIN LÓGICA DE COLORES ---
+
+                // --- [LÓGICA CORREGIDA] ETIQUETA DIARIA (NUEVO / RENOVADO) ---
+                // Solo mostrar hoy (desaparece a las 00:00 del día siguiente)
+                let typeLabel = '';
+                let typeColor = 'transparent';
+                
+                // 1. Obtener fecha de inicio del préstamo actual
+                let loanStartDate = null;
+                if (loan.startDate) {
+                     if (loan.startDate.seconds) loanStartDate = new Date(loan.startDate.seconds * 1000);
+                     else if (loan.startDate instanceof Date) loanStartDate = loan.startDate;
+                     else loanStartDate = new Date(loan.startDate);
+                }
+
+                // 2. Comprobar si es HOY
+                if (loanStartDate) {
+                    const isLoanFromToday = loanStartDate.getDate() === todayStart.getDate() &&
+                                            loanStartDate.getMonth() === todayStart.getMonth() &&
+                                            loanStartDate.getFullYear() === todayStart.getFullYear();
+                    
+                    if (isLoanFromToday) {
+                        const totalLoansCount = client.loans ? client.loans.length : 0;
+                        const isEs = langCode === 'es';
+                        
+                        if (totalLoansCount > 1) {
+                            typeLabel = 'RENOVADO'; 
+                            typeColor = 'var(--accent-purple)'; // Morado
+                        } else {
+                            typeLabel = isEs ? 'NUEVO' : 'NOVO';
+                            typeColor = '#0ea5e9'; // Azul Cyan
+                        }
+                    }
+                }
+                // ------------------------------------------------
+
                 if (displayLoan.status === 'finished') {
                     mainValueToDisplay = 0; 
                     secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 700;">FINALIZADO</span>`;
@@ -2696,16 +2708,20 @@ async function showRefinanceModal(clientId, notificationId) {
                 card.dataset.loanIndex = loanIndex; 
 
                 const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
-                // AQUI USAMOS EL COLOR DINÁMICO (avatarHex)
                 const placeholderUrl = `https://placehold.co/80x80/${avatarHex}/FFFFFF?text=${nameInitial}`;
                 const photoUrl = client.profilePictureUrl || placeholderUrl;
-                // Si tiene foto real, le ponemos borde de color
                 const borderStyle = client.profilePictureUrl ? `border: 3px solid ${reputationColor};` : '';
+
+                // AQUI AGREGAMOS EL SPAN SOLO SI typeLabel TIENE CONTENIDO
+                const labelHtml = typeLabel 
+                    ? `<span style="font-size: 0.6em; font-weight: 700; color: ${typeColor}; margin-top: 2px; letter-spacing: 0.5px; animation: pulse 2s infinite;">${typeLabel}</span>`
+                    : '';
 
                 card.innerHTML = `
                     <div style="display: flex; flex-direction: column; align-items: center; margin-right: 15px; min-width: 55px;">
                         <img src="${photoUrl}" alt="Foto" class="client-avatar" style="${borderStyle} width: 50px; height: 50px;">
                         <span style="font-size: 0.65em; font-weight: 800; color: ${reputationColor}; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${reputationLabel}</span>
+                        ${labelHtml}
                     </div>
 
                     <div class="client-info">
@@ -7250,6 +7266,7 @@ getDocs(collectorQuery).then(snapshot => {
     </script>
 </body>
     </html>
+
 
 
 
