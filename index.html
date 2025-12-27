@@ -7129,24 +7129,32 @@ function renderVerificationResults(container, warnings, systemLoans) {
 
         
         function init() {
-            // --- SISTEMA DE SEGURANÇA HORÁRIA (00:00 - 07:00) ---
-            // Verifica a cada segundo se estamos no horário proibido
-            // Revisamos el bloqueo cada segundo
-            // --- SISTEMA DE SEGURANÇA (BLOQUEO) ---
+            // --- VARIABLE DE CONTROL DE DÍA (FUERA DEL INTERVALO) ---
+            let lastCheckedDate = new Date().getDate();
+
+            // --- SISTEMA DE SEGURANÇA E MONITORAMENTO ---
             setInterval(() => {
                 const now = new Date();
+                const currentDay = now.getDate();
                 const hour = now.getHours();
                 
-                // 1. REGLA: Bloqueo nocturno (00:00 a 07:00)
+                // 1. AUTO-RELOAD AL CAMBIAR DE DÍA (CIERRE AUTOMÁTICO)
+                // Si el número de día cambió (ej: ayer era 10, hoy es 11), recargamos.
+                if (currentDay !== lastCheckedDate) {
+                    console.log("Mudança de dia detectada. Reiniciando sistema para fechar o dia anterior...");
+                    window.location.reload(); // Esto fuerza el reinicio y limpieza de la app
+                    return; 
+                }
+
+                // 2. REGLA: Bloqueo nocturno (00:00 a 07:00)
                 let isRestricted = hour >= 0 && hour < 7;
                 let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
 
-                // 2. REGLA CORREGIDA: Bloqueo 5 minutos después del reporte (Lógica Estricta de HOY)
+                // 3. REGLA: Bloqueo 5 minutos después del reporte (Lógica Estricta)
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
                     let lastReport = null;
                     const rawDate = currentCollectorData.lastReportDate;
 
-                    // A. Normalizar fecha (Timestamp de Firestore o Date de JS)
                     if (rawDate && rawDate.seconds) {
                         lastReport = new Date(rawDate.seconds * 1000);
                     } else if (rawDate instanceof Date) {
@@ -7154,27 +7162,24 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     }
 
                     if (lastReport) {
-                        // B. Verificar si el reporte es estrictamente de HOY
-                        // Compara Día, Mes y Año con la fecha actual ("now")
                         const isReportFromToday = 
                             lastReport.getDate() === now.getDate() &&
                             lastReport.getMonth() === now.getMonth() &&
                             lastReport.getFullYear() === now.getFullYear();
 
                         if (isReportFromToday) {
-                            // C. Si es de hoy, calculamos si pasaron 5 minutos
                             const diffMs = now.getTime() - lastReport.getTime();
                             const diffMinutes = diffMs / 1000 / 60;
 
                             if (diffMinutes > 5) {
-                                isRestricted = true; // ¡Bloqueo activado!
+                                isRestricted = true; 
                                 lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente 5 minutos após o envio do Relatório Diário.";
                             }
                         }
                     }
                 }
 
-                // 3. EXCEPCIÓN: Desbloqueo de Administrador (Botón Naranja)
+                // 4. EXCEPCIÓN: Desbloqueo de Administrador
                 let isAdminUnlocked = false;
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.tempUnlockUntil) {
                     let unlockDate = null;
@@ -7184,17 +7189,15 @@ function renderVerificationResults(container, warnings, systemLoans) {
                         unlockDate = currentCollectorData.tempUnlockUntil;
                     }
 
-                    // Si la fecha de desbloqueo es FUTURA, permitimos entrar
                     if (unlockDate && now < unlockDate) {
                         isAdminUnlocked = true;
                     }
                 }
 
-                // --- APLICAR BLOQUEO ---
+                // --- APLICAR BLOQUEO VISUAL ---
                 const lockScreenId = 'security-lock-overlay';
                 let lockScreen = document.getElementById(lockScreenId);
 
-                // Bloqueamos SI (está restringido) Y (NO tiene permiso de admin)
                 if (isRestricted && !isAdminUnlocked) {
                     if (!lockScreen) {
                         lockScreen = document.createElement('div');
@@ -7216,7 +7219,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
                         `;
                         document.body.appendChild(lockScreen);
                     } else {
-                        // Actualizamos el reloj si ya está visible
                         const timeSpan = lockScreen.querySelector('div span');
                         if(timeSpan) timeSpan.textContent = now.toLocaleTimeString();
                     }
@@ -7224,54 +7226,44 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     if (lockScreen) lockScreen.remove();
                 }
 
-            }, 1000);
+            }, 1000); // Chequeo cada segundo
 
-            // --- FIN SISTEMA DE SEGURANÇA ---
-
-            // --- Service Worker Registration (SEM ALTERAÇÕES) ---
+            // --- Service Worker ---
             if ('serviceWorker' in navigator) {
                 if (window.location.protocol === 'blob:') {
-                    console.warn("Service Worker: Registro ignorado. O ambiente de pré-visualização ('blob:') não suporta Service Workers...");
+                    console.warn("Service Worker ignorado em blob.");
                 } else {
                     navigator.serviceWorker.register('firebase-messaging-sw.js')
                     .then(reg => {
-                        console.log('Service Worker: Registro iniciado.');
-                        return navigator.serviceWorker.ready;
+                        console.log('Service Worker registrado.');
+                        if (typeof currentCollectorUsername !== 'undefined' && currentCollectorUsername) {
+                             setupFCM(currentCollectorUsername, reg);
+                        }
                     })
-                    .then(registration => {
-                        console.log('Service Worker: Ativo e pronto para ser usado após o login.');
-                    })
-                    .catch(error => {
-                        console.error('Service Worker: Falha no registro ou na ativação.', error);
-                    });
+                    .catch(console.error);
                 }
             }
 
             document.body.classList.add('dark-mode');
 
-            // --- Lógica do Banner PWA (SEM ALTERAÇÕES) ---
+            // --- PWA Banner ---
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
                 deferredPrompt = e;
                 const installBanner = document.getElementById('install-banner');
                 if (installBanner) installBanner.style.display = 'block';
             });
-
             const installBtn = document.getElementById('install-btn');
             if (installBtn) {
                 installBtn.addEventListener('click', async () => {
                     if (deferredPrompt) {
                         deferredPrompt.prompt();
                         const { outcome } = await deferredPrompt.userChoice;
-                        if (outcome === 'accepted') {
-                            console.log('Usuário aceitou a instalação');
-                        }
-                        deferredPrompt = null; 
+                        if (outcome === 'accepted') deferredPrompt = null;
                         document.getElementById('install-banner').style.display = 'none';
                     }
                 });
             }
-            
             const closeInstallBanner = document.getElementById('close-install-banner');
             if (closeInstallBanner) {
                 closeInstallBanner.addEventListener('click', () => {
@@ -7279,72 +7271,60 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 });
             }
 
-            // --- INÍCIO TAREFA C1: NOVA LÓGICA DE AUTENTICAÇÃO ---
+            // --- Auth State ---
             const splash = document.getElementById('splash-screen');
-
             onAuthStateChanged(auth, async (user) => {
-                // Oculta o splash imediatamente
                 splash.style.opacity = '0';
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                }, 500);
+                setTimeout(() => { splash.style.display = 'none'; }, 500);
 
                 if (user) {
                     try {
-                        console.log("Verificando permissões do cobrador...");
+                        console.log("Verificando permissões...");
                         const tokenResult = await user.getIdTokenResult(true); 
                         const claims = tokenResult.claims; 
-                        console.log("Claims do usuário:", claims);
-
+                        
                         if (claims.role !== 'collector' || !claims.companyId) {
-                            const errorMsg = "Sua conta não tem permissões de cobrador ou não está associada a uma empresa. Contate o administrador.";
-                            console.error(errorMsg, claims);
-                            showBlockedView(errorMsg);
+                            showBlockedView("Conta sem permissão de cobrador.");
                             await signOut(auth); 
                             return; 
                         }
 
                         currentCollectorUid = user.uid; 
                         currentCompanyId = claims.companyId; 
-                        console.log(`Cobrador verificado. AuthUID: ${currentCollectorUid}, CompanyID: ${currentCompanyId}`);
-
-                        const companyRef = doc(db, 'companies', currentCompanyId);
-                        const companySnap = await getDoc(companyRef);
-
+                        
+                        const companySnap = await getDoc(doc(db, 'companies', currentCompanyId));
                         if (!companySnap.exists()) {
-                            const errorMsg = `Erro crítico: A empresa (${currentCompanyId}) não foi encontrada.`;
-                            console.error(errorMsg);
-                            showBlockedView(errorMsg);
+                            showBlockedView("Empresa não encontrada.");
                             await signOut(auth);
                             return;
                         }
-
                         currentCompanyData = companySnap.data(); 
 
                         if (currentCompanyData.status === 'suspended') {
-                            const errorMsg = `A conta da sua empresa (${currentCompanyData.name || 'Nome não disponível'}) está suspensa. Contate o administrador.`;
-                            console.warn(errorMsg);
-                            showBlockedView(errorMsg); 
+                            showBlockedView("Conta da empresa suspensa."); 
                             return;
                         }
 
-                        console.log(`Acesso concedido para Empresa: ${currentCompanyData.name} (Status: ${currentCompanyData.status})`);
                         document.getElementById('login-view').style.display = 'none'; 
-
                         loadGlobalSettings(currentCompanyData); 
                         showMainApp(currentCollectorUid); 
 
+                        // Setup FCM after login
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(reg => {
+                                setupFCM(currentCollectorUsername, reg);
+                            });
+                        }
+
                     } catch (error) {
-                        console.error("Erro crítico durante a verificação de acesso do cobrador:", error);
-                        showBlockedView(`Ocorreu um erro ao verificar sua conta: ${error.message}`);
+                        console.error("Erro auth:", error);
+                        showBlockedView(`Erro de verificação: ${error.message}`);
                         await signOut(auth);
                     }
-
                 } else {
                     document.getElementById('app-container').style.display = 'none'; 
                     document.getElementById('login-view').style.display = 'flex'; 
                     loadGlobalSettings({}); 
-
                     const loginForm = document.getElementById('login-form');
                     if (loginForm) {
                         loginForm.removeEventListener('submit', handleLogin); 
@@ -7352,13 +7332,13 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     }
                 }
             });
-            // --- FIM TAREFA C1 ---
         }
 
         init();
     </script>
 </body>
     </html>
+
 
 
 
