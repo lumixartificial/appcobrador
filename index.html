@@ -1271,18 +1271,18 @@ const BLACKLIST_DATA = {
                     <div class="logo"><img id="header-logo" src="${DEFAULT_LOGO_URL}" alt="Logo da Empresa"><span id="header-logo-text" class="logo-text">Portal do Cobrador</span></div>
                     <div class="header-controls">
                         <div style="position: relative;">
-                            <!-- BOTÓN IDIOMA CON ETIQUETA -->
+                            <!-- BOTÓN IDIOMA CON ETIQUETA MÁS GRANDE -->
                             <button class="header-btn" id="lang-toggle" title="Mudar idioma" style="flex-direction: column; border-radius: 8px; width: auto; height: auto; padding: 4px 8px;">
-                                <i data-lucide="globe" style="width: 20px; height: 20px;"></i>
-                                <span style="font-size: 0.65em; font-weight: 600; margin-top: 2px;">Idioma</span>
+                                <i data-lucide="globe" style="width: 24px; height: 24px;"></i>
+                                <span style="font-size: 0.85em; font-weight: 700; margin-top: 2px;">Idioma</span>
                             </button>
                             <div class="lang-dropdown" id="lang-dropdown"><button data-lang="pt">Português</button><button data-lang="es">Español</button><button data-lang="en">English</button></div>
                         </div>
                         
-                        <!-- BOTÓN TEMA CON ETIQUETA -->
+                        <!-- BOTÓN TEMA CON ETIQUETA MÁS GRANDE -->
                         <button class="header-btn" id="theme-toggle" title="Mudar tema" style="flex-direction: column; border-radius: 8px; width: auto; height: auto; padding: 4px 8px;">
-                            <i data-lucide="moon" style="width: 20px; height: 20px;"></i>
-                            <span style="font-size: 0.65em; font-weight: 600; margin-top: 2px;">Tema</span>
+                            <i data-lucide="moon" style="width: 24px; height: 24px;"></i>
+                            <span style="font-size: 0.85em; font-weight: 700; margin-top: 2px;">Tema</span>
                         </button>
 
                         <div class="profile" id="header-profile-link" style="cursor: pointer;">
@@ -1304,18 +1304,21 @@ const BLACKLIST_DATA = {
                                 <div class="progress-text" id="route-progress-text">0/0</div>
                             </div>
                             
-                            <!-- NUEVO CAMPO: NOMBRE DE LA RUTA (AJUSTADO A LA IZQUIERDA) -->
-                            <!-- Agregamos 'transform: translateX(-10px)' para moverlo hacia el icono -->
+                            <!-- CAMPO PROTEGIDO: NOMBRE DE LA RUTA -->
                             <div style="width: 100%; display: flex; justify-content: center; margin-bottom: 5px; transform: translateX(-10px);">
                                 <div style="display: flex; align-items: center; justify-content: center; border-bottom: 1px dashed var(--text-secondary); padding-bottom: 4px; max-width: 200px;">
-                                    <i data-lucide="map" style="width: 14px; height: 14px; margin-right: 6px; color: var(--text-secondary);"></i>
-                                    <input type="text" id="route-name-input" placeholder="Nome da Rota" 
-                                        style="border: none; background: transparent; text-align: center; color: var(--text-primary); font-weight: 600; font-size: 0.95em; width: auto; min-width: 100px; max-width: 150px; outline: none;"
+                                    <!-- EL ICONO AHORA ES UN BOTÓN DE DESBLOQUEO -->
+                                    <button id="enable-route-edit-btn" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center;" title="Toque para editar o nome">
+                                        <i data-lucide="map" style="width: 14px; height: 14px; margin-right: 6px; color: var(--text-secondary);"></i>
+                                    </button>
+                                    
+                                    <!-- INPUT DESHABILITADO -->
+                                    <input type="text" id="route-name-input" placeholder="Nome da Rota" disabled
+                                        style="border: none; background: transparent; text-align: center; color: var(--text-primary); -webkit-text-fill-color: var(--text-primary); font-weight: 600; font-size: 0.95em; width: auto; min-width: 100px; max-width: 150px; outline: none; opacity: 1;"
                                         value="${(typeof currentCollectorData !== 'undefined' && currentCollectorData?.routeName) ? currentCollectorData.routeName : ''}"
                                     >
                                 </div>
                             </div>
-                            <!-- FIN NUEVO CAMPO -->
 
                         </div>
 
@@ -1347,7 +1350,6 @@ const BLACKLIST_DATA = {
                         <button class="filter-btn" data-filter="finished">FINALIZADOS</button>
                     </div>
 
-    <!-- ESTE ES EL CONTENEDOR QUE FALTABA -->
     <div class="client-list" id="all-clients-list"></div>
 </div>
 
@@ -1380,14 +1382,12 @@ const BLACKLIST_DATA = {
                          </div>
                          <div class="expense-list" id="expenses-list-container"></div>
                          
-                         <!-- SECCIÓN HISTÓRICO DE LIQUIDACIONES CON TRADUCCIÓN -->
                          <section style="margin-top: 30px;">
                              <h2 class="section-title" data-lang-key="settlementHistory"></h2>
                              <div class="item-list" id="settlements-list-container">
                                  <p class="loading" data-lang-key="loadingSettlements">Carregando liquidações...</p>
                              </div>
                          </section>
-                         <!-- FIN SECCIÓN -->
 
                      </div>
                     <div id="map-view" class="view container">
@@ -1404,7 +1404,6 @@ const BLACKLIST_DATA = {
                             <p style="margin: 5px 0 0; color: var(--text-secondary);" data-lang-key="collector"></p>
                         </div>
 
-                        <!-- KPI: CAPITAL TOTAL (PATRIMONIO) - TRADUCIBLE -->
                         <div class="kpi-card" style="display: none !important; margin-bottom: 20px; text-align: center; border-color: var(--accent-purple); border-width: 2px;">
                             <h3 class="kpi-title" style="justify-content: center; color: var(--accent-purple);">
                                 <i data-lucide="gem"></i> <span data-lang-key="totalAssets">Capital Total (Patrimônio)</span>
@@ -1412,7 +1411,6 @@ const BLACKLIST_DATA = {
                             <p class="kpi-value" id="kpi-total-patrimonio" style="color: var(--accent-purple); font-size: 1.8em;"></p>
                         </div>
 
-                        <!-- KPI: CAPITAL EM MÃOS - TRADUCIBLE -->
                         <div class="kpi-card" style="margin-bottom: 20px; text-align: center; border-color: var(--accent-green); border-width: 2px;">
                             <h3 class="kpi-title" style="justify-content: center; color: var(--accent-green);">
                                 <i data-lucide="banknote"></i> <span data-lang-key="capitalTotal">Capital em Mãos</span>
@@ -1420,7 +1418,6 @@ const BLACKLIST_DATA = {
                             <p class="kpi-value" id="kpi-capital-total"></p>
                         </div>
 
-                        <!-- KPI: CAPITAL DISTRIBUIDO - TRADUCIBLE -->
                         <div class="kpi-card" style="display: none !important; margin-bottom: 20px; text-align: center; border-color: var(--accent-orange);">
                             <h3 class="kpi-title" style="justify-content: center; color: var(--accent-orange);">
                                 <i data-lucide="briefcase"></i> <span data-lang-key="distributedCapital">Capital Distribuído</span>
@@ -1488,16 +1485,7 @@ const BLACKLIST_DATA = {
 
 
         
-        function applyTheme(theme) {
-            const body = document.body;
-            const themeToggle = document.getElementById('theme-toggle');
-            body.classList.toggle('dark-mode', theme === 'dark');
-            if (themeToggle) {
-                // MODIFICADO: Incluye el <span> con el texto "Tema" para que no desaparezca al cambiar el icono
-                themeToggle.innerHTML = `<i data-lucide="${theme === 'dark' ? 'sun' : 'moon'}" style="width: 20px; height: 20px;"></i><span style="font-size: 0.65em; font-weight: 600; margin-top: 2px;">Tema</span>`;
-                lucide.createIcons({ nodes: [themeToggle] });
-            }
-        }
+        
         
         
         function updateNotifications() {
@@ -2129,15 +2117,21 @@ async function showRefinanceModal(clientId, notificationId) {
                      // Isso pode acontecer em desktops onde o compartilhamento de arquivos não é suportado
                     console.warn('O compartilhamento de arquivos não é suportado neste navegador.');
                 }
-            } else {
-                if (!isAppMode) {
-                    console.log('Modo Web detectado: a opção de compartilhar fatura foi desativada.');
-                }
+            }
+        } // <--- ESTA LLAVE FALTABA (Cierra la función generateInvoicePDF)
+
+        // Ahora sí, la función applyTheme empieza limpia fuera de la anterior
+        function applyTheme(theme) {
+            const body = document.body;
+            const themeToggle = document.getElementById('theme-toggle');
+            body.classList.toggle('dark-mode', theme === 'dark');
+            if (themeToggle) {
+                // Aseguramos que al cambiar el icono, el texto se mantenga GRANDE (0.85em)
+                themeToggle.innerHTML = `<i data-lucide="${theme === 'dark' ? 'sun' : 'moon'}" style="width: 24px; height: 24px;"></i><span style="font-size: 0.85em; font-weight: 700; margin-top: 2px;">Tema</span>`;
+                lucide.createIcons({ nodes: [themeToggle] });
             }
         }
 
-        
-        
         function applyLanguage(lang) {
             currentLang = lang;
             document.querySelectorAll('[data-lang-key]').forEach(el => {
@@ -6177,10 +6171,34 @@ function showReportDateModal() {
         
         
         function setupEventListeners() {
-    // --- NUEVO: Listener para cambio de nombre de ruta ---
-    document.body.addEventListener('change', async (e) => {
+    // --- NUEVO: SISTEMA DE EDICIÓN PROTEGIDA DEL NOMBRE DE LA RUTA ---
+    
+    // 1. Botón para desbloquear edición
+    document.body.addEventListener('click', (e) => {
+        const btn = e.target.closest('#enable-route-edit-btn');
+        if (btn) {
+            const input = document.getElementById('route-name-input');
+            if (input) {
+                input.disabled = false; // Desbloquear
+                input.focus(); // Poner el cursor dentro
+                // Feedback visual sutil (borde púrpura mientras edita)
+                input.style.borderBottom = "1px solid var(--accent-purple)";
+                showToast("Edição liberada. Toque fora para salvar.");
+            }
+        }
+    });
+
+    // 2. Al perder el foco (blur), GUARDAR y BLOQUEAR de nuevo
+    document.body.addEventListener('focusout', async (e) => {
         if (e.target.id === 'route-name-input') {
-            const newName = e.target.value.trim();
+            const input = e.target;
+            const newName = input.value.trim();
+            
+            // Re-bloquear inmediatamente para seguridad
+            input.disabled = true;
+            input.style.borderBottom = "none"; // Quitar borde visual
+
+            // Guardar solo si hay un usuario válido
             if (currentCollectorUsername) {
                 try {
                     await updateDoc(doc(db, 'collectors', currentCollectorUsername), {
@@ -6194,7 +6212,7 @@ function showReportDateModal() {
             }
         }
     });
-    // --- FIN NUEVO ---
+    // --- FIN NUEVO SISTEMA ---
 
     document.body.addEventListener('click', e => {
         const target = e.target;
@@ -7314,6 +7332,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
 
