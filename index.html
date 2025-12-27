@@ -2694,6 +2694,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 // Solo mostrar hoy (desaparece a las 00:00 del día siguiente)
                 let typeLabel = '';
                 let typeColor = 'transparent';
+                let isLoanFromToday = false; // Variable para controlar el estado
                 
                 // 1. Obtener fecha de inicio del préstamo actual
                 let loanStartDate = null;
@@ -2705,7 +2706,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 // 2. Comprobar si es HOY
                 if (loanStartDate) {
-                    const isLoanFromToday = loanStartDate.getDate() === todayStart.getDate() &&
+                    isLoanFromToday = loanStartDate.getDate() === todayStart.getDate() &&
                                             loanStartDate.getMonth() === todayStart.getMonth() &&
                                             loanStartDate.getFullYear() === todayStart.getFullYear();
                     
@@ -2749,7 +2750,12 @@ async function showRefinanceModal(clientId, notificationId) {
                     secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 4px;">${freqText}</span>`;
                     mainValueColor = 'var(--accent-green)';
 
-                    if (displayLoan.amountDueToday > 0) {
+                    // --- CAMBIO AQUÍ: Si es préstamo nuevo de HOY, forzamos PENDIENTE ---
+                    if (isLoanFromToday) {
+                        bottomStatusText = translations[currentLang].statusPending; // "PENDENTE"
+                        bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
+                    } 
+                    else if (displayLoan.amountDueToday > 0) {
                         bottomStatusText = translations[currentLang].statusToPay;
                         bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
                     } else {
@@ -7353,6 +7359,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
 
