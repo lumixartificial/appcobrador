@@ -952,7 +952,7 @@ const BLACKLIST_DATA = {
                 paymentDescFull: 'Parcela #{start} paga integralmente.', 
                 paymentDescPartial: 'Pagamento parcial ({percent}%) da parcela.', 
                 paymentDescMultiple: 'Cobre {fullInstallments} parcela(s) e {percent}% da próxima.', 
-                paymentDescOverpay: 'Cobre a parcela #{start} e adianta {overpayAmount} para la próxima.',
+                paymentDescOverpay: 'Cobre a parcela #{start} e adianta {overpayAmount} para a próxima.',
                 paymentInstallmentTitle: 'Pagamento Parcela #{installment}',
                 paymentInstallmentsTitle: 'Pagamento Parcelas #{start} - #{end}',
                 fullPaymentDesc: 'Parcela #{installment} paga integralmente.',
@@ -975,9 +975,9 @@ const BLACKLIST_DATA = {
                 totalAssets: 'Capital Total (Patrimônio)',
                 distributedCapital: 'Capital Distribuído',
                 routeLabel: 'Rota:',
-                // NUEVAS CLAVES PARA METODOS DE PAGO
                 methodDigitalLabel: 'PIX',
-                methodCardLabel: 'Cartão'
+                methodCardLabel: 'Cartão',
+                salary: 'Salário' // <-- NUEVO
             },
             es: { 
                 biweekly: 'QUINCENAL', registerOutflow: 'Registrar Nueva Salida', addExpenseOption: 'Añadir Gasto', expenseOptionDesc: 'Registrar combustible, comida, etc.', cashWithdrawal: 'Retiro de Caja', withdrawalOptionDesc: 'Enviar dinero entregado al admin.', amountDeliveredAdmin: 'Monto entregado al Admin:', sendForApproval: 'Enviar para Aprobación',
@@ -1013,9 +1013,9 @@ const BLACKLIST_DATA = {
                 totalAssets: 'Capital Total (Patrimonio)',
                 distributedCapital: 'Capital Distribuido',
                 routeLabel: 'Ruta:',
-                // NUEVAS CLAVES PARA METODOS DE PAGO
                 methodDigitalLabel: 'Pago Electrónico',
-                methodCardLabel: 'Tarjeta'
+                methodCardLabel: 'Tarjeta',
+                salary: 'Salario' // <-- NUEVO
             },
             en: { 
                 biweekly: 'BI-WEEKLY', registerOutflow: 'Register New Outflow', addExpenseOption: 'Add Expense', expenseOptionDesc: 'Register fuel, food, etc.', cashWithdrawal: 'Cash Withdrawal', withdrawalOptionDesc: 'Send money delivered to admin.', amountDeliveredAdmin: 'Amount delivered to Admin:', sendForApproval: 'Send for Approval',
@@ -1051,9 +1051,9 @@ const BLACKLIST_DATA = {
                 totalAssets: 'Total Assets (Equity)',
                 distributedCapital: 'Distributed Capital',
                 routeLabel: 'Route:',
-                // NUEVAS CLAVES PARA METODOS DE PAGO
                 methodDigitalLabel: 'Digital Transfer',
-                methodCardLabel: 'Card'
+                methodCardLabel: 'Card',
+                salary: 'Salary' // <-- NUEVO
             }
         };
 
@@ -1307,8 +1307,8 @@ const BLACKLIST_DATA = {
                             <!-- CAMPO PROTEGIDO: NOMBRE DE LA RUTA -->
                             <div style="width: 100%; display: flex; justify-content: center; margin-bottom: 5px; transform: translateX(-10px);">
                                 <div style="display: flex; align-items: center; justify-content: center; border-bottom: 1px dashed var(--text-secondary); padding-bottom: 4px; max-width: 200px;">
-                                    <!-- EL ICONO AHORA ES UN BOTÓN DE DESBLOQUEO -->
-                                    <button id="enable-route-edit-btn" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center;" title="Toque para editar o nome">
+                                    <!-- EL ICONO AHORA REQUIERE DOBLE TOQUE -->
+                                    <button id="enable-route-edit-btn" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center;" title="Toque duas vezes para editar">
                                         <i data-lucide="map" style="width: 14px; height: 14px; margin-right: 6px; color: var(--text-secondary);"></i>
                                     </button>
                                     
@@ -1376,6 +1376,11 @@ const BLACKLIST_DATA = {
                              <button class="filter-btn active" data-category="all" data-lang-key="all"></button>
                              <button class="filter-btn" data-category="fuel" data-lang-key="fuel"></button>
                              <button class="filter-btn" data-category="food" data-lang-key="food"></button>
+                             
+                             <!-- AQUI AGREGAMOS EL BOTÓN SALARIO -->
+                             <button class="filter-btn" data-category="salary" data-lang-key="salary"></button>
+                             <!-- FIN BOTÓN SALARIO -->
+
                              <button class="filter-btn" data-category="rent" data-lang-key="rent"></button>
                              <button class="filter-btn" data-category="mechanics" data-lang-key="mechanics"></button>
                              <button class="filter-btn" data-category="other" data-lang-key="other"></button>
@@ -5407,6 +5412,11 @@ function showSettlementFormModal() {
                             <select id="expense-category" required>
                                 <option value="fuel" data-lang-key="fuel"></option>
                                 <option value="food" data-lang-key="food"></option>
+                                
+                                <!-- AQUI AGREGAMOS LA OPCIÓN SALARIO -->
+                                <option value="salary" data-lang-key="salary"></option>
+                                <!-- FIN OPCIÓN SALARIO -->
+
                                 <option value="rent" data-lang-key="rent"></option>
                                 <option value="mechanics" data-lang-key="mechanics"></option>
                                 <option value="other" data-lang-key="other"></option>
@@ -6171,19 +6181,30 @@ function showReportDateModal() {
         
         
         function setupEventListeners() {
-    // --- NUEVO: SISTEMA DE EDICIÓN PROTEGIDA DEL NOMBRE DE LA RUTA ---
+    // --- NUEVO: SISTEMA DE EDICIÓN PROTEGIDA (DOBLE TOQUE) ---
     
+    let lastTouchTime = 0; // Variable para controlar el doble toque
+
     // 1. Botón para desbloquear edición
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('#enable-route-edit-btn');
         if (btn) {
-            const input = document.getElementById('route-name-input');
-            if (input) {
-                input.disabled = false; // Desbloquear
-                input.focus(); // Poner el cursor dentro
-                // Feedback visual sutil (borde púrpura mientras edita)
-                input.style.borderBottom = "1px solid var(--accent-purple)";
-                showToast("Edição liberada. Toque fora para salvar.");
+            const currentTime = new Date().getTime();
+            const timeDiff = currentTime - lastTouchTime;
+            
+            // Si el segundo toque ocurre menos de 400ms después del primero = DOBLE TOQUE
+            if (timeDiff < 400 && timeDiff > 0) {
+                const input = document.getElementById('route-name-input');
+                if (input) {
+                    input.disabled = false; // Desbloquear
+                    input.focus(); // Poner el cursor dentro
+                    input.style.borderBottom = "1px solid var(--accent-purple)";
+                    showToast("Edição liberada. Toque fora para salvar.");
+                }
+                lastTouchTime = 0; // Reiniciar
+            } else {
+                lastTouchTime = currentTime;
+                // Opcional: Podrías mostrar un toast aquí diciendo "Toque de nuevo", pero puede ser molesto.
             }
         }
     });
@@ -7332,6 +7353,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
 
