@@ -679,6 +679,12 @@
             justify-content: center;
             align-items: center;
         }
+        /* Asegura que los pines rojos de los clientes no tengan fondo blanco */
+        .custom-red-pin {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
     </style>
 </head>
 <body>
@@ -5498,136 +5504,132 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
 
         // --- MAPA E OUTRAS FUNÇÕES ---
+        // --- MAPA E OUTRAS FUNÇÕES ---
         function initMap() {
             if (mapInstance) {
-                mapInstance.invalidateSize();
+                setTimeout(() => { mapInstance.invalidateSize(); }, 200);
                 return;
             };
-            mapInstance = L.map('map-container').setView([-16.68, -49.25], 13);
+            // Centrar en coordenadas por defecto (Goiânia) o en la ubicación del cobrador si existe
+            const initialLat = collectorCurrentLocation ? collectorCurrentLocation.lat : -16.68;
+            const initialLng = collectorCurrentLocation ? collectorCurrentLocation.lng : -49.25;
+            
+            mapInstance = L.map('map-container').setView([initialLat, initialLng], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(mapInstance);
         }
-        // [FUNCIÓN MOVIDA AL LUGAR CORRECTO] Pinta clientes en el mapa
+
+        // [FUNCIÓN CORRECTA Y LIMPIA] Pinta clientes (Rojo) y Cobrador (Moto) en el mapa
         function plotClientsOnMap() {
             if (!mapInstance) return;
             
-            // Reajustar tamaño del mapa por si la vista estaba oculta
-            mapInstance.invalidateSize();
+            // Reajuste para asegurar que el mapa cargue bien
+            setTimeout(() => { mapInstance.invalidateSize(); }, 200);
 
-            // 1. Limpiar marcadores antiguos si existen
+            // 1. Limpiar marcadores antiguos (Clientes)
             if (mapMarkers && mapMarkers.length > 0) {
                 mapMarkers.forEach(marker => marker.remove());
             }
             mapMarkers = [];
 
-            // 2. Definir el ícono de la "Burbujita Roja"
+            // 2. Icono de Burbuja Roja para Clientes
             const redPinIcon = L.divIcon({
                 className: 'custom-red-pin',
                 html: `
-                    <div style="
-                        background-color: #dc3545;
-                        width: 32px; 
-                        height: 32px; 
-                        border-radius: 50% 50% 50% 0; 
-                        transform: rotate(-45deg); 
-                        border: 3px solid white; 
-                        box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    ">
+                    <div style="background-color: #dc3545; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">
                         <div style="width: 8px; height: 8px; background: white; border-radius: 50%; transform: rotate(45deg);"></div>
-                    </div>
-                `,
+                    </div>`,
                 iconSize: [32, 42],
-                iconAnchor: [16, 42], // La punta del pin
-                popupAnchor: [0, -45] // Donde sale el popup
+                iconAnchor: [16, 42],
+                popupAnchor: [0, -45]
             });
 
             const locations = [];
 
-            // 3. Iterar sobre TODOS los clientes
+            // 3. Recorrer clientes y poner pines
             allClients.forEach(client => {
                 if (client.location) {
-                    // Intentar extraer coordenadas del link de Google Maps
-                    const match = client.location.match(/query=([\d.-]+),([\d.-]+)/);
+                    let lat = null, lng = null;
                     
+                    // Detectar coordenadas en varios formatos de URL
+                    let match = client.location.match(/query=([-+]?\d+\.\d+),([-+]?\d+\.\d+)/);
+                    if (!match) match = client.location.match(/@([-+]?\d+\.\d+),([-+]?\d+\.\d+)/);
+                    if (!match) match = client.location.match(/[?&]q=([-+]?\d+\.\d+),([-+]?\d+\.\d+)/);
+
                     if (match) {
-                        const lat = parseFloat(match[1]);
-                        const lng = parseFloat(match[2]);
+                        lat = parseFloat(match[1]);
+                        lng = parseFloat(match[2]);
+                        
                         locations.push([lat, lng]);
                         
-                        // Calcular estado para mostrar en el mapa
+                        // Determinar estado para el popup
                         let statusText = "ATIVO";
-                        let statusColor = "#28a745"; // Verde
+                        let statusColor = "#28a745";
                         
-                        // Buscamos si tiene algún préstamo activo o atrasado
-                        const activeLoan = client.loans ? client.loans.find(l => {
-                            // Usamos una lógica simplificada aquí para velocidad
-                            const paid = (l.history || []).filter(h => h.status === 'approved').reduce((a,b)=>a+(b.amount||0),0);
-                            return paid < (l.totalLoan - 0.1);
-                        }) : null;
+                        const activeLoan = client.loans ? client.loans.find(l => calculateLoanDetails(l).status !== 'finished') : null;
                         
                         if (activeLoan) {
-                            // Si tiene préstamo activo, verificamos si está atrasado usando la función principal
                             const details = calculateLoanDetails(activeLoan);
                             if (details.status === 'late') {
                                 statusText = `⚠️ ATRASADO (${details.lateDays} dias)`;
-                                statusColor = "#dc3545"; // Rojo
+                                statusColor = "#dc3545";
                             } else {
                                 statusText = "✅ EM DIA";
                             }
                         } else {
                             statusText = "🏁 FINALIZADO";
-                            statusColor = "#6f42c1"; // Morado
+                            statusColor = "#6f42c1";
                         }
 
-                        // Contenido del Popup (Globo de información)
                         const popupContent = `
                             <div style="text-align: center; font-family: 'Inter', sans-serif; min-width: 150px;">
                                 <div style="font-weight: 700; font-size: 1.1em; color: #333; margin-bottom: 4px;">${client.name}</div>
-                                <div style="font-size: 0.85em; font-weight: 600; color: ${statusColor}; margin-bottom: 12px; text-transform: uppercase;">
-                                    ${statusText}
-                                </div>
-                                <button class="btn-primary popup-details-btn" 
-                                    data-client-id="${client.id}" 
-                                    style="width: 100%; padding: 8px; font-size: 0.9em; border-radius: 6px; cursor: pointer; border: none; background-color: var(--accent-purple); color: white;">
-                                    Ver Ficha
-                                </button>
+                                <div style="font-size: 0.85em; font-weight: 600; color: ${statusColor}; margin-bottom: 12px; text-transform: uppercase;">${statusText}</div>
+                                <button class="btn-primary popup-details-btn" data-client-id="${client.id}" style="width: 100%; padding: 8px; font-size: 0.9em; border-radius: 6px; cursor: pointer; border: none; background-color: var(--accent-purple); color: white;">Ver Ficha</button>
                             </div>
                         `;
 
-                        // Crear el marcador
-                        const marker = L.marker([lat, lng], { icon: redPinIcon })
-                            .addTo(mapInstance)
-                            .bindPopup(popupContent);
+                        const marker = L.marker([lat, lng], { icon: redPinIcon }).addTo(mapInstance).bindPopup(popupContent);
                         
-                        // Configurar el botón "Ver Ficha" dentro del popup
+                        // Evento para el botón dentro del popup
                         marker.on('popupopen', (e) => {
-                            // Pequeño delay para asegurar que el DOM del popup existe
                             setTimeout(() => {
                                 const btn = document.querySelector(`.popup-details-btn[data-client-id="${client.id}"]`);
                                 if (btn) {
                                     btn.onclick = (evt) => {
                                         evt.stopPropagation();
-                                        // 1. Cerrar mapa yendo a Home (para limpiar vista)
-                                        // location.hash = 'home'; 
-                                        // 2. Abrir detalles del cliente directamente
                                         showClientDetails(client.id, 0);
                                     };
                                 }
                             }, 100);
                         });
-
                         mapMarkers.push(marker);
                     }
                 }
             });
             
-            // 4. Centrar el mapa para que se vean todos los clientes
+            // 4. Si tenemos la ubicación del cobrador, actualizamos su marcador "Moto"
+            if (collectorCurrentLocation) {
+                if (!collectorMarker) {
+                    const motoIcon = L.divIcon({
+                        className: 'collector-marker-icon',
+                        html: '<div style="font-size: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🛵</div>',
+                        iconSize: [35, 35],
+                        iconAnchor: [17, 17]
+                    });
+                    collectorMarker = L.marker([collectorCurrentLocation.lat, collectorCurrentLocation.lng], { icon: motoIcon, zIndexOffset: 1000 }).addTo(mapInstance);
+                } else {
+                    collectorMarker.setLatLng([collectorCurrentLocation.lat, collectorCurrentLocation.lng]);
+                }
+                locations.push([collectorCurrentLocation.lat, collectorCurrentLocation.lng]);
+            }
+
+            // 5. Centrar mapa para ver todo (o solo al cobrador si no hay clientes)
             if (locations.length > 0) {
                 mapInstance.fitBounds(locations, { padding: [50, 50] });
+            } else if (collectorCurrentLocation) {
+                mapInstance.setView([collectorCurrentLocation.lat, collectorCurrentLocation.lng], 15);
             }
         }
         // [FUNCIÓN ACTUALIZADA] Mapa General de Clientes con Pines Rojos
@@ -6717,7 +6719,8 @@ function showReportDateModal() {
 
 
 
-async function startRealtimeGeolocation() {
+// [FUNCIÓN CORREGIDA] Inicia GPS y dibuja la "Moto" 🛵
+        async function startRealtimeGeolocation() {
             if (locationWatchId) return; // Ya está activo
             
             if (!('geolocation' in navigator)) {
@@ -6728,47 +6731,54 @@ async function startRealtimeGeolocation() {
             try {
                 locationWatchId = navigator.geolocation.watchPosition(
                     (position) => {
-                        // --- ÉXITO ---
+                        // 1. Guardar coordenadas
                         collectorCurrentLocation = {
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
                         };
                         console.log('GPS OK:', collectorCurrentLocation);
                         
+                        // 2. ACTUALIZAR BASE DE DATOS (Cada 30s)
                         const now = Date.now();
-                        // Guardar en DB cada 30 segundos
                         if (now - lastLocationUpdateTime > 30000) { 
                             lastLocationUpdateTime = now;
                             const collectorRef = doc(db, 'collectors', currentCollectorUsername);
-                            // Enviamos actualización silenciosa
                             updateDoc(collectorRef, {
                                 lastLocation: {
                                     latitude: position.coords.latitude,
                                     longitude: position.coords.longitude
                                 },
                                 lastLocationUpdate: serverTimestamp()
-                            }).catch(e => console.warn("Ping GPS fallido (sin importancia):", e));
+                            }).catch(e => console.warn("Ping GPS silencioso:", e));
 
+                            // Recalcular distancias en la lista
                             updateTodaysRouteList(); 
                         }
 
-                        // Actualizar mapa
-                        if (mapInstance && collectorMarker) {
-                            const newLatLng = [collectorCurrentLocation.lat, collectorCurrentLocation.lng];
-                            collectorMarker.setLatLng(newLatLng);
+                        // 3. DIBUJAR LA MOTO EN EL MAPA (¡ESTO FALTABA!)
+                        if (mapInstance) {
+                            if (!collectorMarker) {
+                                // Si no existe, creamos el marcador de la moto
+                                const motoIcon = L.divIcon({
+                                    className: 'collector-marker-icon',
+                                    html: '<div style="font-size: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🛵</div>',
+                                    iconSize: [35, 35],
+                                    iconAnchor: [17, 17] // Centro del icono
+                                });
+                                collectorMarker = L.marker([collectorCurrentLocation.lat, collectorCurrentLocation.lng], { icon: motoIcon, zIndexOffset: 1000 }).addTo(mapInstance);
+                                // Centramos el mapa en la moto la primera vez
+                                mapInstance.setView([collectorCurrentLocation.lat, collectorCurrentLocation.lng], 15);
+                            } else {
+                                // Si ya existe, solo movemos la moto
+                                collectorMarker.setLatLng([collectorCurrentLocation.lat, collectorCurrentLocation.lng]);
+                            }
                         }
                     },
                     (error) => {
                         console.warn("Aviso GPS:", error.code, error.message);
-                        
-                        // ÚNICO CASO DE APAGADO REAL: EL USUARIO DIJO "NO" AL PERMISO
                         if (error.code === 1) {
-        // Solo mostramos el aviso, PERO NO APAGAMOS NADA
-        showToast('Aviso: Permissão de GPS negada pelo celular.', true);
-        console.warn("GPS sem permissão, mas mantendo switch ligado visualmente.");
-        // stopRealtimeGeolocation(); // <--- COMENTADO O BORRADO
-    }
-                        // Cualquier otro error (señal, timeout, desconocido) SE IGNORA y el botón sigue prendido.
+                            showToast('Aviso: Permissão de GPS negada.', true);
+                        }
                     },
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 }
                 );
@@ -6998,12 +7008,23 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 if (profileImg) profileImg.src = imageUrl || placeholderUrl;
 
                 // --- NUEVO: ACTUALIZAR INPUT DE NOMBRE DE RUTA ---
+                // --- ACTUALIZAR INPUT DE NOMBRE DE RUTA ---
                 const routeInput = document.getElementById('route-name-input');
                 if (routeInput && currentCollectorData.routeName) {
                     routeInput.value = currentCollectorData.routeName;
                 }
-                // --- FIN NUEVO ---
 
+                // --- [NUEVO] AUTO-ARRANQUE DE GPS Y MOTO 🛵 ---
+                // Esto verifica si el rastreo estaba activo y enciende el GPS automáticamente
+                if (currentCollectorData.isRealtimeTrackingActive) {
+                    const toggle = document.getElementById('realtime-tracking-toggle');
+                    if (toggle) toggle.checked = true;
+                    // Iniciamos el rastreo (la función ya existe abajo)
+                    startRealtimeGeolocation(); 
+                }
+                // --- FIN AUTO-ARRANQUE ---
+                
+                
             } else {
                  console.error(`Documento do cobrador ${currentCollectorUsername} foi excluído ou inacessível?`);
                  showBlockedView("Erro: Seus dados de cobrador não puderam ser carregados.");
@@ -7351,4 +7372,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
