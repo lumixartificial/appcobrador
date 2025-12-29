@@ -5529,10 +5529,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             }).addTo(mapInstance);
         }
 
-        // [FUNCIÓN CORRECTA Y LIMPIA] Pinta clientes (Rojo) y Cobrador (Moto) en el mapa
-        // [FUNCIÓN REFORZADA] Mapa de Clientes (Burbujas Rojas)
-        // [FUNCIÓN ACTUALIZADA] Mapa de Clientes con MOTO MODERNA
-        // [FUNCIÓN ACTUALIZADA] Mapa de Clientes con Moto 3D Estable
+        // [FUNCIÓN RESTAURADA] Mapa con Moto Emoji (100% Segura)
         function plotClientsOnMap() {
             if (!mapInstance) return;
             
@@ -5619,15 +5616,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 }
             });
             
-            // 4. Moto del Cobrador (si existe)
+            // 4. Moto del Cobrador (MOTO EMOJI - 100% SEGURA)
             if (collectorCurrentLocation) {
                 if (!collectorMarker) {
-                    // MOTO 3D MODERNA (Mismo enlace estable)
-                    const motoIcon = L.icon({
-                        iconUrl: 'https://img.icons8.com/fluency/96/motorcycle-delivery-single-box.png',
-                        iconSize: [48, 48],
-                        iconAnchor: [24, 24],
-                        className: 'collector-marker-icon'
+                    const motoIcon = L.divIcon({
+                        className: 'collector-marker-icon',
+                        html: '<div style="font-size: 35px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🛵</div>',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20]
                     });
                     collectorMarker = L.marker([collectorCurrentLocation.lat, collectorCurrentLocation.lng], { icon: motoIcon, zIndexOffset: 1000 }).addTo(mapInstance);
                 } else {
@@ -5643,6 +5639,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 mapInstance.setView([collectorCurrentLocation.lat, collectorCurrentLocation.lng], 15);
             }
         }
+        
         // [FUNCIÓN ACTUALIZADA] Mapa General de Clientes con Pines Rojos
         
 
@@ -6733,6 +6730,7 @@ function showReportDateModal() {
 // [FUNCIÓN CORREGIDA] Inicia GPS y dibuja la "Moto" 🛵
         // [FUNCIÓN CORREGIDA] Inicia GPS y dibuja la "Moto Moderna" 🛵💨
         // [FUNCIÓN CORREGIDA] Inicia GPS y dibuja la Moto (Imagen Estable 3D)
+        // [FUNCIÓN RESTAURADA] GPS con Moto Emoji (100% Segura) 🛵
         async function startRealtimeGeolocation() {
             if (locationWatchId) return; // Ya está activo
             
@@ -6771,12 +6769,12 @@ function showReportDateModal() {
                         // 3. DIBUJAR LA MOTO EN EL MAPA
                         if (mapInstance) {
                             if (!collectorMarker) {
-                                // MOTO 3D MODERNA (Enlace estable)
-                                const motoIcon = L.icon({
-                                    iconUrl: 'https://img.icons8.com/fluency/96/motorcycle-delivery-single-box.png', 
-                                    iconSize: [48, 48],   // Tamaño grande
-                                    iconAnchor: [24, 24], // Centro
-                                    className: 'collector-marker-icon'
+                                // MOTO EMOJI (A PRUEBA DE FALLOS)
+                                const motoIcon = L.divIcon({
+                                    className: 'collector-marker-icon',
+                                    html: '<div style="font-size: 35px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));">🛵</div>',
+                                    iconSize: [40, 40],
+                                    iconAnchor: [20, 20] 
                                 });
                                 collectorMarker = L.marker([collectorCurrentLocation.lat, collectorCurrentLocation.lng], { icon: motoIcon, zIndexOffset: 1000 }).addTo(mapInstance);
                                 // Centramos el mapa en la moto la primera vez
@@ -7385,6 +7383,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
 
