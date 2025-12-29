@@ -5532,6 +5532,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
         // [FUNCIÓN CORRECTA Y LIMPIA] Pinta clientes (Rojo) y Cobrador (Moto) en el mapa
         // [FUNCIÓN REFORZADA] Mapa de Clientes (Burbujas Rojas)
         // [FUNCIÓN ACTUALIZADA] Mapa de Clientes con MOTO MODERNA
+        // [FUNCIÓN ACTUALIZADA] Mapa de Clientes con Moto 3D Estable
         function plotClientsOnMap() {
             if (!mapInstance) return;
             
@@ -5621,9 +5622,9 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             // 4. Moto del Cobrador (si existe)
             if (collectorCurrentLocation) {
                 if (!collectorMarker) {
-                    // MOTO MODERNA (Misma URL)
+                    // MOTO 3D MODERNA (Mismo enlace estable)
                     const motoIcon = L.icon({
-                        iconUrl: 'https://cdn-icons-png.flaticon.com/512/9418/9418933.png',
+                        iconUrl: 'https://img.icons8.com/fluency/96/motorcycle-delivery-single-box.png',
                         iconSize: [48, 48],
                         iconAnchor: [24, 24],
                         className: 'collector-marker-icon'
@@ -6731,6 +6732,7 @@ function showReportDateModal() {
 
 // [FUNCIÓN CORREGIDA] Inicia GPS y dibuja la "Moto" 🛵
         // [FUNCIÓN CORREGIDA] Inicia GPS y dibuja la "Moto Moderna" 🛵💨
+        // [FUNCIÓN CORREGIDA] Inicia GPS y dibuja la Moto (Imagen Estable 3D)
         async function startRealtimeGeolocation() {
             if (locationWatchId) return; // Ya está activo
             
@@ -6769,11 +6771,11 @@ function showReportDateModal() {
                         // 3. DIBUJAR LA MOTO EN EL MAPA
                         if (mapInstance) {
                             if (!collectorMarker) {
-                                // MOTO MODERNA (Roja estilo Delivery)
+                                // MOTO 3D MODERNA (Enlace estable)
                                 const motoIcon = L.icon({
-                                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/9418/9418933.png', 
-                                    iconSize: [48, 48],   // Tamaño más grande para que se vea bien
-                                    iconAnchor: [24, 24], // Centro de la imagen
+                                    iconUrl: 'https://img.icons8.com/fluency/96/motorcycle-delivery-single-box.png', 
+                                    iconSize: [48, 48],   // Tamaño grande
+                                    iconAnchor: [24, 24], // Centro
                                     className: 'collector-marker-icon'
                                 });
                                 collectorMarker = L.marker([collectorCurrentLocation.lat, collectorCurrentLocation.lng], { icon: motoIcon, zIndexOffset: 1000 }).addTo(mapInstance);
@@ -7383,6 +7385,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
 
