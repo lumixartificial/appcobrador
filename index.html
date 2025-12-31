@@ -913,7 +913,8 @@ const BLACKLIST_DATA = {
                 routeLabel: 'Rota:',
                 methodDigitalLabel: 'PIX',
                 methodCardLabel: 'Cartão',
-                salary: 'Salário' // <-- NUEVO
+                salary: 'Salário', // <-- NUEVO
+                routeProgress: 'Progresso da Rota'
             },
             es: { 
                 biweekly: 'QUINCENAL', registerOutflow: 'Registrar Nueva Salida', addExpenseOption: 'Añadir Gasto', expenseOptionDesc: 'Registrar combustible, comida, etc.', cashWithdrawal: 'Retiro de Caja', withdrawalOptionDesc: 'Enviar dinero entregado al admin.', amountDeliveredAdmin: 'Monto entregado al Admin:', sendForApproval: 'Enviar para Aprobación',
@@ -951,7 +952,8 @@ const BLACKLIST_DATA = {
                 routeLabel: 'Ruta:',
                 methodDigitalLabel: 'Pago Electrónico',
                 methodCardLabel: 'Tarjeta',
-                salary: 'Salario' // <-- NUEVO
+                salary: 'Salario', // <-- NUEVO
+                routeProgress: 'Progreso de la Ruta'
             },
             en: { 
                 biweekly: 'BI-WEEKLY', registerOutflow: 'Register New Outflow', addExpenseOption: 'Add Expense', expenseOptionDesc: 'Register fuel, food, etc.', cashWithdrawal: 'Cash Withdrawal', withdrawalOptionDesc: 'Send money delivered to admin.', amountDeliveredAdmin: 'Amount delivered to Admin:', sendForApproval: 'Send for Approval',
@@ -989,7 +991,8 @@ const BLACKLIST_DATA = {
                 routeLabel: 'Route:',
                 methodDigitalLabel: 'Digital Transfer',
                 methodCardLabel: 'Card',
-                salary: 'Salary' // <-- NUEVO
+                salary: 'Salary', // <-- NUEVO
+                routeProgress: 'Route Progress'
             }
         };
 
@@ -1232,7 +1235,8 @@ const BLACKLIST_DATA = {
                         
                         <!-- KPI CARD (Progresso da Rota) -->
                         <div class="kpi-card progress-card" style="margin-bottom: 20px; display: flex; flex-direction: column; align-items: center;">
-                            <h3 class="kpi-title" style="justify-content: center; width: 100%;">Progresso da Rota</h3>
+                            <!-- TÍTULO DINÁMICO (MODIFICADO AQUÍ) -->
+                            <h3 class="kpi-title" style="justify-content: center; width: 100%;" data-lang-key="routeProgress">Progresso da Rota</h3>
                             
                             <!-- CIRCULO -->
                             <div class="progress-circle" style="margin: 0 auto 15px auto;">
@@ -2626,13 +2630,11 @@ async function showRefinanceModal(clientId, notificationId) {
                     avatarHex = 'dc3545'; reputationLabel = txt.bad; reputationColor = '#dc3545';
                 }
 
-                // --- [LÓGICA CORREGIDA] ETIQUETA DIARIA (NUEVO / RENOVADO) ---
-                // Solo mostrar hoy (desaparece a las 00:00 del día siguiente)
+                // --- ETIQUETA NUEVO / RENOVADO ---
                 let typeLabel = '';
                 let typeColor = 'transparent';
-                let isLoanFromToday = false; // Variable para controlar el estado
+                let isLoanFromToday = false; 
                 
-                // 1. Obtener fecha de inicio del préstamo actual
                 let loanStartDate = null;
                 if (loan.startDate) {
                      if (loan.startDate.seconds) loanStartDate = new Date(loan.startDate.seconds * 1000);
@@ -2640,7 +2642,6 @@ async function showRefinanceModal(clientId, notificationId) {
                      else loanStartDate = new Date(loan.startDate);
                 }
 
-                // 2. Comprobar si es HOY
                 if (loanStartDate) {
                     isLoanFromToday = loanStartDate.getDate() === todayStart.getDate() &&
                                             loanStartDate.getMonth() === todayStart.getMonth() &&
@@ -2652,14 +2653,13 @@ async function showRefinanceModal(clientId, notificationId) {
                         
                         if (totalLoansCount > 1) {
                             typeLabel = 'RENOVADO'; 
-                            typeColor = 'var(--accent-purple)'; // Morado
+                            typeColor = 'var(--accent-purple)'; 
                         } else {
                             typeLabel = isEs ? 'NUEVO' : 'NOVO';
-                            typeColor = '#0ea5e9'; // Azul Cyan
+                            typeColor = '#0ea5e9'; 
                         }
                     }
                 }
-                // ------------------------------------------------
 
                 if (displayLoan.status === 'finished') {
                     mainValueToDisplay = 0; 
@@ -2686,9 +2686,8 @@ async function showRefinanceModal(clientId, notificationId) {
                     secondaryLabelHtml = `<span style="font-size: 0.9em; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; margin-top: 4px;">${freqText}</span>`;
                     mainValueColor = 'var(--accent-green)';
 
-                    // --- CAMBIO AQUÍ: Si es préstamo nuevo de HOY, forzamos PENDIENTE ---
                     if (isLoanFromToday) {
-                        bottomStatusText = translations[currentLang].statusPending; // "PENDENTE"
+                        bottomStatusText = translations[currentLang].statusPending; 
                         bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
                     } 
                     else if (displayLoan.amountDueToday > 0) {
@@ -2727,11 +2726,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 const photoUrl = client.profilePictureUrl || placeholderUrl;
                 const borderStyle = client.profilePictureUrl ? `border: 3px solid ${reputationColor};` : '';
 
-                // AQUI AGREGAMOS EL SPAN SOLO SI typeLabel TIENE CONTENIDO
                 const labelHtml = typeLabel 
                     ? `<span style="font-size: 0.6em; font-weight: 700; color: ${typeColor}; margin-top: 2px; letter-spacing: 0.5px; animation: pulse 2s infinite;">${typeLabel}</span>`
                     : '';
 
+                // --- AQUI ESTA EL CAMBIO VISUAL PRINCIPAL ---
                 card.innerHTML = `
                     <div style="display: flex; flex-direction: column; align-items: center; margin-right: 15px; min-width: 55px;">
                         <img src="${photoUrl}" alt="Foto" class="client-avatar" style="${borderStyle} width: 50px; height: 50px;">
@@ -2739,14 +2738,15 @@ async function showRefinanceModal(clientId, notificationId) {
                         ${labelHtml}
                     </div>
 
-                    <div class="client-info">
-                        <h4 class="client-name" style="margin-bottom: 0px;">${client.name}</h4>
+                    <div class="client-info" style="flex-grow: 1; min-width: 0; margin-right: 10px;">
+                        <!-- NOMBRE EN UNA SOLA LINEA -->
+                        <h4 class="client-name" style="margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">${client.name}</h4>
                         ${loanInfoLabel} 
                         ${statusLabelUnderName}
-                        <p class="client-address" style="margin-top: 4px;"><i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${client.address}</p>
+                        <!-- DIRECCION ELIMINADA DE AQUI -->
                     </div>
                     
-                    <div class="payment-info" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+                    <div class="payment-info" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; flex-shrink: 0;">
                         <span class="payment-amount" style="color: ${mainValueColor}; font-size: 1.5em; line-height: 1;">
                             ${money(mainValueToDisplay)}
                         </span> 
@@ -3181,7 +3181,32 @@ async function showRefinanceModal(clientId, notificationId) {
         renderClientCards(container, clientsWithLoans);
     }
         
+        // --- PEGAR ESTO ANTES DE function showClientDetails ---
+
+async function sendNotificationToClient(clientId, title, body, type, icon) {
+    try {
+        // Verificamos si db y currentCompanyId existen antes de intentar guardar
+        if (typeof db === 'undefined' || !currentCompanyId) return;
         
+        const notification = {
+            title: title,
+            body: body,
+            date: serverTimestamp(),
+            read: false,
+            type: type || 'info',
+            icon: icon || 'bell'
+        };
+        // Guardar en la subcolección de notificaciones del cliente
+        await addDoc(collection(db, 'companies', currentCompanyId, 'clients', clientId, 'notifications'), notification);
+        console.log(`Notificação enviada ao cliente ${clientId}`);
+    } catch (error) {
+        console.error("Erro ao enviar notificação (ignorado para não travar app):", error);
+    }
+}
+
+// ---------------------------------------------------------
+
+
         function showClientDetails(clientId, loanIndex = 0) {
             currentDetailClientId = clientId;
             currentDetailLoanIndex = loanIndex;
@@ -3416,6 +3441,32 @@ async function showRefinanceModal(clientId, notificationId) {
             else if (score >= 7) barStatusClass = 'status-good';
             else if (score >= 3) barStatusClass = 'status-regular';
 
+            // --- LÓGICA DE VALOR PICO (CORREGIDA: LO QUE EL CLIENTE DIO) ---
+            // Pico = El resto de la división. Es el dinero parcial que el cliente tiene a favor.
+            // Ej: Cuota 100. Pagó 45. Pico = 45.
+            // Ej: Cuota 100. Pagó 150. Pico = 50.
+            let picoValue = 0;
+            const instVal = loan.originalInstallmentAmount || 0;
+            
+            if (instVal > 0 && displayTotalPaid > 0) {
+                const remainder = displayTotalPaid % instVal;
+                
+                // Filtramos errores decimales (ej: 0.0000001)
+                // Si el resto es mayor a 5 centavos, lo mostramos.
+                if (remainder > 0.05 && (instVal - remainder) > 0.05) {
+                    picoValue = remainder;
+                }
+            }
+            // ----------------------------------------
+
+            // --- DICCIONARIO LOCAL PARA TÍTULOS ---
+            const labels = {
+                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor de Pico (Pago Parcial)' },
+                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor de Pico (Pago Parcial)' },
+                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance' }
+            };
+            const l = labels[currentLang] || labels.pt;
+
             clientDetailView.innerHTML = `
                 <header class="modal-header" style="justify-content: space-between;">
                     <div style="display: flex; align-items: center;">
@@ -3435,7 +3486,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 <div class="loan-tabs-wrapper"> 
                     <div class="loan-tabs-container" id="loan-tabs-container">
                         ${allLoans.map((l, index) => {
-                            // CORRECCIÓN: Generamos pestañas para TODOS los préstamos
                             const lStatus = calculateLoanDetails(l).status;
                             const isFinished = lStatus === 'finished';
                             return `<button class="loan-tab ${index === currentLoanIndex ? 'active' : ''}" data-loan-index="${index}" style="${isFinished ? 'opacity: 0.7;' : ''}">
@@ -3447,24 +3497,48 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 <div class="modal-content-wrapper">
                   <div class="container">
+                    
                     <div class="kpi-card progress-card" style="margin-bottom: 20px;">
-                        <h3 class="kpi-title" style="justify-content: center;">Progresso do Empréstimo ${currentLoanIndex + 1}</h3>
+                        <h3 class="kpi-title" style="justify-content: center;">${l.progress} ${currentLoanIndex + 1}</h3>
                         <div class="progress-circle">
                             <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="client-detail-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292; stroke: var(--accent-purple);"></circle></svg>
                             <div class="progress-text" id="client-detail-progress-text"></div>
                         </div>
                     </div>
+
                     <div class="kpi-card" style="margin-bottom: 20px; text-align: center;">
-                        <h3 class="kpi-title" style="justify-content: center;">Estado do Préstamo ${currentLoanIndex + 1}</h3>
+                        <h3 class="kpi-title" style="justify-content: center;">${l.status} ${currentLoanIndex + 1}</h3>
                         <span class="payment-status ${statusClass}" style="font-size: 1.2em; font-weight: 600; padding: 8px 20px;">
                             ${statusText}
                         </span>
                     </div>
+
+                    <div class="kpi-card" style="margin-bottom: 20px; padding: 15px; display: flex; align-items: center; gap: 15px; background-color: var(--surface);">
+                        <div style="background-color: color-mix(in srgb, var(--accent-purple) 10%, transparent); padding: 10px; border-radius: 50%; display: flex; justify-content: center; align-items: center;">
+                            <i data-lucide="map-pin" style="color: var(--accent-purple); width: 20px; height: 20px;"></i>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-size: 0.8em; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${l.loc}</span>
+                            <span style="font-size: 1.05em; font-weight: 500; color: var(--text-primary); line-height: 1.3;">${client.address}</span>
+                            ${client.city ? `<span style="font-size: 0.85em; color: var(--text-secondary); margin-top: 2px;">${client.city}</span>` : ''}
+                        </div>
+                    </div>
+
                     <section class="kpi-grid-profile" style="margin-bottom: 30px;">
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
+                        
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
+                        
+                        <!-- TARJETA VALOR PICO (NUEVA LÓGICA: LO PAGADO) -->
+                        <div class="kpi-card" style="border-color: var(--accent-orange); border-width: 1px;">
+                            <h3 class="kpi-title"><i data-lucide="trending-up" style="color: var(--accent-orange);"></i> ${l.pico}</h3>
+                            <p class="kpi-value" style="color: var(--accent-orange);">${money(picoValue)}</p>
+                        </div>
+                        <!-- FIN TARJETA PICO -->
+
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
-                       <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
+                       
+                        <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
                            <h3 class="kpi-title"><i data-lucide="alert-triangle" style="color: var(--danger-color);"></i> Mora Acumulada</h3>
                            <p class="kpi-value" style="color: var(--danger-color);">${money(loan.lateFeesAccumulated || 0)}</p>
                        </div>
@@ -3494,7 +3568,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 <div class="action-buttons">
                     ${currentStatus === 'finished' ? `
                         <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
-                        <!-- CORRECCIÓN: Botón para nuevo préstamo siempre visible -->
                         <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
                     ` : `
                         <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
@@ -3582,10 +3655,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 });
                 
                 // --- INICIO: SOLUCIÓN BOTÓN IR ---
+                // --- INICIO: BLOQUE ROBUSTO PARA BOTÓN IR ---
                 const startRouteBtn = document.getElementById('startRouteBtn');
                 let navigationUrl = client.location;
 
-                // Si no hay GPS, intentamos construir la búsqueda con la dirección
+                // 1. Si no hay GPS exacto, construimos la URL con la dirección escrita
                 if (!navigationUrl || navigationUrl.trim() === '') {
                     if (client.address && client.address.trim() !== '') {
                         const fullAddress = `${client.address}, ${client.city || ''}`;
@@ -3593,26 +3667,50 @@ async function showRefinanceModal(clientId, notificationId) {
                     }
                 }
 
-                if (navigationUrl) {
-                     startRouteBtn.disabled = false;
-                     startRouteBtn.style.opacity = '1';
-                     startRouteBtn.title = 'Navegar até o cliente'; 
-                     
-                     startRouteBtn.addEventListener('click', () => {
-                         const notifTitle = translations[currentLang].collectorOnTheWayTitle;
-                         const notifBody = translations[currentLang].collectorOnTheWayBody;
-                         sendNotificationToClient(clientId, notifTitle, notifBody, 'on_the_way', 'navigation');
-                         
-                         showToast('Abrindo mapa...', false);
-                         window.open(navigationUrl, '_blank');
-                     });
-                 } else {
-                     startRouteBtn.disabled = true;
-                     startRouteBtn.style.opacity = '0.5';
-                     startRouteBtn.title = 'Endereço não disponível';
-                 }
-                 // --- FIN: SOLUCIÓN BOTÓN IR ---
-            } // <--- ¡ESTA ES LA LLAVE QUE FALTABA! Cierra el 'else'
+                // 2. Configurar el botón (con protecciones de seguridad)
+                if (startRouteBtn) {
+                    if (navigationUrl) {
+                        startRouteBtn.disabled = false;
+                        startRouteBtn.style.opacity = '1';
+                        startRouteBtn.title = 'Navegar até o cliente'; 
+                        
+                        // CLONAMOS el botón para borrar cualquier evento 'click' anterior corrupto
+                        const newBtn = startRouteBtn.cloneNode(true);
+                        startRouteBtn.parentNode.replaceChild(newBtn, startRouteBtn);
+
+                        // Agregamos el nuevo evento "limpio"
+                        newBtn.addEventListener('click', async (e) => {
+                            e.preventDefault(); // Evita comportamientos extraños
+                            showToast('Abrindo mapa...', false);
+                            
+                            // Intentamos notificar, pero dentro de un try-catch para que NUNCA bloquee el mapa
+                            try {
+                                const t = translations[currentLang] || translations['pt'];
+                                const notifTitle = t.collectorOnTheWayTitle || 'Cobrador a caminho!';
+                                const notifBody = t.collectorOnTheWayBody || 'Nosso cobrador está a caminho.';
+                                
+                                // Solo llamamos a la función si realmente existe en el código
+                                if (typeof sendNotificationToClient === 'function') {
+                                    sendNotificationToClient(clientId, notifTitle, notifBody, 'on_the_way', 'navigation');
+                                }
+                            } catch (err) {
+                                console.warn("Aviso: No se pudo notificar, pero el mapa se abrirá igual.", err);
+                            }
+                            
+                            // Abrimos el mapa SIEMPRE, con un pequeño retraso para que se vea el Toast
+                            setTimeout(() => {
+                                window.open(navigationUrl, '_blank');
+                            }, 100);
+                        });
+                    } else {
+                        // Si no hay ubicación ni dirección, deshabilitamos visualmente
+                        startRouteBtn.disabled = true;
+                        startRouteBtn.style.opacity = '0.5';
+                        startRouteBtn.title = 'Endereço não disponível';
+                    }
+                }
+                // --- FIN: BLOQUE ROBUSTO PARA BOTÓN IR ---
+            }  // <--- ¡ESTA ES LA LLAVE QUE FALTABA! (Cierra el 'else')
 
             // --- Lógica del Historial de Pagos (Fuera del if/else) ---
             clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
