@@ -2712,8 +2712,10 @@ async function showRefinanceModal(clientId, notificationId) {
                 }
 
                 const remainingDisplay = money(remainingBalance);
+                
+                // --- CAMBIO: Se eliminó el indicador de índice (#2) ---
                 const loanInfoLabel = `<span style="font-size: 0.95em; color: #d97706; font-weight: 800; display: block; margin-top: 3px;">
-                    <i data-lucide="trending-down" style="width: 14px; height: 14px; vertical-align: text-bottom;"></i> Resta: ${remainingDisplay} ${client.loans.length > 1 ? `(#${loanIndex + 1})` : ''}
+                    <i data-lucide="trending-down" style="width: 14px; height: 14px; vertical-align: text-bottom;"></i> Resta: ${remainingDisplay}
                 </span>`;
 
                 const card = document.createElement('div');
@@ -2730,7 +2732,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     ? `<span style="font-size: 0.6em; font-weight: 700; color: ${typeColor}; margin-top: 2px; letter-spacing: 0.5px; animation: pulse 2s infinite;">${typeLabel}</span>`
                     : '';
 
-                // --- AQUI ESTA EL CAMBIO VISUAL PRINCIPAL ---
                 card.innerHTML = `
                     <div style="display: flex; flex-direction: column; align-items: center; margin-right: 15px; min-width: 55px;">
                         <img src="${photoUrl}" alt="Foto" class="client-avatar" style="${borderStyle} width: 50px; height: 50px;">
@@ -2739,11 +2740,10 @@ async function showRefinanceModal(clientId, notificationId) {
                     </div>
 
                     <div class="client-info" style="flex-grow: 1; min-width: 0; margin-right: 10px;">
-                        <!-- NOMBRE EN UNA SOLA LINEA -->
-                        <h4 class="client-name" style="margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">${client.name}</h4>
+                        <!-- CAMBIO: Nombre completo sin cortes (wrap activado) -->
+                        <h4 class="client-name" style="margin-bottom: 2px; font-size: 1em; line-height: 1.2;">${client.name}</h4>
                         ${loanInfoLabel} 
                         ${statusLabelUnderName}
-                        <!-- DIRECCION ELIMINADA DE AQUI -->
                     </div>
                     
                     <div class="payment-info" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; flex-shrink: 0;">
