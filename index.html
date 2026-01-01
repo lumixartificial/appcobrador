@@ -2261,7 +2261,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
                     // Solo sumamos a la meta si hoy es día de pago según la frecuencia
                     if (isPaymentDay) {
-                        console.log(`META: ${client.name} suma ${goalForThisClient.toFixed(2)} (Deuda total al iniciar dia: ${debtAtStartOfDay})`);
+                        console.log(`META: ${client.name} suma ${goalForThisClient.toFixed(2)}`);
                         calculatedDailyGoal += goalForThisClient;
                     }
                 });
@@ -7406,3 +7406,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
