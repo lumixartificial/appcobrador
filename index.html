@@ -1213,7 +1213,7 @@ const BLACKLIST_DATA = {
                     <div class="logo"><img id="header-logo" src="${DEFAULT_LOGO_URL}" alt="Logo da Empresa"><span id="header-logo-text" class="logo-text">Portal do Cobrador</span></div>
                     <div class="header-controls">
                         <div style="position: relative;">
-                            <!-- BOTÓN IDIOMA CON ETIQUETA MÁS GRANDE -->
+                            <!-- BOTÓN IDIOMA -->
                             <button class="header-btn" id="lang-toggle" title="Mudar idioma" style="flex-direction: column; border-radius: 8px; width: auto; height: auto; padding: 4px 8px;">
                                 <i data-lucide="globe" style="width: 24px; height: 24px;"></i>
                                 <span style="font-size: 0.85em; font-weight: 700; margin-top: 2px;">Idioma</span>
@@ -1221,7 +1221,7 @@ const BLACKLIST_DATA = {
                             <div class="lang-dropdown" id="lang-dropdown"><button data-lang="pt">Português</button><button data-lang="es">Español</button><button data-lang="en">English</button></div>
                         </div>
                         
-                        <!-- BOTÓN TEMA CON ETIQUETA MÁS GRANDE -->
+                        <!-- BOTÓN TEMA -->
                         <button class="header-btn" id="theme-toggle" title="Mudar tema" style="flex-direction: column; border-radius: 8px; width: auto; height: auto; padding: 4px 8px;">
                             <i data-lucide="moon" style="width: 24px; height: 24px;"></i>
                             <span style="font-size: 0.85em; font-weight: 700; margin-top: 2px;">Tema</span>
@@ -1238,35 +1238,28 @@ const BLACKLIST_DATA = {
                         
                         <!-- KPI CARD (Progresso da Rota) -->
                         <div class="kpi-card progress-card" style="margin-bottom: 20px; display: flex; flex-direction: column; align-items: center;">
-                            <!-- TÍTULO DINÁMICO (MODIFICADO AQUÍ) -->
                             <h3 class="kpi-title" style="justify-content: center; width: 100%;" data-lang-key="routeProgress">Progresso da Rota</h3>
                             
-                            <!-- CIRCULO -->
                             <div class="progress-circle" style="margin: 0 auto 15px auto;">
                                 <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="route-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292;"></circle></svg>
                                 <div class="progress-text" id="route-progress-text">0/0</div>
                             </div>
                             
-                            <!-- CAMPO PROTEGIDO: NOMBRE DE LA RUTA -->
-                            <div style="width: 100%; display: flex; justify-content: center; margin-bottom: 5px; transform: translateX(-10px);">
-                                <div style="display: flex; align-items: center; justify-content: center; border-bottom: 1px dashed var(--text-secondary); padding-bottom: 4px; max-width: 200px;">
-                                    <!-- EL ICONO AHORA REQUIERE DOBLE TOQUE -->
-                                    <button id="enable-route-edit-btn" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center;" title="Toque duas vezes para editar">
-                                        <i data-lucide="map" style="width: 14px; height: 14px; margin-right: 6px; color: var(--text-secondary);"></i>
-                                    </button>
-                                    
-                                    <!-- INPUT DESHABILITADO -->
-                                    <input type="text" id="route-name-input" placeholder="Nome da Rota" disabled
-                                        style="border: none; background: transparent; text-align: center; color: var(--text-primary); -webkit-text-fill-color: var(--text-primary); font-weight: 600; font-size: 0.95em; width: auto; min-width: 100px; max-width: 150px; outline: none; opacity: 1;"
-                                        value="${(typeof currentCollectorData !== 'undefined' && currentCollectorData?.routeName) ? currentCollectorData.routeName : ''}"
-                                    >
-                                </div>
+                            <!-- NOMBRE DE LA RUTA (COLOR SUAVE Y SIN BRILLO MOLESTO) -->
+                            <div style="width: 100%; display: flex; justify-content: center; margin-bottom: 5px; position: relative;">
+                                <input type="text" id="route-name-input" placeholder="Nome da Rota" disabled
+                                    style="border: none; background: transparent; text-align: center; 
+                                    color: #2dd4bf; /* Turquesa Suave (Menta) */
+                                    font-weight: 700; font-size: 1.3em; width: 100%; outline: none; opacity: 1; letter-spacing: 0.5px; text-transform: uppercase;"
+                                    value="${(typeof currentCollectorData !== 'undefined' && currentCollectorData?.routeName) ? currentCollectorData.routeName : ''}"
+                                >
+                                <!-- Botón invisible para habilitar edición con doble clic -->
+                                <div id="enable-route-edit-btn" style="position: absolute; top:0; left:0; width:100%; height:100%; cursor: pointer;"></div>
                             </div>
 
                         </div>
 
                         <section class="kpi-grid">
-                            <!-- META DIARIA UNIFICADA -->
                             <div class="kpi-card">
                                 <h3 class="kpi-title" data-lang-key="dailyGoal"><i data-lucide="target"></i></h3>
                                 <p class="kpi-value" id="kpi-goal"></p>
@@ -1278,23 +1271,23 @@ const BLACKLIST_DATA = {
                         <section class="route-section"><h2 class="section-title" data-lang-key="todaysRoute"></h2><div class="client-list" id="todays-route-list"><div class="loading">Carregando clientes...</div></div></section>
                     </div>
                     <div id="clients-view" class="view container">
-    <div class="search-bar-wrapper">
-        <i class="icon" data-lucide="search"></i>
-        <input type="text" id="client-search-input" placeholder="Buscar cliente...">
-    </div>
+                        <div class="search-bar-wrapper">
+                            <i class="icon" data-lucide="search"></i>
+                            <input type="text" id="client-search-input" placeholder="Buscar cliente...">
+                        </div>
 
-                    <div class="filter-buttons">
-                        <button class="filter-btn active" data-filter="all">TODOS</button>
-                        <button class="filter-btn" data-filter="weekly">SEMANALES</button>
-                        <button class="filter-btn" data-filter="biweekly">QUINCENAL</button>
-                        <button class="filter-btn" data-filter="todo_today">FALTA POR PAGAR</button>
-                        <button class="filter-btn" data-filter="paid">PAGADOS</button>
-                        <button class="filter-btn" data-filter="late">ATRASADOS</button>
-                        <button class="filter-btn" data-filter="finished">FINALIZADOS</button>
+                        <div class="filter-buttons">
+                            <button class="filter-btn active" data-filter="all">TODOS</button>
+                            <button class="filter-btn" data-filter="weekly">SEMANALES</button>
+                            <button class="filter-btn" data-filter="biweekly">QUINCENAL</button>
+                            <button class="filter-btn" data-filter="todo_today">FALTA POR PAGAR</button>
+                            <button class="filter-btn" data-filter="paid">PAGADOS</button>
+                            <button class="filter-btn" data-filter="late">ATRASADOS</button>
+                            <button class="filter-btn" data-filter="finished">FINALIZADOS</button>
+                        </div>
+
+                        <div class="client-list" id="all-clients-list"></div>
                     </div>
-
-    <div class="client-list" id="all-clients-list"></div>
-</div>
 
                     <div id="notifications-view" class="view container">
                          <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-purple);">
@@ -1319,11 +1312,7 @@ const BLACKLIST_DATA = {
                              <button class="filter-btn active" data-category="all" data-lang-key="all"></button>
                              <button class="filter-btn" data-category="fuel" data-lang-key="fuel"></button>
                              <button class="filter-btn" data-category="food" data-lang-key="food"></button>
-                             
-                             <!-- AQUI AGREGAMOS EL BOTÓN SALARIO -->
                              <button class="filter-btn" data-category="salary" data-lang-key="salary"></button>
-                             <!-- FIN BOTÓN SALARIO -->
-
                              <button class="filter-btn" data-category="rent" data-lang-key="rent"></button>
                              <button class="filter-btn" data-category="mechanics" data-lang-key="mechanics"></button>
                              <button class="filter-btn" data-category="other" data-lang-key="other"></button>
@@ -2112,11 +2101,13 @@ async function showRefinanceModal(clientId, notificationId) {
          * con este bloque de código completo.
          */
         function updateRouteProgress() {
-            let totalActiveLoansCount = 0;
+            let totalRouteCount = 0;
             let paidTodayCount = 0;
 
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dayOfWeek = today.getDay();
+            const dayOfMonth = today.getDate();
 
             const getPaymentDate = (dateObj) => {
                 if (!dateObj) return null;
@@ -2132,24 +2123,48 @@ async function showRefinanceModal(clientId, notificationId) {
                 client.loans.forEach(loan => {
                      const details = calculateLoanDetails(loan);
                      
-                     // Verificar si PAGÓ HOY
+                     // 1. Verificar si PAGÓ HOY
                      let hasPaidToday = false;
                      if (loan.history) {
                          hasPaidToday = loan.history.some(h => {
                              if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false;
                              const pDate = getPaymentDate(h.date);
-                             return pDate && pDate >= todayStart;
+                             return pDate && pDate >= today;
                          });
                      }
 
-                     // LÓGICA CORREGIDA:
-                     // Contamos para la barra si el préstamo sigue ACTIVO 
-                     // O si está FINALIZADO pero el pago ocurrió HOY (para llegar al 100%)
-                     const isActive = details.status !== 'finished';
-                     const isFinishedToday = (details.status === 'finished' && hasPaidToday);
+                     // 2. Verificar si pertenece a la RUTA DE HOY
+                     let isInRoute = false;
+                     const frequency = loan.paymentFrequency || 'daily';
+                     const paymentDays = loan.paymentDays || [];
 
-                     if (isActive || isFinishedToday) {
-                         totalActiveLoansCount++;
+                     if (frequency === 'daily') {
+                         // --- CORRECCIÓN: IGUAL QUE LA LISTA VISUAL ---
+                         // Si es diario, entra SIEMPRE en la ruta (no importa el día de la semana)
+                         isInRoute = true; 
+                     } else if (frequency === 'weekly') {
+                         isInRoute = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+                     } else if (frequency === 'biweekly') {
+                         if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
+                             const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                             startDate.setHours(0,0,0,0);
+                             const diffTime = Math.abs(today - startDate);
+                             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                             if (Math.floor(diffDays / 7) % 2 === 0) isInRoute = true;
+                         }
+                     } else if (frequency === 'monthly') {
+                         isInRoute = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+                     }
+
+                     const isLate = details.status === 'late';
+                     const isFinished = details.status === 'finished';
+
+                     // REGLA PARA NO SUMAR FINALIZADOS ANTIGUOS:
+                     if (isFinished && !hasPaidToday) return;
+
+                     // Entra en el conteo si: (Es ruta de hoy O es Atrasado O ya pagó hoy)
+                     if (isInRoute || isLate || hasPaidToday) {
+                         totalRouteCount++;
                          if (hasPaidToday) {
                              paidTodayCount++;
                          }
@@ -2157,8 +2172,8 @@ async function showRefinanceModal(clientId, notificationId) {
                 });
             });
 
-            // Renderizar la barra de progreso
-            const progressPercentage = totalActiveLoansCount > 0 ? (paidTodayCount / totalActiveLoansCount) * 100 : 0;
+            // Renderizar la barra
+            const progressPercentage = totalRouteCount > 0 ? (paidTodayCount / totalRouteCount) * 100 : 0;
             const progressBar = document.getElementById('route-progress-bar');
             const progressText = document.getElementById('route-progress-text');
 
@@ -2166,7 +2181,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 const circleCircumference = 2 * Math.PI * 54;
                 const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
                 progressBar.style.strokeDashoffset = strokeDashoffset;
-                progressText.textContent = `${paidTodayCount}/${totalActiveLoansCount}`;
+                progressText.textContent = `${paidTodayCount}/${totalRouteCount}`;
             }
         }
 
@@ -2221,13 +2236,11 @@ async function showRefinanceModal(clientId, notificationId) {
                     } else if (frequency === 'weekly') {
                         isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
                     } else if (frequency === 'biweekly') {
-                        // LÓGICA QUINCENAL PARA LA META: Mismo día de la semana cada 14 días
                         if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
                             const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
                             startDate.setHours(0,0,0,0);
                             const diffTime = Math.abs(today - startDate);
                             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                            // Si han pasado semanas pares (0, 2, 4...) desde el inicio
                             if (Math.floor(diffDays / 7) % 2 === 0) {
                                 isPaymentDay = true;
                             }
@@ -2272,12 +2285,15 @@ async function showRefinanceModal(clientId, notificationId) {
             const { dailyTotal } = calculateDailyTotals();
             kpiReceived.textContent = money(dailyTotal);
 
-            // Renderizar Clientes Restantes
+            // Renderizar Clientes Restantes (CORREGIDO: CUENTA TARJETAS)
             if (!clientsForDashboard || clientsForDashboard.length === 0) {
                  kpiRemaining.textContent = 0;
             } else {
+                // Filtramos solo los que NO han pagado hoy
                 const remainingItems = clientsForDashboard.filter(item => {
+                    // Ignorar finalizados que no pagaron hoy (aunque updateTodaysRouteList ya los filtra)
                     if (item.loan.status === 'finished') return false;
+                    
                     const loan = item.loan;
                     const paidTodayVal = (loan.history || []).reduce((sum, h) => {
                         if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
@@ -2285,10 +2301,14 @@ async function showRefinanceModal(clientId, notificationId) {
                         }
                         return sum;
                     }, 0);
+                    
+                    // Si pagó 0 hoy, sigue contando como restante
                     return paidTodayVal === 0;
                 });
-                const uniqueRemainingIds = new Set(remainingItems.map(i => i.client.id));
-                kpiRemaining.textContent = uniqueRemainingIds.size;
+                
+                // CORRECCIÓN: Usamos .length directamente. 
+                // Esto asegura que coincida exactamente con el número de tarjetas visuales.
+                kpiRemaining.textContent = remainingItems.length;
             }
         }
         
@@ -3041,14 +3061,16 @@ async function showRefinanceModal(clientId, notificationId) {
                    const details = calculateLoanDetails(loan);
                    const currentStatus = details.status;
 
-                   // 1. REGLA DE CALENDARIO (Sincronizada con Meta Diaria)
+                   // 1. REGLA DE CALENDARIO
                    let isScheduledForToday = false;
                    const frequency = loan.paymentFrequency || 'daily';
                    const paymentDays = loan.paymentDays || [];
 
                    if (frequency === 'daily') {
-                       // Usamos parseInt para asegurar que coincida (texto o número)
-                       isScheduledForToday = paymentDays.some(d => parseInt(d) === dayOfWeek);
+                       // --- CAMBIO CLAVE: SI ES DIARIO, APARECE SIEMPRE ---
+                       // Antes verificábamos si hoy estaba marcado en 'paymentDays'.
+                       // Ahora forzamos true para que aparezcan todos los días hasta que paguen.
+                       isScheduledForToday = true; 
                    } else if (frequency === 'weekly') {
                        isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
                    } else if (frequency === 'biweekly') {
@@ -3057,8 +3079,6 @@ async function showRefinanceModal(clientId, notificationId) {
                            startDate.setHours(0,0,0,0);
                            const diffTime = Math.abs(today - startDate);
                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                           
-                           // Lógica de semanas pares
                            if (Math.floor(diffDays / 7) % 2 === 0) {
                                isScheduledForToday = true;
                            }
@@ -3082,6 +3102,7 @@ async function showRefinanceModal(clientId, notificationId) {
                    const isFinished = (currentStatus === 'finished');
                    
                    // Muestra si: (Toca Hoy O es Atrasado) Y (No pagó) Y (No terminó)
+                   // Nota: Al poner isScheduledForToday = true para diarios, aseguramos que siempre pasen este filtro.
                    if ((isScheduledForToday || isLate) && !hasPaidToday && !isFinished) {
                        const loanToRender = { 
                            ...loan, 
@@ -3094,7 +3115,7 @@ async function showRefinanceModal(clientId, notificationId) {
                });
            });
  
-           // Ordenar: Atrasados primero
+           // Ordenar: Atrasados primero, luego alfabéticamente
            clientsForRoute.sort((a, b) => {
                if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
                if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
@@ -7449,3 +7470,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
