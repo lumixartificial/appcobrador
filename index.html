@@ -2443,10 +2443,12 @@ async function showRefinanceModal(clientId, notificationId) {
                .reduce((sum, h) => sum + (h.amount || 0), 0);
 
            // Si ya cubrió el total, finalizado
-           if (!loan || !loan.totalLoan || loan.status === 'finished' || (currentTotalPaid >= loan.totalLoan - 0.1)) {
+           // CORRECCIÓN: Eliminamos "loan.status === 'finished'" para obligar al sistema a recalcular si el saldo cambia.
+           if (!loan || !loan.totalLoan || (currentTotalPaid >= loan.totalLoan - 0.1)) {
                details.status = 'finished';
                return details;
            }
+           
 
            // --- 2. CONFIGURAR FECHAS ---
            const today = new Date();
@@ -3526,7 +3528,75 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance' }
             };
             const l = labels[currentLang] || labels.pt;
+            // --- CÁLCULO DE FECHAS (INICIO Y FIN ESTIMADO) ---
+            let startDateStr = '--/--';
+            let endDateStr = 'Calculando...';
 
+            if (loan.startDate) {
+                let startD = null;
+                if (loan.startDate.seconds) startD = new Date(loan.startDate.seconds * 1000);
+                else if (loan.startDate instanceof Date) startD = loan.startDate;
+                else startD = new Date(loan.startDate);
+
+                if (startD && !isNaN(startD.getTime())) {
+                    startDateStr = startD.toLocaleDateString('pt-BR');
+
+                    // Calcular Fin Estimado proyectando las cuotas
+                    const totalInst = parseInt((loan.installments || "0/0").split('/')[1], 10) || 0;
+                    
+                    if (totalInst > 0) {
+                        // Si el préstamo ya finalizó, intentamos mostrar la fecha del último pago como fin real
+                        if (currentStatus === 'finished' && loan.history && loan.history.length > 0) {
+                             const lastPayment = loan.history[loan.history.length - 1];
+                             let endD = null;
+                             if (lastPayment.date.seconds) endD = new Date(lastPayment.date.seconds * 1000);
+                             else if (lastPayment.date instanceof Date) endD = lastPayment.date;
+                             
+                             if (endD) endDateStr = endD.toLocaleDateString('pt-BR') + ' (Real)';
+                        } 
+                        else {
+                            // Si está activo, proyectamos el futuro
+                            let count = 0;
+                            let currentD = new Date(startD);
+                            // La lógica del sistema empieza a cobrar al día siguiente del inicio
+                            currentD.setDate(currentD.getDate() + 1); 
+
+                            let safetyLoop = 0;
+                            // Iteramos día a día hasta completar las cuotas
+                            while (count < totalInst && safetyLoop < 2000) { // Limite 5-6 años
+                                const dayW = currentD.getDay();
+                                const dayM = currentD.getDate();
+                                const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
+                                const isHol = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(fDate) : false;
+
+                                let isPayDay = false;
+                                const freq = loan.paymentFrequency || 'daily';
+                                const pDays = loan.paymentDays || [];
+
+                                if (!isHol) {
+                                    if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
+                                    else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                    else if (freq === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                    else if (freq === 'biweekly') {
+                                         if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
+                                            const diffT = Math.abs(currentD - startD);
+                                            const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
+                                            if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
+                                         }
+                                    }
+                                }
+
+                                if (isPayDay) count++;
+                                if (count < totalInst) currentD.setDate(currentD.getDate() + 1);
+                                safetyLoop++;
+                            }
+                            endDateStr = currentD.toLocaleDateString('pt-BR');
+                        }
+                    } else {
+                        endDateStr = '--/--';
+                    }
+                }
+            }
             clientDetailView.innerHTML = `
                 <header class="modal-header" style="justify-content: space-between;">
                     <div style="display: flex; align-items: center;">
@@ -3565,7 +3635,22 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                             <div class="progress-text" id="client-detail-progress-text"></div>
                         </div>
                     </div>
-
+                    <!-- TARJETA DE FECHAS (NUEVO) -->
+                    <div class="kpi-card" style="margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center; padding: 15px;">
+                        <div style="border-right: 1px solid var(--border-color);">
+                            <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--accent-purple);">
+                                <i data-lucide="calendar" style="width: 16px; height: 16px;"></i> Início
+                            </h3>
+                            <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${startDateStr}</p>
+                        </div>
+                        <div>
+                            <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--text-secondary);">
+                                <i data-lucide="flag" style="width: 16px; height: 16px;"></i> Fim Est.
+                            </h3>
+                            <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${endDateStr}</p>
+                        </div>
+                    </div>
+                    <!-- FIN TARJETA DE FECHAS -->
                     <div class="kpi-card" style="margin-bottom: 20px; text-align: center;">
                         <h3 class="kpi-title" style="justify-content: center;">${l.status} ${currentLoanIndex + 1}</h3>
                         <span class="payment-status ${statusClass}" style="font-size: 1.2em; font-weight: 600; padding: 8px 20px;">
@@ -7470,4 +7555,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
