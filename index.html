@@ -1761,14 +1761,15 @@ async function showRefinanceModal(clientId, notificationId) {
                 deleteTitle = "Só é possível excluir o ÚLTIMO pagamento lançado.";
             }
             
-            // --- 3. BOTONES ---
+            // --- 3. BOTONES (OCULTO POR SEGURIDAD: display: none) ---
             let deleteButtonHtml = `
                 <button id="delete-payment-btn" class="btn-danger" 
                     ${canDelete ? '' : 'disabled'} 
                     title="${deleteTitle}" 
-                    style="${canDelete ? '' : 'opacity: 0.5; cursor: not-allowed; background-color: var(--text-secondary); border-color: var(--text-secondary);'}">
+                    style="display: none !important; ${canDelete ? '' : 'opacity: 0.5; cursor: not-allowed; background-color: var(--text-secondary); border-color: var(--text-secondary);'}">
                     <i data-lucide="trash-2"></i> Excluir Pagamento
                 </button>`;
+            
 
             let receiptPreviewHtml = `<p class="no-items">Nenhum comprovante anexado.</p>`;
             let receiptButtonHtml = '';
@@ -3725,15 +3726,29 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: currentLoanIndex }, `Details for ${client.name}`, `#client/${clientId}/${currentLoanIndex}`);
             clientDetailView.classList.add('active');
 
+            // --- CÁLCULO VISUAL DE PROGRESO (MATEMÁTICO REAL) ---
             const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
             const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
-            const paidInstallmentsString = (loan.installments || "0/0").split('/')[0];
-            const paidInstallments = paidInstallmentsString ? parseInt(paidInstallmentsString, 10) : 0;
+            
+            // CORRECCIÓN DEFINITIVA: No leemos lo que dice la base de datos ("29/20" o error).
+            // Calculamos: ¿Cuánto dinero hay pagado? / ¿Cuánto vale una cuota? = Número Real.
+            // Usamos las variables 'displayTotalPaid' y 'originalInstallment' que ya existen en esta función.
+            let paidInstallments = 0;
+            if (originalInstallment > 0) {
+                paidInstallments = Math.floor(displayTotalPaid / originalInstallment);
+            }
+
+            // Tope de seguridad: Nunca mostrar más del total (ej: 20/20)
+            if (paidInstallments > totalInstallments) {
+                paidInstallments = totalInstallments;
+            }
+
             const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
             const circleCircumference = 2 * Math.PI * 54;
             const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
             const progressBar = document.getElementById('client-detail-progress-bar');
             const progressText = document.getElementById('client-detail-progress-text');
+            
             if(progressBar && progressText) {
                 progressBar.style.strokeDashoffset = strokeDashoffset;
                 progressText.textContent = `${paidInstallments}/${totalInstallments}`;
