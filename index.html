@@ -331,21 +331,38 @@
             background-color: var(--bg);
         }
         
-        .modal-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg); z-index: 200; transform: translateX(100%); transition: transform 0.3s ease-in-out; display: flex; flex-direction: column; }
+        /* CORRECCIÓN: Z-INDEX 9999 PARA QUE SALGA SIEMPRE ENCIMA DEL MAPA */
+        .modal-view { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: var(--bg); 
+            z-index: 9999; /* Prioridad Máxima */
+            transform: translateX(100%); 
+            transition: transform 0.3s ease-in-out; 
+            display: flex; 
+            flex-direction: column; 
+        }
         .modal-view.active { transform: translateX(0); }
-        /* --- REGLAS AÑADIDAS PARA OVERLAYS --- */
-.modal-overlay { 
-    position: fixed; /* Posición fija para cubrir todo */
-    top: 0; left: 0; width: 100%; height: 100%; 
-    background-color: rgba(0,0,0,0.6); /* Fondo oscuro semitransparente */
-    backdrop-filter: blur(4px); /* Efecto blur */
-    display: none; /* OCULTO por defecto */ 
-    justify-content: center; /* Centrar contenido horizontalmente */
-    align-items: center; /* Centrar contenido verticalmente */
-    z-index: 200; /* Asegura que esté por encima de otros elementos */
-    opacity: 0; /* Empieza invisible para la transición */
-    transition: opacity 0.2s ease-in-out; /* Transición suave */
-}
+
+        /* --- REGLAS AÑADIDAS PARA OVERLAYS (MODALES TRANSPARENTES) --- */
+        .modal-overlay { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0,0,0,0.6); 
+            backdrop-filter: blur(4px); 
+            display: none; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 10000; /* Prioridad SUPERIOR (por encima de modal-view) */
+            opacity: 0; 
+            transition: opacity 0.2s ease-in-out; 
+        }
 /* --- FIN REGLAS AÑADIDAS --- */
 
 /* --- REGLA AÑADIDA PARA MOSTRAR OVERLAY ACTIVO --- */
@@ -3413,7 +3430,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const whatsappString = (client.whatsapp || '').toString(); 
             let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
 
-            // 1. Mapa de Moneda -> Código de País (DDI)
             const currencyToDDI = {
                 'BRL': '55', 'ARS': '54', 'BOB': '591', 'CLP': '56', 'COP': '57', 
                 'USD_EC': '593', 'PYG': '595', 'PEN': '51', 'UYU': '598', 'VES': '58',
@@ -3421,11 +3437,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 'USD_SV': '503', 'USD': '1', 'MXN': '52', 'CAD': '1'
             };
 
-            // 2. Detectar DDI
             const collectorCurrency = currentCollectorData?.paymentSettings?.currency || 'BRL';
             const countryDDI = currencyToDDI[collectorCurrency] || '55';
-
-            // 3. Lógica de Prefijo Automático
             const isNorthAmerica = (countryDDI === '1');
             const maxLocalLength = isNorthAmerica ? 10 : 11;
 
@@ -3444,7 +3457,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                    </button>`;
         
 
-            // --- LÓGICA DE SELECCIÓN DE PRÉSTAMO Y PESTAÑAS ---
             const allLoans = client.loans || [];
             const firstActiveIndex = allLoans.findIndex(l => calculateLoanDetails(l).status !== 'finished');
             
@@ -3454,7 +3466,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             }
             
             if (targetIndex === -1 && allLoans.length === 0) {
-                 console.error(`Cliente sin préstamos: ${clientId}`);
                  showToast("Erro: Cliente sem empréstimos.", true);
                  if(clientDetailView.classList.contains('active')) window.history.back();
                  return; 
@@ -3473,10 +3484,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const initialPaid = loan.initialMigratedAmount || 0;
             const displayTotalPaid = initialPaid + historyPaid;
 
-            // --- GENERACIÓN DE HISTORIAL ---
             let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
             if (loan.history && loan.history.length > 0) {
-                
                 const getSortableTimestamp = (dateObj) => {
                     if (!dateObj) return 0;
                     if (typeof dateObj.toDate === 'function') return dateObj.toDate().getTime();
@@ -3623,7 +3632,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             else if (score >= 7) barStatusClass = 'status-good';
             else if (score >= 3) barStatusClass = 'status-regular';
 
-            // --- LÓGICA DE VALOR PICO ---
             let picoValue = 0;
             const instVal = loan.originalInstallmentAmount || 0;
             if (instVal > 0 && displayTotalPaid > 0) {
@@ -3633,7 +3641,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }
             }
 
-            // --- DICCIONARIO LOCAL PARA TÍTULOS ---
             const labels = {
                 pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor de Pico (Pago Parcial)' },
                 es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor de Pico (Pago Parcial)' },
@@ -3641,7 +3648,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             };
             const l = labels[currentLang] || labels.pt;
 
-            // --- CÁLCULO DE FECHAS (INICIO Y FIN ESTIMADO) ---
             let startDateStr = '--/--';
             let endDateStr = 'Calculando...';
 
@@ -3706,45 +3712,32 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }
             }
 
-            // --- CONSTRUCCIÓN DE BOTONES (IDIOMAS EXPLÍCITOS & CORREGIDO) ---
-            
-            // 1. Texto botón "Recibo" (Multilínea) - AHORA "Enviar Comprovante" en PT
-            let receiptBtnText = 'Enviar<br>Comprovante'; // Fallback (Por defecto PT)
+            // --- CONSTRUCCIÓN DE BOTONES (CORREGIDO: Comprobante con 'b') ---
+            let receiptBtnText = 'Enviar<br>Comprobante'; // Fallback
             
             if (currentLang === 'pt') {
-                receiptBtnText = 'Enviar<br>Comprovante'; // Português
+                receiptBtnText = 'Enviar<br>Comprobante'; // Português (Corregido a 'b')
             } else if (currentLang === 'es') {
                 receiptBtnText = 'Enviar<br>Recibo'; // Español
             } else if (currentLang === 'en') {
                 receiptBtnText = 'Send<br>Receipt';  // English
             }
             
-            // 2. Texto botón "Registrar Pago"
             let payBtnText = 'Registrar Pagamento'; // Fallback
-            
-            if (currentLang === 'pt') {
-                payBtnText = 'Registrar Pagamento'; // Português
-            } else if (currentLang === 'es') {
-                payBtnText = 'Registrar Pago';      // Español
-            } else if (currentLang === 'en') {
-                payBtnText = 'Register Payment';    // English
-            }
+            if (currentLang === 'pt') payBtnText = 'Registrar Pagamento';
+            else if (currentLang === 'es') payBtnText = 'Registrar Pago';
+            else if (currentLang === 'en') payBtnText = 'Register Payment';
 
             const actionButtonsHtml = currentStatus === 'finished' ? `
                 <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
                 <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
             ` : `
                 <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
-                
-                <!-- BOTÓN RECIBO: Usa la variable traducida explícita -->
                 <button class="btn-secondary" id="sendReceiptBtn" style="line-height: 1.2;">
                     <i data-lucide="file-text"></i> 
                     <span style="text-align: center;">${receiptBtnText}</span>
                 </button>
-                
                 <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
-                
-                <!-- BOTÓN PAGAR: Usa la variable traducida explícita -->
                 <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}">
                     <i data-lucide="dollar-sign"></i> ${payBtnText}
                 </button>
@@ -3789,7 +3782,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         </div>
                     </div>
                     
-                    <!-- TARJETA DE FECHAS (NUEVO) -->
                     <div class="kpi-card" style="margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center; padding: 15px;">
                         <div style="border-right: 1px solid var(--border-color);">
                             <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--accent-purple);">
@@ -3825,14 +3817,11 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
                     <section class="kpi-grid-profile" style="margin-bottom: 30px;">
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
-                        
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
-                        
                         <div class="kpi-card" style="border-color: var(--accent-orange); border-width: 1px;">
                             <h3 class="kpi-title"><i data-lucide="trending-up" style="color: var(--accent-orange);"></i> ${l.pico}</h3>
                             <p class="kpi-value" style="color: var(--accent-orange);">${money(picoValue)}</p>
                         </div>
-
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
                        
                         <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
@@ -3869,18 +3858,13 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: currentLoanIndex }, `Details for ${client.name}`, `#client/${clientId}/${currentLoanIndex}`);
             clientDetailView.classList.add('active');
 
-            // --- CÁLCULO VISUAL DE PROGRESO (MATEMÁTICO REAL) ---
             const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
             const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
-            
             let paidInstallments = 0;
             if (originalInstallment > 0) {
                 paidInstallments = Math.floor(displayTotalPaid / originalInstallment);
             }
-
-            if (paidInstallments > totalInstallments) {
-                paidInstallments = totalInstallments;
-            }
+            if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
 
             const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
             const circleCircumference = 2 * Math.PI * 54;
@@ -3905,8 +3889,9 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
 
+            // CORRECCIÓN AQUÍ: Usamos window.history.back() en lugar de forzar 'home'
             document.getElementById('closeDetailView').addEventListener('click', () => {
-                location.hash = 'home'; 
+                window.history.back(); 
             });
 
             document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
@@ -3918,7 +3903,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 document.getElementById('registerPaymentBtn').addEventListener('click', (e) => showPaymentModal(clientId, parseInt(e.currentTarget.dataset.loanIndex, 10)));
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
                 
-                // --- NUEVO LISTENER: GENERAR RECIBO (Reemplaza a Adiar) ---
                 const sendReceiptBtn = document.getElementById('sendReceiptBtn');
                 if (sendReceiptBtn) {
                     sendReceiptBtn.addEventListener('click', () => {
@@ -3926,10 +3910,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     });
                 }
                 
-                // --- LÓGICA BOTÓN IR ---
                 const startRouteBtn = document.getElementById('startRouteBtn');
                 let navigationUrl = client.location;
-
                 if (!navigationUrl || navigationUrl.trim() === '') {
                     if (client.address && client.address.trim() !== '') {
                         const fullAddress = `${client.address}, ${client.city || ''}`;
@@ -3967,7 +3949,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }
             }  
 
-            // --- Lógica del Historial de Pagos ---
             clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
@@ -3998,6 +3979,11 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
         function showMapPinModal() {
             const mapPinModal = document.getElementById('mapPinModal');
+            
+            // Usamos la misma imagen del 'blobito azul' que en el mapa principal
+            // Ajustamos el 'transform' para que la PUNTA del pin quede exactamente en el centro de la mira
+            const markerImage = "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png";
+
             mapPinModal.innerHTML = `
                 <header class="modal-header">
                     <button id="closeMapPinModal"><i data-lucide="arrow-left"></i></button>
@@ -4005,15 +3991,24 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 </header>
                 <div class="modal-content-wrapper" style="padding:0; position:relative; display:flex; justify-content:center; align-items:center; background-color: var(--border-color);">
                     <div id="pin-map-container" style="width: 100%; height: 100%; opacity: 0; transition: opacity 0.5s;"></div>
+                    
+                    <!-- LOADING OVERLAY -->
                     <div id="map-loading-overlay" style="position: absolute; z-index: 1001; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 8px; text-align: center;">
                         <i data-lucide="loader-circle" style="animation: spin 1s linear infinite; width: 32px; height: 32px;"></i>
-                        <p style="margin: 10px 0 0;">Obtendo sua localização...</p>
+                        <p style="margin: 10px 0 0;">Carregando mapa...</p>
                     </div>
+
+                    <!-- BLOBITO AZUL (IMAGEN REAL) EN EL CENTRO EXACTO -->
+                    <!-- transform: translate(-50%, -100%) coloca la PUNTA inferior en el centro exacto de la pantalla -->
+                    <img src="${markerImage}" 
+                         style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -100%); z-index: 1000; pointer-events: none; width: 25px; height: 41px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));">
+
                 </div>
                 <div class="action-buttons">
                     <button class="btn-primary" id="confirmPinLocationBtn" disabled><i data-lucide="check-circle"></i> Confirmar Localização</button>
                 </div>
             `;
+            
             history.pushState({ modal: 'mapPinModal' }, 'Map Pin', '#map-pin');
             mapPinModal.classList.add('active');
             lucide.createIcons({ nodes: mapPinModal.querySelectorAll('[data-lucide]') });
@@ -4022,47 +4017,71 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const loadingOverlay = document.getElementById('map-loading-overlay');
             const confirmBtn = document.getElementById('confirmPinLocationBtn');
 
+            // Función para iniciar el mapa en las coordenadas dadas
             const initializeMap = (centerCoords) => {
                 loadingOverlay.style.display = 'none';
                 confirmBtn.disabled = false;
                 mapContainer.style.opacity = '1';
                 
-                const map = L.map(mapContainer).setView(centerCoords, 16); // Centrado dinámicamente
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                const map = L.map(mapContainer).setView(centerCoords, 18); // Zoom cercano para precisión
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(map);
 
-                // Añade un pin fijo en el centro del mapa para una mejor UX
-                const pinHtml = `<div style="position:absolute; top:50%; left:50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none;"><i data-lucide="map-pin" style="width: 48px; height: 48px; color: var(--danger-color); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5));"></i></div>`;
-                mapContainer.insertAdjacentHTML('beforeend', pinHtml);
-                lucide.createIcons({ nodes: [mapContainer.querySelector('i')] });
-
+                // Botón Confirmar: Guarda el centro actual del mapa
                 mapPinModal.querySelector('#confirmPinLocationBtn').addEventListener('click', () => {
-                    const { lat, lng } = map.getCenter(); // Obtiene las coordenadas del centro del mapa
+                    const { lat, lng } = map.getCenter();
+                    // Guardamos el enlace estándar de Google Maps
                     const locationUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                    
                     const locationInput = document.getElementById('client-location');
                     if (locationInput) {
                         locationInput.value = locationUrl;
+                        // Disparamos un evento 'change' por si acaso hay listeners
+                        locationInput.dispatchEvent(new Event('change'));
                     }
+                    
+                    showToast('Localização capturada!');
                     window.history.back();
                 });
             };
 
             mapPinModal.querySelector('#closeMapPinModal').addEventListener('click', () => window.history.back());
             
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        initializeMap([position.coords.latitude, position.coords.longitude]);
-                    },
-                    (error) => {
-                        console.warn(`Error de geolocalización (${error.code}): ${error.message}`);
-                        showToast('Não foi possível obter a localização. Usando localização padrão.', true);
-                        initializeMap([-16.68, -49.25]); // Fallback a Goiânia si falla
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
+            // --- LÓGICA INTELIGENTE DE UBICACIÓN ---
+            // 1. ¿El cliente ya tiene ubicación guardada?
+            const existingUrl = document.getElementById('client-location')?.value;
+            let existingCoords = null;
+            
+            if (existingUrl) {
+                const match = existingUrl.match(/query=([\d.-]+),([\d.-]+)/);
+                if (match) {
+                    existingCoords = [parseFloat(match[1]), parseFloat(match[2])];
+                }
+            }
+
+            if (existingCoords) {
+                // Si ya tiene, abrimos el mapa DIRECTAMENTE ahí
+                console.log("Usando ubicación existente del cliente...");
+                initializeMap(existingCoords);
             } else {
-                showToast('Geolocalização não é suportada neste navegador.', true);
-                initializeMap([-16.68, -49.25]); // Fallback para navegadores antiguos
+                // Si no tiene, buscamos GPS
+                console.log("Buscando GPS actual...");
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            initializeMap([position.coords.latitude, position.coords.longitude]);
+                        },
+                        (error) => {
+                            console.warn(`Error GPS: ${error.message}`);
+                            showToast('Não foi possível obter GPS. Usando padrão.', true);
+                            initializeMap([-16.68, -49.25]); // Fallback
+                        },
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    );
+                } else {
+                    initializeMap([-16.68, -49.25]); // Fallback no soporte
+                }
             }
         }
         
@@ -5887,25 +5906,24 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
         function plotClientsOnMap() {
             if (!mapInstance) return;
             
-            // [REPARACIÓN] Forzar una revalidación del tamaño del mapa cada vez que se intenta dibujar.
-            // Esto resuelve problemas de renderizado en vistas que cambian de visibilidad, 
-            // especialmente en la app instalada (PWA), asegurando que los pines se muestren correctamente.
+            // Reajuste crítico para visualización correcta
             mapInstance.invalidateSize();
 
+            // Limpiar marcadores antiguos
             mapMarkers.forEach(marker => marker.remove());
             mapMarkers = [];
 
-            // --- INICIO: LÓGICA DEL MARCADOR DEL COBRADOR ---
+            // --- 1. COBRADOR (Icono de Moto) ---
             const collectorIcon = L.icon({
                 iconUrl: 'https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/MotoIcono.png?alt=media&token=e8add7cd-e8d3-424d-8f05-5d04e0d10ec1',
-                iconSize: [40, 40], // Tamaño del icono [ancho, alto]
-                iconAnchor: [20, 20], // Punto del icono que corresponderá a la ubicación del marcador
-                popupAnchor: [0, -20] // Punto desde donde se abrirá el popup, relativo al iconAnchor
+                iconSize: [36, 36],
+                iconAnchor: [18, 36],
+                popupAnchor: [0, -36]
             });
 
             const collectorPosition = collectorCurrentLocation 
                 ? [collectorCurrentLocation.lat, collectorCurrentLocation.lng]
-                : [-16.68, -49.25]; // Posición por defecto: Goiânia
+                : [-16.68, -49.25]; 
 
             if (!collectorMarker) {
                 collectorMarker = L.marker(collectorPosition, { icon: collectorIcon, zIndexOffset: 1000 }).addTo(mapInstance);
@@ -5913,56 +5931,102 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             } else {
                 collectorMarker.setLatLng(collectorPosition);
             }
-            // --- FIN: LÓGICA DEL MARCADOR DEL COBRADOR ---
 
-            const clientsToPlot = getTodaysRouteClients();
-            const locations = [];
-            
-            // Añade la posición del cobrador para el auto-zoom del mapa
-            locations.push(collectorPosition);
-
-            const nextClientIcon = L.divIcon({
-                className: 'next-client-marker',
-                html: '<div class="next-client-pin"></div>',
-                iconSize: [30, 42],
-                iconAnchor: [15, 42],
-                popupAnchor: [0, -42]
+            // --- 2. CLIENTES (Regreso al Icono Azul Clásico - "El Blobito") ---
+            const clientIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [25, 41], // Tamaño estándar
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
             });
 
-            clientsToPlot.forEach((item, index) => {
+            const clientsToPlot = getTodaysRouteClients();
+            const locations = [collectorPosition];
+
+            clientsToPlot.forEach((item) => {
                 const { client, loan, loanIndex } = item;
+                
                 if (client.location) {
                     const match = client.location.match(/query=([\d.-]+),([\d.-]+)/);
                     if (match) {
                         const lat = parseFloat(match[1]);
                         const lng = parseFloat(match[2]);
                         locations.push([lat, lng]);
+
+                        // --- CÁLCULOS FINANCIEROS ---
+                        const details = calculateLoanDetails(loan);
+                        const status = details.status;
                         
+                        let statusLabel = 'SEM DADOS';
+                        let statusColor = '#94a3b8';
+
+                        if (status === 'paid') { statusLabel = 'EM DIA'; statusColor = '#22c55e'; }
+                        else if (status === 'late') { statusLabel = 'ATRASADO'; statusColor = '#ef4444'; }
+                        else if (status === 'pending') { statusLabel = 'PENDENTE'; statusColor = '#f59e0b'; }
+                        else if (status === 'finished') { statusLabel = 'FINALIZADO'; statusColor = '#3b82f6'; }
+
+                        const historyPaid = (loan.history || [])
+                            .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
+                            .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                        
+                        const totalPaid = (loan.initialMigratedAmount || 0) + historyPaid;
+                        const totalDebt = (parseFloat(loan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+                        const remaining = Math.max(0, totalDebt - totalPaid);
+
+                        // --- FICHA BLANCA COMPACTA (Diseño Bingo) ---
                         const popupContent = `
-                            <div class="popup-client-name">${client.name}</div>
-                            <div class="popup-client-amount">${money(loan.amount)}</div>
-                            <button class="btn-primary popup-details-btn" data-client-id="${client.id}" data-loan-index="${loanIndex}" style="width: 100%; margin-top: 10px;">
-                                Ver Detalhes
-                            </button>
+                            <div style="font-family: 'Inter', sans-serif; min-width: 170px; background-color: #ffffff; color: #1e293b; padding: 2px; border-radius: 8px;">
+                                <!-- CABECERA: NOMBRE + ESTADO + X -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                                    <strong style="font-size: 0.95em; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;" title="${client.name}">${client.name}</strong>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="background-color: ${statusColor}; color: white; padding: 1px 6px; border-radius: 4px; font-size: 0.65em; font-weight: 700; text-transform: uppercase;">
+                                            ${statusLabel}
+                                        </span>
+                                        <button class="close-popup-btn" style="background:none; border:none; color:#94a3b8; font-size: 1.4em; cursor:pointer; line-height: 0.8; padding: 0;">&times;</button>
+                                    </div>
+                                </div>
+
+                                <!-- INFO FINANCIERA (Vertical) -->
+                                <div style="font-size: 0.8em; color: #334155; display: flex; flex-direction: column; gap: 3px; margin-top: 5px;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Total:</span> <strong style="color: #0f172a;">${money(totalDebt)}</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Pago:</span> <strong style="color: #22c55e;">${money(totalPaid)}</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 2px; margin-top: 1px;">
+                                        <span style="font-weight: 600;">Resta:</span> <strong style="color: #ef4444;">${money(remaining)}</strong>
+                                    </div>
+                                </div>
+
+                                <button class="popup-details-btn" data-client-id="${client.id}" data-loan-index="${loanIndex}" style="margin-top: 8px; width: 100%; background-color: #3b82f6; color: white; border: none; padding: 5px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.8em;">
+                                    Ver Ficha
+                                </button>
+                            </div>
                         `;
 
-                        let marker;
-                        if (index === 0) { // Si es el primer cliente de la ruta
-                            marker = L.marker([lat, lng], { icon: nextClientIcon }).addTo(mapInstance).bindPopup(popupContent);
-                        } else {
-                            marker = L.marker([lat, lng]).addTo(mapInstance).bindPopup(popupContent);
-                        }
+                        const marker = L.marker([lat, lng], { icon: clientIcon })
+                            .addTo(mapInstance)
+                            .bindPopup(popupContent, { closeButton: false, offset: [0, -25] }); // Offset ajustado para el pin clásico
                         
                         marker.on('popupopen', (e) => {
-                            const btn = e.popup.getElement().querySelector('.popup-details-btn');
-                            if (btn) {
-                                btn.onclick = () => {
-                                    // Primero, cambia la vista para cerrar el mapa
-                                    location.hash = 'home';
-                                    // Después de un breve retraso, muestra los detalles del cliente
-                                    setTimeout(() => {
-                                        showClientDetails(btn.dataset.clientId, parseInt(btn.dataset.loanIndex, 10));
-                                    }, 100); 
+                            const popupNode = e.popup.getElement();
+                            
+                            const detailsBtn = popupNode.querySelector('.popup-details-btn');
+                            if (detailsBtn) {
+                                detailsBtn.onclick = () => {
+                                    showClientDetails(detailsBtn.dataset.clientId, parseInt(detailsBtn.dataset.loanIndex, 10));
+                                };
+                            }
+
+                            const closeBtn = popupNode.querySelector('.close-popup-btn');
+                            if (closeBtn) {
+                                closeBtn.onclick = () => {
+                                    mapInstance.closePopup();
                                 };
                             }
                         });
