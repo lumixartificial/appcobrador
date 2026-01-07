@@ -1914,13 +1914,13 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }    
 
-          // --- [BLOQUE DE RECIBOS: SOLO DESCARGA (SIN COMPARTIR AUTOMÁTICO)] ---
+             // --- [BLOQUE DE RECIBOS: SOLO DESCARGA (DISEÑO AJUSTADO)] ---
 
         // 1. GENERAR ESTADO DE CUENTA (Botón "Enviar Comprovante")
         async function generateStatusReceiptPDF(clientId, loanIndex) {
             try {
                 const { jsPDF } = window.jspdf;
-                const doc = new jsPDF({ unit: 'mm', format: [80, 230] }); // Ticket Largo
+                const doc = new jsPDF({ unit: 'mm', format: [80, 230] }); 
                 
                 const client = allClients.find(c => c.id === clientId);
                 if (!client || !client.loans || !client.loans[loanIndex]) {
@@ -1930,7 +1930,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 const loan = client.loans[loanIndex];
                 const details = calculateLoanDetails(loan); 
                 
-                // Cálculo Matemático
+                // --- CÁLCULOS FINANCIEROS ---
                 const historyPaid = (loan.history || [])
                     .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
                     .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
@@ -1948,6 +1948,20 @@ async function showRefinanceModal(clientId, notificationId) {
                 }
                 if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
 
+                // Calcular Pago de HOY
+                const todayStart = new Date();
+                todayStart.setHours(0,0,0,0);
+                const paidToday = (loan.history || []).reduce((sum, h) => {
+                    let pDate = null;
+                    if (h.date?.seconds) pDate = new Date(h.date.seconds * 1000);
+                    else if (h.date instanceof Date) pDate = h.date;
+                    
+                    if (pDate && pDate >= todayStart && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
+                        return sum + (parseFloat(h.amount) || 0);
+                    }
+                    return sum;
+                }, 0);
+
                 const isEs = currentLang === 'es';
                 const texts = {
                     title: isEs ? "ESTADO DE CUENTA" : "EXTRATO DO EMPRÉSTIMO",
@@ -1960,7 +1974,9 @@ async function showRefinanceModal(clientId, notificationId) {
                     loan_total: isEs ? "Total Préstamo:" : "Total Empréstimo:",
                     late_fees: isEs ? "Multas/Mora:" : "Multas/Juros:",
                     total_paid: isEs ? "Total Pagado:" : "Total Pago:",
-                    to_pay: isEs ? "RESTA PAGAR:" : "RESTA PAGAR:",
+                    to_pay: isEs ? "RESTA POR PAGAR:" : "RESTA A PAGAR:", // Movido a la lista
+                    val_installment: isEs ? "VALOR CUOTA" : "VALOR PARCELA",
+                    val_paid_today: isEs ? "PAGADO HOY" : "PAGO HOJE",
                     footer: isEs ? "Generado por LUMIX Finanzas" : "Gerado por LUMIX Finanças",
                     late: isEs ? "ATRASADO" : "ATRASADO",
                     up_to_date: isEs ? "AL DÍA" : "EM DIA",
@@ -1973,7 +1989,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 let y = 10;
                 const centerX = 40;
 
-                // PDF Content Generation
+                // PDF Content
                 doc.setFontSize(12); doc.setFont(undefined, 'bold');
                 doc.text(texts.company, centerX, y, { align: 'center' });
                 y += 6;
@@ -2005,24 +2021,41 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFillColor(111, 66, 193); doc.rect(5, y, barWidth * progressPct, 6, 'F');
                 y += 10; doc.setLineWidth(0.2); doc.setDrawColor(200); doc.line(5, y, 75, y); y += 6;
 
-                const addRow = (label, value, color='#000000') => {
-                    doc.setFont(undefined, 'normal'); doc.setTextColor(color);
+                // --- TABLA FINANCIERA (MODIFICADA) ---
+                const addRow = (label, value, color='#000000', bold=false) => {
+                    doc.setFont(undefined, bold ? 'bold' : 'normal'); doc.setTextColor(color);
                     doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
                     y += 6;
                 };
+                
                 doc.setFontSize(10);
+                // 1. Total Préstamo
                 addRow(texts.loan_total, loan.totalLoan);
+                // 2. Mora (si hay)
                 if (details.lateFeesAccumulated > 0) addRow(texts.late_fees, details.lateFeesAccumulated, '#dc3545');
+                // 3. Total Pagado
                 addRow(texts.total_paid, totalPaid, '#28a745');
+                
+                // 4. Resta por Pagar (MOVIDO AQUÍ, en la lista)
+                addRow(texts.to_pay, remainingBalance, '#d97706', true); // Naranja/Negrita
+                
                 y += 4;
                 
+                // --- CAJA GRANDE (LO QUE PAGÓ HOY o VALOR CUOTA) ---
+                const showPaidToday = paidToday > 0;
+                const bigBoxValue = showPaidToday ? paidToday : installmentValue;
+                const bigBoxLabel = showPaidToday ? texts.val_paid_today : texts.val_installment;
+                const bigBoxColor = showPaidToday ? '#28a745' : '#6f42c1'; // Verde si pagó, Morado si es informativo
+
                 doc.setFillColor(245, 245, 245); doc.rect(5, y - 4, 70, 14, 'F');
                 doc.setFont(undefined, 'bold'); doc.setTextColor(0);
-                doc.text(texts.to_pay, centerX, y + 1, { align: 'center' });
-                doc.setFontSize(14); doc.setTextColor(111, 66, 193);
-                doc.text(money(remainingBalance), centerX, y + 7, { align: 'center' });
+                doc.text(bigBoxLabel, centerX, y + 1, { align: 'center' }); // Etiqueta (Ej: PAGO HOJE)
+                
+                doc.setFontSize(14); doc.setTextColor(bigBoxColor);
+                doc.text(money(bigBoxValue), centerX, y + 7, { align: 'center' }); // Valor
                 y += 18;
 
+                // Estado
                 let statusColor = '#28a745'; let statusText = texts.up_to_date; let bgColor = '#d4edda';
                 if (details.status === 'late') { statusColor = '#721c24'; statusText = texts.late; bgColor = '#f8d7da'; }
                 else if (details.status === 'finished') { statusColor = '#004085'; statusText = texts.finished; bgColor = '#cce5ff'; }
@@ -2036,7 +2069,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
                 doc.text(texts.footer, centerX, y, { align: 'center' });
 
-                // --- SOLO DESCARGAR ---
                 const fileName = `extrato_${client.name.replace(/\s/g, '_')}.pdf`;
                 doc.save(fileName);
                 showToast(isEs ? "Recibo descargado." : "Recibo baixado.");
@@ -2110,7 +2142,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 let y = 10;
                 const centerX = 40;
 
-                // PDF Content
                 doc.setFontSize(12); doc.setFont(undefined, 'bold');
                 doc.text(texts.company, centerX, y, { align: 'center' });
                 y += 6;
