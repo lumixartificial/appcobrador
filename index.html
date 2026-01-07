@@ -3743,18 +3743,13 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }
             }
 
-            // --- CONSTRUCCIÓN DE BOTONES (CORREGIDO: Comprobante con 'b') ---
-            let receiptBtnText = 'Enviar<br>Comprobante'; // Fallback
+            // --- CONSTRUCCIÓN DE BOTONES ---
+            let receiptBtnText = 'Enviar<br>Comprovante'; 
+            if (currentLang === 'pt') receiptBtnText = 'Enviar<br>Comprovante'; 
+            else if (currentLang === 'es') receiptBtnText = 'Enviar<br>Recibo';
+            else if (currentLang === 'en') receiptBtnText = 'Send<br>Receipt';
             
-            if (currentLang === 'pt') {
-                receiptBtnText = 'Enviar<br>Comprobante'; // Português (Corregido a 'b')
-            } else if (currentLang === 'es') {
-                receiptBtnText = 'Enviar<br>Recibo'; // Español
-            } else if (currentLang === 'en') {
-                receiptBtnText = 'Send<br>Receipt';  // English
-            }
-            
-            let payBtnText = 'Registrar Pagamento'; // Fallback
+            let payBtnText = 'Registrar Pagamento'; 
             if (currentLang === 'pt') payBtnText = 'Registrar Pagamento';
             else if (currentLang === 'es') payBtnText = 'Registrar Pago';
             else if (currentLang === 'en') payBtnText = 'Register Payment';
@@ -3855,10 +3850,14 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         </div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
                        
-                        <div class="kpi-card" style="background-color: color-mix(in srgb, var(--danger-color) 5%, var(--surface));">
-                           <h3 class="kpi-title"><i data-lucide="alert-triangle" style="color: var(--danger-color);"></i> Mora Acumulada</h3>
-                           <p class="kpi-value" style="color: var(--danger-color);">${money(loan.lateFeesAccumulated || 0)}</p>
-                       </div>
+                        <!-- NUEVA TARJETA: MICRO SEGURO - SE OCULTA SI FINALIZADO -->
+                        ${currentStatus !== 'finished' ? `
+                        <div class="kpi-card" style="background-color: color-mix(in srgb, #0ea5e9 10%, var(--surface)); border-color: #0ea5e9;">
+                           <h3 class="kpi-title"><i data-lucide="shield-check" style="color: #0ea5e9;"></i> Micro Seguro</h3>
+                           <p class="kpi-value" style="color: #0ea5e9;">${money(loan.microInsurance || 0)}</p>
+                        </div>` : ''}
+                        <!-- FIN TARJETA -->
+
                        <div class="kpi-card" style="border-color: var(--danger-color);">
                            <h3 class="kpi-title"><i data-lucide="receipt-text"></i> Total Devido Agora</h3>
                            <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0)))}</p>
@@ -3920,7 +3919,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
 
-            // CORRECCIÓN AQUÍ: Usamos window.history.back() en lugar de forzar 'home'
             document.getElementById('closeDetailView').addEventListener('click', () => {
                 window.history.back(); 
             });
@@ -4475,11 +4473,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
 
         
-        /**
-         * INSTRUCCIÓN 2: Reemplaza tu función 'showClientFormModal' existente
-         * (aprox. línea 2056) con este bloque de código completo.
-         */
-        function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0, prefillData = null) {
+             function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0, prefillData = null) {
             const isEditMode = clientId !== null && !isNewLoan;
             const client = isEditMode ? allClients.find(c => c.id === clientId) : (clientId ? allClients.find(c => c.id === clientId) : {});
             const loan = (isEditMode && client && client.loans && client.loans[loanIndex]) ? client.loans[loanIndex] : {};
@@ -4548,7 +4542,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </button>
                         </div>
                         
-                        <!-- SECCIÓN OCULTA DE ACCESO (CORREGIDA: SIN DUPLICADOS Y SIN REQUIRED) -->
                         <div style="display: none;">
                             <h3 class="section-title">Acesso Oculto (Automático)</h3>
                             <div class="form-group">
@@ -4563,7 +4556,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                 <input type="text" id="client-password" value="${autoPassword}">
                             </div>
                         </div>
-                        <!-- FIN SECCIÓN OCULTA -->
 
                         <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
                            <i data-lucide="dollar-sign"></i> 
@@ -4622,12 +4614,18 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </div>
                         </div>
 
+                        <!-- CAMBIO: MICRO SEGURO EN LUGAR DE TASA DE MORA -->
                         <div class="form-group">
-                            <label for="client-late-fee">Tasa de Mora Diaria (%)</label>
-                            <input type="number" id="client-late-fee" step="0.1" 
-                                   value="${loan.lateFeeRate !== undefined ? loan.lateFeeRate : (currentCompanyData?.defaultInterest || 0)}" 
-                                   placeholder="0.0">
+                            <label for="client-micro-insurance" style="color: #0ea5e9; font-weight: 700;">
+                                <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: middle;"></i> 
+                                Micro Seguro (Valor a Descontar)
+                            </label>
+                            <input type="number" id="client-micro-insurance" step="0.01" 
+                                   value="${loan.microInsurance || '0'}" 
+                                   placeholder="Ex: 60.00"
+                                   style="border-color: #0ea5e9;">
                         </div>
+
                         <div class="form-group"><label data-lang-key="totalToPay"></label><input type="text" id="client-total-to-pay" readonly></div>
                         <div class="form-group grid-2">
                             <div>
@@ -4944,6 +4942,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     const totalToPay = installmentValue * installments;
                     const principalAmount = loanAmount;
 
+                    // --- CAMBIO: GUARDAR MICRO SEGURO Y ANULAR TASA DE MORA ---
+                    const microInsurance = parseFloat(document.getElementById('client-micro-insurance').value) || 0;
+                    const lateFeeRate = 0; // Desactivada para usar Micro Seguro
+                    // ---------------------------------------------------------
+
                     const paymentFrequency = document.getElementById('payment-frequency').value;
                     let paymentDaysValue = [];
                     if (paymentFrequency === 'daily') {
@@ -4973,7 +4976,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
                     const loanSpecificData = {
                         principalAmount: principalAmount,
-                        lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
+                        lateFeeRate: lateFeeRate, // Siempre 0 ahora
+                        microInsurance: microInsurance, // NUEVO CAMPO
                         totalLoan: totalToPay,
                         amount: installmentValue,
                         originalInstallmentAmount: installmentValue,
@@ -5038,7 +5042,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         const updatedLoans = [...client.loans];
                         updatedLoans[loanIndex] = {
                              ...updatedLoans[loanIndex], 
-                             lateFeeRate: parseFloat(document.getElementById('client-late-fee').value) || 0,
+                             lateFeeRate: lateFeeRate, // 0
+                             microInsurance: microInsurance, // ACTUALIZAR
                              totalLoan: totalToPay,
                              amount: installmentValue,
                              originalInstallmentAmount: installmentValue,
@@ -5123,6 +5128,10 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 performClientChecks(editingId);
             }
         }
+         
+         
+         
+        
 
         
 
@@ -5941,8 +5950,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             mapInstance.invalidateSize();
 
             // Limpiar marcadores antiguos
-            mapMarkers.forEach(marker => marker.remove());
-            mapMarkers = [];
+            if (window.mapMarkers && Array.isArray(window.mapMarkers)) {
+                window.mapMarkers.forEach(marker => marker.remove());
+            }
+            window.mapMarkers = [];
 
             // --- 1. COBRADOR (Icono de Moto) ---
             const collectorIcon = L.icon({
@@ -5963,7 +5974,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 collectorMarker.setLatLng(collectorPosition);
             }
 
-            // --- 2. CLIENTES (Regreso al Icono Azul Clásico - "El Blobito") ---
+            // --- 2. CLIENTES (TODOS - Icono Azul Clásico) ---
             const clientIcon = L.icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
                 shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -5973,11 +5984,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 shadowSize: [41, 41]
             });
 
-            const clientsToPlot = getTodaysRouteClients();
             const locations = [collectorPosition];
 
-            clientsToPlot.forEach((item) => {
-                const { client, loan, loanIndex } = item;
+            // CAMBIO CLAVE: Usamos 'allClients' para mostrar a todos, no solo la ruta de hoy
+            allClients.forEach((client) => {
                 
                 if (client.location) {
                     const match = client.location.match(/query=([\d.-]+),([\d.-]+)/);
@@ -5986,83 +5996,105 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                         const lng = parseFloat(match[2]);
                         locations.push([lat, lng]);
 
-                        // --- CÁLCULOS FINANCIEROS ---
-                        const details = calculateLoanDetails(loan);
-                        const status = details.status;
-                        
-                        let statusLabel = 'SEM DADOS';
-                        let statusColor = '#94a3b8';
+                        // Buscamos el préstamo activo para mostrar el estado correcto en el mapa
+                        let loan = null;
+                        let loanIndex = 0;
 
-                        if (status === 'paid') { statusLabel = 'EM DIA'; statusColor = '#22c55e'; }
-                        else if (status === 'late') { statusLabel = 'ATRASADO'; statusColor = '#ef4444'; }
-                        else if (status === 'pending') { statusLabel = 'PENDENTE'; statusColor = '#f59e0b'; }
-                        else if (status === 'finished') { statusLabel = 'FINALIZADO'; statusColor = '#3b82f6'; }
+                        if (client.loans && client.loans.length > 0) {
+                            // Intentamos encontrar uno activo (no finalizado)
+                            const activeIndex = client.loans.findIndex(l => calculateLoanDetails(l).status !== 'finished');
+                            if (activeIndex !== -1) {
+                                loanIndex = activeIndex;
+                                loan = client.loans[activeIndex];
+                            } else {
+                                // Si todos están finalizados, mostramos el último
+                                loanIndex = client.loans.length - 1;
+                                loan = client.loans[loanIndex];
+                            }
+                        }
 
-                        const historyPaid = (loan.history || [])
-                            .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
-                            .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
-                        
-                        const totalPaid = (loan.initialMigratedAmount || 0) + historyPaid;
-                        const totalDebt = (parseFloat(loan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
-                        const remaining = Math.max(0, totalDebt - totalPaid);
-
-                        // --- FICHA BLANCA COMPACTA (Diseño Bingo) ---
-                        const popupContent = `
-                            <div style="font-family: 'Inter', sans-serif; min-width: 170px; background-color: #ffffff; color: #1e293b; padding: 2px; border-radius: 8px;">
-                                <!-- CABECERA: NOMBRE + ESTADO + X -->
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
-                                    <strong style="font-size: 0.95em; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%;" title="${client.name}">${client.name}</strong>
-                                    
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="background-color: ${statusColor}; color: white; padding: 1px 6px; border-radius: 4px; font-size: 0.65em; font-weight: 700; text-transform: uppercase;">
-                                            ${statusLabel}
-                                        </span>
-                                        <button class="close-popup-btn" style="background:none; border:none; color:#94a3b8; font-size: 1.4em; cursor:pointer; line-height: 0.8; padding: 0;">&times;</button>
-                                    </div>
-                                </div>
-
-                                <!-- INFO FINANCIERA (Vertical) -->
-                                <div style="font-size: 0.8em; color: #334155; display: flex; flex-direction: column; gap: 3px; margin-top: 5px;">
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span>Total:</span> <strong style="color: #0f172a;">${money(totalDebt)}</strong>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between;">
-                                        <span>Pago:</span> <strong style="color: #22c55e;">${money(totalPaid)}</strong>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 2px; margin-top: 1px;">
-                                        <span style="font-weight: 600;">Resta:</span> <strong style="color: #ef4444;">${money(remaining)}</strong>
-                                    </div>
-                                </div>
-
-                                <button class="popup-details-btn" data-client-id="${client.id}" data-loan-index="${loanIndex}" style="margin-top: 8px; width: 100%; background-color: #3b82f6; color: white; border: none; padding: 5px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.8em;">
-                                    Ver Ficha
-                                </button>
-                            </div>
-                        `;
-
-                        const marker = L.marker([lat, lng], { icon: clientIcon })
-                            .addTo(mapInstance)
-                            .bindPopup(popupContent, { closeButton: false, offset: [0, -25] }); // Offset ajustado para el pin clásico
-                        
-                        marker.on('popupopen', (e) => {
-                            const popupNode = e.popup.getElement();
+                        if (loan) {
+                            // --- CÁLCULOS FINANCIEROS ---
+                            const details = calculateLoanDetails(loan);
+                            const status = details.status;
                             
-                            const detailsBtn = popupNode.querySelector('.popup-details-btn');
-                            if (detailsBtn) {
-                                detailsBtn.onclick = () => {
-                                    showClientDetails(detailsBtn.dataset.clientId, parseInt(detailsBtn.dataset.loanIndex, 10));
-                                };
-                            }
+                            let statusLabel = 'SEM DADOS';
+                            let statusColor = '#94a3b8';
 
-                            const closeBtn = popupNode.querySelector('.close-popup-btn');
-                            if (closeBtn) {
-                                closeBtn.onclick = () => {
-                                    mapInstance.closePopup();
-                                };
-                            }
-                        });
+                            if (status === 'paid') { statusLabel = 'EM DIA'; statusColor = '#22c55e'; }
+                            else if (status === 'late') { statusLabel = 'ATRASADO'; statusColor = '#ef4444'; }
+                            else if (status === 'pending') { statusLabel = 'PENDENTE'; statusColor = '#f59e0b'; }
+                            else if (status === 'finished') { statusLabel = 'FINALIZADO'; statusColor = '#3b82f6'; }
 
-                        mapMarkers.push(marker);
+                            const historyPaid = (loan.history || [])
+                                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
+                                .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                            
+                            const totalPaid = (loan.initialMigratedAmount || 0) + historyPaid;
+                            const totalDebt = (parseFloat(loan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+                            const remaining = Math.max(0, totalDebt - totalPaid);
+
+                            // --- FICHA BLANCA COMPACTA ---
+                            const popupContent = `
+                                <div style="font-family: 'Inter', sans-serif; min-width: 170px; background-color: #ffffff; color: #1e293b; padding: 2px; border-radius: 8px;">
+                                    <!-- CABECERA: NOMBRE + ESTADO + X -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                                        <div style="overflow: hidden;">
+                                            <span style="font-size: 0.65em; text-transform: uppercase; color: #64748b; font-weight: 700; display: block;">CLIENTE</span>
+                                            <strong style="font-size: 1em; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 110px;" title="${client.name}">${client.name}</strong>
+                                        </div>
+                                        
+                                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                                            <span style="background-color: ${statusColor}; color: white; padding: 1px 5px; border-radius: 4px; font-size: 0.65em; font-weight: 700; text-transform: uppercase;">
+                                                ${statusLabel}
+                                            </span>
+                                            <button class="close-popup-btn" style="background:none; border:none; color:#94a3b8; font-size: 1.6em; cursor:pointer; line-height: 0.8; padding: 0 0 0 4px;">&times;</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- INFO FINANCIERA (Vertical) -->
+                                    <div style="font-size: 0.85em; color: #334155; display: flex; flex-direction: column; gap: 3px; margin-top: 5px;">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span>Total:</span> <strong style="color: #0f172a;">${money(totalDebt)}</strong>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span>Pago:</span> <strong style="color: #22c55e;">${money(totalPaid)}</strong>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 2px; margin-top: 1px;">
+                                            <span style="font-weight: 600;">Resta:</span> <strong style="color: #ef4444; font-size: 1.1em;">${money(remaining)}</strong>
+                                        </div>
+                                    </div>
+
+                                    <button class="popup-details-btn" data-client-id="${client.id}" data-loan-index="${loanIndex}" style="margin-top: 10px; width: 100%; background-color: #3b82f6; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9em;">
+                                        Ver Ficha
+                                    </button>
+                                </div>
+                            `;
+
+                            const marker = L.marker([lat, lng], { icon: clientIcon })
+                                .addTo(mapInstance)
+                                .bindPopup(popupContent, { closeButton: false, offset: [0, -25] });
+                            
+                            marker.on('popupopen', (e) => {
+                                const popupNode = e.popup.getElement();
+                                
+                                const detailsBtn = popupNode.querySelector('.popup-details-btn');
+                                if (detailsBtn) {
+                                    detailsBtn.onclick = () => {
+                                        showClientDetails(detailsBtn.dataset.clientId, parseInt(detailsBtn.dataset.loanIndex, 10));
+                                    };
+                                }
+
+                                const closeBtn = popupNode.querySelector('.close-popup-btn');
+                                if (closeBtn) {
+                                    closeBtn.onclick = () => {
+                                        mapInstance.closePopup();
+                                    };
+                                }
+                            });
+
+                            window.mapMarkers.push(marker);
+                        }
                     }
                 }
             });
@@ -7795,3 +7827,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
