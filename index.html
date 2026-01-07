@@ -1897,13 +1897,13 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }    
 
-          // --- [BLOQUE DE RECIBOS: DESCARGA + PREGUNTA WHATSAPP] ---
+          // --- [BLOQUE DE RECIBOS: DESCARGA + COMPARTIR NATIVO] ---
 
-        // 1. GENERAR ESTADO DE CUENTA (Botón "Recibo" en perfil del cliente)
+        // 1. GENERAR ESTADO DE CUENTA (Botón "Enviar Comprovante")
         async function generateStatusReceiptPDF(clientId, loanIndex) {
             try {
                 const { jsPDF } = window.jspdf;
-                const doc = new jsPDF({ unit: 'mm', format: [80, 230] });
+                const doc = new jsPDF({ unit: 'mm', format: [80, 230] }); // Ticket Largo
                 
                 const client = allClients.find(c => c.id === clientId);
                 if (!client || !client.loans || !client.loans[loanIndex]) {
@@ -2019,31 +2019,31 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
                 doc.text(texts.footer, centerX, y, { align: 'center' });
 
-                // 1. Descargar PDF (Primero se descarga)
-                doc.save(`extrato_${client.name.replace(/\s/g, '_')}.pdf`);
-                showToast(isEs ? "PDF descargado correctamente." : "PDF baixado com sucesso!", false);
+                // --- NUEVA LÓGICA DE COMPARTIR ---
+                const fileName = `extrato_${client.name.replace(/\s/g, '_')}.pdf`;
+                const pdfBlob = doc.output('blob');
+                const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-                // 2. Opción de WhatsApp (Pregunta al usuario después de descargar)
-                const whatsappString = (client.whatsapp || '').toString(); 
-                let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
-                
-                if (cleanedWhatsapp) {
-                    const currencyToDDI = { 'BRL': '55', 'ARS': '54', 'BOB': '591', 'CLP': '56', 'COP': '57', 'USD_EC': '593', 'PYG': '595', 'PEN': '51', 'UYU': '598', 'VES': '58', 'CRC': '506', 'GTQ': '502', 'HNL': '504', 'NIO': '505', 'PAB': '507', 'USD_SV': '503', 'USD': '1', 'MXN': '52', 'CAD': '1' };
-                    const collectorCurrency = currentCollectorData?.paymentSettings?.currency || 'BRL';
-                    const countryDDI = currencyToDDI[collectorCurrency] || '55';
-                    if (cleanedWhatsapp.length >= 8 && cleanedWhatsapp.length <= 11) cleanedWhatsapp = countryDDI + cleanedWhatsapp;
-
-                    const msgText = isEs ? `Hola ${client.name}, aquí está tu estado de cuenta actualizado.` : `Olá ${client.name}, segue seu extrato atualizado.`;
-                    
-                    // PREGUNTA INTERACTIVA
-                    showConfirmationModal(
-                        isEs ? '¿Enviar por WhatsApp?' : 'Enviar no WhatsApp?',
-                        isEs ? 'El PDF se ha descargado. ¿Deseas abrir WhatsApp para enviarlo?' : 'O PDF foi baixado. Deseja abrir o WhatsApp para enviá-lo?',
-                        () => {
-                            window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
-                            window.history.back(); // Cerrar modal confirmación
+                // Intenta usar el Menú de Compartir Nativo del Celular
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                    try {
+                        await navigator.share({
+                            files: [pdfFile],
+                            title: texts.title,
+                            text: `Olá ${client.name}, segue seu extrato.`
+                        });
+                        showToast(isEs ? "Compartido con éxito!" : "Compartilhado com sucesso!");
+                    } catch (err) {
+                        // Si el usuario cancela o hay error, descargamos como respaldo
+                        if (err.name !== 'AbortError') {
+                            doc.save(fileName);
+                            showToast(isEs ? "Descargado (Compartir no disponible)" : "Baixado (Compartilhamento indisponível)");
                         }
-                    );
+                    }
+                } else {
+                    // Fallback para PC: Descarga directa
+                    doc.save(fileName);
+                    showToast(isEs ? "Recibo descargado." : "Recibo baixado.");
                 }
 
             } catch (err) {
@@ -2052,7 +2052,7 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }
 
-        // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura" - Estilo Ticket + Opción WhatsApp)
+        // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura")
         async function generateInvoicePDF(clientData, payment) {
             try {
                 const { jsPDF } = window.jspdf;
@@ -2115,7 +2115,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 let y = 10;
                 const centerX = 40;
 
-                // PDF Content
                 doc.setFontSize(12); doc.setFont(undefined, 'bold');
                 doc.text(texts.company, centerX, y, { align: 'center' });
                 y += 6;
@@ -2198,31 +2197,28 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
                 doc.text(texts.signature, centerX, y, { align: 'center' });
 
-                // 1. Descargar PDF (Primero se descarga)
-                doc.save(`fatura_${realClient.name.replace(/\s/g, '_')}.pdf`);
-                showToast(isEs ? "PDF descargado correctamente." : "PDF baixado com sucesso!", false);
+                // --- NUEVA LÓGICA DE COMPARTIR ---
+                const fileName = `fatura_${realClient.name.replace(/\s/g, '_')}.pdf`;
+                const pdfBlob = doc.output('blob');
+                const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-                // 2. Opción de WhatsApp (Pregunta al usuario después de descargar)
-                const whatsappString = (realClient.whatsapp || '').toString(); 
-                let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
-                
-                if (cleanedWhatsapp) {
-                    const currencyToDDI = { 'BRL': '55', 'ARS': '54', 'BOB': '591', 'CLP': '56', 'COP': '57', 'USD_EC': '593', 'PYG': '595', 'PEN': '51', 'UYU': '598', 'VES': '58', 'CRC': '506', 'GTQ': '502', 'HNL': '504', 'NIO': '505', 'PAB': '507', 'USD_SV': '503', 'USD': '1', 'MXN': '52', 'CAD': '1' };
-                    const collectorCurrency = currentCollectorData?.paymentSettings?.currency || 'BRL';
-                    const countryDDI = currencyToDDI[collectorCurrency] || '55';
-                    if (cleanedWhatsapp.length >= 8 && cleanedWhatsapp.length <= 11) cleanedWhatsapp = countryDDI + cleanedWhatsapp;
-
-                    const msgText = isEs ? `Hola ${realClient.name}, adjunto su recibo de pago.` : `Olá ${realClient.name}, segue o comprovante do seu pagamento.`;
-                    
-                    // PREGUNTA INTERACTIVA
-                    showConfirmationModal(
-                        isEs ? '¿Enviar por WhatsApp?' : 'Enviar no WhatsApp?',
-                        isEs ? 'El PDF se ha descargado. ¿Deseas abrir WhatsApp para enviarlo?' : 'O PDF foi baixado. Deseja abrir o WhatsApp para enviá-lo?',
-                        () => {
-                            window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
-                            window.history.back(); // Cerrar modal confirmación
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                    try {
+                        await navigator.share({
+                            files: [pdfFile],
+                            title: texts.title,
+                            text: `Olá ${realClient.name}, segue o comprovante.`
+                        });
+                        showToast(isEs ? "Compartido con éxito!" : "Compartilhado com sucesso!");
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            doc.save(fileName);
+                            showToast(isEs ? "Descargado (Compartir no disponible)" : "Baixado (Compartilhamento indisponível)");
                         }
-                    );
+                    }
+                } else {
+                    doc.save(fileName);
+                    showToast(isEs ? "Fatura descargada." : "Fatura baixada.");
                 }
                 
             } catch (error) {
@@ -2230,6 +2226,9 @@ async function showRefinanceModal(clientId, notificationId) {
                 showToast("Erro ao gerar fatura.", true);
             }
         }
+
+        
+        
 
         // Ahora sí, la función applyTheme empieza limpia fuera de la anterior
         function applyTheme(theme) {
@@ -7741,4 +7740,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
