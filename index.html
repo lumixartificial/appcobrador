@@ -1897,9 +1897,9 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }    
 
-          // --- [BLOQUE DE RECIBOS CON REDIRECCIÓN A WHATSAPP] ---
+          // --- [BLOQUE DE RECIBOS: DESCARGA + PREGUNTA WHATSAPP] ---
 
-        // 1. GENERAR ESTADO DE CUENTA (Botón "Recibo" - Estilo Ticket + WhatsApp)
+        // 1. GENERAR ESTADO DE CUENTA (Botón "Recibo" en perfil del cliente)
         async function generateStatusReceiptPDF(clientId, loanIndex) {
             try {
                 const { jsPDF } = window.jspdf;
@@ -2019,11 +2019,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
                 doc.text(texts.footer, centerX, y, { align: 'center' });
 
-                // 1. Descargar PDF
+                // 1. Descargar PDF (Primero se descarga)
                 doc.save(`extrato_${client.name.replace(/\s/g, '_')}.pdf`);
-                showToast("Baixado! Abrindo WhatsApp...", false);
+                showToast(isEs ? "PDF descargado correctamente." : "PDF baixado com sucesso!", false);
 
-                // 2. Redirección a WhatsApp
+                // 2. Opción de WhatsApp (Pregunta al usuario después de descargar)
                 const whatsappString = (client.whatsapp || '').toString(); 
                 let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
                 
@@ -2035,9 +2035,15 @@ async function showRefinanceModal(clientId, notificationId) {
 
                     const msgText = isEs ? `Hola ${client.name}, aquí está tu estado de cuenta actualizado.` : `Olá ${client.name}, segue seu extrato atualizado.`;
                     
-                    setTimeout(() => {
-                        window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
-                    }, 1500); // 1.5 seg de espera para asegurar que la descarga inició
+                    // PREGUNTA INTERACTIVA
+                    showConfirmationModal(
+                        isEs ? '¿Enviar por WhatsApp?' : 'Enviar no WhatsApp?',
+                        isEs ? 'El PDF se ha descargado. ¿Deseas abrir WhatsApp para enviarlo?' : 'O PDF foi baixado. Deseja abrir o WhatsApp para enviá-lo?',
+                        () => {
+                            window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
+                            window.history.back(); // Cerrar modal confirmación
+                        }
+                    );
                 }
 
             } catch (err) {
@@ -2046,7 +2052,7 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }
 
-        // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura" - Estilo Ticket + WhatsApp)
+        // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura" - Estilo Ticket + Opción WhatsApp)
         async function generateInvoicePDF(clientData, payment) {
             try {
                 const { jsPDF } = window.jspdf;
@@ -2192,11 +2198,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
                 doc.text(texts.signature, centerX, y, { align: 'center' });
 
-                // 1. Descargar PDF
+                // 1. Descargar PDF (Primero se descarga)
                 doc.save(`fatura_${realClient.name.replace(/\s/g, '_')}.pdf`);
-                showToast("Baixado! Abrindo WhatsApp...", false);
+                showToast(isEs ? "PDF descargado correctamente." : "PDF baixado com sucesso!", false);
 
-                // 2. Redirección a WhatsApp
+                // 2. Opción de WhatsApp (Pregunta al usuario después de descargar)
                 const whatsappString = (realClient.whatsapp || '').toString(); 
                 let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
                 
@@ -2208,9 +2214,15 @@ async function showRefinanceModal(clientId, notificationId) {
 
                     const msgText = isEs ? `Hola ${realClient.name}, adjunto su recibo de pago.` : `Olá ${realClient.name}, segue o comprovante do seu pagamento.`;
                     
-                    setTimeout(() => {
-                        window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
-                    }, 1500); // 1.5 seg de espera
+                    // PREGUNTA INTERACTIVA
+                    showConfirmationModal(
+                        isEs ? '¿Enviar por WhatsApp?' : 'Enviar no WhatsApp?',
+                        isEs ? 'El PDF se ha descargado. ¿Deseas abrir WhatsApp para enviarlo?' : 'O PDF foi baixado. Deseja abrir o WhatsApp para enviá-lo?',
+                        () => {
+                            window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
+                            window.history.back(); // Cerrar modal confirmación
+                        }
+                    );
                 }
                 
             } catch (error) {
@@ -7729,3 +7741,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
