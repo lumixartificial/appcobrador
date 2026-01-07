@@ -1897,166 +1897,327 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }    
 
-        async function generateInvoicePDF(client, payment) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const now = new Date();
-            const paymentDate = new Date(payment.date.seconds * 1000);
-            const collectorName = document.querySelector('.profile-name')?.textContent || 'João Silva';
+          // --- [BLOQUE DE RECIBOS CON REDIRECCIÓN A WHATSAPP] ---
 
-            // --- Estilo y Contenido ---
-            const primaryColor = '#6f42c1';
-            const textColor = '#343a40';
-            const secondaryTextColor = '#6c757d';
-            const pageMargin = 15;
-            const pageWidth = doc.internal.pageSize.getWidth();
-            let y = 0;
-
-            // 1. Encabezado de la Empresa (Sin logo, centrado)
-            y = 25;
-            doc.setFontSize(16);
-            doc.setTextColor(textColor);
-            doc.setFont(undefined, 'bold');
-            doc.text('LUMIX Finanças', pageWidth / 2, y, { align: 'center' });
-
-            // 2. Título de la Factura
-            y = 55;
-            doc.setFontSize(26);
-            doc.setTextColor(textColor);
-            doc.setFont(undefined, 'bold');
-            doc.text('FATURA', pageMargin, y);
-            
-            doc.setFontSize(11);
-            doc.setTextColor(secondaryTextColor);
-            doc.setFont(undefined, 'normal');
-            doc.text(`Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`, pageWidth - pageMargin, y, { align: 'right' });
-
-            // Línea divisoria
-            doc.setLineWidth(0.5);
-            doc.setDrawColor(primaryColor);
-            doc.line(pageMargin, y + 5, pageWidth - pageMargin, y + 5);
-
-            // 3. Detalles del Cliente y Pago
-            y += 15;
-            doc.setFontSize(10);
-            doc.setTextColor(secondaryTextColor);
-            doc.text('COBRADOR', pageMargin, y);
-            doc.text('CLIENTE', pageWidth / 2, y);
-            
-            doc.setFontSize(12);
-            doc.setTextColor(textColor);
-            doc.setFont(undefined, 'bold');
-            doc.text(collectorName, pageMargin, y + 6);
-            doc.text(client.name, pageWidth / 2, y + 6);
-
-            y += 15;
-            doc.setFontSize(10);
-            doc.setTextColor(secondaryTextColor);
-            doc.text('DATA DO PAGAMENTO', pageMargin, y);
-            
-            doc.setFontSize(12);
-            doc.setTextColor(textColor);
-            doc.setFont(undefined, 'normal');
-            doc.text(`${paymentDate.toLocaleDateString('pt-BR')} às ${paymentDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`, pageMargin, y + 6);
-
-            // 4. Cuerpo de la factura (Tabla)
-            y += 25;
-            doc.setFillColor('#f0e9ff'); // Un lila muy claro
-            doc.roundedRect(pageMargin, y, pageWidth - (pageMargin * 2), 10, 2, 2, 'F');
-            
-            doc.setFontSize(11);
-            doc.setFont(undefined, 'bold');
-            doc.setTextColor(primaryColor);
-            doc.text('Descrição', pageMargin + 5, y + 7);
-            doc.text('Valor Pago', pageWidth - pageMargin - 5, y + 7, { align: 'right' });
-
-            y += 18;
-            doc.setFontSize(12);
-            doc.setTextColor(textColor);
-            doc.setFont(undefined, 'normal');
-            doc.text('Pagamento de parcela do empréstimo', pageMargin + 5, y);
-            doc.setFont(undefined, 'bold');
-            doc.setTextColor('#28a745'); // accent-green
-            doc.setFontSize(14);
-            doc.text(money(payment.amount), pageWidth - pageMargin - 5, y, { align: 'right' });
-
-            // 5. Resumen del Préstamo
-            const paidInstallments = (client.history || []).filter(p => p.status !== 'pending_verification').length;
-            const totalInstallmentsStr = (client.installments || "0/0").split('/')[1];
-            const totalInstallments = totalInstallmentsStr ? parseInt(totalInstallmentsStr, 10) : 0;
-            const remainingValue = Math.max(0, (client.totalLoan || 0) - (client.paid || 0));
-
-            y += 20;
-            doc.setFillColor('#fafafa');
-            doc.roundedRect(pageMargin, y, pageWidth - (pageMargin * 2), 26, 3, 3, 'F');
-            doc.setFontSize(12);
-            doc.setTextColor(textColor);
-            doc.setFont(undefined, 'bold');
-            doc.text('Resumo do Empréstimo', pageMargin + 5, y + 8);
-            
-            y += 16;
-            doc.setFontSize(11);
-            doc.setFont(undefined, 'normal');
-            doc.setTextColor(secondaryTextColor);
-            doc.text('Progresso das Parcelas:', pageMargin + 5, y);
-            doc.setTextColor(textColor);
-            doc.text(`${paidInstallments} de ${totalInstallments} pagas`, pageWidth - pageMargin - 5, y, { align: 'right' });
-            
-            y += 7;
-            doc.setTextColor(secondaryTextColor);
-            doc.text('Valor Restante:', pageMargin + 5, y);
-            doc.setTextColor(primaryColor);
-            doc.setFont(undefined, 'bold');
-            doc.text(money(remainingValue), pageWidth - pageMargin - 5, y, { align: 'right' });
-            
-            // 6. Pie de página
-            y = doc.internal.pageSize.getHeight() - 30;
-            doc.setLineWidth(0.2);
-            doc.setDrawColor(secondaryTextColor);
-            doc.line(pageMargin, y, pageWidth - pageMargin, y);
-            
-            y += 10;
-            doc.setFontSize(12);
-            doc.setTextColor(primaryColor);
-            doc.setFont(undefined, 'bold');
-            doc.text('Obrigado pela preferência!', pageWidth / 2, y, { align: 'center' });
-
-            const fileName = `fatura-${client.name.replace(/\s/g, '_')}-${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
-
-            // 1. Iniciar o download automaticamente
-            doc.save(fileName);
-            showToast('Download da fatura iniciado...');
-
-            // 2. Tentar compartilhar usando a API de compartilhamento da web, apenas se estiver no modo App (PWA)
-            const isAppMode = window.matchMedia('(display-mode: standalone)').matches;
-
-            if (isAppMode && navigator.share && navigator.canShare) {
-                const pdfBlob = doc.output('blob');
-                const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        // 1. GENERAR ESTADO DE CUENTA (Botón "Recibo" - Estilo Ticket + WhatsApp)
+        async function generateStatusReceiptPDF(clientId, loanIndex) {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ unit: 'mm', format: [80, 230] });
                 
-                const shareData = {
-                    files: [pdfFile],
-                    title: `Fatura - ${client.name}`,
-                    text: `Segue a fatura do pagamento de ${money(payment.amount)} para ${client.name}.`,
+                const client = allClients.find(c => c.id === clientId);
+                if (!client || !client.loans || !client.loans[loanIndex]) {
+                    showToast("Erro: Dados não encontrados.", true);
+                    return;
+                }
+                const loan = client.loans[loanIndex];
+                const details = calculateLoanDetails(loan); 
+                
+                // Cálculo Matemático
+                const historyPaid = (loan.history || [])
+                    .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
+                    .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                
+                const totalPaid = (loan.initialMigratedAmount || 0) + historyPaid;
+                const totalDebt = (parseFloat(loan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+                const remainingBalance = Math.max(0, totalDebt - totalPaid);
+                const totalInstallmentsStr = (loan.installments || "0/0").split('/')[1];
+                const totalInstallments = parseInt(totalInstallmentsStr, 10) || 0;
+                const installmentValue = parseFloat(loan.originalInstallmentAmount || loan.amount || 1);
+                
+                let paidInstallments = 0;
+                if (installmentValue > 0) {
+                    paidInstallments = Math.floor(totalPaid / installmentValue);
+                }
+                if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
+
+                const isEs = currentLang === 'es';
+                const texts = {
+                    title: isEs ? "ESTADO DE CUENTA" : "EXTRATO DO EMPRÉSTIMO",
+                    company: currentCompanyData?.name || "LUMIX Finanças",
+                    date: isEs ? "Fecha:" : "Data:",
+                    client: isEs ? "Cliente:" : "Cliente:",
+                    frequency: isEs ? "Modalidad:" : "Frequência:",
+                    progress: isEs ? "Cuotas Pagadas:" : "Parcelas Pagas:", 
+                    paid_msg: `${paidInstallments} / ${totalInstallments}`,
+                    loan_total: isEs ? "Total Préstamo:" : "Total Empréstimo:",
+                    late_fees: isEs ? "Multas/Mora:" : "Multas/Juros:",
+                    total_paid: isEs ? "Total Pagado:" : "Total Pago:",
+                    to_pay: isEs ? "RESTA PAGAR:" : "RESTA PAGAR:",
+                    footer: isEs ? "Generado por LUMIX Finanzas" : "Gerado por LUMIX Finanças",
+                    late: isEs ? "ATRASADO" : "ATRASADO",
+                    up_to_date: isEs ? "AL DÍA" : "EM DIA",
+                    finished: isEs ? "FINALIZADO" : "FINALIZADO"
                 };
 
-                // Verifica se o navegador pode compartilhar esses dados
-                if (navigator.canShare(shareData)) {
-                    try {
-                        await navigator.share(shareData);
-                    } catch (err) {
-                        // O erro 'AbortError' ocorre se o usuário fechar a janela de compartilhamento, não é um erro crítico.
-                        if (err.name !== 'AbortError') {
-                            console.error('Erro ao compartilhar a fatura:', err);
-                            showToast('Não foi possível abrir a janela de compartilhamento.', true);
-                        }
-                    }
-                } else {
-                     // Isso pode acontecer em desktops onde o compartilhamento de arquivos não é suportado
-                    console.warn('O compartilhamento de arquivos não é suportado neste navegador.');
+                const freqMap = { 'daily': isEs?'DIARIO':'DIÁRIO', 'weekly': isEs?'SEMANAL':'SEMANAL', 'biweekly': isEs?'QUINCENAL':'QUINZENAL', 'monthly': isEs?'MENSUAL':'MENSAL' };
+                const modalidade = freqMap[loan.paymentFrequency] || 'DIÁRIO';
+
+                let y = 10;
+                const centerX = 40;
+
+                // PDF Content Generation
+                doc.setFontSize(12); doc.setFont(undefined, 'bold');
+                doc.text(texts.company, centerX, y, { align: 'center' });
+                y += 6;
+                doc.setFontSize(10); doc.setFont(undefined, 'normal');
+                doc.text(texts.title, centerX, y, { align: 'center' });
+                y += 5; doc.setLineWidth(0.5); doc.line(5, y, 75, y); y += 5;
+
+                doc.setFontSize(9);
+                doc.setFont(undefined, 'bold'); doc.text(texts.date, 5, y);
+                doc.setFont(undefined, 'normal'); doc.text(new Date().toLocaleDateString('pt-BR'), 75, y, { align: 'right' });
+                y += 5;
+                doc.setFont(undefined, 'bold'); doc.text(texts.client, 5, y);
+                y += 4;
+                doc.setFont(undefined, 'normal');
+                const splitName = doc.splitTextToSize(client.name, 70);
+                doc.text(splitName, 5, y);
+                y += (splitName.length * 4) + 2;
+
+                doc.setFont(undefined, 'bold'); doc.text(texts.frequency, 5, y);
+                doc.setFont(undefined, 'normal'); doc.text(modalidade, 75, y, { align: 'right' });
+                y += 8;
+
+                doc.setFont(undefined, 'bold'); doc.text(texts.progress, 5, y);
+                doc.text(texts.paid_msg, 75, y, { align: 'right' });
+                y += 4;
+                const barWidth = 70; 
+                const progressPct = totalInstallments > 0 ? paidInstallments / totalInstallments : 0;
+                doc.setFillColor(230, 230, 230); doc.rect(5, y, barWidth, 6, 'F');
+                doc.setFillColor(111, 66, 193); doc.rect(5, y, barWidth * progressPct, 6, 'F');
+                y += 10; doc.setLineWidth(0.2); doc.setDrawColor(200); doc.line(5, y, 75, y); y += 6;
+
+                const addRow = (label, value, color='#000000') => {
+                    doc.setFont(undefined, 'normal'); doc.setTextColor(color);
+                    doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
+                    y += 6;
+                };
+                doc.setFontSize(10);
+                addRow(texts.loan_total, loan.totalLoan);
+                if (details.lateFeesAccumulated > 0) addRow(texts.late_fees, details.lateFeesAccumulated, '#dc3545');
+                addRow(texts.total_paid, totalPaid, '#28a745');
+                y += 4;
+                
+                doc.setFillColor(245, 245, 245); doc.rect(5, y - 4, 70, 14, 'F');
+                doc.setFont(undefined, 'bold'); doc.setTextColor(0);
+                doc.text(texts.to_pay, centerX, y + 1, { align: 'center' });
+                doc.setFontSize(14); doc.setTextColor(111, 66, 193);
+                doc.text(money(remainingBalance), centerX, y + 7, { align: 'center' });
+                y += 18;
+
+                let statusColor = '#28a745'; let statusText = texts.up_to_date; let bgColor = '#d4edda';
+                if (details.status === 'late') { statusColor = '#721c24'; statusText = texts.late; bgColor = '#f8d7da'; }
+                else if (details.status === 'finished') { statusColor = '#004085'; statusText = texts.finished; bgColor = '#cce5ff'; }
+
+                doc.setDrawColor(statusColor); doc.setFillColor(bgColor);
+                doc.roundedRect(5, y, 70, 12, 2, 2, 'FD');
+                doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(statusColor);
+                doc.text(statusText, centerX, y + 8, { align: 'center' });
+                y += 20;
+
+                doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
+                doc.text(texts.footer, centerX, y, { align: 'center' });
+
+                // 1. Descargar PDF
+                doc.save(`extrato_${client.name.replace(/\s/g, '_')}.pdf`);
+                showToast("Baixado! Abrindo WhatsApp...", false);
+
+                // 2. Redirección a WhatsApp
+                const whatsappString = (client.whatsapp || '').toString(); 
+                let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
+                
+                if (cleanedWhatsapp) {
+                    const currencyToDDI = { 'BRL': '55', 'ARS': '54', 'BOB': '591', 'CLP': '56', 'COP': '57', 'USD_EC': '593', 'PYG': '595', 'PEN': '51', 'UYU': '598', 'VES': '58', 'CRC': '506', 'GTQ': '502', 'HNL': '504', 'NIO': '505', 'PAB': '507', 'USD_SV': '503', 'USD': '1', 'MXN': '52', 'CAD': '1' };
+                    const collectorCurrency = currentCollectorData?.paymentSettings?.currency || 'BRL';
+                    const countryDDI = currencyToDDI[collectorCurrency] || '55';
+                    if (cleanedWhatsapp.length >= 8 && cleanedWhatsapp.length <= 11) cleanedWhatsapp = countryDDI + cleanedWhatsapp;
+
+                    const msgText = isEs ? `Hola ${client.name}, aquí está tu estado de cuenta actualizado.` : `Olá ${client.name}, segue seu extrato atualizado.`;
+                    
+                    setTimeout(() => {
+                        window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
+                    }, 1500); // 1.5 seg de espera para asegurar que la descarga inició
                 }
+
+            } catch (err) {
+                console.error("Erro PDF:", err);
+                showToast("Erro ao gerar extrato.", true);
             }
-        } // <--- ESTA LLAVE FALTABA (Cierra la función generateInvoicePDF)
+        }
+
+        // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura" - Estilo Ticket + WhatsApp)
+        async function generateInvoicePDF(clientData, payment) {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ unit: 'mm', format: [80, 230] }); 
+
+                const realClient = allClients.find(c => c.id === clientData.id) || clientData;
+                
+                let activeLoan = null;
+                if (realClient.loans) {
+                    activeLoan = realClient.loans.find(l => l.history && l.history.some(h => 
+                        h === payment || (h.amount === payment.amount && h.date?.seconds === payment.date?.seconds)
+                    ));
+                    if (!activeLoan) activeLoan = realClient.loans.find(l => l.status !== 'finished');
+                    if (!activeLoan && realClient.loans.length > 0) activeLoan = realClient.loans[realClient.loans.length - 1];
+                }
+
+                let remainingBalance = 0;
+                let paidInstallmentsMsg = "0 / 0";
+                let totalLoanVal = 0;
+                let totalPaidVal = 0;
+
+                if (activeLoan) {
+                    const details = calculateLoanDetails(activeLoan);
+                    const historyPaid = (activeLoan.history || [])
+                        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
+                        .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                    
+                    const initialPaid = activeLoan.initialMigratedAmount || 0;
+                    totalPaidVal = initialPaid + historyPaid;
+                    totalLoanVal = (parseFloat(activeLoan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+                    remainingBalance = Math.max(0, totalLoanVal - totalPaidVal);
+
+                    const totalInstallmentsStr = (activeLoan.installments || "0/0").split('/')[1];
+                    const totalInstallments = parseInt(totalInstallmentsStr, 10) || 0;
+                    const installmentValue = parseFloat(activeLoan.originalInstallmentAmount || activeLoan.amount || 1);
+                    
+                    let paidCount = 0;
+                    if (installmentValue > 0) paidCount = Math.floor(totalPaidVal / installmentValue);
+                    if (paidCount > totalInstallments) paidCount = totalInstallments;
+                    paidInstallmentsMsg = `${paidCount} / ${totalInstallments}`;
+                }
+
+                const isEs = currentLang === 'es';
+                const texts = {
+                    title: isEs ? "RECIBO DE PAGO" : "RECIBO DE PAGAMENTO",
+                    company: currentCompanyData?.name || "LUMIX Finanças",
+                    date: isEs ? "Fecha Pago:" : "Data Pagto:",
+                    client: isEs ? "Cliente:" : "Cliente:",
+                    method: isEs ? "Método:" : "Método:",
+                    collector: isEs ? "Cobrador:" : "Cobrador:",
+                    signature: isEs ? "Firma del Recibidor" : "Assinatura do Recebedor",
+                    summary_title: isEs ? "ESTADO DEL PRÉSTAMO" : "SITUAÇÃO DO EMPRÉSTIMO",
+                    progress: isEs ? "Cuotas Pagadas:" : "Parcelas Pagas:", 
+                    paid_msg: paidInstallmentsMsg,
+                    loan_total: isEs ? "Total Préstamo:" : "Total Empréstimo:",
+                    total_paid_global: isEs ? "Total Pagado (Acum.):" : "Total Pago (Acum.):",
+                    to_pay: isEs ? "RESTA PAGAR:" : "RESTA PAGAR:"
+                };
+
+                let y = 10;
+                const centerX = 40;
+
+                // PDF Content
+                doc.setFontSize(12); doc.setFont(undefined, 'bold');
+                doc.text(texts.company, centerX, y, { align: 'center' });
+                y += 6;
+                doc.setFontSize(10); doc.setFont(undefined, 'normal');
+                doc.text(texts.title, centerX, y, { align: 'center' });
+                y += 5; doc.setLineWidth(0.5); doc.line(5, y, 75, y); y += 5;
+
+                doc.setFontSize(9);
+                let dateStr = "N/A", timeStr = "";
+                if(payment.date) {
+                    let d = payment.date.seconds ? new Date(payment.date.seconds * 1000) : (payment.date instanceof Date ? payment.date : new Date(payment.date));
+                    dateStr = d.toLocaleDateString('pt-BR');
+                    timeStr = d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                }
+                
+                doc.setFont(undefined, 'bold'); doc.text(texts.date, 5, y);
+                doc.setFont(undefined, 'normal'); doc.text(`${dateStr} ${timeStr}`, 75, y, { align: 'right' });
+                y += 6;
+
+                doc.setFont(undefined, 'bold'); doc.text(texts.collector, 5, y);
+                doc.setFont(undefined, 'normal'); doc.text(currentCollectorData?.name || 'N/A', 75, y, { align: 'right' });
+                y += 6;
+
+                doc.setFont(undefined, 'bold'); doc.text(texts.client, 5, y);
+                y += 4;
+                doc.setFont(undefined, 'normal');
+                const splitName = doc.splitTextToSize(realClient.name, 70);
+                doc.text(splitName, 5, y);
+                y += (splitName.length * 4) + 2;
+
+                let methodText = payment.method === 'dinheiro' ? (isEs ? 'Efectivo' : 'Dinheiro') : (payment.method === 'pix' ? 'PIX' : 'Cartão');
+                doc.setFont(undefined, 'bold'); doc.text(texts.method, 5, y);
+                doc.setFont(undefined, 'normal'); doc.text(methodText.toUpperCase(), 75, y, { align: 'right' });
+                y += 8;
+
+                doc.setFillColor(240, 240, 240); doc.rect(5, y - 4, 70, 12, 'F');
+                doc.setFontSize(14); doc.setFont(undefined, 'bold');
+                doc.text(money(payment.amount), centerX, y + 4, { align: 'center' });
+                y += 12;
+
+                y += 5; doc.setLineWidth(0.2); doc.setLineDash([1, 1], 0); doc.line(5, y, 75, y); doc.setLineDash([]); y += 6;
+
+                if (activeLoan) {
+                    doc.setFontSize(10); doc.setFont(undefined, 'bold');
+                    doc.text(texts.summary_title, centerX, y, { align: 'center' });
+                    y += 6;
+
+                    doc.setFontSize(9);
+                    doc.text(texts.progress, 5, y);
+                    doc.text(texts.paid_msg, 75, y, { align: 'right' });
+                    y += 4;
+                    const barWidth = 70; 
+                    const totalInst = parseInt((activeLoan.installments || "0/0").split('/')[1], 10) || 1;
+                    const paidInst = parseInt((activeLoan.installments || "0/0").split('/')[0], 10) || 0;
+                    const progressPct = totalInst > 0 ? paidInst / totalInst : 0;
+                    doc.setFillColor(230, 230, 230); doc.rect(5, y, barWidth, 5, 'F');
+                    doc.setFillColor(111, 66, 193); doc.rect(5, y, barWidth * progressPct, 5, 'F');
+                    y += 8;
+
+                    const addRow = (label, value, color='#000000', bold=false) => {
+                        doc.setFont(undefined, bold ? 'bold' : 'normal'); doc.setTextColor(color);
+                        doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
+                        y += 5;
+                    };
+                    
+                    doc.setFontSize(9);
+                    addRow(texts.loan_total, totalLoanVal);
+                    addRow(texts.total_paid_global, totalPaidVal, '#28a745');
+                    
+                    y += 2;
+                    doc.setFont(undefined, 'bold'); doc.setTextColor(0);
+                    doc.text(texts.to_pay, 5, y+4); 
+                    doc.setFontSize(12); doc.setTextColor(111, 66, 193);
+                    doc.text(money(remainingBalance), 75, y+4, { align: 'right' });
+                    y += 10;
+                }
+
+                y += 10; doc.setLineWidth(0.2); doc.setTextColor(0); doc.setDrawColor(0);
+                doc.line(15, y, 65, y); y += 4;
+                doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+                doc.text(texts.signature, centerX, y, { align: 'center' });
+
+                // 1. Descargar PDF
+                doc.save(`fatura_${realClient.name.replace(/\s/g, '_')}.pdf`);
+                showToast("Baixado! Abrindo WhatsApp...", false);
+
+                // 2. Redirección a WhatsApp
+                const whatsappString = (realClient.whatsapp || '').toString(); 
+                let cleanedWhatsapp = whatsappString ? whatsappString.replace(/\D/g, '') : '';
+                
+                if (cleanedWhatsapp) {
+                    const currencyToDDI = { 'BRL': '55', 'ARS': '54', 'BOB': '591', 'CLP': '56', 'COP': '57', 'USD_EC': '593', 'PYG': '595', 'PEN': '51', 'UYU': '598', 'VES': '58', 'CRC': '506', 'GTQ': '502', 'HNL': '504', 'NIO': '505', 'PAB': '507', 'USD_SV': '503', 'USD': '1', 'MXN': '52', 'CAD': '1' };
+                    const collectorCurrency = currentCollectorData?.paymentSettings?.currency || 'BRL';
+                    const countryDDI = currencyToDDI[collectorCurrency] || '55';
+                    if (cleanedWhatsapp.length >= 8 && cleanedWhatsapp.length <= 11) cleanedWhatsapp = countryDDI + cleanedWhatsapp;
+
+                    const msgText = isEs ? `Hola ${realClient.name}, adjunto su recibo de pago.` : `Olá ${realClient.name}, segue o comprovante do seu pagamento.`;
+                    
+                    setTimeout(() => {
+                        window.open(`https://api.whatsapp.com/send?phone=${cleanedWhatsapp}&text=${encodeURIComponent(msgText)}`, '_blank');
+                    }, 1500); // 1.5 seg de espera
+                }
+                
+            } catch (error) {
+                console.error("Erro fatura:", error);
+                showToast("Erro ao gerar fatura.", true);
+            }
+        }
 
         // Ahora sí, la función applyTheme empieza limpia fuera de la anterior
         function applyTheme(theme) {
@@ -3312,25 +3473,15 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                    </button>`;
         
 
-            // --- LÓGICA DE SELECCIÓN DE PRÉSTAMO Y PESTAÑAS (CORREGIDA) ---
-            // 1. No filtramos nada. Mostramos TODOS los préstamos. Historial Ilimitado.
+            // --- LÓGICA DE SELECCIÓN DE PRÉSTAMO Y PESTAÑAS ---
             const allLoans = client.loans || [];
-            
-            // 2. Buscamos el índice del primer préstamo ACTIVO (no finalizado) para darle prioridad visual
             const firstActiveIndex = allLoans.findIndex(l => calculateLoanDetails(l).status !== 'finished');
             
-            // 3. Decidimos qué índice mostrar:
-            // - Si el usuario seleccionó uno específico (loanIndex), usamos ese.
-            // - Si no, intentamos mostrar el primer activo.
-            // - Si no hay activos, mostramos el último de la lista (el más reciente finalizado).
             let targetIndex = loanIndex;
-            
-            // Verificamos si el loanIndex solicitado es válido
             if (targetIndex < 0 || targetIndex >= allLoans.length) {
                 targetIndex = firstActiveIndex !== -1 ? firstActiveIndex : (allLoans.length - 1);
             }
             
-            // Si después de todo es -1 (cliente sin préstamos, raro pero posible), salimos
             if (targetIndex === -1 && allLoans.length === 0) {
                  console.error(`Cliente sin préstamos: ${clientId}`);
                  showToast("Erro: Cliente sem empréstimos.", true);
@@ -3338,23 +3489,20 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                  return; 
             }
 
-            // Actualizamos la variable global con el índice real que vamos a mostrar
             const currentLoanIndex = targetIndex;
             const loan = allLoans[currentLoanIndex];
             const hasMultipleLoans = allLoans.length > 1;
 
-            // (Corrección Desajuste - SIN CAMBIOS)
             const originalInstallment = loan.originalInstallmentAmount || 0;
             let approvedCumulativePaidForNumbering = 0;
 
-            // --- (Lógica de 'displayTotalPaid' - SIN CAMBIOS) ---
             const historyPaid = (loan.history || [])
                 .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') 
                 .reduce((sum, h) => sum + (h.amount || 0), 0);
             const initialPaid = loan.initialMigratedAmount || 0;
             const displayTotalPaid = initialPaid + historyPaid;
 
-            // --- (Lógica de Generación de Historial - CON CORRECCIÓN ROBUSTA DE FECHAS) ---
+            // --- GENERACIÓN DE HISTORIAL ---
             let historyHtml = `<p class="no-history">Nenhum pagamento registrado ainda.</p>`;
             if (loan.history && loan.history.length > 0) {
                 
@@ -3504,23 +3652,15 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             else if (score >= 7) barStatusClass = 'status-good';
             else if (score >= 3) barStatusClass = 'status-regular';
 
-            // --- LÓGICA DE VALOR PICO (CORREGIDA: LO QUE EL CLIENTE DIO) ---
-            // Pico = El resto de la división. Es el dinero parcial que el cliente tiene a favor.
-            // Ej: Cuota 100. Pagó 45. Pico = 45.
-            // Ej: Cuota 100. Pagó 150. Pico = 50.
+            // --- LÓGICA DE VALOR PICO ---
             let picoValue = 0;
             const instVal = loan.originalInstallmentAmount || 0;
-            
             if (instVal > 0 && displayTotalPaid > 0) {
                 const remainder = displayTotalPaid % instVal;
-                
-                // Filtramos errores decimales (ej: 0.0000001)
-                // Si el resto es mayor a 5 centavos, lo mostramos.
                 if (remainder > 0.05 && (instVal - remainder) > 0.05) {
                     picoValue = remainder;
                 }
             }
-            // ----------------------------------------
 
             // --- DICCIONARIO LOCAL PARA TÍTULOS ---
             const labels = {
@@ -3529,6 +3669,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance' }
             };
             const l = labels[currentLang] || labels.pt;
+
             // --- CÁLCULO DE FECHAS (INICIO Y FIN ESTIMADO) ---
             let startDateStr = '--/--';
             let endDateStr = 'Calculando...';
@@ -3542,11 +3683,9 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 if (startD && !isNaN(startD.getTime())) {
                     startDateStr = startD.toLocaleDateString('pt-BR');
 
-                    // Calcular Fin Estimado proyectando las cuotas
                     const totalInst = parseInt((loan.installments || "0/0").split('/')[1], 10) || 0;
                     
                     if (totalInst > 0) {
-                        // Si el préstamo ya finalizó, intentamos mostrar la fecha del último pago como fin real
                         if (currentStatus === 'finished' && loan.history && loan.history.length > 0) {
                              const lastPayment = loan.history[loan.history.length - 1];
                              let endD = null;
@@ -3556,15 +3695,12 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                              if (endD) endDateStr = endD.toLocaleDateString('pt-BR') + ' (Real)';
                         } 
                         else {
-                            // Si está activo, proyectamos el futuro
                             let count = 0;
                             let currentD = new Date(startD);
-                            // La lógica del sistema empieza a cobrar al día siguiente del inicio
                             currentD.setDate(currentD.getDate() + 1); 
 
                             let safetyLoop = 0;
-                            // Iteramos día a día hasta completar las cuotas
-                            while (count < totalInst && safetyLoop < 2000) { // Limite 5-6 años
+                            while (count < totalInst && safetyLoop < 2000) { 
                                 const dayW = currentD.getDay();
                                 const dayM = currentD.getDate();
                                 const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
@@ -3598,6 +3734,51 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     }
                 }
             }
+
+            // --- CONSTRUCCIÓN DE BOTONES (IDIOMAS EXPLÍCITOS & CORREGIDO) ---
+            
+            // 1. Texto botón "Recibo" (Multilínea) - AHORA "Enviar Comprovante" en PT
+            let receiptBtnText = 'Enviar<br>Comprovante'; // Fallback (Por defecto PT)
+            
+            if (currentLang === 'pt') {
+                receiptBtnText = 'Enviar<br>Comprovante'; // Português
+            } else if (currentLang === 'es') {
+                receiptBtnText = 'Enviar<br>Recibo'; // Español
+            } else if (currentLang === 'en') {
+                receiptBtnText = 'Send<br>Receipt';  // English
+            }
+            
+            // 2. Texto botón "Registrar Pago"
+            let payBtnText = 'Registrar Pagamento'; // Fallback
+            
+            if (currentLang === 'pt') {
+                payBtnText = 'Registrar Pagamento'; // Português
+            } else if (currentLang === 'es') {
+                payBtnText = 'Registrar Pago';      // Español
+            } else if (currentLang === 'en') {
+                payBtnText = 'Register Payment';    // English
+            }
+
+            const actionButtonsHtml = currentStatus === 'finished' ? `
+                <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
+                <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
+            ` : `
+                <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
+                
+                <!-- BOTÓN RECIBO: Usa la variable traducida explícita -->
+                <button class="btn-secondary" id="sendReceiptBtn" style="line-height: 1.2;">
+                    <i data-lucide="file-text"></i> 
+                    <span style="text-align: center;">${receiptBtnText}</span>
+                </button>
+                
+                <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
+                
+                <!-- BOTÓN PAGAR: Usa la variable traducida explícita -->
+                <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}">
+                    <i data-lucide="dollar-sign"></i> ${payBtnText}
+                </button>
+            `;
+
             clientDetailView.innerHTML = `
                 <header class="modal-header" style="justify-content: space-between;">
                     <div style="display: flex; align-items: center;">
@@ -3636,6 +3817,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                             <div class="progress-text" id="client-detail-progress-text"></div>
                         </div>
                     </div>
+                    
                     <!-- TARJETA DE FECHAS (NUEVO) -->
                     <div class="kpi-card" style="margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center; padding: 15px;">
                         <div style="border-right: 1px solid var(--border-color);">
@@ -3651,7 +3833,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                             <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${endDateStr}</p>
                         </div>
                     </div>
-                    <!-- FIN TARJETA DE FECHAS -->
+                    
                     <div class="kpi-card" style="margin-bottom: 20px; text-align: center;">
                         <h3 class="kpi-title" style="justify-content: center;">${l.status} ${currentLoanIndex + 1}</h3>
                         <span class="payment-status ${statusClass}" style="font-size: 1.2em; font-weight: 600; padding: 8px 20px;">
@@ -3675,12 +3857,10 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
                         
-                        <!-- TARJETA VALOR PICO (NUEVA LÓGICA: LO PAGADO) -->
                         <div class="kpi-card" style="border-color: var(--accent-orange); border-width: 1px;">
                             <h3 class="kpi-title"><i data-lucide="trending-up" style="color: var(--accent-orange);"></i> ${l.pico}</h3>
                             <p class="kpi-value" style="color: var(--accent-orange);">${money(picoValue)}</p>
                         </div>
-                        <!-- FIN TARJETA PICO -->
 
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
                        
@@ -3712,15 +3892,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                   </div>
                 </div>
                 <div class="action-buttons">
-                    ${currentStatus === 'finished' ? `
-                        <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
-                        <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
-                    ` : `
-                        <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
-                        <button class="btn-secondary" id="postponePaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="calendar-plus"></i> <span data-lang-key="postponePayment"></span></button>
-                        <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
-                        <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> Registrar Pagamento</button>
-                    `}
+                    ${actionButtonsHtml}
                 </div>`;
 
             history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: currentLoanIndex }, `Details for ${client.name}`, `#client/${clientId}/${currentLoanIndex}`);
@@ -3730,15 +3902,11 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
             const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
             
-            // CORRECCIÓN DEFINITIVA: No leemos lo que dice la base de datos ("29/20" o error).
-            // Calculamos: ¿Cuánto dinero hay pagado? / ¿Cuánto vale una cuota? = Número Real.
-            // Usamos las variables 'displayTotalPaid' y 'originalInstallment' que ya existen en esta función.
             let paidInstallments = 0;
             if (originalInstallment > 0) {
                 paidInstallments = Math.floor(displayTotalPaid / originalInstallment);
             }
 
-            // Tope de seguridad: Nunca mostrar más del total (ej: 20/20)
             if (paidInstallments > totalInstallments) {
                 paidInstallments = totalInstallments;
             }
@@ -3778,48 +3946,19 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             } else {
                 document.getElementById('registerPaymentBtn').addEventListener('click', (e) => showPaymentModal(clientId, parseInt(e.currentTarget.dataset.loanIndex, 10)));
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
-                document.getElementById('postponePaymentBtn').addEventListener('click', (e) => {
-                     const indexToPostpone = parseInt(e.currentTarget.dataset.loanIndex, 10);
-                     showConfirmationModal(
-                        translations[currentLang].postponeConfirmTitle,
-                        translations[currentLang].postponeConfirmMsg,
-                        async () => {
-                            const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-                            try {
-                                const clientIndex = allClients.findIndex(c => c.id === clientId);
-                                if (clientIndex === -1) throw new Error("Cliente no encontrado en allClients.");
-                                const currentClientData = allClients[clientIndex]; 
-                                if (!currentClientData || !currentClientData.loans || !currentClientData.loans[indexToPostpone]) throw new Error("Loan not found");
-                                
-                                const updatedLoans = currentClientData.loans;
-                                const currentLoan = updatedLoans[indexToPostpone];
-                                if (!currentLoan.history) currentLoan.history = [];
-                                
-                                const postponedPayment = { amount: 0, date: new Date(), status: 'postponed' };
-                                currentLoan.history.push(postponedPayment);
-                                await updateDoc(clientRef, { loans: updatedLoans });
-
-                                showToast('Pagamento adiado com sucesso!');
-                                window.history.back(); 
-                                showClientDetails(clientId, indexToPostpone);
-                                updateTodaysRouteList();
-                                updateRouteProgress();
-                                updateAllClientsList();
-                            } catch(error) {
-                                console.error("Error postponing payment: ", error);
-                                showToast('Falha ao adiar pagamento.', true);
-                                window.history.back();
-                            }
-                        }
-                    );
-                });
                 
-                // --- INICIO: SOLUCIÓN BOTÓN IR ---
-                // --- INICIO: BLOQUE ROBUSTO PARA BOTÓN IR ---
+                // --- NUEVO LISTENER: GENERAR RECIBO (Reemplaza a Adiar) ---
+                const sendReceiptBtn = document.getElementById('sendReceiptBtn');
+                if (sendReceiptBtn) {
+                    sendReceiptBtn.addEventListener('click', () => {
+                        generateStatusReceiptPDF(clientId, currentLoanIndex);
+                    });
+                }
+                
+                // --- LÓGICA BOTÓN IR ---
                 const startRouteBtn = document.getElementById('startRouteBtn');
                 let navigationUrl = client.location;
 
-                // 1. Si no hay GPS exacto, construimos la URL con la dirección escrita
                 if (!navigationUrl || navigationUrl.trim() === '') {
                     if (client.address && client.address.trim() !== '') {
                         const fullAddress = `${client.address}, ${client.city || ''}`;
@@ -3827,52 +3966,37 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     }
                 }
 
-                // 2. Configurar el botón (con protecciones de seguridad)
                 if (startRouteBtn) {
                     if (navigationUrl) {
                         startRouteBtn.disabled = false;
                         startRouteBtn.style.opacity = '1';
                         startRouteBtn.title = 'Navegar até o cliente'; 
-                        
-                        // CLONAMOS el botón para borrar cualquier evento 'click' anterior corrupto
                         const newBtn = startRouteBtn.cloneNode(true);
                         startRouteBtn.parentNode.replaceChild(newBtn, startRouteBtn);
-
-                        // Agregamos el nuevo evento "limpio"
                         newBtn.addEventListener('click', async (e) => {
-                            e.preventDefault(); // Evita comportamientos extraños
+                            e.preventDefault(); 
                             showToast('Abrindo mapa...', false);
-                            
-                            // Intentamos notificar, pero dentro de un try-catch para que NUNCA bloquee el mapa
                             try {
                                 const t = translations[currentLang] || translations['pt'];
                                 const notifTitle = t.collectorOnTheWayTitle || 'Cobrador a caminho!';
                                 const notifBody = t.collectorOnTheWayBody || 'Nosso cobrador está a caminho.';
-                                
-                                // Solo llamamos a la función si realmente existe en el código
                                 if (typeof sendNotificationToClient === 'function') {
                                     sendNotificationToClient(clientId, notifTitle, notifBody, 'on_the_way', 'navigation');
                                 }
                             } catch (err) {
                                 console.warn("Aviso: No se pudo notificar, pero el mapa se abrirá igual.", err);
                             }
-                            
-                            // Abrimos el mapa SIEMPRE, con un pequeño retraso para que se vea el Toast
-                            setTimeout(() => {
-                                window.open(navigationUrl, '_blank');
-                            }, 100);
+                            setTimeout(() => { window.open(navigationUrl, '_blank'); }, 100);
                         });
                     } else {
-                        // Si no hay ubicación ni dirección, deshabilitamos visualmente
                         startRouteBtn.disabled = true;
                         startRouteBtn.style.opacity = '0.5';
                         startRouteBtn.title = 'Endereço não disponível';
                     }
                 }
-                // --- FIN: BLOQUE ROBUSTO PARA BOTÓN IR ---
-            }  // <--- ¡ESTA ES LA LLAVE QUE FALTABA! (Cierra el 'else')
+            }  
 
-            // --- Lógica del Historial de Pagos (Fuera del if/else) ---
+            // --- Lógica del Historial de Pagos ---
             clientDetailView.querySelectorAll('.payment-history-item[data-history-index]').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const historyIndex = parseInt(e.currentTarget.dataset.historyIndex, 10);
@@ -3973,235 +4097,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
         
 
 
-    function showPaymentModal(clientId, loanIndex) {
-            const paymentModal = document.getElementById('paymentModal');
-            const client = allClients.find(c => c.id === clientId);
-            const loan = client.loans[loanIndex];
-
-            // --- INICIO: CÁLCULO INTELIGENTE DE DEUDA RESTANTE ---
-            // 1. Obtenemos detalles actualizados (incluye mora acumulada al día de hoy)
-            const details = calculateLoanDetails(loan);
-            
-            // 2. Calculamos cuánto ha pagado realmente hasta ahora (historial + migración)
-            const historyPaid = (loan.history || [])
-                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
-                .reduce((sum, h) => sum + (h.amount || 0), 0);
-            
-            const initialPaid = loan.initialMigratedAmount || 0;
-            const totalPaidSoFar = initialPaid + historyPaid;
-
-            // 3. Calculamos la deuda total real (Préstamo original + Mora acumulada)
-            const totalDebt = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
-
-            // 4. Calculamos el saldo restante exacto
-            let remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
-            
-            // Redondeamos a 2 decimales para evitar errores tipo 40.00000001
-            remainingBalance = Math.round(remainingBalance * 100) / 100;
-
-            // 5. DECISIÓN INTELIGENTE: ¿Qué valor mostrar?
-            const standardInstallment = loan.amount || loan.originalInstallmentAmount || 0;
-            
-            let suggestedValue = standardInstallment;
-
-            // Si lo que falta es MENOR que la cuota normal (con un margen de 5 centavos),
-            // sugerimos el saldo restante para liquidar.
-            if (remainingBalance < (standardInstallment - 0.05)) {
-                suggestedValue = remainingBalance;
-            }
-            // --- FIN CÁLCULO INTELIGENTE ---
-
-            paymentModal.innerHTML = `
-                <header class="modal-header">
-                    <button id="closePaymentModal"><i data-lucide="arrow-left"></i></button>
-                    <span class="modal-title">Registrar Pagamento para ${client.name} (Préstamo ${loanIndex + 1})</span>
-                </header>
-                <div class="modal-content-wrapper container">
-                    
-                    <!-- Tarjeta Informativa de la Cuota -->
-                    <div class="kpi-card" style="text-align:center; display: flex; justify-content: space-around; align-items: center;">
-                        <div>
-                            <h3 class="kpi-title" style="justify-content:center; margin-bottom: 4px;" data-lang-key="installmentValue">Valor Parcela</h3>
-                            <p class="kpi-value" style="font-size: 1.1em; color: var(--text-secondary);">${money(standardInstallment)}</p>
-                        </div>
-                        <div style="border-left: 1px solid var(--border-color); height: 40px;"></div>
-                        <div>
-                            <h3 class="kpi-title" style="justify-content:center; margin-bottom: 4px;">Resta</h3>
-                            <p class="kpi-value" style="font-size: 1.1em; color: var(--accent-orange);">${money(remainingBalance)}</p>
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-top: 20px;">
-                        <label for="payment-amount-input" data-lang-key="amountPaid"></label>
-                        <!-- AQUÍ USAMOS EL VALOR SUGERIDO INTELIGENTE -->
-                        <input type="number" id="payment-amount-input" step="0.01" value="${suggestedValue.toFixed(2)}" style="font-size: 1.6em; text-align: center; font-weight: 700; color: var(--accent-green); padding: 15px;">
-                        
-                        ${suggestedValue < standardInstallment ? 
-                            `<p style="text-align: center; font-size: 0.85em; color: var(--accent-purple); margin-top: 8px; font-weight: 600;">
-                                <i data-lucide="sparkles" style="width: 14px; height: 14px; vertical-align: middle;"></i> Valor ajustado para liquidar o restante.
-                            </p>` : ''
-                        }
-                    </div>
-
-                    <h3 class="section-title" style="margin-top: 30px;">Método de Pagamento</h3>
-                    <div class="radio-group" id="payment-method-selector">
-                        <input type="radio" name="paymentMethod" id="method-dinheiro" value="dinheiro" checked>
-                        <label for="method-dinheiro"><i class="icon" data-lucide="banknote"></i><span data-lang-key="receivedInCash"></span></label>
-                        
-                        <input type="radio" name="paymentMethod" id="method-pix" value="pix">
-                        <label for="method-pix"><i class="icon" data-lucide="smartphone"></i><span data-lang-key="methodDigitalLabel"></span></label>
-                        
-                        <input type="radio" name="paymentMethod" id="method-cartao" value="cartao">
-                        <label for="method-cartao"><i class="icon" data-lucide="credit-card"></i><span data-lang-key="methodCardLabel"></span></label>
-                    </div>
-                    <div class="form-group" id="receipt-upload-section" style="display: none; margin-top: 20px;">
-                        <label data-lang-key="uploadReceipt"></label>
-                        <label for="payment-receipt-input" style="border: 2px dashed var(--border-color); padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; display: block;">
-                            <i data-lucide="upload-cloud"></i>
-                            <span id="payment-upload-label-text">Clique para anexar</span>
-                            <img id="payment-receipt-preview" style="display:none; max-width: 100px; max-height: 100px; margin-top: 10px; border-radius: 8px;">
-                        </label>
-                        <input type="file" id="payment-receipt-input" accept="image/*" style="display:none;">
-                    </div>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn-primary" id="confirmPaymentBtn"><i data-lucide="check-circle"></i> Confirmar Pagamento</button>
-                </div>`;
-            
-            history.pushState({ modal: 'paymentModal' }, 'Payment', '#payment');
-            paymentModal.classList.add('active');
-            lucide.createIcons({ nodes: paymentModal.querySelectorAll('[data-lucide]') });
-            applyLanguage(currentLang);
-
-            paymentModal.querySelector('#closePaymentModal').addEventListener('click', () => window.history.back());
-            
-            const paymentMethodSelector = paymentModal.querySelector('#payment-method-selector');
-            const receiptUploadSection = paymentModal.querySelector('#receipt-upload-section');
-            let receiptFile = null;
-
-            paymentMethodSelector.addEventListener('change', (e) => {
-                const selectedInputs = document.querySelectorAll('input[name="paymentMethod"]');
-                selectedInputs.forEach(input => {
-                    const method = input.value;
-                     if(input.checked && (method === 'pix' || method === 'cartao')) {
-                        receiptUploadSection.style.display = 'block';
-                     } else if (input.checked && method === 'dinheiro') {
-                        receiptUploadSection.style.display = 'none';
-                        receiptFile = null;
-                        const preview = document.getElementById('payment-receipt-preview');
-                        if (preview) {
-                            preview.style.display = 'none';
-                            preview.src = '';
-                        }
-                        const label = document.getElementById('payment-upload-label-text');
-                        if (label) label.textContent = 'Clique para anexar';
-                     }
-                });
-            });
-
-            paymentModal.querySelector('#payment-receipt-input').addEventListener('change', e => {
-                if (e.target.files && e.target.files[0]) {
-                    receiptFile = e.target.files[0];
-                    const preview = document.getElementById('payment-receipt-preview');
-                    const uploadLabel = document.getElementById('payment-upload-label-text');
-                    preview.src = URL.createObjectURL(receiptFile);
-                    preview.style.display = 'block';
-                    uploadLabel.textContent = receiptFile.name;
-                }
-            });
-            
-            paymentModal.querySelector('#confirmPaymentBtn').addEventListener('click', async (e) => {
-                const confirmBtn = e.currentTarget;
-                const originalBtnHTML = confirmBtn.innerHTML;
-                confirmBtn.disabled = true;
-                confirmBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Processando...`;
-                lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
-
-                const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
-
-                try {
-                    const clientIndex = allClients.findIndex(c => c.id === clientId);
-                    if (clientIndex === -1) throw new Error("Cliente não encontrado em allClients.");
-                    
-                    const currentClient = allClients[clientIndex]; 
-                    if (!currentClient || !currentClient.loans || !currentClient.loans[loanIndex]) {
-                         throw new Error("Cliente ou empréstimo não encontrado para registrar o pagamento.");
-                    }
-                    
-                    const currentLoan = currentClient.loans[loanIndex]; 
-
-                    let receiptUrl = '';
-                    if (receiptFile && (selectedMethod === 'pix' || selectedMethod === 'cartao')) {
-                        try {
-                            const tempPaymentId = `payment_${Date.now()}`;
-                            const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${clientId}/payments/${tempPaymentId}/${receiptFile.name.replace(/\s+/g, '_')}`);
-                            await uploadBytes(storageRef, receiptFile);
-                            receiptUrl = await getDownloadURL(storageRef);
-                        } catch (storageError) {
-                             console.error("Error al subir recibo a Firebase Storage:", storageError);
-                             showToast('Falha ao subir o recibo. O pagamento será salvo sem ele.', true);
-                        }
-                    }
-
-                    const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
-                    if (isNaN(actualPaidAmount) || actualPaidAmount < 0) {
-                        showToast('Por favor, insira um valor de pagamento válido.', true);
-                        confirmBtn.disabled = false; 
-                        confirmBtn.innerHTML = originalBtnHTML;
-                        lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
-                        return;
-                    }
-
-                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-
-                    const newPayment = {
-                        amount: actualPaidAmount,
-                        date: new Date(), 
-                        status: 'approved', 
-                        method: selectedMethod
-                    };
-                    
-                    if(receiptUrl) {
-                        newPayment.receiptUrl = receiptUrl;
-                    }
-
-                    if (!currentLoan.history) currentLoan.history = [];
-                    currentLoan.history.push(newPayment);
-
-                    const newTotalPaid = (currentLoan.history || [])
-                        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
-                        .reduce((sum, h) => sum + (h.amount || 0), 0);
-                        
-                    const installmentValue = currentLoan.originalInstallmentAmount || 0; 
-                    const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
-                    const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
-
-                    currentLoan.paid = newTotalPaid;
-                    currentLoan.paymentBalance = newBalance;
-                    const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
-                    currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
-                    
-                    await updateDoc(clientRef, {
-                        loans: currentClient.loans 
-                    });
-
-                    showToast('Pagamento registrado com sucesso!');
-                    window.history.back(); 
-                    showClientDetails(clientId, loanIndex); 
-                    updateTodaysRouteList();
-                    updateRouteProgress(); 
-                    updateAllClientsList(); 
-                    updateProfileView(currentCollectorData); 
-                    
-                } catch(error) {
-                    console.error("Error updating document: ", error);
-                    showToast('Falha ao registrar pagamento.', true);
-                    confirmBtn.disabled = false;
-                    confirmBtn.innerHTML = originalBtnHTML;
-                    lucide.createIcons({nodes: [confirmBtn.querySelector('i')]});
-                }
-            });
-        }
+       
 
 
 function showVerificationModal(clientId, historyIndex, loanIndex, notificationId) { // <-- [CAMBIO 1/4] Añadir notificationId
@@ -5741,7 +5637,270 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             lucide.createIcons({ nodes: expenseFormModal.querySelectorAll('[data-lucide]') });
         }
 
+            function showPaymentModal(clientId, loanIndex) {
+            const paymentModal = document.getElementById('paymentModal');
+            const client = allClients.find(c => c.id === clientId);
+            const loan = client.loans[loanIndex];
 
+            // --- INICIO: CÁLCULO INTELIGENTE DE DEUDA RESTANTE ---
+            const details = calculateLoanDetails(loan);
+            const historyPaid = (loan.history || [])
+                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
+                .reduce((sum, h) => sum + (h.amount || 0), 0);
+            
+            const initialPaid = loan.initialMigratedAmount || 0;
+            const totalPaidSoFar = initialPaid + historyPaid;
+            const totalDebt = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
+            let remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
+            remainingBalance = Math.round(remainingBalance * 100) / 100;
+
+            const standardInstallment = loan.amount || loan.originalInstallmentAmount || 0;
+            let suggestedValue = standardInstallment;
+            if (remainingBalance < (standardInstallment - 0.05)) {
+                suggestedValue = remainingBalance;
+            }
+            // --- FIN CÁLCULO INTELIGENTE ---
+
+            paymentModal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closePaymentModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title">Registrar Pagamento para ${client.name} (Préstamo ${loanIndex + 1})</span>
+                </header>
+                <div class="modal-content-wrapper container">
+                    
+                    <div class="kpi-card" style="text-align:center; display: flex; justify-content: space-around; align-items: center;">
+                        <div>
+                            <h3 class="kpi-title" style="justify-content:center; margin-bottom: 4px;" data-lang-key="installmentValue">Valor Parcela</h3>
+                            <p class="kpi-value" style="font-size: 1.1em; color: var(--text-secondary);">${money(standardInstallment)}</p>
+                        </div>
+                        <div style="border-left: 1px solid var(--border-color); height: 40px;"></div>
+                        <div>
+                            <h3 class="kpi-title" style="justify-content:center; margin-bottom: 4px;">Resta</h3>
+                            <p class="kpi-value" style="font-size: 1.1em; color: var(--accent-orange);">${money(remainingBalance)}</p>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="payment-amount-input" data-lang-key="amountPaid"></label>
+                        <input type="number" id="payment-amount-input" step="0.01" value="${suggestedValue.toFixed(2)}" style="font-size: 1.6em; text-align: center; font-weight: 700; color: var(--accent-green); padding: 15px;">
+                        
+                        ${suggestedValue < standardInstallment ? 
+                            `<p style="text-align: center; font-size: 0.85em; color: var(--accent-purple); margin-top: 8px; font-weight: 600;">
+                                <i data-lucide="sparkles" style="width: 14px; height: 14px; vertical-align: middle;"></i> Valor ajustado para liquidar o restante.
+                            </p>` : ''
+                        }
+                    </div>
+
+                    <h3 class="section-title" style="margin-top: 30px;">Método de Pagamento</h3>
+                    <div class="radio-group" id="payment-method-selector">
+                        <input type="radio" name="paymentMethod" id="method-dinheiro" value="dinheiro" checked>
+                        <label for="method-dinheiro"><i class="icon" data-lucide="banknote"></i><span data-lang-key="receivedInCash"></span></label>
+                        
+                        <input type="radio" name="paymentMethod" id="method-pix" value="pix">
+                        <label for="method-pix"><i class="icon" data-lucide="smartphone"></i><span data-lang-key="methodDigitalLabel"></span></label>
+                        
+                        <input type="radio" name="paymentMethod" id="method-cartao" value="cartao">
+                        <label for="method-cartao"><i class="icon" data-lucide="credit-card"></i><span data-lang-key="methodCardLabel"></span></label>
+                    </div>
+                    <div class="form-group" id="receipt-upload-section" style="display: none; margin-top: 20px;">
+                        <label data-lang-key="uploadReceipt"></label>
+                        <label for="payment-receipt-input" style="border: 2px dashed var(--border-color); padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; display: block;">
+                            <i data-lucide="upload-cloud"></i>
+                            <span id="payment-upload-label-text">Clique para anexar</span>
+                            <img id="payment-receipt-preview" style="display:none; max-width: 100px; max-height: 100px; margin-top: 10px; border-radius: 8px;">
+                        </label>
+                        <input type="file" id="payment-receipt-input" accept="image/*" style="display:none;">
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <!-- BOTÓN ADIAR TRADUCIDO -->
+                    <button class="btn-secondary" id="postponePaymentBtnInModal" style="border-color: var(--text-secondary); color: var(--text-secondary);">
+                        <i data-lucide="calendar-plus"></i> <span data-lang-key="postponePayment">Adiar</span>
+                    </button>
+                    
+                    <button class="btn-primary" id="confirmPaymentBtn" style="flex-grow: 2;">
+                        <i data-lucide="check-circle"></i> Confirmar Pagamento
+                    </button>
+                </div>`;
+            
+            history.pushState({ modal: 'paymentModal' }, 'Payment', '#payment');
+            paymentModal.classList.add('active');
+            lucide.createIcons({ nodes: paymentModal.querySelectorAll('[data-lucide]') });
+            applyLanguage(currentLang);
+
+            paymentModal.querySelector('#closePaymentModal').addEventListener('click', () => window.history.back());
+            
+            const paymentMethodSelector = paymentModal.querySelector('#payment-method-selector');
+            const receiptUploadSection = paymentModal.querySelector('#receipt-upload-section');
+            let receiptFile = null;
+
+            paymentMethodSelector.addEventListener('change', (e) => {
+                const selectedInputs = document.querySelectorAll('input[name="paymentMethod"]');
+                selectedInputs.forEach(input => {
+                    const method = input.value;
+                     if(input.checked && (method === 'pix' || method === 'cartao')) {
+                        receiptUploadSection.style.display = 'block';
+                     } else if (input.checked && method === 'dinheiro') {
+                        receiptUploadSection.style.display = 'none';
+                        receiptFile = null;
+                        const preview = document.getElementById('payment-receipt-preview');
+                        if (preview) {
+                            preview.style.display = 'none';
+                            preview.src = '';
+                        }
+                        const label = document.getElementById('payment-upload-label-text');
+                        if (label) label.textContent = 'Clique para anexar';
+                     }
+                });
+            });
+
+            paymentModal.querySelector('#payment-receipt-input').addEventListener('change', e => {
+                if (e.target.files && e.target.files[0]) {
+                    receiptFile = e.target.files[0];
+                    const preview = document.getElementById('payment-receipt-preview');
+                    const uploadLabel = document.getElementById('payment-upload-label-text');
+                    preview.src = URL.createObjectURL(receiptFile);
+                    preview.style.display = 'block';
+                    uploadLabel.textContent = receiptFile.name;
+                }
+            });
+            
+            // --- LÓGICA BOTÓN ADIAR (MOVIDO AQUÍ) ---
+            const postponeBtn = paymentModal.querySelector('#postponePaymentBtnInModal');
+            if (postponeBtn) {
+                postponeBtn.addEventListener('click', () => {
+                     showConfirmationModal(
+                        translations[currentLang].postponeConfirmTitle || 'Confirmar Adiamento',
+                        translations[currentLang].postponeConfirmMsg || 'Isso moverá a data de vencimento em 1 dia. Deseja continuar?',
+                        async () => {
+                            const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
+                            try {
+                                const freshClientIdx = allClients.findIndex(c => c.id === clientId);
+                                const freshClient = allClients[freshClientIdx];
+                                const loansCopy = JSON.parse(JSON.stringify(freshClient.loans));
+                                const targetLoan = loansCopy[loanIndex];
+                                
+                                if (!targetLoan.history) targetLoan.history = [];
+                                
+                                targetLoan.history.push({ 
+                                    amount: 0, 
+                                    date: new Date(), 
+                                    status: 'postponed' 
+                                });
+                                
+                                await updateDoc(clientRef, { loans: loansCopy });
+
+                                showToast('Pagamento adiado com sucesso!');
+                                window.history.back(); // Cierra confirmación
+                                window.history.back(); // Cierra modal de pago
+                                
+                                // Refrescamos todo
+                                showClientDetails(clientId, loanIndex);
+                                updateTodaysRouteList();
+                                updateAllClientsList();
+                            } catch(error) {
+                                console.error("Error postponing:", error);
+                                showToast('Erro ao adiar.', true);
+                                window.history.back(); // Cierra confirmación
+                            }
+                        }
+                    );
+                });
+            }
+
+            paymentModal.querySelector('#confirmPaymentBtn').addEventListener('click', async (e) => {
+                const confirmBtn = e.currentTarget;
+                const originalBtnHTML = confirmBtn.innerHTML;
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Processando...`;
+                lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
+
+                const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+
+                try {
+                    const clientIndex = allClients.findIndex(c => c.id === clientId);
+                    if (clientIndex === -1) throw new Error("Cliente não encontrado em allClients.");
+                    
+                    const currentClient = allClients[clientIndex]; 
+                    if (!currentClient || !currentClient.loans || !currentClient.loans[loanIndex]) {
+                         throw new Error("Cliente ou empréstimo não encontrado para registrar o pagamento.");
+                    }
+                    
+                    const currentLoan = currentClient.loans[loanIndex]; 
+
+                    let receiptUrl = '';
+                    if (receiptFile && (selectedMethod === 'pix' || selectedMethod === 'cartao')) {
+                        try {
+                            const tempPaymentId = `payment_${Date.now()}`;
+                            const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${clientId}/payments/${tempPaymentId}/${receiptFile.name.replace(/\s+/g, '_')}`);
+                            await uploadBytes(storageRef, receiptFile);
+                            receiptUrl = await getDownloadURL(storageRef);
+                        } catch (storageError) {
+                             console.error("Error al subir recibo a Firebase Storage:", storageError);
+                             showToast('Falha ao subir o recibo. O pagamento será salvo sem ele.', true);
+                        }
+                    }
+
+                    const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
+                    if (isNaN(actualPaidAmount) || actualPaidAmount < 0) {
+                        showToast('Por favor, insira um valor de pagamento válido.', true);
+                        confirmBtn.disabled = false; 
+                        confirmBtn.innerHTML = originalBtnHTML;
+                        lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
+                        return;
+                    }
+
+                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
+
+                    const newPayment = {
+                        amount: actualPaidAmount,
+                        date: new Date(), 
+                        status: 'approved', 
+                        method: selectedMethod
+                    };
+                    
+                    if(receiptUrl) {
+                        newPayment.receiptUrl = receiptUrl;
+                    }
+
+                    if (!currentLoan.history) currentLoan.history = [];
+                    currentLoan.history.push(newPayment);
+
+                    const newTotalPaid = (currentLoan.history || [])
+                        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+                        .reduce((sum, h) => sum + (h.amount || 0), 0);
+                        
+                    const installmentValue = currentLoan.originalInstallmentAmount || 0; 
+                    const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
+                    const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
+
+                    currentLoan.paid = newTotalPaid;
+                    currentLoan.paymentBalance = newBalance;
+                    const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
+                    currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
+                    
+                    await updateDoc(clientRef, {
+                        loans: currentClient.loans 
+                    });
+
+                    showToast('Pagamento registrado com sucesso!');
+                    window.history.back(); 
+                    showClientDetails(clientId, loanIndex); 
+                    updateTodaysRouteList();
+                    updateRouteProgress(); 
+                    updateAllClientsList(); 
+                    updateProfileView(currentCollectorData); 
+                    
+                } catch(error) {
+                    console.error("Error updating document: ", error);
+                    showToast('Falha ao registrar pagamento.', true);
+                    confirmBtn.disabled = false;
+                    confirmBtn.innerHTML = originalBtnHTML;
+                    lucide.createIcons({nodes: [confirmBtn.querySelector('i')]});
+                }
+            });
+        }
+        
         // --- MAPA E OUTRAS FUNÇÕES ---
         function initMap() {
             if (mapInstance) {
