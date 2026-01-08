@@ -2056,15 +2056,48 @@ async function showRefinanceModal(clientId, notificationId) {
                 y += 18;
 
                 // Estado
-                let statusColor = '#28a745'; let statusText = texts.up_to_date; let bgColor = '#d4edda';
-                if (details.status === 'late') { statusColor = '#721c24'; statusText = texts.late; bgColor = '#f8d7da'; }
-                else if (details.status === 'finished') { statusColor = '#004085'; statusText = texts.finished; bgColor = '#cce5ff'; }
+                let statusColor = '#28a745'; 
+                let statusText = texts.up_to_date; 
+                let bgColor = '#d4edda';
+                let subStatusText = ''; // Variable para los días
 
-                doc.setDrawColor(statusColor); doc.setFillColor(bgColor);
-                doc.roundedRect(5, y, 70, 12, 2, 2, 'FD');
-                doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(statusColor);
-                doc.text(statusText, centerX, y + 8, { align: 'center' });
-                y += 20;
+                if (details.status === 'late') { 
+                    statusColor = '#721c24'; 
+                    statusText = texts.late; 
+                    bgColor = '#f8d7da'; 
+                    
+                    // Lógica para mostrar días
+                    const daysLabel = currentLang === 'es' ? 'Días' : (currentLang === 'en' ? 'Days' : 'Dias');
+                    subStatusText = `(${details.lateDays} ${daysLabel})`;
+                }
+                else if (details.status === 'finished') { 
+                    statusColor = '#004085'; 
+                    statusText = texts.finished; 
+                    bgColor = '#cce5ff'; 
+                }
+
+                // Ajustamos la altura de la caja si hay subtítulo (días)
+                const boxHeight = subStatusText ? 16 : 12;
+
+                doc.setDrawColor(statusColor); 
+                doc.setFillColor(bgColor);
+                doc.roundedRect(5, y, 70, boxHeight, 2, 2, 'FD');
+                
+                doc.setFontSize(12); 
+                doc.setFont(undefined, 'bold'); 
+                doc.setTextColor(statusColor);
+
+                if (subStatusText) {
+                    // Si hay atraso, imprimimos en dos líneas
+                    doc.text(statusText, centerX, y + 6, { align: 'center' }); // ATRASADO
+                    doc.setFontSize(10); // Un poco más pequeño para los días
+                    doc.text(subStatusText, centerX, y + 12, { align: 'center' }); // (X Dias)
+                } else {
+                    // Si es normal, centrado simple
+                    doc.text(statusText, centerX, y + 8, { align: 'center' });
+                }
+                
+                y += (boxHeight + 8);
 
                 doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
                 doc.text(texts.footer, centerX, y, { align: 'center' });
@@ -6104,16 +6137,13 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             }
         }
 
-        // [FUNCIÓN ACTUALIZADA] Reporte con Lógica Separada (Operativo vs Caja)
-        // [FUNCIÓN ACTUALIZADA] Reporte con Mejor Paginación y Etiqueta PDF
-        // [FUNCIÓN OPTIMIZADA] Reporte con Salto de Página Inteligente y Etiqueta PDF
+          // [FUNCIÓN ACTUALIZADA] Reporte Diario con Micro Seguro Incluido
         async function exportDailyReport(customDate = null) {
             const { jsPDF } = window.jspdf;
             const pdfDoc = new jsPDF();
             
             const todayLabel = currentLang === 'es' ? '(HOY)' : (currentLang === 'en' ? '(TODAY)' : '(HOJE)');
 
-            // Diccionario de textos
             const t = {
                 title: currentLang === 'es' ? 'Reporte Diario' : (currentLang === 'en' ? 'Daily Report' : 'Relatório Diário'),
                 collector: translations[currentLang].reportCollector || 'Cobrador',
@@ -6139,7 +6169,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 page: currentLang === 'es' ? 'Página' : (currentLang === 'en' ? 'Page' : 'Página'),
                 of: currentLang === 'es' ? 'de' : (currentLang === 'en' ? 'of' : 'de'),
                 noLate: currentLang === 'es' ? '¡Felicidades! Ningún cliente atrasado actualmente.' : (currentLang === 'en' ? 'Congrats! No late clients currently.' : 'Parabéns! Nenhum cliente atrasado atualmente.'),
-                routeLabel: translations[currentLang].routeLabel || 'Rota:'
+                routeLabel: translations[currentLang].routeLabel || 'Rota:',
+                microInsurance: currentLang === 'es' ? 'Micro Seguro (Fondo)' : 'Micro Seguro (Fundo)' // TRADUCCIÓN NUEVA
             };
             
             const reportDate = customDate || new Date();
@@ -6240,12 +6271,16 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                             clientName: client.name,
                             amount: principal || 0,
                             time: loanTime,
+                            microInsurance: parseFloat(loan.microInsurance) || 0, // <--- CAPTURA SEGURO
                             loanIndex: index + 1
                         });
                     }
                 });
             });
             const totalLoansOutflow = dailyNewLoans.reduce((sum, l) => sum + l.amount, 0);
+            
+            // --- CÁLCULO TOTAL MICRO SEGURO ---
+            const totalMicroInsurance = dailyNewLoans.reduce((sum, l) => sum + l.microInsurance, 0);
 
             const lateClientsList = [];
             allClients.forEach(client => {
@@ -6264,7 +6299,9 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             lateClientsList.sort((a, b) => b.lateDays - a.lateDays);
             
             const operationalResult = dailyTotal - totalExpenses;
-            const netCashFlow = (operationalResult + totalInjections) - (totalSettlements + totalLoansOutflow);
+            
+            // --- FÓRMULA CORREGIDA: Se suma el Micro Seguro al Flujo Neto ---
+            const netCashFlow = (operationalResult + totalInjections + totalMicroInsurance) - (totalSettlements + totalLoansOutflow);
 
             const pageMargin = 15;
             const pageWidth = pdfDoc.internal.pageSize.getWidth();
@@ -6272,19 +6309,16 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const center = pageWidth / 2;
             let y = 0;
 
-            // --- SISTEMA DE PAGINACIÓN MEJORADO ---
             const checkPageBreak = (neededSpace = 0) => {
-                const limit = pageHeight - 20; // Margen inferior de seguridad
+                const limit = pageHeight - 20; 
                 if (y + neededSpace > limit) { 
                     pdfDoc.addPage(); 
-                    y = 20; // Reiniciar Y en la nueva página
+                    y = 20; 
                 }
             };
 
             const addSectionHeader = (title) => {
-                // AHORA: Pide 50mm de espacio (más que antes). Si no hay, salta.
                 checkPageBreak(50); 
-                
                 y += 10;
                 pdfDoc.setFontSize(14);
                 pdfDoc.setFont(undefined, 'bold');
@@ -6297,7 +6331,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 y += 8;
             };
 
-            // --- INICIO DEL REPORTE ---
             y = 25;
             pdfDoc.setFontSize(16);
             pdfDoc.setFont(undefined, 'bold');
@@ -6328,7 +6361,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             pdfDoc.setFont(undefined, 'bold');
             pdfDoc.text(routeName, pageWidth - pageMargin, y, { align: 'right' });
 
-            checkPageBreak(80); // Verificar espacio para el resumen completo
+            checkPageBreak(80); 
 
             y += 15;
             pdfDoc.setFontSize(14);
@@ -6365,6 +6398,11 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             addSummaryLine(`(-) ${t.newLoans}:`, totalLoansOutflow, '#dc3545');
             addSummaryLine(`(-) ${t.settlements}:`, totalSettlements, '#dc3545');
             addSummaryLine(`(+) ${t.injections}:`, totalInjections, '#28a745');
+            
+            // --- NUEVO: LÍNEA DE MICRO SEGURO EN EL RESUMEN ---
+            if (totalMicroInsurance > 0) {
+                addSummaryLine(`(+) ${t.microInsurance}:`, totalMicroInsurance, '#0ea5e9'); // Azul
+            }
 
             y += 3;
             pdfDoc.setLineWidth(0.5);
@@ -6409,6 +6447,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
             
+            // ... (Secciones de Missed y Finished sin cambios) ...
             if (missedPaymentsList.length > 0) {
                 addSectionHeader(t.missedSection);
                 missedPaymentsList.forEach(p => {
@@ -6417,19 +6456,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setFont(undefined, 'normal');
                     pdfDoc.setTextColor(0);
                     pdfDoc.text(p.clientName, pageMargin + 5, y);
-                    
                     pdfDoc.setFont(undefined, 'bold');
-                    if (p.status === 'ATRASADO') pdfDoc.setTextColor('#dc3545'); 
-                    else pdfDoc.setTextColor('#d97706'); 
-                    
+                    if (p.status === 'ATRASADO') pdfDoc.setTextColor('#dc3545'); else pdfDoc.setTextColor('#d97706'); 
                     pdfDoc.text(p.status, pageMargin + 100, y);
-                    
                     pdfDoc.setTextColor('#000000');
                     pdfDoc.text(money(p.expectedAmount), pageWidth - pageMargin - 5, y, { align: 'right' });
                     y += 7;
                 });
             }
-
             if (finishedClientsList.length > 0) {
                 addSectionHeader(t.finishedSection);
                 finishedClientsList.forEach(f => {
@@ -6438,11 +6472,9 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setFont(undefined, 'normal');
                     pdfDoc.setTextColor(0);
                     pdfDoc.text(`${f.clientName} (Emp. #${f.loanIndex})`, pageMargin + 5, y);
-                    
                     pdfDoc.setFont(undefined, 'bold');
                     pdfDoc.setTextColor('#4338ca'); 
                     pdfDoc.text('FINALIZADO', pageMargin + 100, y); 
-
                     pdfDoc.setTextColor('#000000'); 
                     pdfDoc.text(money(f.totalLoan), pageWidth - pageMargin - 5, y, { align: 'right' });
                     y += 7;
@@ -6450,11 +6482,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             }
 
             if (dailyExpenses.length > 0) {
-                // Aquí es donde ocurría el problema: el título se escribía muy abajo.
-                addSectionHeader(t.expensesSection); // Ahora esto verifica 50mm de espacio
+                addSectionHeader(t.expensesSection); 
                 dailyExpenses.forEach(e => {
-                    checkPageBreak(12); // Verificamos espacio para cada gasto
-                    const cat = translations[currentLang][e.category] || e.category;
+                    checkPageBreak(12); 
+                    const cat = translations[lang][e.category] || e.category;
                     pdfDoc.setFontSize(10);
                     pdfDoc.setFont(undefined, 'normal');
                     pdfDoc.setTextColor(0);
@@ -6475,6 +6506,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setTextColor(0);
                     const displayText = `${l.time} - ${l.clientName}`;
                     pdfDoc.text(displayText, pageMargin + 5, y);
+                    
+                    // --- MOSTRAR SEGURO EN EL DETALLE ---
+                    if (l.microInsurance > 0) {
+                        pdfDoc.setTextColor('#0ea5e9'); // Azul
+                        pdfDoc.setFont(undefined, 'bold');
+                        pdfDoc.text(`(+Seguro: ${money(l.microInsurance)})`, pageMargin + 100, y);
+                    }
+
                     pdfDoc.setFont(undefined, 'bold');
                     pdfDoc.setTextColor('#dc3545'); 
                     pdfDoc.text(`-${money(l.amount)}`, pageWidth - pageMargin - 5, y, { align: 'right' });
@@ -6554,6 +6593,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 }
             }
         }
+        
         
         // --- [NUEVA FUNCIÓN] Modal para seleccionar fecha del reporte ---
 // [CORREGIDO] Modal para seleccionar fecha del reporte (Usa hora LOCAL)
@@ -7827,4 +7867,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
