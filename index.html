@@ -2618,35 +2618,22 @@ async function showRefinanceModal(clientId, notificationId) {
                amountDueToday: 0 
            };
 
-           // --- 1. CALCULAR TOTAL PAGADO REAL (CON SEGURIDAD DE NÚMEROS) ---
-           // Usamos parseFloat para evitar que textos como "450" se concatenen en lugar de sumarse
+           // --- 1. CALCULAR TOTAL PAGADO REAL ---
            const currentTotalPaid = (loan.history || [])
                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
-               .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+               .reduce((sum, h) => sum + (h.amount || 0), 0);
 
-           // --- 2. VALIDAR Y RECONSTRUIR TOTAL DEL PRÉSTAMO (CURA DE DATOS) ---
-           let totalLoanVal = parseFloat(loan.totalLoan);
-           
-           // Si el total viene dañado (0, nulo o texto inválido), intentamos reconstruirlo matemáticamente
-           if (!totalLoanVal || isNaN(totalLoanVal) || totalLoanVal <= 0) {
-               const instVal = parseFloat(loan.originalInstallmentAmount || loan.amount || 0);
-               const numInst = parseInt((loan.installments || "0/0").split('/')[1] || 0);
-               
-               if (instVal > 0 && numInst > 0) {
-                   totalLoanVal = instVal * numInst; // Reconstruimos el total correcto
-               }
-           }
-
-           // SI AÚN ASÍ NO HAY TOTAL VÁLIDO, O SI YA SE PAGÓ TODO -> FINALIZADO
-           // Usamos el totalLoanVal reconstruido para la comparación
-           if (!loan || !totalLoanVal || (currentTotalPaid >= totalLoanVal - 0.1)) {
+           // Si ya cubrió el total, finalizado
+           // CORRECCIÓN: Eliminamos "loan.status === 'finished'" para obligar al sistema a recalcular si el saldo cambia.
+           if (!loan || !loan.totalLoan || (currentTotalPaid >= loan.totalLoan - 0.1)) {
                details.status = 'finished';
                return details;
            }
+           
 
-           // --- 3. CONFIGURAR FECHAS ---
+           // --- 2. CONFIGURAR FECHAS ---
            const today = new Date();
-           today.setHours(0, 0, 0, 0); 
+           today.setHours(0, 0, 0, 0); // Hoy a las 00:00
            
            let startDateObj = null;
            if (loan.startDate) {
@@ -2659,14 +2646,15 @@ async function showRefinanceModal(clientId, notificationId) {
            
            startDateObj.setHours(0, 0, 0, 0);
            
-           // Empezamos a contar desde el día siguiente al inicio
+           // --- CORRECCIÓN CLAVE: EMPEZAR A CONTAR DESDE EL DÍA SIGUIENTE ---
+           // El día que se crea el préstamo NO se cobra. El primer cobro posible es mañana.
            let checkDate = new Date(startDateObj); 
            checkDate.setDate(checkDate.getDate() + 1); 
            
            let accumulatedLateDays = 0;
            let accumulatedLateFees = 0;
            const dailyLateRate = (loan.lateFeeRate || 0) / 100;
-           const installmentAmount = parseFloat(loan.originalInstallmentAmount || loan.amount || 0); 
+           const installmentAmount = loan.originalInstallmentAmount || 0;
            let installmentsDueCount = 0; 
            
            // Límite de seguridad
@@ -2675,7 +2663,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
            if (checkDate > stopDate) return details;
 
-           // --- 4. BUCLE DE COMPROBACIÓN (MORA) ---
+           // --- 3. BUCLE DE COMPROBACIÓN ---
            while (checkDate <= stopDate) {
                const dayOfWeek = checkDate.getDay();
                const dayOfMonth = checkDate.getDate();
@@ -2692,23 +2680,26 @@ async function showRefinanceModal(clientId, notificationId) {
 
                if (isPaymentDay && !isHoliday) {
                    
-                   // === ANÁLISIS DEL PASADO ===
+                   // === ANÁLISIS DEL PASADO (AYER HACIA ATRÁS) ===
                    if (checkDate.getTime() < today.getTime()) {
                        installmentsDueCount++; 
                        const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
                        
+                       // Compara deuda acumulada vs pagado total
                        const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
 
+                       // Si debe algo del pasado, suma un día de atraso
                        if (outstandingDueAmount > 0.9) { 
                            accumulatedLateDays++; 
                            if (dailyLateRate > 0) accumulatedLateFees += (outstandingDueAmount * dailyLateRate);
                        }
                    } 
                    
-                   // === ANÁLISIS DEL PRESENTE ===
+                   // === ANÁLISIS DEL PRESENTE (HOY) ===
                    else if (checkDate.getTime() === today.getTime()) {
                        const expectedTotalIncludingToday = (installmentsDueCount + 1) * installmentAmount;
                        
+                       // Si debe la cuota de HOY, se marca el monto, pero NO aumenta 'accumulatedLateDays'
                        if (currentTotalPaid < expectedTotalIncludingToday - 0.1) {
                            details.amountDueToday = installmentAmount;
                        }
@@ -2729,18 +2720,20 @@ async function showRefinanceModal(clientId, notificationId) {
            details.lateDays = accumulatedLateDays;
            details.lateFeesAccumulated = accumulatedLateFees;
            
-           // --- 5. DETERMINAR ESTADO FINAL ---
-           // Usamos totalLoanVal (el valor reconstruido y seguro)
-           if (currentTotalPaid >= totalLoanVal - 0.1) {
+           // --- 4. DETERMINAR ESTADO FINAL ---
+           if (currentTotalPaid >= loan.totalLoan - 0.1) {
                details.status = 'finished';
            } 
            else if (accumulatedLateDays > 0) { 
+               // Solo si debe días del PASADO (ayer o antes) se pone ROJO (Atrasado)
                details.status = 'late';
            } 
            else if (details.amountDueToday > 0) { 
+               // Si debe HOY pero está al día con el pasado -> AMARILLO (Pendiente)
                details.status = 'pending'; 
            } 
            else {
+               // Al día (o pagado hoy)
                details.status = 'pending'; 
            }
            
@@ -7834,5 +7827,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
