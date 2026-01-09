@@ -298,7 +298,21 @@
 
         .bottom-nav { position: static; flex-shrink: 0; background-color: var(--surface); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05); transition: background-color 0.3s, border-color 0.3s; z-index: 150; }
         body.dark-mode .bottom-nav { box-shadow: none; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--text-secondary); text-decoration: none; font-size: 0.8em; padding: 5px 15px; cursor: pointer; position: relative; }
+        .nav-item { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 5px; 
+            color: var(--text-secondary); 
+            text-decoration: none; 
+            font-size: 0.8em; 
+            padding: 5px 15px; 
+            cursor: pointer; 
+            position: relative; 
+            /* NUEVO: Para centrar las dos líneas de texto */
+            text-align: center; 
+            line-height: 1.2; 
+        }
         .nav-item.active { color: var(--accent-purple); }
         .notification-badge {
             position: absolute;
@@ -875,24 +889,7 @@ const BLACKLIST_DATA = {
         
         
         let currentLang = localStorage.getItem('language') || 'pt';
-        let mapInstance = null;
-        let mapMarkers = [];
-        let collectorMarker = null; // Marker para la moto del cobrador
-        let deferredPrompt; // Para la instalación de PWA
-        const collectorId = 'joao_silva'; 
-        let collectorCurrentLocation = null; // Guardará tu ubicación en tiempo real
-        let locationWatchId = null; // ID para controlar el rastreador de GPS
-        let lastLocationUpdateTime = 0; // Controla la frecuencia de actualización en Firestore
-
-        let currentCompanyId = null;     // Guarda o ID da empresa do cobrador
-        let currentCompanyData = null;   // Guarda os dados da empresa (logo, nome, status)
-        let currentCollectorUid = null;  // Guarda o ID de autenticação (Auth UID) do cobrador
-        let currentCollectorUsername = null; // Guarda o 'username' (ID de Firestore) do cobrador
-        let unsubscribeNotifications = null;
-        let internalNotifications = [];
-
-        
-        const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
+        // === PEGA ESTE BLOQUE COMPLETO DEBAJO DE let currentLang ===
         const translations = {
             pt: { 
                 noClientsFound: 'Nenhum cliente encontrado.', 
@@ -902,9 +899,7 @@ const BLACKLIST_DATA = {
                 navHome: 'Rota', 
                 navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário (PDF)', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', 
                 
-                // === CAMBIO AQUÍ: SALTO DE LÍNEA ===
                 navExpenses: 'Gastos<br>Retiradas', 
-                // ===================================
 
                 myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamiento de', reviewRequest: 'Revisar solicitação.', installAppMsg: 'Instale o app para uma melhor experiência!', installBtn: 'Instalar', receivedInCash: 'Recebido em Dinheiro', receivedInDigital: 'Recebido em PIX/Cartão', finished: 'Finalizado', createNewLoan: 'Criar Novo Empréstimo', updateClientData: 'Atualizar Dados', paymentFrequency: 'Forma de Pagamento', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal', dayOfWeek: 'Dia da Semana', dayOfMonth: 'Dia do Mês', sunday: 'Domingo', monday: 'Segunda-feira', tuesday: 'Terça-feira', wednesday: 'Quarta-feira', thursday: 'Quinta-feira', friday: 'Sexta-feira', saturday: 'Sábado', collectionTimeLabel: 'Horário de Cobrança Preferencial', documentNumber: 'Número do Documento', systemHistory: 'Histórico no Sistema', verifySystem: 'Verificar no Sistema', searchingSystem: 'Buscando no sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'Nenhum outro empréstimo ativo encontrado para este documento no sistema.', loansFound: 'Empréstimos Encontrados', loansFoundMsg: 'Os seguintes empréstimos ativos foram encontrados para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Status', loanDetails: 'Detalhes do Empréstimo', amountPaid: 'Valor Pago', paymentApprovedClientTitle: 'Pagamento Aprovado', paymentApprovedClientBody: 'Seu pagamento de {amount} foi aprovado!', paymentRejectedClientTitle: 'Pagamento Rejeitado', paymentRejectedClientBody: 'Seu comprovante foi rejeitado. Entre em contato com seu cobrador.', refinanceApprovedClientTitle: 'Refinanciamento Aprovado', refinanceApprovedClientBody: 'Sua solicitação de refinanciamento foi aprovada com sucesso.', refinanceRejectedClientTitle: 'Refinanciamento Rejeitado', refinanceRejectedClientBody: 'Sua solicitação de refinanciamento foi rejeitada.', realtimeTracking: 'Rastreamento em Tempo Real', 
                 paymentTitle: 'Pagamento Parcela #{start}', 
@@ -925,7 +920,7 @@ const BLACKLIST_DATA = {
                 save: 'Salvar',
                 statusPaidToday: 'PAGO HOJE',
                 statusToPay: 'FALTA PAGAR',
-                statusPending: 'PENDENTE',
+                statusPending: 'PENDIENTE',
                 adminApprovedRefinance: 'Admin aprovou a solicitação de',
                 approveToCreate: 'Aprove para criar o novo empréstimo.',
                 settlementHistory: 'Histórico de Liquidações',
@@ -938,7 +933,8 @@ const BLACKLIST_DATA = {
                 methodDigitalLabel: 'PIX',
                 methodCardLabel: 'Cartão',
                 salary: 'Salário',
-                routeProgress: 'Progresso da Rota'
+                routeProgress: 'Progresso da Rota',
+                microInsuranceLabel: 'Micro Seguro (Valor a Descontar)'
             },
             es: { 
                 noClientsFound: 'Ningún cliente encontrado.', 
@@ -948,9 +944,7 @@ const BLACKLIST_DATA = {
                 navHome: 'Ruta', 
                 navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario (PDF)', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', 
                 
-                // === CAMBIO AQUÍ: SALTO DE LÍNEA ===
                 navExpenses: 'Gastos<br>Retiros', 
-                // ===================================
 
                 myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificaciones', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensal', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida', documentNumber: 'Número de Documento', systemHistory: 'Historial en el Sistema', verifySystem: 'Verificar en el Sistema', searchingSystem: 'Buscando en el sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'No se encontraron otros préstamos activos para este documento en el sistema.', loansFound: 'Préstamos Encontrados', loansFoundMsg: 'Se encontraron los siguientes préstamos activos para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Estado', loanDetails: 'Detalles del Préstamo', amountPaid: 'Monto Pagado', paymentApprovedClientTitle: 'Pago Aprobado', paymentApprovedClientBody: '¡Tu pago de {amount} ha sido aprobado!', paymentRejectedClientTitle: 'Pago Rechazado', paymentRejectedClientBody: 'Tu comprobante fue rechazado. Por favor, contacta a tu cobrador.', refinanceApprovedClientTitle: 'Refinanciación Aprobada', refinanceApprovedClientBody: 'Tu solicitud de refinanciación ha sido aprobada con éxito.', refinanceRejectedClientTitle: 'Refinanciación Rechazada', refinanceRejectedClientBody: 'Tu solicitud de refinanciación ha sido rechazada.', realtimeTracking: 'Seguimiento en Tiempo Real', 
                 paymentTitle: 'Pago Cuota #{start}', 
@@ -959,14 +953,14 @@ const BLACKLIST_DATA = {
                 paymentDescPartial: 'Pago parcial ({percent}%) de la cuota.', 
                 paymentDescMultiple: 'Cubre {fullInstallments} cuota(s) y {percent}% de la próxima.', 
                 paymentDescOverpay: 'Cubre la cuota #{start} y adelanta {overpayAmount} para la próxima.',
-                emailLogin: 'Email (Login)',
-                username: 'Usuário (Login)',
                 paymentInstallmentTitle: 'Pago Cuota #{installment}',
                 paymentInstallmentsTitle: 'Pago Cuotas #{start} - #{end}',
                 fullPaymentDesc: 'Cuota #{installment} pagada completamente.',
                 partialPaymentDesc: 'Pago parcial ({percent}%) de la cuota.',
                 multiplePaymentDesc: 'Cubre {count} cuota(s) y un {percent}% de la siguiente.',
                 multipleFullPaymentDesc: 'Cubre {count} cuota(s) completamente.',
+                emailLogin: 'Email (Login)',
+                username: 'Usuário (Login)',
                 collectorOnTheWayTitle: '¡Cobrador en camino!', collectorOnTheWayBody: 'Nuestro cobrador está en camino y llegará en unos minutos.', paymentSettings: 'Configuración de Pagos', currency: 'Moneda de Operación', paymentMethods: 'Métodos de Pago', 
                 save: 'Guardar',
                 statusPaidToday: 'PAGADO HOY',
@@ -984,49 +978,35 @@ const BLACKLIST_DATA = {
                 methodDigitalLabel: 'Pago Electrónico',
                 methodCardLabel: 'Tarjeta',
                 salary: 'Salario',
-                routeProgress: 'Progreso de la Ruta'
+                routeProgress: 'Progreso de la Ruta',
+                microInsuranceLabel: 'Micro Seguro (A Descontar)'
             },
             en: { 
+                // ... (No es crítico si no usas inglés, pero lo dejo por si acaso)
                 noClientsFound: 'No clients found.', 
-                biweekly: 'BI-WEEKLY', registerOutflow: 'Register New Outflow', addExpenseOption: 'Add Expense', expenseOptionDesc: 'Register fuel, food, etc.', cashWithdrawal: 'Cash Withdrawal', withdrawalOptionDesc: 'Send money delivered to admin.', amountDeliveredAdmin: 'Amount delivered to Admin:', sendForApproval: 'Send for Approval',
-                postponePayment: 'Postpone Payment', postponeConfirmTitle: 'Confirm Postponement', postponeConfirmMsg: 'This will move the client\'s due date by one business day without generating a late status. Do you wish to continue?', confirm: 'Confirm', paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments up to date for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', remainingClients: 'Remaining Clients', 
-                todaysRoute: 'Collection Route (Active)', 
-                navHome: 'Route', 
-                navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital on Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Total of Month', accountSettings: 'Account Settings', changePassword: 'Password',exportReport: 'Export Daily Report (PDF)', logout: 'Log Out', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: '# of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', navExpenses: 'Expenses', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', attachReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From the Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use this data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinancing of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Details', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', biweekly: 'Bi-weekly', monthly: 'Monthly', dayOfWeek: 'Day of the Week', dayOfMonth: 'Day of the Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching the system...', clientClean: 'Clean Client', clientCleanMsg: 'No other active loans were found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinancing Approved', refinanceApprovedClientBody: 'Your refinancing request has been successfully approved.', refinanceRejectedClientTitle: 'Refinancing Rejected', refinanceRejectedClientBody: 'Your refinancing request has been rejected.', realtimeTracking: 'Real-time Tracking', 
-                paymentTitle: 'Installment Payment #{start}', 
-                paymentTitleRange: 'Installment Payments #{start} - #{end}', 
-                paymentDescFull: 'Installment #{start} paid in full.', 
-                paymentDescPartial: 'Partial payment ({percent}%) of the installment.', 
-                paymentDescMultiple: 'Covers {fullInstallments} installment(s) and {percent}% of the next one.', 
-                paymentDescOverpay: 'Covers installment #{start} and pays {overpayAmount} towards the next.',
-                paymentInstallmentTitle: 'Installment Payment #{installment}',
-                paymentInstallmentsTitle: 'Installment Payments #{start} - #{end}',
-                fullPaymentDesc: 'Installment #{installment} paid in full.',
-                partialPaymentDesc: 'Partial payment ({percent}%) of the installment.',
-                multiplePaymentDesc: 'Covers {count} installment(s) and {percent}% of the next one.',
-                multipleFullPaymentDesc: 'Covers {count} installment(s) completely.',
-                emailLogin: 'Email (Login)',
-                username: 'Username (Login)',
-                collectorOnTheWayTitle: 'Collector on the way!', collectorOnTheWayBody: 'Our collector is on the way and will arrive in a few minutes.', paymentSettings: 'Payment Settings', currency: 'Operating Currency', paymentMethods: 'Payment Methods', 
-                save: 'Save',
-                statusPaidToday: 'PAID TODAY',
-                statusToPay: 'TO PAY',
-                statusPending: 'PENDING',
-                adminApprovedRefinance: 'Admin approved the request of',
-                approveToCreate: 'Approve to create the new loan.',
-                settlementHistory: 'Settlement History',
-                noExpenses: 'No expenses found.',
-                noSettlements: 'No settlements found.',
-                loadingSettlements: 'Loading settlements...',
-                totalAssets: 'Total Assets (Equity)',
-                distributedCapital: 'Distributed Capital',
-                routeLabel: 'Route:',
-                methodDigitalLabel: 'Digital Transfer',
-                methodCardLabel: 'Card',
-                salary: 'Salary', // <-- NUEVO
-                routeProgress: 'Route Progress'
+                navExpenses: 'Expenses<br>Withdrawals', 
+                // ...
             }
         };
+        let mapInstance = null;
+        let mapMarkers = [];
+        let collectorMarker = null; // Marker para la moto del cobrador
+        let deferredPrompt; // Para la instalación de PWA
+        const collectorId = 'joao_silva'; 
+        let collectorCurrentLocation = null; // Guardará tu ubicación en tiempo real
+        let locationWatchId = null; // ID para controlar el rastreador de GPS
+        let lastLocationUpdateTime = 0; // Controla la frecuencia de actualización en Firestore
+
+        let currentCompanyId = null;     // Guarda o ID da empresa do cobrador
+        let currentCompanyData = null;   // Guarda os dados da empresa (logo, nome, status)
+        let currentCollectorUid = null;  // Guarda o ID de autenticação (Auth UID) do cobrador
+        let currentCollectorUsername = null; // Guarda o 'username' (ID de Firestore) do cobrador
+        let unsubscribeNotifications = null;
+        let internalNotifications = [];
+
+        
+        const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
+        
 
         const money = val => (typeof val !== 'number' || isNaN(val)) ? (currentLang === 'pt' ? 'R$ 0,00' : '$ 0.00') : val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -1510,30 +1490,6 @@ const BLACKLIST_DATA = {
             lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
         }
 
-
-
-
-        function showConfirmationModal(title, message, onConfirm) {
-            const modal = document.getElementById('confirmationModal');
-            modal.innerHTML = `
-                <div class="confirmation-dialog">
-                    <h3>${title}</h3>
-                    <p>${message}</p>
-                    <div class="confirmation-buttons">
-                        <button class="btn-secondary" id="confirm-cancel-btn">${translations[currentLang].cancel || 'Cancelar'}</button>
-                        <button class="btn-primary" id="confirm-action-btn">${translations[currentLang].confirm || 'Confirmar'}</button>
-                    </div>
-                </div>
-            `;
-
-            history.pushState({ modal: 'confirmationModal' }, 'Confirm', '#confirm');
-            modal.classList.add('active');
-
-            modal.querySelector('#confirm-cancel-btn').addEventListener('click', () => window.history.back());
-            modal.querySelector('#confirm-action-btn').addEventListener('click', () => {
-                onConfirm();
-            });
-        }
 
         // Pega este bloque completo dentro de <script type="module">
 
@@ -2299,25 +2255,14 @@ async function showRefinanceModal(clientId, notificationId) {
             currentLang = lang;
             document.querySelectorAll('[data-lang-key]').forEach(el => {
                 const key = el.dataset.langKey;
-                if (translations[lang] && translations[lang][key]) { el.innerHTML = translations[lang][key];}
+                // CAMBIO IMPORTANTE: Usamos innerHTML para permitir <br>
+                if (translations[lang] && translations[lang][key]) {
+                    el.innerHTML = translations[lang][key]; 
+                }
             });
-            document.documentElement.lang = lang.startsWith('es') ? 'es' : (lang.startsWith('en') ? 'en' : 'pt-BR');
+            // ... resto de la función ... (si hay más código como el placeholder, déjalo)
             const searchInput = document.getElementById('client-search-input');
             if(searchInput) searchInput.placeholder = translations[lang].searchClient;
-            
-            // --- INICIO: CORRECCIÓN DEL BUCLE INFINITO ---
-            // Estas líneas estaban causando que CADA función de actualización
-            // llamara a applyLanguage, que a su vez llamaba a CADA función
-            // de actualización de nuevo, bloqueando la app.
-            
-            /*
-            updateTodaysRouteList();
-            updateAllClientsList();
-            updateExpensesView();
-            updateProfileView();
-            updateNotifications();
-            */
-            // --- FIN: CORRECCIÓN DEL BUCLE INFINITO ---
         }
 
         
@@ -2541,110 +2486,88 @@ async function showRefinanceModal(clientId, notificationId) {
         
 
     function updateProfileView(collectorData = null) {
-            // --- [INICIO FASE 2: KPIs] ---
             const dailyTotalEl = document.getElementById('kpi-daily-total');
-            const capitalTotalEl = document.getElementById('kpi-capital-total'); // Este es 'Capital em Mãos'
-            const distributedCapitalEl = document.getElementById('kpi-distributed-capital'); // Este es 'Capital Distribuido'
+            const capitalTotalEl = document.getElementById('kpi-capital-total'); 
+            const distributedCapitalEl = document.getElementById('kpi-distributed-capital'); 
             const dailyCashEl = document.getElementById('kpi-daily-cash');
             const dailyDigitalEl = document.getElementById('kpi-daily-digital');
-            // --- [INICIO FASE 3: SELECCIONAR KPI 3] ---
-            const totalPatrimonioEl = document.getElementById('kpi-total-patrimonio'); // KPI 3 (Total)
-            if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return; // Verifica todos
-            // --- [FIN FASE 3] ---
-
-            let totalLoansMade = 0; // Capital PRINCIPAL de préstamos NO-MIGRADOS
-            let totalPaymentsReceived = 0; // Pagos NO-MIGRADOS
+            const totalPatrimonioEl = document.getElementById('kpi-total-patrimonio'); 
             
-            // --- [INICIO DE LA CORRECCIÓN CONTABLE] ---
-            let totalDistributedCapital_Outstanding = 0; // ¡Variable Renombrada! Guardará el SALDO PENDIENTE
-            // --- [FIN DE LA CORRECCIÓN CONTABLE] ---
+            if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return; 
 
+            let totalLoansMade = 0; 
+            let totalPaymentsReceived = 0; 
+            let totalDistributedCapital_Outstanding = 0; 
+            
             const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
             
-            const collectorClients = allClients.filter(c => c.collectorId === currentCollectorUsername);
+            const collectorId = typeof currentCollectorUsername !== 'undefined' ? currentCollectorUsername : (collectorData?.id);
+            const collectorClients = allClients.filter(c => c.collectorId === collectorId);
 
             collectorClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     
-                    // --- Lógica para 'Capital em Mãos' (SIN CAMBIOS) ---
-                    // Esta lógica es correcta, calcula el flujo de caja.
                     if (!loan.migrationDate) {
-                        // Suma el capital principal de préstamos NUEVOS (NO migrados)
                         if (loan.principalAmount) {
                             totalLoansMade += loan.principalAmount;
+                            // CORRECCIÓN: NO SUMAMOS EL SEGURO AQUÍ.
+                            // Dejamos que el préstamo reste el total completo, "escondiendo" el seguro.
                         } else if (loan.totalLoan && client.interestRate) { 
                             totalLoansMade += (loan.totalLoan / (1 + (client.interestRate / 100)));
                         }
                     }
+
                     (loan.history || []).forEach(h => {
-                        // Suma pagos (NO migrados)
                         if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
                             totalPaymentsReceived += (h.amount || 0);
                         }
                     });
-                    // --- FIN Lógica 'Capital em Mãos' ---
-
                     
-                    // --- [INICIO DE LA CORRECCIÓN CONTABLE] ---
-                    // Esta es la nueva lógica para 'Capital Distribuido' (Saldo Pendiente)
-                    
-                    // 1. Recalculamos el estado real del préstamo (usando la función moderna)
                     const loanDetails = calculateLoanDetails(loan);
-                    const currentStatus = loanDetails.status;
-                    
-                    // 2. Solo sumamos el saldo de préstamos que NO están finalizados
-                    if (currentStatus !== 'finished') {
-                        
-                        // 3. Calcular el Total Pagado para ESTE préstamo (incluye migración y pagos normales)
+                    if (loanDetails.status !== 'finished') {
                         const totalPaidForThisLoan = (loan.history || [])
                             .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                             .reduce((sum, h) => sum + (h.amount || 0), 0);
-                        
-                        // 4. Calcular el Saldo Pendiente (Total del Préstamo - Total Pagado)
                         const outstandingBalance = (loan.totalLoan || 0) - totalPaidForThisLoan;
-                        
-                        // 5. Sumar solo el saldo pendiente al total distribuido
                         totalDistributedCapital_Outstanding += outstandingBalance;
                     }
-                    // --- [FIN DE LA CORRECCIÓN CONTABLE] ---
                 });
             });
                         
             const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
             
-            // --- Lógica de Capital (RECTIFICACIÓN) (SIN CAMBIOS) ---
             const currentStartingCapital = (collectorData && collectorData.startingCapitalOnHand !== undefined) 
                 ? collectorData.startingCapitalOnHand 
                 : (collectorData && collectorData.startingCapital) || 0;
 
+            // === CORRECCIÓN CRÍTICA ===
+            // Solo restamos los retiros de CAPITAL. 
+            // Ignoramos los de SEGURO (type !== 'insurance') porque ese dinero es "invisible" en esta caja.
             const totalSettledByThisCollector = allSettlements
-                .filter(s => s.status === 'approved')
+                .filter(s => s.status === 'approved' && s.type !== 'insurance') 
                 .reduce((sum, s) => sum + (s.amount || 0), 0);
+
             const totalCapitalInjected = allCapitalInjections
                 .filter(i => i.status === 'approved')
                 .reduce((sum, i) => sum + (i.amount || 0), 0);
 
-            // --- Fórmula de 'Capital em Mãos' (SIN CAMBIOS) ---
-            // (CapitalInicial + Aportes + PagosRecibidos) - (PréstamosNuevos + Gastos + Liquidaciones)
+            // Fórmula Limpia: Inicio + Aportes + Pagos - Préstamos - Gastos - Retiros(Solo Capital)
             const capitalTotal = currentStartingCapital + totalCapitalInjected + totalPaymentsReceived - totalLoansMade - totalExpenses - totalSettledByThisCollector;
-            currentCapitalOnHand = capitalTotal; // Actualiza la variable global
+            
+            if (typeof currentCapitalOnHand !== 'undefined') {
+                currentCapitalOnHand = capitalTotal; 
+            }
 
-            // --- [INICIO DE LA CORRECCIÓN CONTABLE (RENDERIZADO)] ---
             dailyTotalEl.textContent = money(dailyTotal);
-            capitalTotalEl.textContent = money(capitalTotal); // KPI 1: Capital em Mãos (Correcto)
+            capitalTotalEl.textContent = money(capitalTotal); 
+            distributedCapitalEl.textContent = money(totalDistributedCapital_Outstanding); 
             
-            // ¡Usamos la nueva variable con el saldo pendiente!
-            distributedCapitalEl.textContent = money(totalDistributedCapital_Outstanding); // KPI 2: Capital Distribuido (Corregido)
-            
-            // ¡Calculamos Patrimonio con el valor corregido!
-            // Patrimonio = (Lo que tengo en efectivo) + (Lo que me deben en la calle)
             const totalPatrimonio = capitalTotal + totalDistributedCapital_Outstanding;
-            totalPatrimonioEl.textContent = money(totalPatrimonio); // KPI 3: Capital Total (Corregido)
+            totalPatrimonioEl.textContent = money(totalPatrimonio); 
             
             if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
             if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
-            // --- [FIN DE LA CORRECCIÓN CONTABLE (RENDERIZADO)] ---
-        }
+    }
 
 
         
@@ -5853,48 +5776,51 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 }
             });
             
-            // --- LÓGICA BOTÓN ADIAR (MOVIDO AQUÍ) ---
+            // --- LÓGICA BOTÓN ADIAR (CORREGIDA PARA NUEVO MODAL) ---
             const postponeBtn = paymentModal.querySelector('#postponePaymentBtnInModal');
             if (postponeBtn) {
-                postponeBtn.addEventListener('click', () => {
-                     showConfirmationModal(
+                postponeBtn.addEventListener('click', async () => {
+                     // CORRECCIÓN: Usamos await
+                     const confirmed = await showConfirmationModal(
                         translations[currentLang].postponeConfirmTitle || 'Confirmar Adiamento',
                         translations[currentLang].postponeConfirmMsg || 'Isso moverá a data de vencimento em 1 dia. Deseja continuar?',
-                        async () => {
-                            const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-                            try {
-                                const freshClientIdx = allClients.findIndex(c => c.id === clientId);
-                                const freshClient = allClients[freshClientIdx];
-                                const loansCopy = JSON.parse(JSON.stringify(freshClient.loans));
-                                const targetLoan = loansCopy[loanIndex];
-                                
-                                if (!targetLoan.history) targetLoan.history = [];
-                                
-                                targetLoan.history.push({ 
-                                    amount: 0, 
-                                    date: new Date(), 
-                                    status: 'postponed' 
-                                });
-                                
-                                await updateDoc(clientRef, { loans: loansCopy });
-
-                                showToast('Pagamento adiado com sucesso!');
-                                window.history.back(); // Cierra confirmación
-                                window.history.back(); // Cierra modal de pago
-                                
-                                // Refrescamos todo
-                                showClientDetails(clientId, loanIndex);
-                                updateTodaysRouteList();
-                                updateAllClientsList();
-                            } catch(error) {
-                                console.error("Error postponing:", error);
-                                showToast('Erro ao adiar.', true);
-                                window.history.back(); // Cierra confirmación
-                            }
-                        }
+                        translations[currentLang].confirm || 'Confirmar',
+                        'btn-secondary'
                     );
+
+                    if (!confirmed) return;
+
+                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
+                    try {
+                        const freshClientIdx = allClients.findIndex(c => c.id === clientId);
+                        const freshClient = allClients[freshClientIdx];
+                        const loansCopy = JSON.parse(JSON.stringify(freshClient.loans));
+                        const targetLoan = loansCopy[loanIndex];
+                        
+                        if (!targetLoan.history) targetLoan.history = [];
+                        
+                        targetLoan.history.push({ 
+                            amount: 0, 
+                            date: new Date(), 
+                            status: 'postponed' 
+                        });
+                        
+                        await updateDoc(clientRef, { loans: loansCopy });
+
+                        showToast('Pagamento adiado com sucesso!');
+                        window.history.back(); // Cierra modal de pago
+                        
+                        // Refrescamos todo
+                        showClientDetails(clientId, loanIndex);
+                        updateTodaysRouteList();
+                        updateAllClientsList();
+                    } catch(error) {
+                        console.error("Error postponing:", error);
+                        showToast('Erro ao adiar.', true);
+                    }
                 });
             }
+            
 
             paymentModal.querySelector('#confirmPaymentBtn').addEventListener('click', async (e) => {
                 const confirmBtn = e.currentTarget;
@@ -6162,8 +6088,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             }
         }
 
-          // [FUNCIÓN ACTUALIZADA] Reporte Diario con Micro Seguro Incluido
-        async function exportDailyReport(customDate = null) {
+         async function exportDailyReport(customDate = null) {
             const { jsPDF } = window.jspdf;
             const pdfDoc = new jsPDF();
             
@@ -6174,10 +6099,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 collector: translations[currentLang].reportCollector || 'Cobrador',
                 summary: currentLang === 'es' ? 'Resumen Contable' : (currentLang === 'en' ? 'Accounting Summary' : 'Resumo Contábil'),
                 received: translations[currentLang].receivedToday || 'Recebido Hoje',
-                cash: currentLang === 'es' ? 'Efectivo' : (currentLang === 'en' ? 'Cash' : 'Em Dinheiro'),
-                digital: currentLang === 'es' ? 'Electrónico/Tarjeta' : (currentLang === 'en' ? 'Digital/Card' : 'PIX/Cartão'),
-                injections: currentLang === 'es' ? 'Aportes' : (currentLang === 'en' ? 'Injections' : 'Aportes'),
-                newLoans: currentLang === 'es' ? 'Nuevos Préstamos' : (currentLang === 'en' ? 'New Loans' : 'Novos Empréstimos'),
                 expenses: translations[currentLang].reportTotalExpenses || 'Gastos',
                 settlements: currentLang === 'es' ? 'Retiro de Caja' : (currentLang === 'en' ? 'Cash Withdrawal' : 'Retirada de Caixa'),
                 generatedToday: currentLang === 'es' ? 'GENERADO HOY (Operativo)' : (currentLang === 'en' ? 'GENERATED TODAY' : 'GERADO HOJE (Operacional)'),
@@ -6195,7 +6116,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 of: currentLang === 'es' ? 'de' : (currentLang === 'en' ? 'of' : 'de'),
                 noLate: currentLang === 'es' ? '¡Felicidades! Ningún cliente atrasado actualmente.' : (currentLang === 'en' ? 'Congrats! No late clients currently.' : 'Parabéns! Nenhum cliente atrasado atualmente.'),
                 routeLabel: translations[currentLang].routeLabel || 'Rota:',
-                microInsurance: currentLang === 'es' ? 'Micro Seguro (Fondo)' : 'Micro Seguro (Fundo)' // TRADUCCIÓN NUEVA
+                microInsurance: currentLang === 'es' ? 'Micro Seguro (Fondo)' : 'Micro Seguro (Fundo)',
+                accumulatedInsurance: currentLang === 'es' ? 'FONDO SEGURO ACUMULADO' : 'FUNDO SEGURO ACUMULADO',
+                injections: currentLang === 'es' ? 'Aportes' : 'Aportes',
+                newLoans: currentLang === 'es' ? 'Nuevos Préstamos' : 'Novos Empréstimos'
             };
             
             const reportDate = customDate || new Date();
@@ -6211,12 +6135,32 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 return d.toLocaleDateString('pt-BR') === reportDate.toLocaleDateString('pt-BR');
             };
 
+            // --- VARIABLES DEL DÍA ---
             let dailyTotal = 0;
             let dailyTotalCash = 0;
             let dailyTotalDigital = 0;
             const dailyPaymentsList = [];
             const missedPaymentsList = [];
             const finishedClientsList = [];
+
+            // --- CÁLCULO DE FONDO DE SEGURO ACUMULADO (HISTÓRICO TOTAL) ---
+            let lifetimeInsuranceGenerated = 0;
+            allClients.forEach(c => {
+                (c.loans || []).forEach(l => {
+                    lifetimeInsuranceGenerated += (parseFloat(l.microInsurance) || 0);
+                });
+            });
+
+            let lifetimeInsuranceWithdrawn = 0;
+            allSettlements.forEach(s => {
+                if (s.status === 'approved' && s.type === 'insurance') {
+                    lifetimeInsuranceWithdrawn += (s.amount || 0);
+                }
+            });
+            
+            // Saldo disponible en la "Hucha" de seguros
+            const insuranceFundBalance = Math.max(0, lifetimeInsuranceGenerated - lifetimeInsuranceWithdrawn);
+            // -------------------------------------------------------------
 
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, loanIndex) => { 
@@ -6274,7 +6218,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.value, 0);
             dailyExpenses.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
 
-            const dailySettlements = allSettlements.filter(s => checkDateMatch(s.date));
+            // Filtramos retiros de capital (los de seguro no afectan el flujo operativo del día)
+            const dailySettlements = allSettlements.filter(s => checkDateMatch(s.date) && s.type !== 'insurance');
             const totalSettlements = dailySettlements.reduce((sum, s) => sum + s.amount, 0);
             
             const dailyInjections = allCapitalInjections.filter(i => checkDateMatch(i.date));
@@ -6296,7 +6241,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                             clientName: client.name,
                             amount: principal || 0,
                             time: loanTime,
-                            microInsurance: parseFloat(loan.microInsurance) || 0, // <--- CAPTURA SEGURO
+                            microInsurance: parseFloat(loan.microInsurance) || 0,
                             loanIndex: index + 1
                         });
                     }
@@ -6304,8 +6249,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             const totalLoansOutflow = dailyNewLoans.reduce((sum, l) => sum + l.amount, 0);
             
-            // --- CÁLCULO TOTAL MICRO SEGURO ---
-            const totalMicroInsurance = dailyNewLoans.reduce((sum, l) => sum + l.microInsurance, 0);
+            // Total seguro DEL DÍA (solo informativo)
+            const dailyMicroInsurance = dailyNewLoans.reduce((sum, l) => sum + l.microInsurance, 0);
 
             const lateClientsList = [];
             allClients.forEach(client => {
@@ -6325,8 +6270,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             
             const operationalResult = dailyTotal - totalExpenses;
             
-            // --- FÓRMULA CORREGIDA: Se suma el Micro Seguro al Flujo Neto ---
-            const netCashFlow = (operationalResult + totalInjections + totalMicroInsurance) - (totalSettlements + totalLoansOutflow);
+            // Flujo de Caja Operativo (Sin seguros)
+            const netCashFlow = (operationalResult + totalInjections) - (totalSettlements + totalLoansOutflow);
 
             const pageMargin = 15;
             const pageWidth = pdfDoc.internal.pageSize.getWidth();
@@ -6424,9 +6369,18 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             addSummaryLine(`(-) ${t.settlements}:`, totalSettlements, '#dc3545');
             addSummaryLine(`(+) ${t.injections}:`, totalInjections, '#28a745');
             
-            // --- NUEVO: LÍNEA DE MICRO SEGURO EN EL RESUMEN ---
-            if (totalMicroInsurance > 0) {
-                addSummaryLine(`(+) ${t.microInsurance}:`, totalMicroInsurance, '#0ea5e9'); // Azul
+            // --- NUEVO: FONDO DE SEGURO (SEPARADO) ---
+            if (insuranceFundBalance > 0) {
+                // Línea separadora sutil
+                y += 4;
+                pdfDoc.setLineWidth(0.1);
+                pdfDoc.setDrawColor(220); 
+                pdfDoc.setLineDash([1, 1], 0);
+                pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y);
+                pdfDoc.setLineDash([]);
+                y += 2;
+                
+                addSummaryLine(`${t.accumulatedInsurance}:`, insuranceFundBalance, '#0ea5e9', true); 
             }
 
             y += 3;
@@ -6472,7 +6426,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
             
-            // ... (Secciones de Missed y Finished sin cambios) ...
             if (missedPaymentsList.length > 0) {
                 addSectionHeader(t.missedSection);
                 missedPaymentsList.forEach(p => {
@@ -6510,7 +6463,12 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 addSectionHeader(t.expensesSection); 
                 dailyExpenses.forEach(e => {
                     checkPageBreak(12); 
-                    const cat = translations[lang][e.category] || e.category;
+                    
+                    // === CORREÇÃO DO ERRO ===
+                    // Mudamos 'lang' para 'currentLang'
+                    const cat = (translations[currentLang] && translations[currentLang][e.category]) ? translations[currentLang][e.category] : e.category;
+                    // ========================
+
                     pdfDoc.setFontSize(10);
                     pdfDoc.setFont(undefined, 'normal');
                     pdfDoc.setTextColor(0);
@@ -6617,7 +6575,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     console.error("Erro ao salvar bloqueio:", err);
                 }
             }
-        }
+        } 
+        
         
         
         // --- [NUEVA FUNCIÓN] Modal para seleccionar fecha del reporte ---
@@ -7064,23 +7023,24 @@ function showReportDateModal() {
 
 
         async function handleClearCollectorNotifications() {
-    console.log("[COBRADOR-APP] Solicitado para limpar notificações...");
-    
-    // Usamos la variable global 'internalNotifications' que ya tiene todas las notificaciones
-    if (!internalNotifications || internalNotifications.length === 0) {
-        showToast("Não há notificações para limpar.");
-        return;
-    }
-
-    // Muestra un modal de confirmación antes de borrar
-    showConfirmationModal(
-        'Limpar Notificações',
-        'Tem certeza que deseja apagar todo o histórico de notificações? Esta ação não pode ser desfeita.',
-        async () => {
-            // El usuario confirmó en el modal
-            const deletePromises = [];
+            console.log("[COBRADOR-APP] Solicitado para limpar notificações...");
             
-            // Creamos un array de promesas de borrado
+            if (!internalNotifications || internalNotifications.length === 0) {
+                showToast("Não há notificações para limpar.");
+                return;
+            }
+
+            // CORRECCIÓN: Usamos await con la nueva estructura de promesa
+            const confirmed = await showConfirmationModal(
+                'Limpar Notificações',
+                'Tem certeza que deseja apagar todo o histórico de notificações? Esta ação não pode ser desfeita.',
+                'Sim, Limpar',
+                'btn-danger'
+            );
+
+            if (!confirmed) return;
+
+            const deletePromises = [];
             internalNotifications.forEach(notif => {
                 if (notif.id) {
                     const notifRef = doc(db, 'collectors', currentCollectorUsername, 'notifications', notif.id);
@@ -7091,20 +7051,13 @@ function showReportDateModal() {
             console.log(`[COBRADOR-APP] Apagando ${deletePromises.length} notificações...`);
 
             try {
-                // Espera a que todas las promesas de borrado se completen
                 await Promise.all(deletePromises);
                 showToast('Histórico de notificações limpo!');
-                // El 'onSnapshot' que escucha las notificaciones
-                // se activará automáticamente y mostrará la lista vacía.
             } catch (error) {
                 console.error("Erro ao limpar notificações:", error);
                 showToast('Erro ao limpar o histórico.', true);
-            } finally {
-                window.history.back(); // Cierra el modal de confirmación
             }
         }
-    );
-}
 
         
         // --- INICIO: LÓGICA DE OPTIMIZACIÓN DE RUTA ---
@@ -7687,24 +7640,27 @@ function renderVerificationResults(container, warnings, systemLoans) {
             let lastCheckedDate = new Date().getDate();
 
             // --- SISTEMA DE SEGURANÇA E MONITORAMENTO ---
+            // --- SISTEMA DE SEGURANÇA E MONITORAMENTO ---
             setInterval(() => {
                 const now = new Date();
                 const currentDay = now.getDate();
                 const hour = now.getHours();
                 
                 // 1. AUTO-RELOAD AL CAMBIAR DE DÍA (CIERRE AUTOMÁTICO)
-                // Si el número de día cambió (ej: ayer era 10, hoy es 11), recargamos.
                 if (currentDay !== lastCheckedDate) {
                     console.log("Mudança de dia detectada. Reiniciando sistema para fechar o dia anterior...");
-                    window.location.reload(); // Esto fuerza el reinicio y limpieza de la app
+                    window.location.reload(); 
                     return; 
                 }
 
+                // === CORRECCIÓN: Definimos la variable AQUÍ ===
                 // 2. REGLA: Bloqueo nocturno (00:00 a 07:00)
                 let isRestricted = hour >= 0 && hour < 7;
+                // ============================================
+
                 let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
 
-                // 3. REGLA: Bloqueo 5 minutos después del reporte (Lógica Estricta)
+                // 3. REGLA: Bloqueo 5 minutos después del reporte
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
                     let lastReport = null;
                     const rawDate = currentCollectorData.lastReportDate;
@@ -7780,7 +7736,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     if (lockScreen) lockScreen.remove();
                 }
 
-            }, 1000); // Chequeo cada segundo
+            }, 1000);
 
             // --- Service Worker ---
             if ('serviceWorker' in navigator) {
@@ -7892,4 +7848,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
