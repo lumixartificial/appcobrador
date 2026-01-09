@@ -563,7 +563,7 @@
         #cropper-container { height: calc(100% - 150px); }
         #cropper-container img { max-width: 100%; height: auto; }
         
-        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 20000; display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
         .toast { background-color: #333; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-size: 0.9em; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.toast-error { background-color: var(--danger-color); }
@@ -5552,12 +5552,17 @@ function showSettlementFormModal() {
                         notes: document.getElementById('settlement-form-notes').value.trim(),
                         receiptUrl: receiptUrl,
                         date: serverTimestamp(),
-                        status: 'pending_verification'
+                        
+                        // === CAMBIO: ESTADO APROBADO DIRECTAMENTE ===
+                        // Esto descuenta el dinero inmediatamente sin esperar al admin
+                        status: 'approved' 
                     };
 
                     await addDoc(collection(db, 'companies', currentCompanyId, 'settlements'), settlementData);
                     window.history.back();
-                    showToast('Liquidação enviada!');
+                    
+                    // Cambiamos el mensaje para reflejar que ya se hizo
+                    showToast('Retirada registrada e descontada!');
                  } catch (err) {
                      console.error(err);
                      showToast('Erro ao enviar', true);
@@ -7867,3 +7872,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
