@@ -7636,72 +7636,87 @@ function renderVerificationResults(container, warnings, systemLoans) {
 
         
         function init() {
-            // --- VARIABLE DE CONTROL DE DÍA (FUERA DEL INTERVALO) ---
+            // --- VARIABLE DE CONTROL DE DÍA ---
             let lastCheckedDate = new Date().getDate();
 
-            // --- SISTEMA DE SEGURANÇA E MONITORAMENTO ---
+            document.body.classList.add('dark-mode');
+
+            // --- PWA Banner ---
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                const installBanner = document.getElementById('install-banner');
+                if (installBanner) {
+                    installBanner.style.display = 'block';
+                    if (typeof applyLanguage === 'function') applyLanguage(currentLang);
+                }
+            });
+            const installBtn = document.getElementById('install-btn');
+            if (installBtn) {
+                installBtn.addEventListener('click', async () => {
+                    const installBanner = document.getElementById('install-banner');
+                    if (installBanner) installBanner.style.display = 'none';
+                    if (deferredPrompt) {
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        deferredPrompt = null;
+                    }
+                });
+            }
+            const closeInstallBtn = document.getElementById('close-install-banner');
+            if (closeInstallBtn) {
+                closeInstallBtn.addEventListener('click', () => {
+                    document.getElementById('install-banner').style.display = 'none';
+                });
+            }
+
             // --- SISTEMA DE SEGURANÇA E MONITORAMENTO ---
             setInterval(() => {
                 const now = new Date();
                 const currentDay = now.getDate();
                 const hour = now.getHours();
                 
-                // 1. AUTO-RELOAD AL CAMBIAR DE DÍA (CIERRE AUTOMÁTICO)
+                // 1. AUTO-RELOAD AL CAMBIAR DE DÍA
                 if (currentDay !== lastCheckedDate) {
-                    console.log("Mudança de dia detectada. Reiniciando sistema para fechar o dia anterior...");
+                    console.log("Mudança de dia detectada. Reiniciando...");
                     window.location.reload(); 
                     return; 
                 }
 
-                // === CORRECCIÓN: Definimos la variable AQUÍ ===
                 // 2. REGLA: Bloqueo nocturno (00:00 a 07:00)
                 let isRestricted = hour >= 0 && hour < 7;
-                // ============================================
-
                 let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
 
                 // 3. REGLA: Bloqueo 5 minutos después del reporte
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
                     let lastReport = null;
                     const rawDate = currentCollectorData.lastReportDate;
-
-                    if (rawDate && rawDate.seconds) {
-                        lastReport = new Date(rawDate.seconds * 1000);
-                    } else if (rawDate instanceof Date) {
-                        lastReport = rawDate;
-                    }
+                    if (rawDate && rawDate.seconds) lastReport = new Date(rawDate.seconds * 1000);
+                    else if (rawDate instanceof Date) lastReport = rawDate;
 
                     if (lastReport) {
-                        const isReportFromToday = 
-                            lastReport.getDate() === now.getDate() &&
-                            lastReport.getMonth() === now.getMonth() &&
-                            lastReport.getFullYear() === now.getFullYear();
-
-                        if (isReportFromToday) {
-                            const diffMs = now.getTime() - lastReport.getTime();
-                            const diffMinutes = diffMs / 1000 / 60;
-
+                        const isReportFromToday = lastReport.getDate() === now.getDate() && lastReport.getMonth() === now.getMonth() && lastReport.getFullYear() === now.getFullYear();
+                        
+                        // === CORRECCIÓN: Solo bloqueamos si el reporte es de hoy Y se hizo DESPUÉS de las 7 AM ===
+                        // Esto evita que las pruebas de madrugada (00:00 - 06:59) bloqueen el día siguiente.
+                        if (isReportFromToday && lastReport.getHours() >= 7) {
+                            const diffMinutes = (now.getTime() - lastReport.getTime()) / 1000 / 60;
                             if (diffMinutes > 5) {
                                 isRestricted = true; 
-                                lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente 5 minutos após o envio do Relatório Diário.";
+                                lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente após o envio do Relatório Diário.";
                             }
                         }
                     }
                 }
 
-                // 4. EXCEPCIÓN: Desbloqueo de Administrador
+                // 4. EXCEPCIÓN: Desbloqueo de Administrador (30 min)
                 let isAdminUnlocked = false;
-                if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.tempUnlockUntil) {
+                if (currentCollectorData && currentCollectorData.tempUnlockUntil) {
                     let unlockDate = null;
-                    if (currentCollectorData.tempUnlockUntil.seconds) {
-                        unlockDate = new Date(currentCollectorData.tempUnlockUntil.seconds * 1000);
-                    } else if (currentCollectorData.tempUnlockUntil instanceof Date) {
-                        unlockDate = currentCollectorData.tempUnlockUntil;
-                    }
+                    if (currentCollectorData.tempUnlockUntil.seconds) unlockDate = new Date(currentCollectorData.tempUnlockUntil.seconds * 1000);
+                    else if (currentCollectorData.tempUnlockUntil instanceof Date) unlockDate = currentCollectorData.tempUnlockUntil;
 
-                    if (unlockDate && now < unlockDate) {
-                        isAdminUnlocked = true;
-                    }
+                    if (unlockDate && now < unlockDate) isAdminUnlocked = true;
                 }
 
                 // --- APLICAR BLOQUEO VISUAL ---
@@ -7712,21 +7727,12 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     if (!lockScreen) {
                         lockScreen = document.createElement('div');
                         lockScreen.id = lockScreenId;
-                        lockScreen.style.cssText = `
-                            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                            background-color: #020617; z-index: 100000;
-                            display: flex; flex-direction: column;
-                            justify-content: center; align-items: center;
-                            text-align: center; padding: 30px; color: white;
-                        `;
+                        lockScreen.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #020617; z-index: 100000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 30px; color: white;`;
                         lockScreen.innerHTML = `
                             <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                             <h2 style="margin: 25px 0 10px; font-size: 1.8em; font-weight: 700;">Sistema Bloqueado</h2>
                             <p style="color: #94a3b8; font-size: 1.1em; max-width: 400px; line-height: 1.5;">${lockMessage}</p>
-                            <div style="margin-top: 30px;">
-                                <span style="color: #ef4444; font-weight: bold; font-size: 1.2em;">${now.toLocaleTimeString()}</span>
-                            </div>
-                        `;
+                            <div style="margin-top: 30px;"><span style="color: #ef4444; font-weight: bold; font-size: 1.2em;">${now.toLocaleTimeString()}</span></div>`;
                         document.body.appendChild(lockScreen);
                     } else {
                         const timeSpan = lockScreen.querySelector('div span');
@@ -7735,7 +7741,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 } else {
                     if (lockScreen) lockScreen.remove();
                 }
-
             }, 1000);
 
             // --- Service Worker ---
@@ -7752,33 +7757,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     })
                     .catch(console.error);
                 }
-            }
-
-            document.body.classList.add('dark-mode');
-
-            // --- PWA Banner ---
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                const installBanner = document.getElementById('install-banner');
-                if (installBanner) installBanner.style.display = 'block';
-            });
-            const installBtn = document.getElementById('install-btn');
-            if (installBtn) {
-                installBtn.addEventListener('click', async () => {
-                    if (deferredPrompt) {
-                        deferredPrompt.prompt();
-                        const { outcome } = await deferredPrompt.userChoice;
-                        if (outcome === 'accepted') deferredPrompt = null;
-                        document.getElementById('install-banner').style.display = 'none';
-                    }
-                });
-            }
-            const closeInstallBanner = document.getElementById('close-install-banner');
-            if (closeInstallBanner) {
-                closeInstallBanner.addEventListener('click', () => {
-                    document.getElementById('install-banner').style.display = 'none';
-                });
             }
 
             // --- Auth State ---
@@ -7848,3 +7826,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
