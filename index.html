@@ -2411,7 +2411,7 @@ async function showRefinanceModal(clientId, notificationId) {
     
 
         // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura")
-        async function generateInvoicePDF(clientData, payment) {
+         async function generateInvoicePDF(clientData, payment) {
             try {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ unit: 'mm', format: [80, 230] }); 
@@ -2424,12 +2424,11 @@ async function showRefinanceModal(clientId, notificationId) {
                     activeLoan = realClient.loans.find(l => l.history && l.history.some(h => 
                         h === payment || (h.amount === payment.amount && h.date?.seconds === payment.date?.seconds)
                     ));
-                    // Si no se encuentra por referencia exacta, fallback al último activo o el último de la lista
                     if (!activeLoan) activeLoan = realClient.loans.find(l => l.status !== 'finished');
                     if (!activeLoan && realClient.loans.length > 0) activeLoan = realClient.loans[realClient.loans.length - 1];
                 }
 
-                // --- CÁLCULOS FINANCIEROS (IGUAL QUE TICKET) ---
+                // --- CÁLCULOS FINANCIEROS ---
                 let totalLoanVal = 0;
                 let totalPaidVal = 0;
                 let remainingBalance = 0;
@@ -2461,7 +2460,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     if (installmentValue > 0) paidInstallments = Math.floor(totalPaidVal / installmentValue);
                     if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
 
-                    // Cálculo Pico
                     if (installmentValue > 0 && totalPaidVal > 0) {
                         const remainder = totalPaidVal % installmentValue;
                         if (remainder > 0.05 && (installmentValue - remainder) > 0.05) {
@@ -2470,7 +2468,7 @@ async function showRefinanceModal(clientId, notificationId) {
                     }
                 }
 
-                // --- FECHAS DE CONTRATO ---
+                // --- TEXTOS E IDIOMA ---
                 const isEs = currentLang === 'es';
                 const isEn = currentLang === 'en'; 
                 const localeCode = isEs ? 'es-ES' : (isEn ? 'en-US' : 'pt-BR');
@@ -2487,7 +2485,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     if (startD && !isNaN(startD.getTime())) {
                         startDateStr = startD.toLocaleDateString(localeCode);
                         if (totalInstallments > 0) {
-                            // Lógica de estimación de fin (Mismo algoritmo que el Ticket)
                             if (statusDetails.status === 'finished' && activeLoan.history && activeLoan.history.length > 0) {
                                 const lastPayment = activeLoan.history[activeLoan.history.length - 1];
                                 let endD = null;
@@ -2529,7 +2526,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     }
                 }
 
-                // --- DATOS DEL PAGO ESPECÍFICO ---
                 let paymentDateStr = "N/A";
                 if(payment.date) {
                     let d = payment.date.seconds ? new Date(payment.date.seconds * 1000) : (payment.date instanceof Date ? payment.date : new Date(payment.date));
@@ -2537,26 +2533,10 @@ async function showRefinanceModal(clientId, notificationId) {
                 }
 
                 let methodText = '---';
-                if (payment.method === 'dinheiro') {
-                    if (isEs) methodText = 'Efectivo';
-                    else if (isEn) methodText = 'Cash';
-                    else methodText = 'Dinheiro';
-                }
-                else if (payment.method === 'pix') {
-                    if (isEs) methodText = 'Pago Electrónico';
-                    else if (isEn) methodText = 'Electronic Payment';
-                    else methodText = 'PIX';
-                }
-                else if (payment.method === 'cartao') {
-                    if (isEs) methodText = 'Tarjeta';
-                    else if (isEn) methodText = 'Card';
-                    else methodText = 'Cartão';
-                }
-                else if (payment.method === 'migration') {
-                    if (isEs) methodText = 'Migración';
-                    else if (isEn) methodText = 'Migration';
-                    else methodText = 'Migração';
-                }
+                if (payment.method === 'dinheiro') methodText = isEs ? 'Efectivo' : (isEn ? 'Cash' : 'Dinheiro');
+                else if (payment.method === 'pix') methodText = isEs ? 'Pago Electrónico' : (isEn ? 'Electronic Payment' : 'PIX');
+                else if (payment.method === 'cartao') methodText = isEs ? 'Tarjeta' : (isEn ? 'Card' : 'Cartão');
+                else if (payment.method === 'migration') methodText = isEs ? 'Migración' : (isEn ? 'Migration' : 'Migração');
 
                 const freqMap = { 
                     'daily': isEs ? 'DIARIO' : (isEn ? 'DAILY' : 'DIÁRIO'), 
@@ -2566,31 +2546,24 @@ async function showRefinanceModal(clientId, notificationId) {
                 };
                 const modalidade = activeLoan ? (freqMap[activeLoan.paymentFrequency] || (isEn ? 'DAILY' : 'DIÁRIO')) : '---';
 
-                // --- TEXTOS ---
                 const texts = {
                     title: isEs ? "RECIBO DE PAGO" : (isEn ? "PAYMENT RECEIPT" : "RECIBO DE PAGAMENTO"),
                     company: currentCompanyData?.name || "LUMIX Finanças",
                     client: isEs ? "Cliente:" : (isEn ? "Client:" : "Cliente:"),
                     frequency: isEs ? "Modalidad:" : (isEn ? "Frequency:" : "Frequência:"),
-                    
                     contract_title: isEs ? "FECHAS DEL CONTRATO" : (isEn ? "CONTRACT DATES" : "DATAS DO CONTRATO"),
                     start_label: isEs ? "Inicio" : (isEn ? "Start" : "Início"),
                     end_label: isEs ? "Fin" : (isEn ? "End" : "Fim"),
-                    
                     progress: isEs ? "Cuotas Pagadas:" : (isEn ? "Paid Installments:" : "Parcelas Pagas:"), 
                     paid_msg: `${paidInstallments} / ${totalInstallments}`,
-                    
                     loan_total: isEs ? "Total Préstamo:" : (isEn ? "Total Loan:" : "Total Empréstimo:"),
                     late_fees: isEs ? "Multas/Mora:" : (isEn ? "Fees/Interest:" : "Multas/Juros:"),
                     total_paid: isEs ? "Total Pagado:" : (isEn ? "Total Paid:" : "Total Pago:"),
                     to_pay: isEs ? "RESTA POR PAGAR:" : (isEn ? "REMAINING BALANCE:" : "RESTA A PAGAR:"),
                     pico_label: isEs ? "Valor Pico:" : (isEn ? "Partial Balance:" : "Valor Picado:"),
-                    
                     method_label: isEs ? "Método de Pago:" : (isEn ? "Payment Method:" : "Método de Pagamento:"),
                     payment_date_label: isEs ? "Fecha Pago:" : (isEn ? "Payment Date:" : "Data Pagto:"),
-                    
                     val_paid_now: isEs ? "VALOR PAGADO" : (isEn ? "AMOUNT PAID" : "VALOR PAGO"),
-                    
                     footer: isEs ? "Generado por LUMIX Finanzas" : (isEn ? "Generated by LUMIX Finance" : "Gerado por LUMIX Finanças"),
                     signature: isEs ? "Firma del Recibidor" : (isEn ? "Receiver Signature" : "Assinatura do Recebedor")
                 };
@@ -2606,19 +2579,16 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setTextColor(111, 66, 193); // Morado oscuro
                 doc.setFontSize(14); doc.setFont(undefined, 'bold');
                 doc.text(texts.company, centerX, y, { align: 'center' });
-                
                 y += 7;
                 doc.setTextColor(50); 
                 doc.setFontSize(10); doc.setFont(undefined, 'normal');
                 doc.text(texts.title, centerX, y, { align: 'center' });
-                
                 y += 15; 
 
-                // --- 2. FECHAS DE CONTRATO (ARRIBA, EN CAJA - CENTRADAS) ---
+                // --- 2. FECHAS DE CONTRATO (CENTRADAS) ---
                 doc.setFillColor(250, 250, 250); 
                 doc.setDrawColor(230); 
                 doc.roundedRect(5, y, 70, 14, 2, 2, 'FD');
-                
                 doc.setFontSize(8); doc.setTextColor(111, 66, 193); doc.setFont(undefined, 'bold');
                 doc.text(texts.contract_title, centerX, y + 4, { align: 'center' });
                 
@@ -2629,14 +2599,12 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(9); doc.setTextColor(0); doc.setFont(undefined, 'bold');
                 doc.text(startDateStr, 22.5, y + 12, { align: 'center' }); 
                 doc.text(endDateStr, 57.5, y + 12, { align: 'center' }); 
-
                 y += 20;
 
-                // --- 3. CLIENTE Y FRECUENCIA (CENTRADOS) ---
+                // --- 3. CLIENTE Y FRECUENCIA ---
                 doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
                 doc.text(texts.client, centerX, y, { align: 'center' });
                 y += 4;
-                
                 doc.setFontSize(12); doc.setTextColor(0); doc.setFont(undefined, 'bold');
                 const splitName = doc.splitTextToSize(realClient.name, 70);
                 doc.text(splitName, centerX, y, { align: 'center' });
@@ -2645,12 +2613,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
                 doc.text(texts.frequency, centerX, y, { align: 'center' });
                 y += 4;
-                
                 doc.setFontSize(11); doc.setTextColor(0); doc.setFont(undefined, 'bold');
                 doc.text(modalidade, centerX, y, { align: 'center' });
                 y += 8;
 
-                // --- 4. BARRA DE PROGRESO ---
+                // --- 4. BARRA PROGRESO ---
                 doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text(texts.progress, 5, y);
                 doc.text(texts.paid_msg, 75, y, { align: 'right' });
                 y += 4;
@@ -2666,37 +2633,30 @@ async function showRefinanceModal(clientId, notificationId) {
                     doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
                     y += 6;
                 };
-                
                 doc.setFontSize(10);
                 addRow(texts.loan_total, totalLoanVal);
-                
                 if (picoValue > 0) addRow(texts.pico_label, picoValue, '#fb923c');
                 if (lateFeesVal > 0) addRow(texts.late_fees, lateFeesVal, '#dc3545');
-                
                 addRow(texts.total_paid, totalPaidVal, '#28a745');
                 addRow(texts.to_pay, remainingBalance, '#d97706', true); 
                 
-                // FECHA DEL PAGO (Específico de la Factura)
                 doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
                 doc.text(texts.payment_date_label, 5, y);
                 doc.text(paymentDateStr, 75, y, { align: 'right' });
                 y += 6;
 
-                // MÉTODO DE PAGO
                 doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
                 doc.text(texts.method_label, 5, y); 
                 if (methodText.length > 10) doc.setFontSize(8); 
                 doc.text(methodText.toUpperCase(), 75, y, { align: 'right' });
                 doc.setFontSize(10); 
                 y += 6;
-
                 y += 4;
                 
-                // --- CAJA GRANDE (VALOR DE ESTE PAGO) ---
+                // --- CAJA GRANDE ---
                 doc.setFillColor(245, 245, 245); doc.rect(5, y - 4, 70, 14, 'F');
                 doc.setFont(undefined, 'bold'); doc.setTextColor(0);
                 doc.text(texts.val_paid_now, centerX, y + 1, { align: 'center' }); 
-                
                 doc.setFontSize(14); doc.setTextColor('#28a745');
                 doc.text(money(payment.amount), centerX, y + 7, { align: 'center' }); 
                 y += 18;
@@ -2706,17 +2666,40 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.line(15, y, 65, y); y += 4;
                 doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
                 doc.text(texts.signature, centerX, y, { align: 'center' });
-                
                 y += 8;
                 doc.text(texts.footer, centerX, y, { align: 'center' });
 
                 const fileName = `fatura_${realClient.name.replace(/\s/g, '_')}.pdf`;
-                doc.save(fileName);
-                showToast(isEs ? "Fatura descargada." : "Fatura baixada.");
+                
+                // === LÓGICA DE COMPARTIR DIRECTO (WEB SHARE API) ===
+                const pdfBlob = doc.output('blob');
+                const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+                // Verificamos si el navegador soporta compartir archivos
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                    const shareTitle = isEs ? `Recibo - ${realClient.name}` : `Recibo - ${realClient.name}`;
+                    const shareText = isEs ? `Hola ${realClient.name}, aquí tienes tu recibo de pago.` : `Olá ${realClient.name}, segue seu comprovante de pagamento.`;
+                    
+                    await navigator.share({
+                        files: [pdfFile],
+                        title: shareTitle,
+                        text: shareText
+                    });
+                    
+                    // Si se comparte exitosamente, mostramos un mensaje breve
+                    console.log('Recibo compartido exitosamente');
+                } else {
+                    // Fallback: Si no soporta compartir (ej. PC de escritorio), descarga el archivo
+                    doc.save(fileName);
+                    showToast(isEs ? "Recibo descargado (Compartir no soportado)." : "Recibo baixado.");
+                }
                 
             } catch (error) {
-                console.error("Erro fatura:", error);
-                showToast("Erro ao gerar fatura.", true);
+                // Si el usuario cancela el compartir, puede dar error, lo ignoramos si es AbortError
+                if (error.name !== 'AbortError') {
+                    console.error("Erro fatura:", error);
+                    showToast("Erro ao gerar/compartilhar fatura.", true);
+                }
             }
         }
 
@@ -8318,3 +8301,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
