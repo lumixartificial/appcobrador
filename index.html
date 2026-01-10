@@ -982,10 +982,49 @@ const BLACKLIST_DATA = {
                 microInsuranceLabel: 'Micro Seguro (A Descontar)'
             },
             en: { 
-                // ... (No es crítico si no usas inglés, pero lo dejo por si acaso)
-                noClientsFound: 'No clients found.', 
+                noClientsFound: 'No clients found.',
+                biweekly: 'BIWEEKLY', registerOutflow: 'Register New Outflow', addExpenseOption: 'Add Expense', expenseOptionDesc: 'Register fuel, food, etc.', cashWithdrawal: 'Cash Withdrawal', withdrawalOptionDesc: 'Send money delivered to admin.', amountDeliveredAdmin: 'Amount delivered to Admin:', sendForApproval: 'Send for Approval',
+                postponePayment: 'Postpone Payment', postponeConfirmTitle: 'Confirm Postponement', postponeConfirmMsg: 'This will move the client due date by one business day, without generating a delay. Do you wish to continue?', confirm: 'Confirm', paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments on time for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', clientsRemaining: 'Remaining Clients', 
+                todaysRoute: 'Collection Route (Active)', 
+                navHome: 'Route', 
+                navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital in Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report (PDF)', logout: 'Logout', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: 'No. of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', 
+                
                 navExpenses: 'Expenses<br>Withdrawals', 
-                // ...
+
+                myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', uploadReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use these data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created successfully.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinance of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Data', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', dayOfWeek: 'Day of Week', dayOfMonth: 'Day of Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching in system...', clientClean: 'Client Clean', clientCleanMsg: 'No other active loans found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinance Approved', refinanceApprovedClientBody: 'Your refinance request has been approved successfully.', refinanceRejectedClientTitle: 'Refinance Rejected', refinanceRejectedClientBody: 'Your refinance request has been rejected.', realtimeTracking: 'Real-time Tracking', 
+                paymentTitle: 'Payment Installment #{start}', 
+                paymentTitleRange: 'Payment Installments #{start} - #{end}', 
+                paymentDescFull: 'Installment #{start} paid in full.', 
+                paymentDescPartial: 'Partial payment ({percent}%) of the installment.', 
+                paymentDescMultiple: 'Covers {fullInstallments} installment(s) and {percent}% of the next.', 
+                paymentDescOverpay: 'Covers installment #{start} and advances {overpayAmount} for the next.',
+                paymentInstallmentTitle: 'Payment Installment #{installment}',
+                paymentInstallmentsTitle: 'Payment Installments #{start} - #{end}',
+                fullPaymentDesc: 'Installment #{installment} paid fully.',
+                partialPaymentDesc: 'Partial payment ({percent}%) of the installment.',
+                multiplePaymentDesc: 'Covers {count} installment(s) and {percent}% of the next.',
+                multipleFullPaymentDesc: 'Covers {count} installment(s) fully.',
+                emailLogin: 'Email (Login)',
+                username: 'Username (Login)',
+                collectorOnTheWayTitle: 'Collector on the way!', collectorOnTheWayBody: 'Our collector is on the way and will arrive in a few minutes.', paymentSettings: 'Payment Settings', currency: 'Operation Currency', paymentMethods: 'Payment Methods', 
+                save: 'Save',
+                statusPaidToday: 'PAID TODAY',
+                statusToPay: 'TO PAY',
+                statusPending: 'PENDING',
+                adminApprovedRefinance: 'Admin approved the request of',
+                approveToCreate: 'Approve to create the new loan.',
+                settlementHistory: 'Settlement History',
+                noExpenses: 'No expenses found.',
+                noSettlements: 'No settlements found.',
+                loadingSettlements: 'Loading settlements...',
+                totalAssets: 'Total Capital (Assets)',
+                distributedCapital: 'Distributed Capital',
+                routeLabel: 'Route:',
+                methodDigitalLabel: 'Electronic Payment',
+                methodCardLabel: 'Card',
+                salary: 'Salary',
+                routeProgress: 'Route Progress',
+                microInsuranceLabel: 'Micro Insurance (To Deduct)'
             }
         };
         let mapInstance = null;
@@ -1882,9 +1921,6 @@ async function showRefinanceModal(clientId, notificationId) {
             }
         }    
 
-             // --- [BLOQUE DE RECIBOS: SOLO DESCARGA (DISEÑO AJUSTADO)] ---
-
-        // 1. GENERAR ESTADO DE CUENTA (Botón "Enviar Comprovante")
         async function generateStatusReceiptPDF(clientId, loanIndex) {
             try {
                 const { jsPDF } = window.jspdf;
@@ -1930,29 +1966,84 @@ async function showRefinanceModal(clientId, notificationId) {
                     return sum;
                 }, 0);
 
+                // --- CÁLCULO: VALOR PICO (PICADO) ---
+                let picoValue = 0;
+                if (installmentValue > 0 && totalPaid > 0) {
+                    const remainder = totalPaid % installmentValue;
+                    if (remainder > 0.05 && (installmentValue - remainder) > 0.05) {
+                        picoValue = remainder;
+                    }
+                }
+
+                // --- DETECCIÓN DE IDIOMA ---
                 const isEs = currentLang === 'es';
+                const isEn = currentLang === 'en'; // Detectar Inglés
+                
+                // --- OBTENER ÚLTIMO MÉTODO DE PAGO (TRADUCIDO A 3 IDIOMAS) ---
+                let lastMethodText = "---";
+                if (loan.history && loan.history.length > 0) {
+                    const validPayments = loan.history.filter(h => h.status === 'approved' || h.method === 'migration');
+                    if (validPayments.length > 0) {
+                        const lastPay = validPayments[validPayments.length - 1];
+                        
+                        if (lastPay.method === 'dinheiro') {
+                            if (isEs) lastMethodText = 'Efectivo';
+                            else if (isEn) lastMethodText = 'Cash';
+                            else lastMethodText = 'Dinheiro';
+                        }
+                        else if (lastPay.method === 'pix') {
+                            if (isEs) lastMethodText = 'Pago Electrónico';
+                            else if (isEn) lastMethodText = 'Electronic Payment';
+                            else lastMethodText = 'PIX';
+                        }
+                        else if (lastPay.method === 'cartao') {
+                            if (isEs) lastMethodText = 'Tarjeta';
+                            else if (isEn) lastMethodText = 'Card';
+                            else lastMethodText = 'Cartão';
+                        }
+                        else if (lastPay.method === 'migration') {
+                            if (isEs) lastMethodText = 'Migración';
+                            else if (isEn) lastMethodText = 'Migration';
+                            else lastMethodText = 'Migração';
+                        }
+                    }
+                }
+
+                // --- TEXTOS DEL PDF (3 IDIOMAS) ---
                 const texts = {
-                    title: isEs ? "ESTADO DE CUENTA" : "EXTRATO DO EMPRÉSTIMO",
+                    title: isEs ? "ESTADO DE CUENTA" : (isEn ? "LOAN STATEMENT" : "EXTRATO DO EMPRÉSTIMO"),
                     company: currentCompanyData?.name || "LUMIX Finanças",
-                    date: isEs ? "Fecha:" : "Data:",
-                    client: isEs ? "Cliente:" : "Cliente:",
-                    frequency: isEs ? "Modalidad:" : "Frequência:",
-                    progress: isEs ? "Cuotas Pagadas:" : "Parcelas Pagas:", 
+                    date: isEs ? "Fecha:" : (isEn ? "Date:" : "Data:"),
+                    client: isEs ? "Cliente:" : (isEn ? "Client:" : "Cliente:"),
+                    frequency: isEs ? "Modalidad:" : (isEn ? "Frequency:" : "Frequência:"),
+                    progress: isEs ? "Cuotas Pagadas:" : (isEn ? "Paid Installments:" : "Parcelas Pagas:"), 
                     paid_msg: `${paidInstallments} / ${totalInstallments}`,
-                    loan_total: isEs ? "Total Préstamo:" : "Total Empréstimo:",
-                    late_fees: isEs ? "Multas/Mora:" : "Multas/Juros:",
-                    total_paid: isEs ? "Total Pagado:" : "Total Pago:",
-                    to_pay: isEs ? "RESTA POR PAGAR:" : "RESTA A PAGAR:", // Movido a la lista
-                    val_installment: isEs ? "VALOR CUOTA" : "VALOR PARCELA",
-                    val_paid_today: isEs ? "PAGADO HOY" : "PAGO HOJE",
-                    footer: isEs ? "Generado por LUMIX Finanzas" : "Gerado por LUMIX Finanças",
-                    late: isEs ? "ATRASADO" : "ATRASADO",
-                    up_to_date: isEs ? "AL DÍA" : "EM DIA",
-                    finished: isEs ? "FINALIZADO" : "FINALIZADO"
+                    loan_total: isEs ? "Total Préstamo:" : (isEn ? "Total Loan:" : "Total Empréstimo:"),
+                    late_fees: isEs ? "Multas/Mora:" : (isEn ? "Fees/Interest:" : "Multas/Juros:"),
+                    total_paid: isEs ? "Total Pagado:" : (isEn ? "Total Paid:" : "Total Pago:"),
+                    to_pay: isEs ? "RESTA POR PAGAR:" : (isEn ? "REMAINING BALANCE:" : "RESTA A PAGAR:"),
+                    pico_label: isEs ? "Valor Pico:" : (isEn ? "Partial Balance:" : "Valor Picado:"),
+                    method_label: isEs ? "Método de Pago:" : (isEn ? "Payment Method:" : "Método de Pagamento:"),
+                    
+                    val_installment: isEs ? "VALOR CUOTA" : (isEn ? "INSTALLMENT VALUE" : "VALOR PARCELA"),
+                    val_paid_today: isEs ? "PAGADO HOY" : (isEn ? "PAID TODAY" : "PAGO HOJE"),
+                    footer: isEs ? "Generado por LUMIX Finanzas" : (isEn ? "Generated by LUMIX Finance" : "Gerado por LUMIX Finanças"),
+                    late: isEs ? "ATRASADO" : (isEn ? "LATE" : "ATRASADO"),
+                    up_to_date: isEs ? "AL DÍA" : (isEn ? "UP TO DATE" : "EM DIA"),
+                    finished: isEs ? "FINALIZADO" : (isEn ? "FINISHED" : "FINALIZADO")
                 };
 
-                const freqMap = { 'daily': isEs?'DIARIO':'DIÁRIO', 'weekly': isEs?'SEMANAL':'SEMANAL', 'biweekly': isEs?'QUINCENAL':'QUINZENAL', 'monthly': isEs?'MENSUAL':'MENSAL' };
-                const modalidade = freqMap[loan.paymentFrequency] || 'DIÁRIO';
+                const freqMap = { 
+                    'daily': isEs ? 'DIARIO' : (isEn ? 'DAILY' : 'DIÁRIO'), 
+                    'weekly': isEs ? 'SEMANAL' : (isEn ? 'WEEKLY' : 'SEMANAL'), 
+                    'biweekly': isEs ? 'QUINCENAL' : (isEn ? 'BIWEEKLY' : 'QUINZENAL'), 
+                    'monthly': isEs ? 'MENSUAL' : (isEn ? 'MONTHLY' : 'MENSAL') 
+                };
+                const modalidade = freqMap[loan.paymentFrequency] || (isEn ? 'DAILY' : 'DIÁRIO');
+
+                // Formato de fecha según idioma
+                const locale = isEs ? 'es-ES' : (isEn ? 'en-US' : 'pt-BR');
+                const todayStr = new Date().toLocaleDateString(locale);
 
                 let y = 10;
                 const centerX = 40;
@@ -1967,7 +2058,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 doc.setFontSize(9);
                 doc.setFont(undefined, 'bold'); doc.text(texts.date, 5, y);
-                doc.setFont(undefined, 'normal'); doc.text(new Date().toLocaleDateString('pt-BR'), 75, y, { align: 'right' });
+                doc.setFont(undefined, 'normal'); doc.text(todayStr, 75, y, { align: 'right' });
                 y += 5;
                 doc.setFont(undefined, 'bold'); doc.text(texts.client, 5, y);
                 y += 4;
@@ -1989,7 +2080,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFillColor(111, 66, 193); doc.rect(5, y, barWidth * progressPct, 6, 'F');
                 y += 10; doc.setLineWidth(0.2); doc.setDrawColor(200); doc.line(5, y, 75, y); y += 6;
 
-                // --- TABLA FINANCIERA (MODIFICADA) ---
+                // --- TABLA FINANCIERA ---
                 const addRow = (label, value, color='#000000', bold=false) => {
                     doc.setFont(undefined, bold ? 'bold' : 'normal'); doc.setTextColor(color);
                     doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
@@ -1999,43 +2090,63 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setFontSize(10);
                 // 1. Total Préstamo
                 addRow(texts.loan_total, loan.totalLoan);
-                // 2. Mora (si hay)
+                
+                // 2. Valor Pico
+                if (picoValue > 0) {
+                    addRow(texts.pico_label, picoValue, '#fb923c'); // Naranja
+                }
+
+                // 3. Mora
                 if (details.lateFeesAccumulated > 0) addRow(texts.late_fees, details.lateFeesAccumulated, '#dc3545');
-                // 3. Total Pagado
+                
+                // 4. Total Pagado
                 addRow(texts.total_paid, totalPaid, '#28a745');
                 
-                // 4. Resta por Pagar (MOVIDO AQUÍ, en la lista)
-                addRow(texts.to_pay, remainingBalance, '#d97706', true); // Naranja/Negrita
+                // 5. Resta por Pagar
+                addRow(texts.to_pay, remainingBalance, '#d97706', true); 
                 
+                // 6. Método de Pago (AJUSTADO PARA QUE NO SE VEA GIGANTE)
+                doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
+                doc.text(texts.method_label, 5, y); 
+                
+                // -- LÓGICA DE TAMAÑO: Si el texto es largo (> 10 caracteres), reduce la letra a 8pt --
+                if (lastMethodText.length > 10) {
+                    doc.setFontSize(8); 
+                }
+                
+                doc.text(lastMethodText.toUpperCase(), 75, y, { align: 'right' });
+                
+                doc.setFontSize(10); // Restaurar tamaño normal para lo que siga
+                y += 6;
+
                 y += 4;
                 
-                // --- CAJA GRANDE (LO QUE PAGÓ HOY o VALOR CUOTA) ---
+                // --- CAJA GRANDE ---
                 const showPaidToday = paidToday > 0;
                 const bigBoxValue = showPaidToday ? paidToday : installmentValue;
                 const bigBoxLabel = showPaidToday ? texts.val_paid_today : texts.val_installment;
-                const bigBoxColor = showPaidToday ? '#28a745' : '#6f42c1'; // Verde si pagó, Morado si es informativo
+                const bigBoxColor = showPaidToday ? '#28a745' : '#6f42c1'; 
 
                 doc.setFillColor(245, 245, 245); doc.rect(5, y - 4, 70, 14, 'F');
                 doc.setFont(undefined, 'bold'); doc.setTextColor(0);
-                doc.text(bigBoxLabel, centerX, y + 1, { align: 'center' }); // Etiqueta (Ej: PAGO HOJE)
+                doc.text(bigBoxLabel, centerX, y + 1, { align: 'center' }); 
                 
                 doc.setFontSize(14); doc.setTextColor(bigBoxColor);
-                doc.text(money(bigBoxValue), centerX, y + 7, { align: 'center' }); // Valor
+                doc.text(money(bigBoxValue), centerX, y + 7, { align: 'center' }); 
                 y += 18;
 
                 // Estado
                 let statusColor = '#28a745'; 
                 let statusText = texts.up_to_date; 
                 let bgColor = '#d4edda';
-                let subStatusText = ''; // Variable para los días
+                let subStatusText = ''; 
 
                 if (details.status === 'late') { 
                     statusColor = '#721c24'; 
                     statusText = texts.late; 
                     bgColor = '#f8d7da'; 
                     
-                    // Lógica para mostrar días
-                    const daysLabel = currentLang === 'es' ? 'Días' : (currentLang === 'en' ? 'Days' : 'Dias');
+                    const daysLabel = isEs ? 'Días' : (isEn ? 'Days' : 'Dias');
                     subStatusText = `(${details.lateDays} ${daysLabel})`;
                 }
                 else if (details.status === 'finished') { 
@@ -2044,7 +2155,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     bgColor = '#cce5ff'; 
                 }
 
-                // Ajustamos la altura de la caja si hay subtítulo (días)
                 const boxHeight = subStatusText ? 16 : 12;
 
                 doc.setDrawColor(statusColor); 
@@ -2056,12 +2166,10 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.setTextColor(statusColor);
 
                 if (subStatusText) {
-                    // Si hay atraso, imprimimos en dos líneas
-                    doc.text(statusText, centerX, y + 6, { align: 'center' }); // ATRASADO
-                    doc.setFontSize(10); // Un poco más pequeño para los días
-                    doc.text(subStatusText, centerX, y + 12, { align: 'center' }); // (X Dias)
+                    doc.text(statusText, centerX, y + 6, { align: 'center' }); 
+                    doc.setFontSize(10); 
+                    doc.text(subStatusText, centerX, y + 12, { align: 'center' }); 
                 } else {
-                    // Si es normal, centrado simple
                     doc.text(statusText, centerX, y + 8, { align: 'center' });
                 }
                 
@@ -2072,13 +2180,20 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 const fileName = `extrato_${client.name.replace(/\s/g, '_')}.pdf`;
                 doc.save(fileName);
-                showToast(isEs ? "Recibo descargado." : "Recibo baixado.");
+                
+                let successMsg = "Recibo baixado.";
+                if (isEs) successMsg = "Recibo descargado.";
+                if (isEn) successMsg = "Receipt downloaded.";
+                showToast(successMsg);
 
             } catch (err) {
                 console.error("Erro PDF:", err);
                 showToast("Erro ao gerar extrato.", true);
             }
         }
+
+    
+    
 
         // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura")
         async function generateInvoicePDF(clientData, payment) {
@@ -3641,8 +3756,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             }
 
             const labels = {
-                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor de Pico (Pago Parcial)', contractDateTitle: 'Datas do Contrato' },
-                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor de Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato' },
+                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato' },
+                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato' },
                 en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates' }
             };
             const l = labels[currentLang] || labels.pt;
@@ -7834,3 +7949,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
