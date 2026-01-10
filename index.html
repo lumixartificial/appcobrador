@@ -1722,7 +1722,7 @@ async function showRefinanceModal(clientId, notificationId) {
 
 // Fin del bloque para pegar
 
-    function showPaymentDetailModal(clientId, loanIndex, historyIndex) {
+     function showPaymentDetailModal(clientId, loanIndex, historyIndex) {
             const modal = document.getElementById('paymentDetailModal');
             const client = allClients.find(c => c.id === clientId);
             
@@ -1735,107 +1735,229 @@ async function showRefinanceModal(clientId, notificationId) {
                 return;
             }
             
-            // --- 1. NORMALIZACIÓN DE FECHAS (La corrección clave) ---
-            // Convertimos la fecha del pago a un objeto Date estándar, venga de donde venga
+            // --- 1. NORMALIZACIÓN DE FECHAS ---
             let paymentDateObj = null;
             if (payment.date?.seconds) {
-                paymentDateObj = new Date(payment.date.seconds * 1000); // Es Timestamp de Firestore
+                paymentDateObj = new Date(payment.date.seconds * 1000);
             } else if (payment.date instanceof Date) {
-                paymentDateObj = payment.date; // Es fecha local (recién creado)
+                paymentDateObj = payment.date;
             } else {
-                paymentDateObj = new Date(payment.date); // Intento de fallback
+                paymentDateObj = new Date(payment.date);
             }
 
-            const dateStr = paymentDateObj.toLocaleDateString('pt-BR');
-            const timeStr = paymentDateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            // --- DETECCIÓN DE IDIOMA LOCAL ---
+            const isEs = currentLang === 'es';
+            const isEn = currentLang === 'en';
+            const locale = isEs ? 'es-ES' : (isEn ? 'en-US' : 'pt-BR');
+
+            const dateStr = paymentDateObj.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timeStr = paymentDateObj.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
             
-            // --- 2. LÓGICA DE EXCLUSIÓN ROBUSTA ---
+            // --- 2. CÁLCULO DE FECHAS DE CONTRATO (Igual que en el PDF) ---
+            let startDateStr = '--/--';
+            let endDateStr = '--/--';
+            const totalInstallmentsStr = (loan.installments || "0/0").split('/')[1];
+            const totalInstallments = parseInt(totalInstallmentsStr, 10) || 0;
+
+            if (loan.startDate) {
+                let startD = null;
+                if (loan.startDate.seconds) startD = new Date(loan.startDate.seconds * 1000);
+                else if (loan.startDate instanceof Date) startD = loan.startDate;
+                else startD = new Date(loan.startDate);
+
+                if (startD && !isNaN(startD.getTime())) {
+                    startDateStr = startD.toLocaleDateString(locale);
+
+                    if (totalInstallments > 0) {
+                        const details = calculateLoanDetails(loan);
+                        if (details.status === 'finished' && loan.history && loan.history.length > 0) {
+                            const lastPayment = loan.history[loan.history.length - 1];
+                            let endD = null;
+                            if (lastPayment.date?.seconds) endD = new Date(lastPayment.date.seconds * 1000);
+                            else if (lastPayment.date instanceof Date) endD = lastPayment.date;
+                            if (endD) endDateStr = endD.toLocaleDateString(locale);
+                        } else {
+                            let count = 0;
+                            let currentD = new Date(startD);
+                            currentD.setDate(currentD.getDate() + 1); 
+                            let safetyLoop = 0;
+                            while (count < totalInstallments && safetyLoop < 2000) { 
+                                const dayW = currentD.getDay();
+                                const dayM = currentD.getDate();
+                                const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
+                                const isHol = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(fDate) : false;
+                                let isPayDay = false;
+                                const freq = loan.paymentFrequency || 'daily';
+                                const pDays = loan.paymentDays || [];
+                                if (!isHol) {
+                                    if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
+                                    else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                    else if (freq === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                    else if (freq === 'biweekly') {
+                                        if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
+                                            const diffT = Math.abs(currentD - startD);
+                                            const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
+                                            if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
+                                        }
+                                    }
+                                }
+                                if (isPayDay) count++;
+                                if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
+                                safetyLoop++;
+                            }
+                            endDateStr = currentD.toLocaleDateString(locale);
+                        }
+                    }
+                }
+            }
+
+            // --- 3. TEXTOS DINÁMICOS ---
+            const txt = {
+                title: isEs ? 'Detalles del Pago' : (isEn ? 'Payment Details' : 'Detalhes do Pagamento'),
+                client: isEs ? 'Cliente' : (isEn ? 'Client' : 'Cliente'),
+                contractDates: isEs ? 'Fechas del Contrato' : (isEn ? 'Contract Dates' : 'Datas do Contrato'),
+                start: isEs ? 'Inicio' : (isEn ? 'Start' : 'Início'),
+                end: isEs ? 'Fin' : (isEn ? 'End' : 'Fim'),
+                paidAmount: isEs ? 'Valor Pagado' : (isEn ? 'Paid Amount' : 'Valor Pago'),
+                method: isEs ? 'Método' : (isEn ? 'Method' : 'Método'),
+                receipt: isEs ? 'Comprobante' : (isEn ? 'Receipt' : 'Comprovante'),
+                download: isEs ? 'Descargar' : (isEn ? 'Download' : 'Baixar'),
+                sendReceipt: isEs ? 'Enviar Recibo' : (isEn ? 'Send Receipt' : 'Enviar Recibo'), // Texto Nuevo
+                delete: isEs ? 'Eliminar Pago' : (isEn ? 'Delete Payment' : 'Excluir Pagamento'),
+                methodCash: isEs ? 'Efectivo' : (isEn ? 'Cash' : 'Dinheiro'),
+                methodPix: isEs ? 'Pago Electrónico' : (isEn ? 'Electronic' : 'PIX'),
+                methodCard: isEs ? 'Tarjeta' : (isEn ? 'Card' : 'Cartão'),
+                noReceipt: isEs ? 'Sin comprobante adjunto.' : (isEn ? 'No receipt attached.' : 'Nenhum comprovante anexado.')
+            };
+
+            let methodLabel = txt.methodCash;
+            let methodIcon = 'banknote';
+            if (payment.method === 'pix') { methodLabel = txt.methodPix; methodIcon = 'smartphone'; }
+            else if (payment.method === 'cartao') { methodLabel = txt.methodCard; methodIcon = 'credit-card'; }
+            else if (payment.method === 'migration') { methodLabel = 'Migração'; methodIcon = 'arrow-right-circle'; }
+
+            // --- 4. LÓGICA DE EXCLUSIÓN ROBUSTA (INTACTA) ---
             let canDelete = false;
-            let deleteTitle = "Exclusão não permitida";
-            
-            // Obtenemos fecha de hoy sin hora para comparar
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const paymentDay = new Date(paymentDateObj);
-            paymentDay.setHours(0, 0, 0, 0);
-
-            // A. ¿Es el pago de HOY?
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const paymentDay = new Date(paymentDateObj); paymentDay.setHours(0, 0, 0, 0);
             const isToday = paymentDay.getTime() === today.getTime();
-
-            // B. ¿Es el ÚLTIMO pago registrado? (Para no romper la matemática)
-            // Ordenamos el historial temporalmente para verificar
+            
             const sortedHistory = [...loan.history].sort((a, b) => {
                 const timeA = a.date?.seconds ? a.date.seconds : (a.date instanceof Date ? a.date.getTime()/1000 : 0);
                 const timeB = b.date?.seconds ? b.date.seconds : (b.date instanceof Date ? b.date.getTime()/1000 : 0);
                 return timeA - timeB;
             });
-            
             const lastPayment = sortedHistory[sortedHistory.length - 1];
-            // Comparamos por referencia o por valor exacto y fecha
             const isLastPayment = (payment === lastPayment) || 
                                   (payment.amount === lastPayment.amount && paymentDateObj.getTime() === (lastPayment.date?.seconds ? lastPayment.date.seconds*1000 : lastPayment.date.getTime()));
 
-            // C. Decisión final
-            if (isToday && isLastPayment) {
-                canDelete = true;
-                deleteTitle = "Excluir este pagamento permanentemente";
-            } else if (!isToday) {
-                deleteTitle = "Só é possível excluir pagamentos feitos HOJE.";
-            } else if (!isLastPayment) {
-                deleteTitle = "Só é possível excluir o ÚLTIMO pagamento lançado.";
-            }
+            if (isToday && isLastPayment) canDelete = true;
             
-            // --- 3. BOTONES (OCULTO POR SEGURIDAD: display: none) ---
+            // --- 5. RENDERIZADO VISUAL ---
+            
+            // Foto del cliente
+            const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
+            const avatarUrl = client.profilePictureUrl || `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
+
+            // Botón Borrar (Lógica visual original)
             let deleteButtonHtml = `
                 <button id="delete-payment-btn" class="btn-danger" 
                     ${canDelete ? '' : 'disabled'} 
-                    title="${deleteTitle}" 
-                    style="display: none !important; ${canDelete ? '' : 'opacity: 0.5; cursor: not-allowed; background-color: var(--text-secondary); border-color: var(--text-secondary);'}">
-                    <i data-lucide="trash-2"></i> Excluir Pagamento
+                    style="display: none !important; ${canDelete ? '' : 'opacity: 0.5; cursor: not-allowed;'}">
+                    <i data-lucide="trash-2"></i> ${txt.delete}
                 </button>`;
-            
 
-            let receiptPreviewHtml = `<p class="no-items">Nenhum comprovante anexado.</p>`;
-            let receiptButtonHtml = '';
+            let receiptContentHtml = `
+                <div style="background-color: var(--bg); padding: 20px; border-radius: 8px; text-align: center; border: 1px dashed var(--border-color);">
+                    <p style="color: var(--text-secondary); font-size: 0.9em; margin: 0;">${txt.noReceipt}</p>
+                </div>`;
+            
+            let downloadBtnHtml = '';
 
             if (payment.receiptUrl) {
-                receiptPreviewHtml = `<img src="${payment.receiptUrl}" alt="Comprovante" style="width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">`;
-                receiptButtonHtml = `<a href="${payment.receiptUrl}" target="_blank" class="btn-primary" style="flex-grow:1;"><i data-lucide="download"></i> Baixar</a>`;
+                receiptContentHtml = `<img src="${payment.receiptUrl}" alt="Comprovante" style="width: 100%; max-height: 40vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color); background-color: #000;">`;
+                downloadBtnHtml = `
+                    <a href="${payment.receiptUrl}" target="_blank" class="btn-secondary" style="flex: 1; border-color: var(--text-secondary); color: var(--text-secondary);">
+                        <i data-lucide="download"></i> ${txt.download}
+                    </a>`;
             }
 
-            const invoiceButtonHtml = `<button id="generate-invoice-btn" class="btn-secondary" style="flex-grow:1;"><i data-lucide="receipt"></i> Fatura</button>`;
+            // BOTÓN "ENVIAR RECIBO" (Reemplaza a Fatura, Diseño Principal)
+            const sendReceiptBtnHtml = `
+                <button id="generate-invoice-btn" class="btn-primary" style="flex: 2; background-color: var(--accent-purple); color: white; box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);">
+                    <i data-lucide="send"></i> ${txt.sendReceipt}
+                </button>`;
 
-            // --- 4. RENDERIZADO ---
             modal.innerHTML = `
                 <header class="modal-header">
                     <button id="closePaymentDetailModal"><i data-lucide="arrow-left"></i></button>
-                    <span class="modal-title">Detalhes do Pagamento</span>
+                    <span class="modal-title">${txt.title}</span>
                 </header>
                 <div class="modal-content-wrapper container">
-                    <div class="kpi-card" style="margin-bottom: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <div>
-                                <h3 class="kpi-title">Data</h3>
-                                <p class="kpi-value" style="font-size: 1.2em;">${dateStr} às ${timeStr}</p>
+                    
+                    <!-- 1. TARJETA CLIENTE (Header) -->
+                    <div class="kpi-card" style="margin-bottom: 15px; display: flex; align-items: center; gap: 15px; padding: 15px;">
+                        <img src="${avatarUrl}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-purple);">
+                        <div>
+                            <span style="font-size: 0.8em; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">${txt.client}</span>
+                            <h3 style="margin: 0; font-size: 1.1em; color: var(--text-primary); line-height: 1.2;">${client.name}</h3>
+                        </div>
+                    </div>
+
+                    <!-- 2. TARJETA FECHAS CONTRATO (Estilo Pastel Centrado) -->
+                    <div class="kpi-card" style="margin-bottom: 20px; text-align: center; padding: 15px; background-color: var(--surface);">
+                        <h3 class="kpi-title" style="justify-content: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; font-weight: 700; color: var(--text-primary);">
+                            ${txt.contractDates}
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div style="border-right: 1px solid var(--border-color);">
+                                <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--accent-purple);">
+                                    <i data-lucide="calendar" style="width: 16px; height: 16px;"></i> ${txt.start}
+                                </h3>
+                                <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${startDateStr}</p>
                             </div>
                             <div>
-                                <h3 class="kpi-title" style="justify-content: flex-end;">Valor Pago</h3>
-                                <p class="kpi-value green" style="font-size: 1.4em;">${money(payment.amount)}</p>
+                                <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--text-secondary);">
+                                    <i data-lucide="flag" style="width: 16px; height: 16px;"></i> ${txt.end}
+                                </h3>
+                                <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${endDateStr}</p>
                             </div>
                         </div>
-                        ${!canDelete ? `<p style="font-size:0.85em; color:var(--text-secondary); text-align:center; background:#f0f0f0; padding:5px; border-radius:4px;">${deleteTitle}</p>` : ''}
                     </div>
-                    <h3 class="section-title" style="border: none;">Comprovante</h3>
-                    <div class="kpi-card">
-                        ${receiptPreviewHtml}
+
+                    <!-- 3. TARJETA DETALLE PAGO (Grande y Bonita) -->
+                    <div class="kpi-card" style="margin-bottom: 20px; padding: 20px; text-align: center; border: 1px solid var(--accent-green);">
+                        <p style="font-size: 0.9em; color: var(--text-secondary); margin: 0 0 5px; font-weight: 600; text-transform: uppercase;">${txt.paidAmount}</p>
+                        
+                        <p class="kpi-value" style="font-size: 2.2em; color: var(--accent-green); margin-bottom: 10px;">
+                            ${money(payment.amount)}
+                        </p>
+                        
+                        <div style="display: flex; justify-content: center; gap: 20px; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color);">
+                            <div style="text-align: center;">
+                                <i data-lucide="clock" style="width: 16px; height: 16px; color: var(--text-secondary); margin-bottom: 2px;"></i>
+                                <div style="font-size: 0.9em; font-weight: 600;">${dateStr}<br><span style="font-size: 0.85em; font-weight: 400; color: var(--text-secondary);">${timeStr}</span></div>
+                            </div>
+                            <div style="border-left: 1px solid var(--border-color);"></div>
+                            <div style="text-align: center;">
+                                <i data-lucide="${methodIcon}" style="width: 16px; height: 16px; color: var(--text-secondary); margin-bottom: 2px;"></i>
+                                <div style="font-size: 0.9em; font-weight: 600; margin-top: 2px;">${methodLabel}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="section-title" style="border: none; font-size: 1em;">${txt.receipt}</h3>
+                    <div class="kpi-card" style="padding: 10px;">
+                        ${receiptContentHtml}
                     </div>
                 </div>
-                <div class="action-buttons" style="flex-wrap: wrap;">
-                    <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 10px;">
-                        ${receiptButtonHtml}
-                        ${invoiceButtonHtml}
+
+                <div class="action-buttons" style="flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        ${downloadBtnHtml}
+                        ${sendReceiptBtnHtml}
                     </div>
-                    ${deleteButtonHtml} <!-- El botón de borrar ocupa todo el ancho abajo -->
+                    ${deleteButtonHtml}
                 </div>
             `;
 
@@ -1845,9 +1967,14 @@ async function showRefinanceModal(clientId, notificationId) {
             lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
             
             modal.querySelector('#closePaymentDetailModal').addEventListener('click', () => window.history.back());
-            modal.querySelector('#generate-invoice-btn').addEventListener('click', () => generateInvoicePDF(client, payment));
             
-            // --- 5. LISTENER DE BORRADO ---
+            // Botón GENERAR RECIBO (Ahora "Enviar Recibo")
+            const genInvoiceBtn = modal.querySelector('#generate-invoice-btn');
+            if(genInvoiceBtn) {
+                genInvoiceBtn.addEventListener('click', () => generateInvoicePDF(client, payment));
+            }
+            
+            // LÓGICA DE BORRADO (INTACTA)
             const deleteBtn = modal.querySelector('#delete-payment-btn');
             if (deleteBtn && canDelete) {
                 deleteBtn.addEventListener('click', async () => {
@@ -1855,7 +1982,6 @@ async function showRefinanceModal(clientId, notificationId) {
                         'Excluir Pagamento?',
                         'Esta ação removerá o pagamento do saldo e do histórico. O valor da dívida aumentará. Tem certeza?',
                         async () => {
-                            // Bloqueamos el botón
                             if(deleteBtn) {
                                 deleteBtn.disabled = true;
                                 deleteBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Excluindo...`;
@@ -1864,18 +1990,14 @@ async function showRefinanceModal(clientId, notificationId) {
                             
                             try {
                                 const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-                                
-                                // Recargamos datos frescos para evitar conflictos
                                 const clientIdx = allClients.findIndex(c => c.id === clientId);
                                 if (clientIdx === -1) throw new Error("Cliente no encontrado en memoria");
                                 const currentClientData = allClients[clientIdx];
                                 const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
                                 const currentLoan = updatedLoans[loanIndex];
 
-                                // Borramos el pago del array
                                 currentLoan.history.splice(historyIndex, 1);
                                 
-                                // RECALCULAMOS SALDOS (Lógica contable unificada)
                                 const historyPaid = (currentLoan.history || [])
                                     .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
                                     .reduce((sum, h) => sum + (h.amount || 0), 0);
@@ -1895,14 +2017,11 @@ async function showRefinanceModal(clientId, notificationId) {
                                 currentLoan.paymentBalance = newBalance;
                                 currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
 
-                                // Guardamos en Firebase
                                 await updateDoc(clientRef, { loans: updatedLoans });
 
                                 showToast('Pagamento excluído com sucesso!');
-                                window.history.back(); // Cierra confirmación
-                                window.history.back(); // Cierra detalle
-                                
-                                // Refrescamos vista
+                                window.history.back(); 
+                                window.history.back(); 
                                 showClientDetails(clientId, loanIndex); 
                                 
                             } catch (error) {
@@ -1910,16 +2029,16 @@ async function showRefinanceModal(clientId, notificationId) {
                                 showToast('Falha ao excluir o pagamento.', true);
                                 if(deleteBtn) {
                                     deleteBtn.disabled = false;
-                                    deleteBtn.innerHTML = `<i data-lucide="trash-2"></i> Excluir Pagamento`;
+                                    deleteBtn.innerHTML = `<i data-lucide="trash-2"></i> ${txt.delete}`;
                                     lucide.createIcons({nodes: [deleteBtn.querySelector('i')]});
                                 }
-                                window.history.back(); // Cierra confirmación
+                                window.history.back();
                             }
                         }
                     );
                 });
             }
-        }    
+        }   
 
         async function generateStatusReceiptPDF(clientId, loanIndex) {
             try {
@@ -2299,144 +2418,298 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 const realClient = allClients.find(c => c.id === clientData.id) || clientData;
                 
+                // Buscar el préstamo al que pertenece este pago
                 let activeLoan = null;
                 if (realClient.loans) {
                     activeLoan = realClient.loans.find(l => l.history && l.history.some(h => 
                         h === payment || (h.amount === payment.amount && h.date?.seconds === payment.date?.seconds)
                     ));
+                    // Si no se encuentra por referencia exacta, fallback al último activo o el último de la lista
                     if (!activeLoan) activeLoan = realClient.loans.find(l => l.status !== 'finished');
                     if (!activeLoan && realClient.loans.length > 0) activeLoan = realClient.loans[realClient.loans.length - 1];
                 }
 
-                let remainingBalance = 0;
-                let paidInstallmentsMsg = "0 / 0";
+                // --- CÁLCULOS FINANCIEROS (IGUAL QUE TICKET) ---
                 let totalLoanVal = 0;
                 let totalPaidVal = 0;
+                let remainingBalance = 0;
+                let lateFeesVal = 0;
+                let paidInstallments = 0;
+                let totalInstallments = 0;
+                let installmentValue = 0;
+                let picoValue = 0;
+                let statusDetails = { status: 'active', lateDays: 0 };
 
                 if (activeLoan) {
                     const details = calculateLoanDetails(activeLoan);
+                    statusDetails = details;
+                    lateFeesVal = details.lateFeesAccumulated || 0;
+
                     const historyPaid = (activeLoan.history || [])
                         .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
                         .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
                     
                     const initialPaid = activeLoan.initialMigratedAmount || 0;
                     totalPaidVal = initialPaid + historyPaid;
-                    totalLoanVal = (parseFloat(activeLoan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+                    totalLoanVal = (parseFloat(activeLoan.totalLoan) || 0) + lateFeesVal;
                     remainingBalance = Math.max(0, totalLoanVal - totalPaidVal);
 
                     const totalInstallmentsStr = (activeLoan.installments || "0/0").split('/')[1];
-                    const totalInstallments = parseInt(totalInstallmentsStr, 10) || 0;
-                    const installmentValue = parseFloat(activeLoan.originalInstallmentAmount || activeLoan.amount || 1);
+                    totalInstallments = parseInt(totalInstallmentsStr, 10) || 0;
+                    installmentValue = parseFloat(activeLoan.originalInstallmentAmount || activeLoan.amount || 1);
                     
-                    let paidCount = 0;
-                    if (installmentValue > 0) paidCount = Math.floor(totalPaidVal / installmentValue);
-                    if (paidCount > totalInstallments) paidCount = totalInstallments;
-                    paidInstallmentsMsg = `${paidCount} / ${totalInstallments}`;
+                    if (installmentValue > 0) paidInstallments = Math.floor(totalPaidVal / installmentValue);
+                    if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
+
+                    // Cálculo Pico
+                    if (installmentValue > 0 && totalPaidVal > 0) {
+                        const remainder = totalPaidVal % installmentValue;
+                        if (remainder > 0.05 && (installmentValue - remainder) > 0.05) {
+                            picoValue = remainder;
+                        }
+                    }
                 }
 
+                // --- FECHAS DE CONTRATO ---
                 const isEs = currentLang === 'es';
-                const texts = {
-                    title: isEs ? "RECIBO DE PAGO" : "RECIBO DE PAGAMENTO",
-                    company: currentCompanyData?.name || "LUMIX Finanças",
-                    date: isEs ? "Fecha Pago:" : "Data Pagto:",
-                    client: isEs ? "Cliente:" : "Cliente:",
-                    method: isEs ? "Método:" : "Método:",
-                    collector: isEs ? "Cobrador:" : "Cobrador:",
-                    signature: isEs ? "Firma del Recibidor" : "Assinatura do Recebedor",
-                    summary_title: isEs ? "ESTADO DEL PRÉSTAMO" : "SITUAÇÃO DO EMPRÉSTIMO",
-                    progress: isEs ? "Cuotas Pagadas:" : "Parcelas Pagas:", 
-                    paid_msg: paidInstallmentsMsg,
-                    loan_total: isEs ? "Total Préstamo:" : "Total Empréstimo:",
-                    total_paid_global: isEs ? "Total Pagado (Acum.):" : "Total Pago (Acum.):",
-                    to_pay: isEs ? "RESTA PAGAR:" : "RESTA PAGAR:"
-                };
+                const isEn = currentLang === 'en'; 
+                const localeCode = isEs ? 'es-ES' : (isEn ? 'en-US' : 'pt-BR');
 
-                let y = 10;
-                const centerX = 40;
+                let startDateStr = '--/--';
+                let endDateStr = '--/--';
 
-                doc.setFontSize(12); doc.setFont(undefined, 'bold');
-                doc.text(texts.company, centerX, y, { align: 'center' });
-                y += 6;
-                doc.setFontSize(10); doc.setFont(undefined, 'normal');
-                doc.text(texts.title, centerX, y, { align: 'center' });
-                y += 5; doc.setLineWidth(0.5); doc.line(5, y, 75, y); y += 5;
+                if (activeLoan && activeLoan.startDate) {
+                    let startD = null;
+                    if (activeLoan.startDate.seconds) startD = new Date(activeLoan.startDate.seconds * 1000);
+                    else if (activeLoan.startDate instanceof Date) startD = activeLoan.startDate;
+                    else startD = new Date(activeLoan.startDate);
 
-                doc.setFontSize(9);
-                let dateStr = "N/A", timeStr = "";
+                    if (startD && !isNaN(startD.getTime())) {
+                        startDateStr = startD.toLocaleDateString(localeCode);
+                        if (totalInstallments > 0) {
+                            // Lógica de estimación de fin (Mismo algoritmo que el Ticket)
+                            if (statusDetails.status === 'finished' && activeLoan.history && activeLoan.history.length > 0) {
+                                const lastPayment = activeLoan.history[activeLoan.history.length - 1];
+                                let endD = null;
+                                if (lastPayment.date?.seconds) endD = new Date(lastPayment.date.seconds * 1000);
+                                else if (lastPayment.date instanceof Date) endD = lastPayment.date;
+                                if (endD) endDateStr = endD.toLocaleDateString(localeCode);
+                            } else {
+                                let count = 0;
+                                let currentD = new Date(startD);
+                                currentD.setDate(currentD.getDate() + 1); 
+                                let safetyLoop = 0;
+                                while (count < totalInstallments && safetyLoop < 2000) { 
+                                    const dayW = currentD.getDay();
+                                    const dayM = currentD.getDate();
+                                    const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
+                                    const isHol = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(fDate) : false;
+                                    let isPayDay = false;
+                                    const freq = activeLoan.paymentFrequency || 'daily';
+                                    const pDays = activeLoan.paymentDays || [];
+                                    if (!isHol) {
+                                        if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
+                                        else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                        else if (freq === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                        else if (freq === 'biweekly') {
+                                            if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
+                                                const diffT = Math.abs(currentD - startD);
+                                                const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
+                                                if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
+                                            }
+                                        }
+                                    }
+                                    if (isPayDay) count++;
+                                    if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
+                                    safetyLoop++;
+                                }
+                                endDateStr = currentD.toLocaleDateString(localeCode);
+                            }
+                        }
+                    }
+                }
+
+                // --- DATOS DEL PAGO ESPECÍFICO ---
+                let paymentDateStr = "N/A";
                 if(payment.date) {
                     let d = payment.date.seconds ? new Date(payment.date.seconds * 1000) : (payment.date instanceof Date ? payment.date : new Date(payment.date));
-                    dateStr = d.toLocaleDateString('pt-BR');
-                    timeStr = d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                    paymentDateStr = d.toLocaleDateString(localeCode) + ' ' + d.toLocaleTimeString(localeCode, {hour: '2-digit', minute:'2-digit'});
                 }
+
+                let methodText = '---';
+                if (payment.method === 'dinheiro') {
+                    if (isEs) methodText = 'Efectivo';
+                    else if (isEn) methodText = 'Cash';
+                    else methodText = 'Dinheiro';
+                }
+                else if (payment.method === 'pix') {
+                    if (isEs) methodText = 'Pago Electrónico';
+                    else if (isEn) methodText = 'Electronic Payment';
+                    else methodText = 'PIX';
+                }
+                else if (payment.method === 'cartao') {
+                    if (isEs) methodText = 'Tarjeta';
+                    else if (isEn) methodText = 'Card';
+                    else methodText = 'Cartão';
+                }
+                else if (payment.method === 'migration') {
+                    if (isEs) methodText = 'Migración';
+                    else if (isEn) methodText = 'Migration';
+                    else methodText = 'Migração';
+                }
+
+                const freqMap = { 
+                    'daily': isEs ? 'DIARIO' : (isEn ? 'DAILY' : 'DIÁRIO'), 
+                    'weekly': isEs ? 'SEMANAL' : (isEn ? 'WEEKLY' : 'SEMANAL'), 
+                    'biweekly': isEs ? 'QUINCENAL' : (isEn ? 'BIWEEKLY' : 'QUINZENAL'), 
+                    'monthly': isEs ? 'MENSUAL' : (isEn ? 'MONTHLY' : 'MENSAL') 
+                };
+                const modalidade = activeLoan ? (freqMap[activeLoan.paymentFrequency] || (isEn ? 'DAILY' : 'DIÁRIO')) : '---';
+
+                // --- TEXTOS ---
+                const texts = {
+                    title: isEs ? "RECIBO DE PAGO" : (isEn ? "PAYMENT RECEIPT" : "RECIBO DE PAGAMENTO"),
+                    company: currentCompanyData?.name || "LUMIX Finanças",
+                    client: isEs ? "Cliente:" : (isEn ? "Client:" : "Cliente:"),
+                    frequency: isEs ? "Modalidad:" : (isEn ? "Frequency:" : "Frequência:"),
+                    
+                    contract_title: isEs ? "FECHAS DEL CONTRATO" : (isEn ? "CONTRACT DATES" : "DATAS DO CONTRATO"),
+                    start_label: isEs ? "Inicio" : (isEn ? "Start" : "Início"),
+                    end_label: isEs ? "Fin" : (isEn ? "End" : "Fim"),
+                    
+                    progress: isEs ? "Cuotas Pagadas:" : (isEn ? "Paid Installments:" : "Parcelas Pagas:"), 
+                    paid_msg: `${paidInstallments} / ${totalInstallments}`,
+                    
+                    loan_total: isEs ? "Total Préstamo:" : (isEn ? "Total Loan:" : "Total Empréstimo:"),
+                    late_fees: isEs ? "Multas/Mora:" : (isEn ? "Fees/Interest:" : "Multas/Juros:"),
+                    total_paid: isEs ? "Total Pagado:" : (isEn ? "Total Paid:" : "Total Pago:"),
+                    to_pay: isEs ? "RESTA POR PAGAR:" : (isEn ? "REMAINING BALANCE:" : "RESTA A PAGAR:"),
+                    pico_label: isEs ? "Valor Pico:" : (isEn ? "Partial Balance:" : "Valor Picado:"),
+                    
+                    method_label: isEs ? "Método de Pago:" : (isEn ? "Payment Method:" : "Método de Pagamento:"),
+                    payment_date_label: isEs ? "Fecha Pago:" : (isEn ? "Payment Date:" : "Data Pagto:"),
+                    
+                    val_paid_now: isEs ? "VALOR PAGADO" : (isEn ? "AMOUNT PAID" : "VALOR PAGO"),
+                    
+                    footer: isEs ? "Generado por LUMIX Finanzas" : (isEn ? "Generated by LUMIX Finance" : "Gerado por LUMIX Finanças"),
+                    signature: isEs ? "Firma del Recibidor" : (isEn ? "Receiver Signature" : "Assinatura do Recebedor")
+                };
+
+                let y = 0;
+                const centerX = 40;
+
+                // --- 1. ENCABEZADO "BONITO" (FONDO PASTEL) ---
+                doc.setFillColor(243, 232, 255); // Lila Pastel
+                doc.rect(0, 0, 80, 25, 'F');
+
+                y = 10;
+                doc.setTextColor(111, 66, 193); // Morado oscuro
+                doc.setFontSize(14); doc.setFont(undefined, 'bold');
+                doc.text(texts.company, centerX, y, { align: 'center' });
                 
-                doc.setFont(undefined, 'bold'); doc.text(texts.date, 5, y);
-                doc.setFont(undefined, 'normal'); doc.text(`${dateStr} ${timeStr}`, 75, y, { align: 'right' });
-                y += 6;
+                y += 7;
+                doc.setTextColor(50); 
+                doc.setFontSize(10); doc.setFont(undefined, 'normal');
+                doc.text(texts.title, centerX, y, { align: 'center' });
+                
+                y += 15; 
 
-                doc.setFont(undefined, 'bold'); doc.text(texts.collector, 5, y);
-                doc.setFont(undefined, 'normal'); doc.text(currentCollectorData?.name || 'N/A', 75, y, { align: 'right' });
-                y += 6;
+                // --- 2. FECHAS DE CONTRATO (ARRIBA, EN CAJA - CENTRADAS) ---
+                doc.setFillColor(250, 250, 250); 
+                doc.setDrawColor(230); 
+                doc.roundedRect(5, y, 70, 14, 2, 2, 'FD');
+                
+                doc.setFontSize(8); doc.setTextColor(111, 66, 193); doc.setFont(undefined, 'bold');
+                doc.text(texts.contract_title, centerX, y + 4, { align: 'center' });
+                
+                doc.setFontSize(8); doc.setTextColor(100); doc.setFont(undefined, 'normal');
+                doc.text(texts.start_label, 22.5, y + 9, { align: 'center' });
+                doc.text(texts.end_label, 57.5, y + 9, { align: 'center' });
+                
+                doc.setFontSize(9); doc.setTextColor(0); doc.setFont(undefined, 'bold');
+                doc.text(startDateStr, 22.5, y + 12, { align: 'center' }); 
+                doc.text(endDateStr, 57.5, y + 12, { align: 'center' }); 
 
-                doc.setFont(undefined, 'bold'); doc.text(texts.client, 5, y);
+                y += 20;
+
+                // --- 3. CLIENTE Y FRECUENCIA (CENTRADOS) ---
+                doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
+                doc.text(texts.client, centerX, y, { align: 'center' });
                 y += 4;
-                doc.setFont(undefined, 'normal');
+                
+                doc.setFontSize(12); doc.setTextColor(0); doc.setFont(undefined, 'bold');
                 const splitName = doc.splitTextToSize(realClient.name, 70);
-                doc.text(splitName, 5, y);
-                y += (splitName.length * 4) + 2;
+                doc.text(splitName, centerX, y, { align: 'center' });
+                y += (splitName.length * 5) + 3;
 
-                let methodText = payment.method === 'dinheiro' ? (isEs ? 'Efectivo' : 'Dinheiro') : (payment.method === 'pix' ? 'PIX' : 'Cartão');
-                doc.setFont(undefined, 'bold'); doc.text(texts.method, 5, y);
-                doc.setFont(undefined, 'normal'); doc.text(methodText.toUpperCase(), 75, y, { align: 'right' });
+                doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
+                doc.text(texts.frequency, centerX, y, { align: 'center' });
+                y += 4;
+                
+                doc.setFontSize(11); doc.setTextColor(0); doc.setFont(undefined, 'bold');
+                doc.text(modalidade, centerX, y, { align: 'center' });
                 y += 8;
 
-                doc.setFillColor(240, 240, 240); doc.rect(5, y - 4, 70, 12, 'F');
-                doc.setFontSize(14); doc.setFont(undefined, 'bold');
-                doc.text(money(payment.amount), centerX, y + 4, { align: 'center' });
-                y += 12;
+                // --- 4. BARRA DE PROGRESO ---
+                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text(texts.progress, 5, y);
+                doc.text(texts.paid_msg, 75, y, { align: 'right' });
+                y += 4;
+                const barWidth = 70; 
+                const progressPct = totalInstallments > 0 ? paidInstallments / totalInstallments : 0;
+                doc.setFillColor(230, 230, 230); doc.rect(5, y, barWidth, 6, 'F');
+                doc.setFillColor(111, 66, 193); doc.rect(5, y, barWidth * progressPct, 6, 'F');
+                y += 10; doc.setLineWidth(0.2); doc.setDrawColor(200); doc.line(5, y, 75, y); y += 6;
 
-                y += 5; doc.setLineWidth(0.2); doc.setLineDash([1, 1], 0); doc.line(5, y, 75, y); doc.setLineDash([]); y += 6;
-
-                if (activeLoan) {
-                    doc.setFontSize(10); doc.setFont(undefined, 'bold');
-                    doc.text(texts.summary_title, centerX, y, { align: 'center' });
+                // --- TABLA FINANCIERA ---
+                const addRow = (label, value, color='#000000', bold=false) => {
+                    doc.setFont(undefined, bold ? 'bold' : 'normal'); doc.setTextColor(color);
+                    doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
                     y += 6;
+                };
+                
+                doc.setFontSize(10);
+                addRow(texts.loan_total, totalLoanVal);
+                
+                if (picoValue > 0) addRow(texts.pico_label, picoValue, '#fb923c');
+                if (lateFeesVal > 0) addRow(texts.late_fees, lateFeesVal, '#dc3545');
+                
+                addRow(texts.total_paid, totalPaidVal, '#28a745');
+                addRow(texts.to_pay, remainingBalance, '#d97706', true); 
+                
+                // FECHA DEL PAGO (Específico de la Factura)
+                doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
+                doc.text(texts.payment_date_label, 5, y);
+                doc.text(paymentDateStr, 75, y, { align: 'right' });
+                y += 6;
 
-                    doc.setFontSize(9);
-                    doc.text(texts.progress, 5, y);
-                    doc.text(texts.paid_msg, 75, y, { align: 'right' });
-                    y += 4;
-                    const barWidth = 70; 
-                    const totalInst = parseInt((activeLoan.installments || "0/0").split('/')[1], 10) || 1;
-                    const paidInst = parseInt((activeLoan.installments || "0/0").split('/')[0], 10) || 0;
-                    const progressPct = totalInst > 0 ? paidInst / totalInst : 0;
-                    doc.setFillColor(230, 230, 230); doc.rect(5, y, barWidth, 5, 'F');
-                    doc.setFillColor(111, 66, 193); doc.rect(5, y, barWidth * progressPct, 5, 'F');
-                    y += 8;
+                // MÉTODO DE PAGO
+                doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
+                doc.text(texts.method_label, 5, y); 
+                if (methodText.length > 10) doc.setFontSize(8); 
+                doc.text(methodText.toUpperCase(), 75, y, { align: 'right' });
+                doc.setFontSize(10); 
+                y += 6;
 
-                    const addRow = (label, value, color='#000000', bold=false) => {
-                        doc.setFont(undefined, bold ? 'bold' : 'normal'); doc.setTextColor(color);
-                        doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
-                        y += 5;
-                    };
-                    
-                    doc.setFontSize(9);
-                    addRow(texts.loan_total, totalLoanVal);
-                    addRow(texts.total_paid_global, totalPaidVal, '#28a745');
-                    
-                    y += 2;
-                    doc.setFont(undefined, 'bold'); doc.setTextColor(0);
-                    doc.text(texts.to_pay, 5, y+4); 
-                    doc.setFontSize(12); doc.setTextColor(111, 66, 193);
-                    doc.text(money(remainingBalance), 75, y+4, { align: 'right' });
-                    y += 10;
-                }
+                y += 4;
+                
+                // --- CAJA GRANDE (VALOR DE ESTE PAGO) ---
+                doc.setFillColor(245, 245, 245); doc.rect(5, y - 4, 70, 14, 'F');
+                doc.setFont(undefined, 'bold'); doc.setTextColor(0);
+                doc.text(texts.val_paid_now, centerX, y + 1, { align: 'center' }); 
+                
+                doc.setFontSize(14); doc.setTextColor('#28a745');
+                doc.text(money(payment.amount), centerX, y + 7, { align: 'center' }); 
+                y += 18;
 
-                y += 10; doc.setLineWidth(0.2); doc.setTextColor(0); doc.setDrawColor(0);
+                // FIRMA
+                y += 5; doc.setLineWidth(0.2); doc.setTextColor(0); doc.setDrawColor(0);
                 doc.line(15, y, 65, y); y += 4;
                 doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
                 doc.text(texts.signature, centerX, y, { align: 'center' });
+                
+                y += 8;
+                doc.text(texts.footer, centerX, y, { align: 'center' });
 
-                // --- SOLO DESCARGAR ---
                 const fileName = `fatura_${realClient.name.replace(/\s/g, '_')}.pdf`;
                 doc.save(fileName);
                 showToast(isEs ? "Fatura descargada." : "Fatura baixada.");
@@ -8045,5 +8318,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
-
