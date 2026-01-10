@@ -3641,9 +3641,9 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             }
 
             const labels = {
-                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor de Pico (Pago Parcial)' },
-                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor de Pico (Pago Parcial)' },
-                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance' }
+                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor de Pico (Pago Parcial)', contractDateTitle: 'Datas do Contrato' },
+                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor de Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato' },
+                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates' }
             };
             const l = labels[currentLang] || labels.pt;
 
@@ -3776,18 +3776,26 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         </div>
                     </div>
                     
-                    <div class="kpi-card" style="margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center; padding: 15px;">
-                        <div style="border-right: 1px solid var(--border-color);">
-                            <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--accent-purple);">
-                                <i data-lucide="calendar" style="width: 16px; height: 16px;"></i> Início
-                            </h3>
-                            <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${startDateStr}</p>
-                        </div>
-                        <div>
-                            <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--text-secondary);">
-                                <i data-lucide="flag" style="width: 16px; height: 16px;"></i> Fim Est.
-                            </h3>
-                            <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${endDateStr}</p>
+                    <div class="kpi-card" style="margin-bottom: 20px; text-align: center; padding: 15px;">
+                        <!-- NUEVO TÍTULO AGREGADO AQUÍ -->
+                        <h3 class="kpi-title" style="justify-content: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; font-weight: 700; color: var(--text-primary);">
+                            ${l.contractDateTitle}
+                        </h3>
+
+                        <!-- Grid de Fechas original (Sin cambios en los textos internos) -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div style="border-right: 1px solid var(--border-color);">
+                                <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--accent-purple);">
+                                    <i data-lucide="calendar" style="width: 16px; height: 16px;"></i> Início
+                                </h3>
+                                <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${startDateStr}</p>
+                            </div>
+                            <div>
+                                <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--text-secondary);">
+                                    <i data-lucide="flag" style="width: 16px; height: 16px;"></i> Fim Est.
+                                </h3>
+                                <p class="kpi-value" style="font-size: 1.1em; font-weight: 600;">${endDateStr}</p>
+                            </div>
                         </div>
                     </div>
                     
@@ -7826,4 +7834,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
