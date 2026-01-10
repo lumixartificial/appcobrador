@@ -1977,9 +1977,68 @@ async function showRefinanceModal(clientId, notificationId) {
 
                 // --- DETECCIÓN DE IDIOMA ---
                 const isEs = currentLang === 'es';
-                const isEn = currentLang === 'en'; // Detectar Inglés
+                const isEn = currentLang === 'en'; 
+                const localeCode = isEs ? 'es-ES' : (isEn ? 'en-US' : 'pt-BR');
+
+                // --- CÁLCULO DE FECHAS DE CONTRATO ---
+                let startDateStr = '--/--';
+                let endDateStr = '--/--';
+
+                if (loan.startDate) {
+                    let startD = null;
+                    if (loan.startDate.seconds) startD = new Date(loan.startDate.seconds * 1000);
+                    else if (loan.startDate instanceof Date) startD = loan.startDate;
+                    else startD = new Date(loan.startDate);
+
+                    if (startD && !isNaN(startD.getTime())) {
+                        startDateStr = startD.toLocaleDateString(localeCode);
+
+                        if (totalInstallments > 0) {
+                            if (details.status === 'finished' && loan.history && loan.history.length > 0) {
+                                const lastPayment = loan.history[loan.history.length - 1];
+                                let endD = null;
+                                if (lastPayment.date?.seconds) endD = new Date(lastPayment.date.seconds * 1000);
+                                else if (lastPayment.date instanceof Date) endD = lastPayment.date;
+                                if (endD) endDateStr = endD.toLocaleDateString(localeCode);
+                            } else {
+                                let count = 0;
+                                let currentD = new Date(startD);
+                                currentD.setDate(currentD.getDate() + 1); 
+                                let safetyLoop = 0;
+                                
+                                while (count < totalInstallments && safetyLoop < 2000) { 
+                                    const dayW = currentD.getDay();
+                                    const dayM = currentD.getDate();
+                                    const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
+                                    const isHol = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(fDate) : false;
+
+                                    let isPayDay = false;
+                                    const freq = loan.paymentFrequency || 'daily';
+                                    const pDays = loan.paymentDays || [];
+
+                                    if (!isHol) {
+                                        if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
+                                        else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                        else if (freq === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                        else if (freq === 'biweekly') {
+                                            if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
+                                                const diffT = Math.abs(currentD - startD);
+                                                const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
+                                                if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
+                                            }
+                                        }
+                                    }
+                                    if (isPayDay) count++;
+                                    if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
+                                    safetyLoop++;
+                                }
+                                endDateStr = currentD.toLocaleDateString(localeCode);
+                            }
+                        }
+                    }
+                }
                 
-                // --- OBTENER ÚLTIMO MÉTODO DE PAGO (TRADUCIDO A 3 IDIOMAS) ---
+                // --- OBTENER ÚLTIMO MÉTODO DE PAGO ---
                 let lastMethodText = "---";
                 if (loan.history && loan.history.length > 0) {
                     const validPayments = loan.history.filter(h => h.status === 'approved' || h.method === 'migration');
@@ -2009,13 +2068,17 @@ async function showRefinanceModal(clientId, notificationId) {
                     }
                 }
 
-                // --- TEXTOS DEL PDF (3 IDIOMAS) ---
+                // --- TEXTOS DEL PDF ---
                 const texts = {
                     title: isEs ? "ESTADO DE CUENTA" : (isEn ? "LOAN STATEMENT" : "EXTRATO DO EMPRÉSTIMO"),
                     company: currentCompanyData?.name || "LUMIX Finanças",
-                    date: isEs ? "Fecha:" : (isEn ? "Date:" : "Data:"),
                     client: isEs ? "Cliente:" : (isEn ? "Client:" : "Cliente:"),
                     frequency: isEs ? "Modalidad:" : (isEn ? "Frequency:" : "Frequência:"),
+                    
+                    contract_title: isEs ? "FECHAS DEL CONTRATO" : (isEn ? "CONTRACT DATES" : "DATAS DO CONTRATO"),
+                    start_label: isEs ? "Inicio" : (isEn ? "Start" : "Início"),
+                    end_label: isEs ? "Fin" : (isEn ? "End" : "Fim"),
+                    
                     progress: isEs ? "Cuotas Pagadas:" : (isEn ? "Paid Installments:" : "Parcelas Pagas:"), 
                     paid_msg: `${paidInstallments} / ${totalInstallments}`,
                     loan_total: isEs ? "Total Préstamo:" : (isEn ? "Total Loan:" : "Total Empréstimo:"),
@@ -2041,37 +2104,72 @@ async function showRefinanceModal(clientId, notificationId) {
                 };
                 const modalidade = freqMap[loan.paymentFrequency] || (isEn ? 'DAILY' : 'DIÁRIO');
 
-                // Formato de fecha según idioma
-                const locale = isEs ? 'es-ES' : (isEn ? 'en-US' : 'pt-BR');
-                const todayStr = new Date().toLocaleDateString(locale);
-
-                let y = 10;
+                let y = 0;
                 const centerX = 40;
 
-                // PDF Content
-                doc.setFontSize(12); doc.setFont(undefined, 'bold');
+                // --- 1. ENCABEZADO "BONITO" (FONDO PASTEL) ---
+                doc.setFillColor(243, 232, 255); // Lila Pastel Suave
+                doc.rect(0, 0, 80, 25, 'F'); // Rectángulo superior
+
+                // Texto del Encabezado
+                y = 10;
+                doc.setTextColor(111, 66, 193); // Morado oscuro (para contraste)
+                doc.setFontSize(14); doc.setFont(undefined, 'bold');
                 doc.text(texts.company, centerX, y, { align: 'center' });
-                y += 6;
+                
+                y += 7;
+                doc.setTextColor(50); // Gris oscuro
                 doc.setFontSize(10); doc.setFont(undefined, 'normal');
                 doc.text(texts.title, centerX, y, { align: 'center' });
-                y += 5; doc.setLineWidth(0.5); doc.line(5, y, 75, y); y += 5;
+                
+                y += 15; // Salimos del área pastel
 
-                doc.setFontSize(9);
-                doc.setFont(undefined, 'bold'); doc.text(texts.date, 5, y);
-                doc.setFont(undefined, 'normal'); doc.text(todayStr, 75, y, { align: 'right' });
-                y += 5;
-                doc.setFont(undefined, 'bold'); doc.text(texts.client, 5, y);
+                // --- 2. FECHAS DE CONTRATO (ARRIBA, EN CAJA - CENTRADAS) ---
+                doc.setFillColor(250, 250, 250); 
+                doc.setDrawColor(230); // Borde gris claro
+                doc.roundedRect(5, y, 70, 14, 2, 2, 'FD');
+                
+                // Título fechas
+                doc.setFontSize(8); doc.setTextColor(111, 66, 193); doc.setFont(undefined, 'bold');
+                doc.text(texts.contract_title, centerX, y + 4, { align: 'center' });
+                
+                // Fechas (CENTRADAS EN SUS COLUMNAS)
+                // Columna Izq: Centro en 22.5mm | Columna Der: Centro en 57.5mm
+                doc.setFontSize(8); doc.setTextColor(100); doc.setFont(undefined, 'normal');
+                doc.text(texts.start_label, 22.5, y + 9, { align: 'center' });
+                doc.text(texts.end_label, 57.5, y + 9, { align: 'center' });
+                
+                doc.setFontSize(9); doc.setTextColor(0); doc.setFont(undefined, 'bold');
+                doc.text(startDateStr, 22.5, y + 12, { align: 'center' }); 
+                doc.text(endDateStr, 57.5, y + 12, { align: 'center' }); 
+
+                y += 20;
+
+                // --- 3. CLIENTE Y FRECUENCIA (CENTRADOS Y LIMPIOS) ---
+                
+                // Etiqueta Cliente
+                doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
+                doc.text(texts.client, centerX, y, { align: 'center' });
                 y += 4;
-                doc.setFont(undefined, 'normal');
+                
+                // Nombre Cliente (Grande)
+                doc.setFontSize(12); doc.setTextColor(0); doc.setFont(undefined, 'bold');
                 const splitName = doc.splitTextToSize(client.name, 70);
-                doc.text(splitName, 5, y);
-                y += (splitName.length * 4) + 2;
+                doc.text(splitName, centerX, y, { align: 'center' });
+                y += (splitName.length * 5) + 3;
 
-                doc.setFont(undefined, 'bold'); doc.text(texts.frequency, 5, y);
-                doc.setFont(undefined, 'normal'); doc.text(modalidade, 75, y, { align: 'right' });
+                // Etiqueta Modalidad
+                doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
+                doc.text(texts.frequency, centerX, y, { align: 'center' });
+                y += 4;
+                
+                // Valor Modalidad
+                doc.setFontSize(11); doc.setTextColor(0); doc.setFont(undefined, 'bold');
+                doc.text(modalidade, centerX, y, { align: 'center' });
                 y += 8;
 
-                doc.setFont(undefined, 'bold'); doc.text(texts.progress, 5, y);
+                // --- 4. BARRA DE PROGRESO ---
+                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text(texts.progress, 5, y);
                 doc.text(texts.paid_msg, 75, y, { align: 'right' });
                 y += 4;
                 const barWidth = 70; 
@@ -2105,18 +2203,15 @@ async function showRefinanceModal(clientId, notificationId) {
                 // 5. Resta por Pagar
                 addRow(texts.to_pay, remainingBalance, '#d97706', true); 
                 
-                // 6. Método de Pago (AJUSTADO PARA QUE NO SE VEA GIGANTE)
+                // 6. Método de Pago
                 doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
                 doc.text(texts.method_label, 5, y); 
                 
-                // -- LÓGICA DE TAMAÑO: Si el texto es largo (> 10 caracteres), reduce la letra a 8pt --
                 if (lastMethodText.length > 10) {
                     doc.setFontSize(8); 
                 }
-                
                 doc.text(lastMethodText.toUpperCase(), 75, y, { align: 'right' });
-                
-                doc.setFontSize(10); // Restaurar tamaño normal para lo que siga
+                doc.setFontSize(10); 
                 y += 6;
 
                 y += 4;
@@ -2191,6 +2286,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 showToast("Erro ao gerar extrato.", true);
             }
         }
+
 
     
     
@@ -7949,4 +8045,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
