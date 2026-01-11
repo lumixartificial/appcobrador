@@ -3854,7 +3854,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 // ---------------------------------------------------------
 
 
-         function showClientDetails(clientId, loanIndex = 0) {
+          function showClientDetails(clientId, loanIndex = 0) {
             currentDetailClientId = clientId;
             currentDetailLoanIndex = loanIndex;
             console.log(`[DIAG-STATE] Vista de detalles abierta para Cliente: ${currentDetailClientId}, Préstamo Índice: ${currentDetailLoanIndex}`);
@@ -4076,10 +4076,11 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }
             }
 
+            // --- ACTUALIZADO: NUEVO TÍTULO Y TEXTOS PARA LA TARJETA DE ALERTA ---
             const labels = {
-                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'Apontamentos / Detalhes', notesPlaceholder: 'Escreva observações aqui...', saveNote: 'Salvar Nota' },
-                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'Apuntes / Detalles Cliente', notesPlaceholder: 'Escriba observaciones aquí...', saveNote: 'Guardar Nota' },
-                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates', totalDue: 'Total Due Now', notesTitle: 'Notes / Details', notesPlaceholder: 'Write observations here...', saveNote: 'Save Note' }
+                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'DETALHES / CLIENTE, ALERTAS', notesPlaceholder: 'Escreva observações de alerta aqui...', saveNote: 'Salvar Alerta' },
+                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'DETALLES/ CLIENTE, ALERTAS', notesPlaceholder: 'Escriba observaciones de alerta aquí...', saveNote: 'Guardar Alerta' },
+                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates', totalDue: 'Total Due Now', notesTitle: 'DETAILS / CLIENT, ALERTS', notesPlaceholder: 'Write alert observations here...', saveNote: 'Save Alert' }
             };
             const l = labels[currentLang] || labels.pt;
 
@@ -4285,15 +4286,18 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                            <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0)))}</p>
                        </div>
 
-                       <!-- TARJETA: APUNTES / DETALLES (NUEVA) -->
-                       <div class="kpi-card" style="border-color: var(--text-secondary);">
-                           <h3 class="kpi-title"><i data-lucide="file-pen-line"></i> ${l.notesTitle}</h3>
-                           <textarea id="loan-notes-input" rows="3" placeholder="${l.notesPlaceholder}" style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; background-color: var(--bg); color: var(--text-primary); resize: vertical; font-family: inherit;">${loan.notes || ''}</textarea>
-                           <button id="save-notes-btn" class="btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px; font-size: 0.9em; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                       <!-- TARJETA: DETALLES / ALERTAS (MODIFICADA ESTILO ALERTA) -->
+                       <div class="kpi-card" style="border-color: #dc3545; border-width: 1px;">
+                           <h3 class="kpi-title" style="color: #dc3545; font-weight: 700; font-size: 1em;">
+                                <i data-lucide="alert-circle"></i> ${l.notesTitle}
+                           </h3>
+                           <textarea id="loan-notes-input" rows="3" placeholder="${l.notesPlaceholder}" 
+                               style="width: 100%; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px; background-color: #fef2f2; color: #b91c1c; font-size: 1.15em; font-weight: 600; resize: vertical; font-family: inherit;">${loan.notes || ''}</textarea>
+                           <button id="save-notes-btn" class="btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px; font-size: 0.9em; display: flex; align-items: center; justify-content: center; gap: 5px; border-color: #dc3545; color: #dc3545;">
                                <i data-lucide="save" style="width: 16px; height: 16px;"></i> ${l.saveNote}
                            </button>
                        </div>
-                       <!-- FIN TARJETA APUNTES -->
+                       <!-- FIN TARJETA ALERTAS -->
 
                     </section>
                     <section>
@@ -4381,7 +4385,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         updatedLoans[currentLoanIndex].notes = noteText;
 
                         await updateDoc(clientRef, { loans: updatedLoans });
-                        showToast(currentLang === 'es' ? 'Nota guardada!' : 'Nota salva com sucesso!');
+                        showToast(currentLang === 'es' ? 'Alerta guardada!' : 'Alerta salva com sucesso!');
                     } catch (err) {
                         console.error("Error saving notes:", err);
                         showToast('Erro ao salvar nota.', true);
@@ -8385,4 +8389,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
