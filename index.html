@@ -1124,6 +1124,63 @@ const BLACKLIST_DATA = {
             }, 3500);
         }
 
+         function showConfirmationModal(title, message, confirmTextOrCallback = 'Confirmar', btnClass = 'btn-primary') {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('confirmationModal');
+                if (!modal) return resolve(false);
+
+                // Soporte híbrido: Si el 3er argumento es una función, es modo callback (legado).
+                // Si es un string, es modo promesa (nuevo).
+                const isCallback = typeof confirmTextOrCallback === 'function';
+                const confirmLabel = isCallback ? 'Confirmar' : confirmTextOrCallback;
+                // Si es callback (usado en borrados antiguos), usamos rojo por defecto.
+                const confirmClass = isCallback ? 'btn-danger' : btnClass; 
+
+                modal.innerHTML = `
+                    <div class="confirmation-dialog" style="background-color: var(--surface); padding: 25px; border-radius: 12px; max-width: 350px; width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+                        <h3 style="margin-top: 0; color: var(--text-primary); font-size: 1.2em; font-weight: 600;">${title}</h3>
+                        <p style="color: var(--text-secondary); margin: 15px 0 25px; font-size: 0.95em; line-height: 1.5;">${message}</p>
+                        <div class="confirmation-buttons" style="display: flex; gap: 10px;">
+                            <button id="cancel-confirm-btn" class="btn-secondary" style="flex: 1;">Cancelar</button>
+                            <button id="action-confirm-btn" class="${confirmClass}" style="flex: 1;">${confirmLabel}</button>
+                        </div>
+                    </div>
+                `;
+
+                // Asegurar visibilidad
+                modal.classList.add('active');
+
+                const cleanup = () => {
+                    modal.classList.remove('active');
+                    modal.innerHTML = ''; // Limpiar para evitar duplicados de IDs
+                };
+
+                const handleCancel = () => {
+                    cleanup();
+                    resolve(false);
+                };
+
+                const handleConfirm = () => {
+                    cleanup();
+                    if (isCallback) {
+                        confirmTextOrCallback(); // Ejecutar la función antigua
+                        resolve(true);
+                    } else {
+                        resolve(true); // Retornar true a la promesa (await)
+                    }
+                };
+
+                const cancelBtn = modal.querySelector('#cancel-confirm-btn');
+                const confirmBtn = modal.querySelector('#action-confirm-btn');
+
+                if (cancelBtn) cancelBtn.onclick = handleCancel;
+                if (confirmBtn) confirmBtn.onclick = handleConfirm;
+            });
+        }
+
+
+
+
         function showBlockedView(message) {
     console.error("Acceso bloqueado:", message);
     // Ocultamos todas as vistas principais
@@ -4076,7 +4133,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }
             }
 
-            // --- ACTUALIZADO: NUEVO TÍTULO Y TEXTOS PARA LA TARJETA DE ALERTA ---
+            // --- ACTUALIZADO: TÍTULOS Y PLACEHOLDERS EN 3 IDIOMAS ---
             const labels = {
                 pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'DETALHES / CLIENTE, ALERTAS', notesPlaceholder: 'Escreva observações de alerta aqui...', saveNote: 'Salvar Alerta' },
                 es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'DETALLES/ CLIENTE, ALERTAS', notesPlaceholder: 'Escriba observaciones de alerta aquí...', saveNote: 'Guardar Alerta' },
@@ -4286,15 +4343,16 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                            <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0)))}</p>
                        </div>
 
-                       <!-- TARJETA: DETALLES / ALERTAS (MODIFICADA ESTILO ALERTA) -->
-                       <div class="kpi-card" style="border-color: #dc3545; border-width: 1px;">
-                           <h3 class="kpi-title" style="color: #dc3545; font-weight: 700; font-size: 1em;">
+                       <!-- TARJETA: DETALLES / ALERTAS (MODIFICADA: Fondo Blanco, Letras Rojas Grandes) -->
+                       <div class="kpi-card" style="border-color: var(--border-color); border-width: 1px;">
+                           <h3 class="kpi-title" style="color: #dc3545; font-weight: 700; font-size: 1.1em;">
                                 <i data-lucide="alert-circle"></i> ${l.notesTitle}
                            </h3>
+                           <!-- Textarea: Fondo Blanco (surface), Texto Rojo Grande -->
                            <textarea id="loan-notes-input" rows="3" placeholder="${l.notesPlaceholder}" 
-                               style="width: 100%; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px; background-color: #fef2f2; color: #b91c1c; font-size: 1.15em; font-weight: 600; resize: vertical; font-family: inherit;">${loan.notes || ''}</textarea>
-                           <button id="save-notes-btn" class="btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px; font-size: 0.9em; display: flex; align-items: center; justify-content: center; gap: 5px; border-color: #dc3545; color: #dc3545;">
-                               <i data-lucide="save" style="width: 16px; height: 16px;"></i> ${l.saveNote}
+                               style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background-color: var(--surface); color: #dc3545; font-size: 1.25em; font-weight: 700; resize: vertical; font-family: inherit;">${loan.notes || ''}</textarea>
+                           <button id="save-notes-btn" class="btn-secondary" style="margin-top: 10px; width: 100%; padding: 10px; font-size: 1em; display: flex; align-items: center; justify-content: center; gap: 5px; border-color: #dc3545; color: #dc3545;">
+                               <i data-lucide="save" style="width: 18px; height: 18px;"></i> ${l.saveNote}
                            </button>
                        </div>
                        <!-- FIN TARJETA ALERTAS -->
@@ -8389,5 +8447,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
-
