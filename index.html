@@ -732,23 +732,24 @@
         <img id="splash-logo" src="https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO---LUMIX-FINANZAS-REDUCIDO.png?alt=media&token=0b4c34d2-f2e3-44b3-a380-7aadfb9c0991" alt="Logo">
     </div>
 
-    <div id="login-view">
+      <div id="login-view">
         <div class="login-card">
             <div class="logo">
                 <img id="login-logo" src="https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/LOGO---LUMIX-FINANZAS-REDUCIDO.png?alt=media&token=0b4c34d2-f2e3-44b3-a380-7aadfb9c0991" alt="Logo">
             </div>
-            <h2>Bem-vindo, Cobrador!</h2>
-            <p>Faça login para acessar seu painel.</p>
+            <!-- TEXTOS CON DATA-LANG-KEY PARA TRADUCCIÓN -->
+            <h2 data-lang-key="welcomeCollector">Bem-vindo, Cobrador!</h2>
+            <p data-lang-key="loginDesc">Faça login para acessar seu painel.</p>
             <form id="login-form">
                 <div class="form-group">
-                    <label for="username">Usuário</label>
+                    <label for="username" data-lang-key="usernameLabel">Usuário</label>
                     <input type="text" id="username" required>
                 </div>
                 <div class="form-group">
-                    <label for="password">Senha</label>
+                    <label for="password" data-lang-key="passwordLabel">Senha</label>
                     <input type="password" id="password" required>
                 </div>
-                <button type="submit" class="btn-primary">Entrar</button>
+                <button type="submit" class="btn-primary" data-lang-key="enterBtn">Entrar</button>
             </form>
         </div>
     </div>
@@ -891,140 +892,119 @@ const BLACKLIST_DATA = {
         let currentLang = localStorage.getItem('language') || 'pt';
         // === PEGA ESTE BLOQUE COMPLETO DEBAJO DE let currentLang ===
         const translations = {
-            pt: { 
+            pt: {
+                portalTitle: 'Portal do Cobrador', 
                 noClientsFound: 'Nenhum cliente encontrado.', 
                 biweekly: 'QUINZENAL', registerOutflow: 'Registrar Nova Saída', addExpenseOption: 'Adicionar Gasto', expenseOptionDesc: 'Registrar combustível, alimentação, etc.', cashWithdrawal: 'Retirada de Caixa', withdrawalOptionDesc: 'Enviar dinheiro entregue ao admin.', amountDeliveredAdmin: 'Valor entregue ao Admin:', sendForApproval: 'Enviar para Aprovação',
                 postponePayment: 'Adiar Pagamento', postponeConfirmTitle: 'Confirmar Adiamento', postponeConfirmMsg: 'Isso moverá a data de vencimento do cliente em um dia útil, sem gerar atraso. Deseja continuar?', confirm: 'Confirmar', paymentApproved: 'Pagamento aprovado com sucesso!', paymentRejected: 'Pagamento rejeitado.', approve: 'Aprobar', reject: 'Rejeitar', paymentReceipt: 'Comprovante de Pagamento', sentAmount: 'Valor Enviado', paymentVerification: 'Verificação de Pagamento', reputation: 'Reputação', reputationScore: 'Pontuação de Reputação', reputationPerfect: 'Excelente', reputationGood: 'Bom', reputationRegular: 'Regular', reputationBad: 'Ruim', reputationInfo: 'Mantenha seus pagamentos em dia para uma boa reputação.', collector: 'Cobrador', dailyGoal: 'Meta Diária', receivedToday: 'Recebido Hoje', clientsRemaining: 'Clientes Restantes', 
-                todaysRoute: 'Rota de Cobrança (Ativos)', 
-                navHome: 'Rota', 
-                navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário (PDF)', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', 
+                todaysRoute: 'Rota de Cobrança (Ativos)', navHome: 'Rota', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendente', paid: 'Pago', late: 'Atrasado', addNewClient: 'Adicionar Novo Cliente', clientName: 'Nome do Cliente', address: 'Endereço', totalLoan: 'Valor do Empréstimo', installmentValue: 'Valor da Parcela', numInstallments: 'Número de Parcelas', paymentDays: 'Dias de Pagamento', saveClient: 'Salvar Cliente', city: 'Cidade', location: 'Localização GPS', interest: 'Juros (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos do Cliente (Opcional)', takePhoto: 'Tirar Foto', uploadFile: 'Carregar Arquivo', attachedDocs: 'Documentos Anexados', editClient: 'Editar Cliente', saveChanges: 'Salvar Alterações', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital em Mãos', dailyTotal: 'Total do Dia', weeklyTotal: 'Total da Semana', monthlyTotal: 'Total do Mês', accountSettings: 'Configurações da Conta', changePassword: 'Mudar Senha', exportReport: 'Exportar Relatório Diário (PDF)', logout: 'Sair da Conta', reportTitle: 'Relatório Diário de Cobrança', reportDate: 'Data', reportCollector: 'Cobrador', reportTotalCollected: 'Total Arrecadado', reportNumPayments: 'Nº de Pagamentos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'Nenhum pagamento registrado hoje.', cropImage: 'Recortar Imagem', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar',                
+                navExpenses: 'Gastos<br>Retiradas', myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamiento de', reviewRequest: 'Revisar solicitação.', installAppMsg: 'Instale o app para uma melhor experiência!', installBtn: 'Instalar', receivedInCash: 'Recebido em Dinheiro', receivedInDigital: 'Recebido em PIX/Cartão', finished: 'Finalizado', createNewLoan: 'Criar Novo Empréstimo', updateClientData: 'Atualizar Dados', paymentFrequency: 'Forma de Pagamento', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal', dayOfWeek: 'Dia da Semana', dayOfMonth: 'Dia do Mês', sunday: 'Domingo', monday: 'Segunda-feira', tuesday: 'Terça-feira', wednesday: 'Quarta-feira', thursday: 'Quinta-feira', friday: 'Sexta-feira', saturday: 'Sábado', collectionTimeLabel: 'Horário de Cobrança Preferencial', documentNumber: 'Número do Documento', systemHistory: 'Histórico no Sistema', verifySystem: 'Verificar no Sistema', searchingSystem: 'Buscando no sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'Nenhum outro empréstimo ativo encontrado para este documento no sistema.', loansFound: 'Empréstimos Encontrados', loansFoundMsg: 'Os seguintes empréstimos ativos foram encontrados para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Status', loanDetails: 'Detalhes do Empréstimo', amountPaid: 'Valor Pago', paymentApprovedClientTitle: 'Pagamento Aprovado', paymentApprovedClientBody: 'Seu pagamento de {amount} foi aprovado!', paymentRejectedClientTitle: 'Pagamento Rejeitado', paymentRejectedClientBody: 'Seu comprovante foi rejeitado. Entre em contato com seu cobrador.', refinanceApprovedClientTitle: 'Refinanciamento Aprovado', refinanceApprovedClientBody: 'Sua solicitação de refinanciamento foi aprovada com sucesso.', refinanceRejectedClientTitle: 'Refinanciamento Rejeitado', refinanceRejectedClientBody: 'Sua solicitação de refinanciamento foi rejeitada.', realtimeTracking: 'Rastreamento em Tempo Real', 
+                paymentTitle: 'Pagamento Parcela #{start}', paymentTitleRange: 'Pagamento Parcelas #{start} - #{end}', paymentDescFull: 'Parcela #{start} paga integralmente.', paymentDescPartial: 'Pagamento parcial ({percent}%) da parcela.', paymentDescMultiple: 'Cobre {fullInstallments} parcela(s) e {percent}% da próxima.', paymentDescOverpay: 'Cobre a parcela #{start} e adianta {overpayAmount} para a próxima.', paymentInstallmentTitle: 'Pagamento Parcela #{installment}', paymentInstallmentsTitle: 'Pagamento Parcelas #{start} - #{end}', fullPaymentDesc: 'Parcela #{installment} paga integralmente.', partialPaymentDesc: 'Pagamento parcial ({percent}%) da parcela.', multiplePaymentDesc: 'Cobre {count} parcela(s) e {percent}% da próxima.', multipleFullPaymentDesc: 'Cobre {count} parcela(s) integralmente.', emailLogin: 'Email (Login)', username: 'Usuário (Login)', collectorOnTheWayTitle: 'Cobrador a caminho!', collectorOnTheWayBody: 'Nosso cobrador está a caminho e chegará em alguns minutos.', paymentSettings: 'Configurações de Pagamento', currency: 'Moeda de Operação', paymentMethods: 'Métodos de Pagamento', 
+                save: 'Salvar', statusPaidToday: 'PAGO HOJE', statusToPay: 'FALTA PAGAR', statusPending: 'PENDENTE', adminApprovedRefinance: 'Admin aprovou a solicitação de', approveToCreate: 'Aprove para criar o novo empréstimo.', settlementHistory: 'Histórico de Liquidações', noExpenses: 'Nenhum gasto encontrado.', noSettlements: 'Nenhuma liquidação encontrada.', loadingSettlements: 'Carregando liquidações...', totalAssets: 'Capital Total (Patrimônio)', distributedCapital: 'Capital Distribuído', routeLabel: 'Rota:', methodDigitalLabel: 'PIX', methodCardLabel: 'Cartão', salary: 'Salário', routeProgress: 'Progresso da Rota', microInsuranceLabel: 'Micro Seguro (Valor a Descontar)',
                 
-                navExpenses: 'Gastos<br>Retiradas', 
-
-                myExpenses: 'Meus Gastos', addExpense: 'Adicionar Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor do Gasto', observations: 'Observações (Opcional)', uploadReceipt: 'Anexar Recibo (Opcional)', saveExpense: 'Salvar Gasto', fuel: 'Combustível', food: 'Alimentação', rent: 'Aluguel', mechanics: 'Mecânica', other: 'Outros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoria', today: 'Hoje', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde o Início', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Líquido', clientAccess: 'Acesso do Cliente', username: 'Usuário', password: 'Senha', usernameTaken: 'Este nome de usuário já existe.', usernameAvailable: 'Nome de usuário disponível.', usernameRequired: 'O nome de usuário é obrigatório.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartilhar no WhatsApp', clientRegisteredSuccess: 'Cliente Registrado com Sucesso!', clientUpdatedSuccess: 'Cliente Atualizado com Sucesso!', accessData: 'Dados de Acesso', appInstructions: 'Use estes dados para acessar o app do cliente:', appLink: 'Link do App', whatsappMessageTemplate: `Olá {clientName}! 👋 Seu acesso ao nosso app foi criado com sucesso.\n\n*LINK DO APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*SENHA*\n{password}`, navNotifications: 'Notificações', paymentSent: 'enviou um pagamento de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Nenhuma notificação pendente.', refinanceRequested: 'solicitou um refinanciamiento de', reviewRequest: 'Revisar solicitação.', installAppMsg: 'Instale o app para uma melhor experiência!', installBtn: 'Instalar', receivedInCash: 'Recebido em Dinheiro', receivedInDigital: 'Recebido em PIX/Cartão', finished: 'Finalizado', createNewLoan: 'Criar Novo Empréstimo', updateClientData: 'Atualizar Dados', paymentFrequency: 'Forma de Pagamento', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal', dayOfWeek: 'Dia da Semana', dayOfMonth: 'Dia do Mês', sunday: 'Domingo', monday: 'Segunda-feira', tuesday: 'Terça-feira', wednesday: 'Quarta-feira', thursday: 'Quinta-feira', friday: 'Sexta-feira', saturday: 'Sábado', collectionTimeLabel: 'Horário de Cobrança Preferencial', documentNumber: 'Número do Documento', systemHistory: 'Histórico no Sistema', verifySystem: 'Verificar no Sistema', searchingSystem: 'Buscando no sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'Nenhum outro empréstimo ativo encontrado para este documento no sistema.', loansFound: 'Empréstimos Encontrados', loansFoundMsg: 'Os seguintes empréstimos ativos foram encontrados para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Status', loanDetails: 'Detalhes do Empréstimo', amountPaid: 'Valor Pago', paymentApprovedClientTitle: 'Pagamento Aprovado', paymentApprovedClientBody: 'Seu pagamento de {amount} foi aprovado!', paymentRejectedClientTitle: 'Pagamento Rejeitado', paymentRejectedClientBody: 'Seu comprovante foi rejeitado. Entre em contato com seu cobrador.', refinanceApprovedClientTitle: 'Refinanciamento Aprovado', refinanceApprovedClientBody: 'Sua solicitação de refinanciamento foi aprovada com sucesso.', refinanceRejectedClientTitle: 'Refinanciamento Rejeitado', refinanceRejectedClientBody: 'Sua solicitação de refinanciamento foi rejeitada.', realtimeTracking: 'Rastreamento em Tempo Real', 
-                paymentTitle: 'Pagamento Parcela #{start}', 
-                paymentTitleRange: 'Pagamento Parcelas #{start} - #{end}', 
-                paymentDescFull: 'Parcela #{start} paga integralmente.', 
-                paymentDescPartial: 'Pagamento parcial ({percent}%) da parcela.', 
-                paymentDescMultiple: 'Cobre {fullInstallments} parcela(s) e {percent}% da próxima.', 
-                paymentDescOverpay: 'Cobre a parcela #{start} e adianta {overpayAmount} para a próxima.',
-                paymentInstallmentTitle: 'Pagamento Parcela #{installment}',
-                paymentInstallmentsTitle: 'Pagamento Parcelas #{start} - #{end}',
-                fullPaymentDesc: 'Parcela #{installment} paga integralmente.',
-                partialPaymentDesc: 'Pagamento parcial ({percent}%) da parcela.',
-                multiplePaymentDesc: 'Cobre {count} parcela(s) e {percent}% da próxima.',
-                multipleFullPaymentDesc: 'Cobre {count} parcela(s) integralmente.',
-                emailLogin: 'Email (Login)',
-                username: 'Usuário (Login)',
-                collectorOnTheWayTitle: 'Cobrador a caminho!', collectorOnTheWayBody: 'Nosso cobrador está a caminho e chegará em alguns minutos.', paymentSettings: 'Configurações de Pagamento', currency: 'Moeda de Operação', paymentMethods: 'Métodos de Pagamento', 
-                save: 'Salvar',
-                statusPaidToday: 'PAGO HOJE',
-                statusToPay: 'FALTA PAGAR',
-                statusPending: 'PENDIENTE',
-                adminApprovedRefinance: 'Admin aprovou a solicitação de',
-                approveToCreate: 'Aprove para criar o novo empréstimo.',
-                settlementHistory: 'Histórico de Liquidações',
-                noExpenses: 'Nenhum gasto encontrado.',
-                noSettlements: 'Nenhuma liquidação encontrada.',
-                loadingSettlements: 'Carregando liquidações...',
-                totalAssets: 'Capital Total (Patrimônio)',
-                distributedCapital: 'Capital Distribuído',
-                routeLabel: 'Rota:',
-                methodDigitalLabel: 'PIX',
-                methodCardLabel: 'Cartão',
-                salary: 'Salário',
-                routeProgress: 'Progresso da Rota',
-                microInsuranceLabel: 'Micro Seguro (Valor a Descontar)'
+                // COMPLETOS PT
+                activeFines: 'Multas Ativas (Total)',
+                registerSettlement: 'Registrar Retirada',
+                aportarCapital: 'Aportar Capital',
+                unlockAppButton: 'Desbloquear (30m)',
+                unlockAppTitle: 'Desbloquear App',
+                unlockAppMsg: 'Isso permitirá que o cobrador acesse o aplicativo por 30 minutos, ignorando horários. Continuar?',
+                unlockConfirm: 'Sim, Desbloquear',
+                appUnlockedSuccess: 'App do cobrador desbloqueado por 30min!',
+                deleteAlertTitle: 'Apagar Alerta?',
+                deleteAlertMsg: 'Deseja remover esta observação do cliente?',
+                confirmDeleteShort: 'Apagar',
+                welcomeCollector: 'Bem-vindo, Cobrador!',
+                loginDesc: 'Faça login para acessar seu painel.',
+                usernameLabel: 'Usuário',
+                passwordLabel: 'Senha',
+                enterBtn: 'Entrar',
+                languageChanged: 'Idioma alterado para',
+                expenseSaved: 'Gasto salvo com sucesso!',
+                valToWithdraw: 'Valor a Retirar',
+                valToInject: 'Valor a Aportar',
+                obsOptional: 'Observações (Opcional)',
+                confirmRegister: 'Confirmar Registro',
+                confirmInjection: 'Confirmar Aporte',
+                capitalOnHandLabel: 'Capital em Mãos',
+                microInsuranceLabelSimple: 'Micro Seguro',
+                last24h: 'Últimas 24h', last48h: 'Últimas 48h', lastWeek: 'Última Semana', lastMonth: 'Último Mês'
             },
             es: { 
+                portalTitle: 'Portal del Cobrador',
                 noClientsFound: 'Ningún cliente encontrado.', 
                 biweekly: 'QUINCENAL', registerOutflow: 'Registrar Nueva Salida', addExpenseOption: 'Añadir Gasto', expenseOptionDesc: 'Registrar combustible, comida, etc.', cashWithdrawal: 'Retiro de Caja', withdrawalOptionDesc: 'Enviar dinero entregado al admin.', amountDeliveredAdmin: 'Monto entregado al Admin:', sendForApproval: 'Enviar para Aprobación',
                 postponePayment: 'Aplazar Pago', postponeConfirmTitle: 'Confirmar Aplazamiento', postponeConfirmMsg: 'Esto moverá la fecha de vencimiento del cliente un día hábil, sin generar atraso. ¿Desea continuar?', confirm: 'Confirmar', paymentApproved: '¡Pago aprobado con éxito!', paymentRejected: 'Pago rechazado.', approve: 'Aprobar', reject: 'Rechazar', paymentReceipt: 'Comprobante de Pago', sentAmount: 'Monto Enviado', paymentVerification: 'Verificación de Pago', reputation: 'Reputación', reputationScore: 'Puntuación de Reputación', reputationPerfect: 'Excelente', reputationGood: 'Bueno', reputationRegular: 'Regular', reputationBad: 'Mala', reputationInfo: 'Mantén tus pagos al día para tener una buena reputación.', collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', 
-                todaysRoute: 'Ruta de Cobro (Activos)', 
-                navHome: 'Ruta', 
-                navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario (PDF)', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', 
+                todaysRoute: 'Ruta de Cobro (Activos)', navHome: 'Ruta', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario (PDF)', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', 
+                navExpenses: 'Gastos<br>Retiros', myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificaciones', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensal', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida', documentNumber: 'Número de Documento', systemHistory: 'Historial en el Sistema', verifySystem: 'Verificar en el Sistema', searchingSystem: 'Buscando en el sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'No se encontraron otros préstamos activos para este documento en el sistema.', loansFound: 'Préstamos Encontrados', loansFoundMsg: 'Se encontraron los siguientes préstamos activos para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Estado', loanDetails: 'Detalles del Préstamo', amountPaid: 'Monto Pagado', paymentApprovedClientTitle: 'Pago Aprobado', paymentApprovedClientBody: '¡Tu pago de {amount} ha sido aprobado!', paymentRejectedClientTitle: 'Pago Rechazado', paymentRejectedClientBody: 'Tu comprobante fue rechazado. Por favor, contacta a tu cobrador.', refinanceApprovedClientTitle: 'Refinanciación Aprobada', refinanceApprovedClientBody: 'Tu solicitud de refinanciación ha sido aprobada con éxito.', refinanceRejectedClientTitle: 'Refinanciación Rechazada', refinanceRejectedClientBody: 'Tu solicitud de refinanciación ha sido rechazada.', realtimeTracking: 'Seguimiento en Tiempo Real', 
+                paymentTitle: 'Pago Cuota #{start}', paymentTitleRange: 'Pago Cuotas #{start} - #{end}', paymentDescFull: 'Cuota #{start} pagada en su totalidad.', paymentDescPartial: 'Pago parcial ({percent}%) de la cuota.', paymentDescMultiple: 'Cubre {fullInstallments} cuota(s) y {percent}% de la próxima.', paymentDescOverpay: 'Cubre la cuota #{start} y adelanta {overpayAmount} para la próxima.', paymentInstallmentTitle: 'Pago Cuota #{installment}', paymentInstallmentsTitle: 'Pago Cuotas #{start} - #{end}', fullPaymentDesc: 'Cuota #{installment} pagada completamente.', partialPaymentDesc: 'Pago parcial ({percent}%) de la cuota.', multiplePaymentDesc: 'Cubre {count} cuota(s) y un {percent}% de la siguiente.', multipleFullPaymentDesc: 'Cubre {count} cuota(s) completamente.', emailLogin: 'Email (Login)', username: 'Usuário (Login)', collectorOnTheWayTitle: '¡Cobrador en camino!', collectorOnTheWayBody: 'Nuestro cobrador está en camino y llegará en unos minutos.', paymentSettings: 'Configuración de Pagos', currency: 'Moneda de Operación', paymentMethods: 'Métodos de Pago', 
+                save: 'Guardar', statusPaidToday: 'PAGADO HOY', statusToPay: 'FALTA POR PAGAR', statusPending: 'PENDIENTE', adminApprovedRefinance: 'Admin aprobó la solicitud de', approveToCreate: 'Aprueba para crear el nuevo préstamo.', settlementHistory: 'Historial de Liquidaciones', noExpenses: 'Ningún gasto encontrado.', noSettlements: 'Ninguna liquidación encontrada.', loadingSettlements: 'Cargando liquidaciones...', totalAssets: 'Capital Total (Patrimonio)', distributedCapital: 'Capital Distribuido', routeLabel: 'Ruta:', methodDigitalLabel: 'Pago Electrónico', methodCardLabel: 'Tarjeta', salary: 'Salario', routeProgress: 'Progreso de la Ruta', microInsuranceLabel: 'Micro Seguro (A Descontar)',
                 
-                navExpenses: 'Gastos<br>Retiros', 
-
-                myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificaciones', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensal', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida', documentNumber: 'Número de Documento', systemHistory: 'Historial en el Sistema', verifySystem: 'Verificar en el Sistema', searchingSystem: 'Buscando en el sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'No se encontraron otros préstamos activos para este documento en el sistema.', loansFound: 'Préstamos Encontrados', loansFoundMsg: 'Se encontraron los siguientes préstamos activos para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Estado', loanDetails: 'Detalles del Préstamo', amountPaid: 'Monto Pagado', paymentApprovedClientTitle: 'Pago Aprobado', paymentApprovedClientBody: '¡Tu pago de {amount} ha sido aprobado!', paymentRejectedClientTitle: 'Pago Rechazado', paymentRejectedClientBody: 'Tu comprobante fue rechazado. Por favor, contacta a tu cobrador.', refinanceApprovedClientTitle: 'Refinanciación Aprobada', refinanceApprovedClientBody: 'Tu solicitud de refinanciación ha sido aprobada con éxito.', refinanceRejectedClientTitle: 'Refinanciación Rechazada', refinanceRejectedClientBody: 'Tu solicitud de refinanciación ha sido rechazada.', realtimeTracking: 'Seguimiento en Tiempo Real', 
-                paymentTitle: 'Pago Cuota #{start}', 
-                paymentTitleRange: 'Pago Cuotas #{start} - #{end}', 
-                paymentDescFull: 'Cuota #{start} pagada en su totalidad.', 
-                paymentDescPartial: 'Pago parcial ({percent}%) de la cuota.', 
-                paymentDescMultiple: 'Cubre {fullInstallments} cuota(s) y {percent}% de la próxima.', 
-                paymentDescOverpay: 'Cubre la cuota #{start} y adelanta {overpayAmount} para la próxima.',
-                paymentInstallmentTitle: 'Pago Cuota #{installment}',
-                paymentInstallmentsTitle: 'Pago Cuotas #{start} - #{end}',
-                fullPaymentDesc: 'Cuota #{installment} pagada completamente.',
-                partialPaymentDesc: 'Pago parcial ({percent}%) de la cuota.',
-                multiplePaymentDesc: 'Cubre {count} cuota(s) y un {percent}% de la siguiente.',
-                multipleFullPaymentDesc: 'Cubre {count} cuota(s) completamente.',
-                emailLogin: 'Email (Login)',
-                username: 'Usuário (Login)',
-                collectorOnTheWayTitle: '¡Cobrador en camino!', collectorOnTheWayBody: 'Nuestro cobrador está en camino y llegará en unos minutos.', paymentSettings: 'Configuración de Pagos', currency: 'Moneda de Operación', paymentMethods: 'Métodos de Pago', 
-                save: 'Guardar',
-                statusPaidToday: 'PAGADO HOY',
-                statusToPay: 'FALTA POR PAGAR',
-                statusPending: 'PENDIENTE',
-                adminApprovedRefinance: 'Admin aprobó la solicitud de',
-                approveToCreate: 'Aprueba para crear el nuevo préstamo.',
-                settlementHistory: 'Historial de Liquidaciones',
-                noExpenses: 'Ningún gasto encontrado.',
-                noSettlements: 'Ninguna liquidación encontrada.',
-                loadingSettlements: 'Cargando liquidaciones...',
-                totalAssets: 'Capital Total (Patrimonio)',
-                distributedCapital: 'Capital Distribuido',
-                routeLabel: 'Ruta:',
-                methodDigitalLabel: 'Pago Electrónico',
-                methodCardLabel: 'Tarjeta',
-                salary: 'Salario',
-                routeProgress: 'Progreso de la Ruta',
-                microInsuranceLabel: 'Micro Seguro (A Descontar)'
+                // COMPLETOS ES
+                activeFines: 'Multas Activas (Total)',
+                registerSettlement: 'Registrar Retiro',
+                aportarCapital: 'Aportar Capital',
+                unlockAppButton: 'Desbloquear (30m)',
+                unlockAppTitle: 'Desbloquear App',
+                unlockAppMsg: 'Esto permitirá al cobrador acceder a la app por 30 minutos, ignorando horarios. ¿Continuar?',
+                unlockConfirm: 'Sí, Desbloquear',
+                appUnlockedSuccess: '¡App de cobrador desbloqueada por 30min!',
+                deleteAlertTitle: '¿Borrar Alerta?',
+                deleteAlertMsg: '¿Desea eliminar esta observación del cliente?',
+                confirmDeleteShort: 'Eliminar',
+                welcomeCollector: '¡Bienvenido, Cobrador!',
+                loginDesc: 'Inicia sesión para acceder a tu panel.',
+                usernameLabel: 'Usuario',
+                passwordLabel: 'Contraseña',
+                enterBtn: 'Entrar',
+                languageChanged: 'Idioma cambiado a',
+                expenseSaved: '¡Gasto guardado con éxito!',
+                valToWithdraw: 'Valor a Retirar',
+                valToInject: 'Valor a Aportar',
+                obsOptional: 'Observaciones (Opcional)',
+                confirmRegister: 'Confirmar Registro',
+                confirmInjection: 'Confirmar Aporte',
+                capitalOnHandLabel: 'Capital en Mano',
+                microInsuranceLabelSimple: 'Micro Seguro',
+                last24h: 'Últimas 24h', last48h: 'Últimas 48h', lastWeek: 'Última Semana', lastMonth: 'Último Mes'
             },
             en: { 
+                portalTitle: 'Collector Portal',
                 noClientsFound: 'No clients found.',
                 biweekly: 'BIWEEKLY', registerOutflow: 'Register New Outflow', addExpenseOption: 'Add Expense', expenseOptionDesc: 'Register fuel, food, etc.', cashWithdrawal: 'Cash Withdrawal', withdrawalOptionDesc: 'Send money delivered to admin.', amountDeliveredAdmin: 'Amount delivered to Admin:', sendForApproval: 'Send for Approval',
                 postponePayment: 'Postpone Payment', postponeConfirmTitle: 'Confirm Postponement', postponeConfirmMsg: 'This will move the client due date by one business day, without generating a delay. Do you wish to continue?', confirm: 'Confirm', paymentApproved: 'Payment approved successfully!', paymentRejected: 'Payment rejected.', approve: 'Approve', reject: 'Reject', paymentReceipt: 'Payment Receipt', sentAmount: 'Amount Sent', paymentVerification: 'Payment Verification', reputation: 'Reputation', reputationScore: 'Reputation Score', reputationPerfect: 'Excellent', reputationGood: 'Good', reputationRegular: 'Regular', reputationBad: 'Bad', reputationInfo: 'Keep your payments on time for a good reputation.', collector: 'Collector', dailyGoal: 'Daily Goal', receivedToday: 'Received Today', clientsRemaining: 'Remaining Clients', 
-                todaysRoute: 'Collection Route (Active)', 
-                navHome: 'Route', 
-                navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital in Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report (PDF)', logout: 'Logout', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: 'No. of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel', 
+                todaysRoute: 'Collection Route (Active)', navHome: 'Route', navClients: 'Clients', navMap: 'Map', navProfile: 'Profile', pending: 'Pending', paid: 'Paid', late: 'Late', addNewClient: 'Add New Client', clientName: 'Client Name', address: 'Address', totalLoan: 'Loan Amount', installmentValue: 'Installment Value', numInstallments: 'Number of Installments', paymentDays: 'Payment Days', saveClient: 'Save Client', city: 'City', location: 'GPS Location', interest: 'Interest (%)', totalToPay: 'Total Amount to Pay', clientDocs: 'Client Documents (Optional)', takePhoto: 'Take Photo', uploadFile: 'Upload File', attachedDocs: 'Attached Documents', editClient: 'Edit Client', saveChanges: 'Save Changes', startRoute: 'GO', searchClient: 'Search client...', all: 'All', navigate: 'Navigate', capitalTotal: 'Capital in Hand', dailyTotal: 'Daily Total', weeklyTotal: 'Weekly Total', monthlyTotal: 'Monthly Total', accountSettings: 'Account Settings', changePassword: 'Change Password', exportReport: 'Export Daily Report (PDF)', logout: 'Logout', reportTitle: 'Daily Collection Report', reportDate: 'Date', reportCollector: 'Collector', reportTotalCollected: 'Total Collected', reportNumPayments: 'No. of Payments', reportClient: 'Client', reportAmount: 'Amount', reportTime: 'Time', noPaymentsToday: 'No payments registered today.', cropImage: 'Crop Image', confirmCrop: 'Confirm Crop', cancel: 'Cancel',
+                navExpenses: 'Expenses<br>Withdrawals', myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', uploadReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use these data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created successfully.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinance of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Data', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', dayOfWeek: 'Day of Week', dayOfMonth: 'Day of Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching in system...', clientClean: 'Client Clean', clientCleanMsg: 'No other active loans found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinance Approved', refinanceApprovedClientBody: 'Your refinance request has been approved successfully.', refinanceRejectedClientTitle: 'Refinance Rejected', refinanceRejectedClientBody: 'Your refinance request has been rejected.', realtimeTracking: 'Real-time Tracking', 
+                paymentTitle: 'Payment Installment #{start}', paymentTitleRange: 'Payment Installments #{start} - #{end}', paymentDescFull: 'Installment #{start} paid in full.', paymentDescPartial: 'Partial payment ({percent}%) of the installment.', paymentDescMultiple: 'Covers {fullInstallments} installment(s) and {percent}% of the next.', paymentDescOverpay: 'Covers installment #{start} and advances {overpayAmount} for the next.', paymentInstallmentTitle: 'Payment Installment #{installment}', paymentInstallmentsTitle: 'Payment Installments #{start} - #{end}', fullPaymentDesc: 'Installment #{installment} paid fully.', partialPaymentDesc: 'Partial payment ({percent}%) of the installment.', multiplePaymentDesc: 'Covers {count} installment(s) and {percent}% of the next.', multipleFullPaymentDesc: 'Covers {count} installment(s) fully.', emailLogin: 'Email (Login)', username: 'Username (Login)', collectorOnTheWayTitle: 'Collector on the way!', collectorOnTheWayBody: 'Our collector is on the way and will arrive in a few minutes.', paymentSettings: 'Payment Settings', currency: 'Operation Currency', paymentMethods: 'Payment Methods', 
+                save: 'Save', statusPaidToday: 'PAID TODAY', statusToPay: 'TO PAY', statusPending: 'PENDING', adminApprovedRefinance: 'Admin approved the request of', approveToCreate: 'Approve to create the new loan.', settlementHistory: 'Settlement History', noExpenses: 'No expenses found.', noSettlements: 'No settlements found.', loadingSettlements: 'Loading settlements...', totalAssets: 'Total Capital (Assets)', distributedCapital: 'Distributed Capital', routeLabel: 'Route:', methodDigitalLabel: 'Electronic Payment', methodCardLabel: 'Card', salary: 'Salary', routeProgress: 'Route Progress', microInsuranceLabel: 'Micro Insurance (To Deduct)',
                 
-                navExpenses: 'Expenses<br>Withdrawals', 
-
-                myExpenses: 'My Expenses', addExpense: 'Add Expense', expenseType: 'Expense Type', expenseValue: 'Expense Value', observations: 'Observations (Optional)', uploadReceipt: 'Attach Receipt (Optional)', saveExpense: 'Save Expense', fuel: 'Fuel', food: 'Food', rent: 'Rent', mechanics: 'Mechanics', other: 'Other', filterPeriod: 'Filter by Period', filterCategory: 'Filter by Category', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month', fromBeginning: 'From Beginning', reportTotalExpenses: 'Total Expenses', reportNetBalance: 'Net Balance', clientAccess: 'Client Access', username: 'Username', password: 'Password', usernameTaken: 'This username is already taken.', usernameAvailable: 'Username available.', usernameRequired: 'Username is required.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Share on WhatsApp', clientRegisteredSuccess: 'Client Registered Successfully!', clientUpdatedSuccess: 'Client Updated Successfully!', accessData: 'Access Data', appInstructions: 'Use these data to access the client app:', appLink: 'App Link', whatsappMessageTemplate: `Hello {clientName}! 👋 Your access to our app has been created successfully.\n\n*APP LINK*\n{appLink}\n\n*EMAIL*\n{email}\n\n*PASSWORD*\n{password}`, navNotifications: 'Notifications', paymentSent: 'sent a payment of', pleaseVerify: 'Please verify.', noNotifications: 'No pending notifications.', refinanceRequested: 'requested a refinance of', reviewRequest: 'Review request.', installAppMsg: 'Install the app for a better experience!', installBtn: 'Install', receivedInCash: 'Received in Cash', receivedInDigital: 'Received in PIX/Card', finished: 'Finished', createNewLoan: 'Create New Loan', updateClientData: 'Update Data', paymentFrequency: 'Payment Frequency', daily: 'Daily', weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', dayOfWeek: 'Day of Week', dayOfMonth: 'Day of Month', sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', collectionTimeLabel: 'Preferred Collection Time', documentNumber: 'Document Number', systemHistory: 'System History', verifySystem: 'Verify in System', searchingSystem: 'Searching in system...', clientClean: 'Client Clean', clientCleanMsg: 'No other active loans found for this document in the system.', loansFound: 'Loans Found', loansFoundMsg: 'The following active loans were found for this document:', otherLoanCollector: 'Collector', otherLoanStatus: 'Status', loanDetails: 'Loan Details', amountPaid: 'Amount Paid', paymentApprovedClientTitle: 'Payment Approved', paymentApprovedClientBody: 'Your payment of {amount} has been approved!', paymentRejectedClientTitle: 'Payment Rejected', paymentRejectedClientBody: 'Your receipt was rejected. Please contact your collector.', refinanceApprovedClientTitle: 'Refinance Approved', refinanceApprovedClientBody: 'Your refinance request has been approved successfully.', refinanceRejectedClientTitle: 'Refinance Rejected', refinanceRejectedClientBody: 'Your refinance request has been rejected.', realtimeTracking: 'Real-time Tracking', 
-                paymentTitle: 'Payment Installment #{start}', 
-                paymentTitleRange: 'Payment Installments #{start} - #{end}', 
-                paymentDescFull: 'Installment #{start} paid in full.', 
-                paymentDescPartial: 'Partial payment ({percent}%) of the installment.', 
-                paymentDescMultiple: 'Covers {fullInstallments} installment(s) and {percent}% of the next.', 
-                paymentDescOverpay: 'Covers installment #{start} and advances {overpayAmount} for the next.',
-                paymentInstallmentTitle: 'Payment Installment #{installment}',
-                paymentInstallmentsTitle: 'Payment Installments #{start} - #{end}',
-                fullPaymentDesc: 'Installment #{installment} paid fully.',
-                partialPaymentDesc: 'Partial payment ({percent}%) of the installment.',
-                multiplePaymentDesc: 'Covers {count} installment(s) and {percent}% of the next.',
-                multipleFullPaymentDesc: 'Covers {count} installment(s) fully.',
-                emailLogin: 'Email (Login)',
-                username: 'Username (Login)',
-                collectorOnTheWayTitle: 'Collector on the way!', collectorOnTheWayBody: 'Our collector is on the way and will arrive in a few minutes.', paymentSettings: 'Payment Settings', currency: 'Operation Currency', paymentMethods: 'Payment Methods', 
-                save: 'Save',
-                statusPaidToday: 'PAID TODAY',
-                statusToPay: 'TO PAY',
-                statusPending: 'PENDING',
-                adminApprovedRefinance: 'Admin approved the request of',
-                approveToCreate: 'Approve to create the new loan.',
-                settlementHistory: 'Settlement History',
-                noExpenses: 'No expenses found.',
-                noSettlements: 'No settlements found.',
-                loadingSettlements: 'Loading settlements...',
-                totalAssets: 'Total Capital (Assets)',
-                distributedCapital: 'Distributed Capital',
-                routeLabel: 'Route:',
-                methodDigitalLabel: 'Electronic Payment',
-                methodCardLabel: 'Card',
-                salary: 'Salary',
-                routeProgress: 'Route Progress',
-                microInsuranceLabel: 'Micro Insurance (To Deduct)'
+                // COMPLETOS EN
+                activeFines: 'Active Fines (Total)',
+                registerSettlement: 'Register Withdrawal',
+                aportarCapital: 'Contribute Capital',
+                unlockAppButton: 'Unlock (30m)',
+                unlockAppTitle: 'Unlock App',
+                unlockAppMsg: 'This will allow the collector to access the app for 30 minutes, ignoring schedule restrictions. Continue?',
+                unlockConfirm: 'Yes, Unlock',
+                appUnlockedSuccess: 'Collector app unlocked for 30min!',
+                deleteAlertTitle: 'Delete Alert?',
+                deleteAlertMsg: 'Do you want to remove this client observation?',
+                confirmDeleteShort: 'Delete',
+                welcomeCollector: 'Welcome, Collector!',
+                loginDesc: 'Login to access your dashboard.',
+                usernameLabel: 'Username',
+                passwordLabel: 'Password',
+                enterBtn: 'Login',
+                languageChanged: 'Language changed to',
+                expenseSaved: 'Expense saved successfully!',
+                valToWithdraw: 'Amount to Withdraw',
+                valToInject: 'Amount to Inject',
+                obsOptional: 'Observations (Optional)',
+                confirmRegister: 'Confirm Register',
+                confirmInjection: 'Confirm Injection',
+                capitalOnHandLabel: 'Capital on Hand',
+                microInsuranceLabelSimple: 'Micro Insurance',
+                last24h: 'Last 24h', last48h: 'Last 48h', lastWeek: 'Last Week', lastMonth: 'Last Month'
             }
         };
         let mapInstance = null;
@@ -1102,26 +1082,53 @@ const BLACKLIST_DATA = {
 
 
         
-        function showToast(message, isError = false) {
-            const toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) return;
-
+        function showToast(message, type = 'normal') {
             const toast = document.createElement('div');
-            toast.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
-            toast.textContent = message;
+            
+            let cssClass = 'toast';
+            let bgColor = '#333'; 
+            let textColor = '#fff';
+            let iconHtml = '';
 
-            toastContainer.appendChild(toast);
+            // ROJO (Error)
+            if (type === true || type === 'error') {
+                cssClass += ' toast-error';
+                bgColor = '#ef4444'; 
+            } 
+            // VERDE (Éxito / Gasto Guardado)
+            else if (type === 'success') {
+                cssClass += ' toast-success';
+                bgColor = '#10b981'; 
+                iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+            } 
+            // AZUL (Cambio de Idioma)
+            else if (type === 'blue') {
+                bgColor = '#3b82f6';
+                iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+            }
+            
+            toast.className = cssClass;
+            toast.style.backgroundColor = bgColor;
+            toast.style.color = textColor;
+            toast.style.fontWeight = '600';
+            toast.style.display = 'flex';
+            toast.style.alignItems = 'center';
+            
+            if (iconHtml) {
+                toast.innerHTML = `<span style="display:flex; align-items:center;">${iconHtml} ${message}</span>`;
+            } else {
+                toast.textContent = message;
+            }
 
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 10);
-
-            setTimeout(() => {
-                toast.classList.remove('show');
+            const container = document.getElementById('toast-container');
+            if (container) {
+                container.appendChild(toast);
+                setTimeout(() => toast.classList.add('show'), 10);
                 setTimeout(() => {
-                    toast.remove();
-                }, 500);
-            }, 3500);
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 500);
+                }, 3500);
+            }
         }
 
          function showConfirmationModal(title, message, confirmTextOrCallback = 'Confirmar', btnClass = 'btn-primary') {
@@ -1315,7 +1322,7 @@ const BLACKLIST_DATA = {
         function renderMainLayout() {
             document.getElementById('app-container').innerHTML = `
                 <header class="main-header">
-                    <div class="logo"><img id="header-logo" src="${DEFAULT_LOGO_URL}" alt="Logo da Empresa"><span id="header-logo-text" class="logo-text">Portal do Cobrador</span></div>
+                    <div class="logo"><img id="header-logo" src="${DEFAULT_LOGO_URL}" alt="Logo da Empresa"><span id="header-logo-text" class="logo-text" data-lang-key="portalTitle">Portal do Cobrador</span></div>
                     <div class="header-controls">
                         <div style="position: relative;">
                             <!-- BOTÓN IDIOMA -->
@@ -3206,14 +3213,11 @@ async function showRefinanceModal(clientId, notificationId) {
         function renderClientCards(container, clientsData) {
             if (!container) return;
             
-            // --- CAMBIO AQUÍ: TEXTO TRADUCIDO ---
             if (!clientsData || clientsData.length === 0) {
-                // Usamos la traducción o un texto por defecto si falla
                 const msg = (translations[currentLang] && translations[currentLang].noClientsFound) ? translations[currentLang].noClientsFound : 'Nenhum cliente encontrado.';
                 container.innerHTML = `<div class="no-items" data-lang-key="noClientsFound">${msg}</div>`;
                 return;
             }
-            // -------------------------------------
 
             container.innerHTML = ''; 
 
@@ -3232,11 +3236,14 @@ async function showRefinanceModal(clientId, notificationId) {
                 };
 
                 const totalPaidSoFar = (loan.history || [])
-                    .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
+                    .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
                     .reduce((sum, h) => sum + (h.amount || 0), 0);
 
-                const totalDebt = (loan.totalLoan || 0) + (loan.lateFeesAccumulated || 0);
+                // --- CORRECCIÓN CLAVE: USAR EL CÁLCULO EN VIVO DE MORA ---
+                // Usamos details.lateFeesAccumulated para que incluya la multa de 5 días si corresponde
+                const totalDebt = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
                 const remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
+                // ---------------------------------------------------------
 
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
@@ -3275,7 +3282,6 @@ async function showRefinanceModal(clientId, notificationId) {
                 const rawFreq = displayLoan.paymentFrequency || 'daily';
                 const freqText = (freqMap[rawFreq] || rawFreq).toUpperCase();
 
-                // --- LÓGICA DE COLORES DE ESTADO ---
                 const daysLate = displayLoan.lateDays || 0;
                 let avatarHex = '6f42c1'; 
                 let reputationLabel = '';
@@ -3299,7 +3305,6 @@ async function showRefinanceModal(clientId, notificationId) {
                     avatarHex = 'dc3545'; reputationLabel = txt.bad; reputationColor = '#dc3545';
                 }
 
-                // --- ETIQUETA NUEVO / RENOVADO ---
                 let typeLabel = '';
                 let typeColor = 'transparent';
                 let isLoanFromToday = false; 
@@ -4133,7 +4138,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }
             }
 
-            // --- ACTUALIZADO: TÍTULOS Y PLACEHOLDERS EN 3 IDIOMAS ---
             const labels = {
                 pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'DETALHES / CLIENTE, ALERTAS', notesPlaceholder: 'Escreva observações de alerta aqui...', saveNote: 'Salvar Alerta' },
                 es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'DETALLES/ CLIENTE, ALERTAS', notesPlaceholder: 'Escriba observaciones de alerta aquí...', saveNote: 'Guardar Alerta' },
@@ -4340,7 +4344,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
                        <div class="kpi-card" style="border-color: var(--danger-color);">
                            <h3 class="kpi-title"><i data-lucide="receipt-text"></i> ${l.totalDue}</h3>
-                           <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0)))}</p>
+                           <!-- CORRECCIÓN: SUMAMOS loanDetails.lateFeesAccumulated EN LUGAR DE loan.lateFeesAccumulated -->
+                           <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loanDetails.lateFeesAccumulated || 0)))}</p>
                        </div>
 
                        <!-- TARJETA: DETALLES / ALERTAS (MODIFICADA: Fondo Blanco, Letras Rojas Grandes) -->
@@ -6209,7 +6214,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
                     
                     window.history.back();
-                    showToast('Gasto salvo com sucesso!');
+                    showToast(translations[currentLang].expenseSaved, 'success');
 
                 } catch (err) {
                     console.error("Falha ao salvar gasto:", err);
@@ -7320,243 +7325,219 @@ function showReportDateModal() {
 
         
         
-        function setupEventListeners() {
-    // --- NUEVO: SISTEMA DE EDICIÓN PROTEGIDA (DOBLE TOQUE) ---
-    
-    let lastTouchTime = 0; // Variable para controlar el doble toque
-
-    // 1. Botón para desbloquear edición
-    document.body.addEventListener('click', (e) => {
-        const btn = e.target.closest('#enable-route-edit-btn');
-        if (btn) {
-            const currentTime = new Date().getTime();
-            const timeDiff = currentTime - lastTouchTime;
-            
-            // Si el segundo toque ocurre menos de 400ms después del primero = DOBLE TOQUE
-            if (timeDiff < 400 && timeDiff > 0) {
-                const input = document.getElementById('route-name-input');
-                if (input) {
-                    input.disabled = false; // Desbloquear
-                    input.focus(); // Poner el cursor dentro
-                    input.style.borderBottom = "1px solid var(--accent-purple)";
-                    showToast("Edição liberada. Toque fora para salvar.");
+              function setupEventListeners() {
+            // --- SISTEMA DE EDICIÓN PROTEGIDA (DOBLE TOQUE) ---
+            let lastTouchTime = 0; 
+            document.body.addEventListener('click', (e) => {
+                const btn = e.target.closest('#enable-route-edit-btn');
+                if (btn) {
+                    const currentTime = new Date().getTime();
+                    const timeDiff = currentTime - lastTouchTime;
+                    if (timeDiff < 400 && timeDiff > 0) {
+                        const input = document.getElementById('route-name-input');
+                        if (input) {
+                            input.disabled = false; 
+                            input.focus(); 
+                            input.style.borderBottom = "1px solid var(--accent-purple)";
+                            showToast("Edição liberada. Toque fora para salvar.");
+                        }
+                        lastTouchTime = 0; 
+                    } else {
+                        lastTouchTime = currentTime;
+                    }
                 }
-                lastTouchTime = 0; // Reiniciar
-            } else {
-                lastTouchTime = currentTime;
-                // Opcional: Podrías mostrar un toast aquí diciendo "Toque de nuevo", pero puede ser molesto.
-            }
-        }
-    });
-
-    // 2. Al perder el foco (blur), GUARDAR y BLOQUEAR de nuevo
-    document.body.addEventListener('focusout', async (e) => {
-        if (e.target.id === 'route-name-input') {
-            const input = e.target;
-            const newName = input.value.trim();
-            
-            // Re-bloquear inmediatamente para seguridad
-            input.disabled = true;
-            input.style.borderBottom = "none"; // Quitar borde visual
-
-            // Guardar solo si hay un usuario válido
-            if (currentCollectorUsername) {
-                try {
-                    await updateDoc(doc(db, 'collectors', currentCollectorUsername), {
-                        routeName: newName
-                    });
-                    showToast('Nome da rota salvo!');
-                } catch (err) {
-                    console.error("Erro ao salvar nome da rota:", err);
-                    showToast('Erro ao salvar nome da rota.', true);
-                }
-            }
-        }
-    });
-    // --- FIN NUEVO SISTEMA ---
-
-    document.body.addEventListener('click', e => {
-        const target = e.target;
-        if (target.closest('#header-profile-link')) {
-            location.hash = 'profile';
-        }
-        const navItem = target.closest('.nav-item[data-view]');
-        if (navItem) {
-            location.hash = navItem.dataset.view;
-        }
-        if (target.closest('#theme-toggle')) {
-            const newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
-            localStorage.setItem('theme', newTheme);
-            applyTheme(newTheme);
-        }
-        const langToggle = document.getElementById('lang-toggle');
-        const langDropdown = document.getElementById('lang-dropdown');
-        if (langToggle && target.closest('#lang-toggle')) {
-            e.stopPropagation();
-            langDropdown.style.display = langDropdown.style.display === 'block' ? 'none' : 'block';
-        } else if (langDropdown) {
-            langDropdown.style.display = 'none';
-        }
-        if (langDropdown && target.closest('[data-lang]')) {
-            const newLang = target.dataset.lang;
-            localStorage.setItem('language', newLang);
-            currentLang = newLang; // Actualiza el idioma global
-            
-            applyLanguage(currentLang); 
-            
-            updateTodaysRouteList();
-            updateRouteProgress();
-            updateAllClientsList();
-            updateExpensesView();
-            updateProfileView(currentCollectorData); 
-            updateNotifications(); 
-            
-            if(currentDetailClientId && currentDetailLoanIndex !== null) {
-                showClientDetails(currentDetailClientId, currentDetailLoanIndex);
-            }
-        }
-        if(target.closest('#addClientBtn')) showClientFormModal();
-        if(target.closest('#addExpenseBtn')) {
-            console.log("Botão + (Gastos/Liquidación) clicado. Llamando a showOutflowTypeModal...");
-            showOutflowTypeModal();
-        }
-        if (target.closest('#logout-btn')) {
-            stopRealtimeGeolocation(); 
-            if (unsubscribeNotifications) {
-                 console.log("[COBRADOR-APP] Cancelando listener de notificações...");
-                 unsubscribeNotifications();
-                 unsubscribeNotifications = null;
-            }
-            signOut(auth).catch((error) => {
-                console.error("Erro ao fazer logout:", error);
-                showToast("Erro ao tentar sair.", true);
             });
-        }
-        
-        const notificationCard = target.closest('.notification-card');
-        if (notificationCard) {
-            const type = notificationCard.dataset.type;
-            const clientId = notificationCard.dataset.clientId;
-            const notificationId = notificationCard.dataset.notificationId; // ID del documento de notificación
-            const loanIndex = parseInt(notificationCard.dataset.loanIndex, 10);
-            const historyIndex = parseInt(notificationCard.dataset.historyIndex, 10);
 
-            if (type === 'payment') {
-                if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
-                     showVerificationModal(clientId, historyIndex, loanIndex, notificationId);
-                } else {
-                     console.error("Índices inválidos na notificação de pagamento:", notificationCard.dataset);
-                     showToast("Erro ao abrir detalhes da notificação.", true);
+            document.body.addEventListener('focusout', async (e) => {
+                if (e.target.id === 'route-name-input') {
+                    const input = e.target;
+                    const newName = input.value.trim();
+                    input.disabled = true;
+                    input.style.borderBottom = "none"; 
+                    if (currentCollectorUsername) {
+                        try {
+                            await updateDoc(doc(db, 'collectors', currentCollectorUsername), { routeName: newName });
+                            showToast('Nome da rota salvo!');
+                        } catch (err) {
+                            console.error("Erro ao salvar nome da rota:", err);
+                            showToast('Erro ao salvar nome da rota.', true);
+                        }
+                    }
                 }
-            } else if (type === 'refinance') {
-                showRefinanceModal(clientId, notificationId); 
-            } else if (type === 'refinance_admin_approved') {
-                showRefinanceModal(clientId, notificationId);
-            } else {
-                 console.warn("Tipo de notificação desconhecido clicado:", type);
-            }
-        }
+            });
+            // --- FIN SISTEMA EDICIÓN ---
 
-        const clearNotifsBtn = target.closest('#clear-collector-notifications-btn');
-        if (clearNotifsBtn) {
-            e.preventDefault();
-            handleClearCollectorNotifications(); 
-        }
+            document.body.addEventListener('click', e => {
+                const target = e.target;
+                if (target.closest('#header-profile-link')) {
+                    location.hash = 'profile';
+                }
+                const navItem = target.closest('.nav-item[data-view]');
+                if (navItem) {
+                    location.hash = navItem.dataset.view;
+                }
+                if (target.closest('#theme-toggle')) {
+                    const newTheme = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+                    localStorage.setItem('theme', newTheme);
+                    applyTheme(newTheme);
+                }
+                const langToggle = document.getElementById('lang-toggle');
+                const langDropdown = document.getElementById('lang-dropdown');
+                if (langToggle && target.closest('#lang-toggle')) {
+                    e.stopPropagation();
+                    langDropdown.style.display = langDropdown.style.display === 'block' ? 'none' : 'block';
+                } else if (langDropdown) {
+                    langDropdown.style.display = 'none';
+                }
+                
+                // --- CAMBIO DE IDIOMA ---
+                if (langDropdown && target.closest('[data-lang]')) {
+                    const newLang = target.dataset.lang;
+                    localStorage.setItem('language', newLang);
+                    currentLang = newLang; 
+                    
+                    applyLanguage(currentLang); 
+                    
+                    updateTodaysRouteList();
+                    updateRouteProgress();
+                    updateAllClientsList();
+                    updateExpensesView();
+                    updateProfileView(currentCollectorData); 
+                    updateNotifications(); 
+                    
+                    if(currentDetailClientId && currentDetailLoanIndex !== null) {
+                        showClientDetails(currentDetailClientId, currentDetailLoanIndex);
+                    }
 
-        if (target.closest('#change-password-btn')) console.log("Mudar senha a ser implementado.");
-        if (target.closest('#export-report-btn')) showReportDateModal();
-        
-        if (target.closest('#payment-settings-btn')) {
-             if (currentCollectorData) {
-                showPaymentSettingsModal(currentCollectorData);
-             } else {
-                 console.error("currentCollectorData no está disponible globalmente.");
-             }
-        }
-    });
-    
-    window.addEventListener('popstate', (event) => {
-        console.log("[POPSTATE] Evento popstate disparado. Novo estado:", event.state);
-        document.querySelectorAll('.modal-view.active, .modal-overlay.active').forEach(modal => {
-            modal.classList.remove('active');
-        });
-        if (event.state && event.state.modal) {
-            console.log(`[POPSTATE] Reabrindo modal: ${event.state.modal}`);
-            const modalToShow = document.getElementById(event.state.modal);
-            if (modalToShow) {
-                modalToShow.classList.add('active');
-            }
-            if (event.state.modal === 'clientDetailView') {
-                currentDetailClientId = event.state.clientId;
-                currentDetailLoanIndex = event.state.loanIndex;
-                console.log(`[POPSTATE] Restaurando estado de clientDetailView: C=${currentDetailClientId}, L=${currentDetailLoanIndex}`);
-            }
-            return; 
-        }
-        console.log("[POPSTATE] Navegação de vista principal detectada.");
-        currentDetailClientId = null;
-        currentDetailLoanIndex = null;
-        const viewName = location.hash.substring(1) || 'home';
-        console.log(`[POPSTATE] Mostrando vista: ${viewName}`);
-        showView(viewName);
-    });
-    
-    document.body.addEventListener('change', async e => {
-        if (e.target.id === 'realtime-tracking-toggle') {
-            const isActive = e.target.checked;
-            const toggle = e.target;
-            toggle.disabled = true; 
+                    // --- MENSAJE AZUL DE CONFIRMACIÓN (NUEVO) ---
+                    const langName = target.textContent.trim();
+                    const msgPrefix = translations[newLang].languageChanged || 'Idioma alterado para';
+                    showToast(`${msgPrefix}: ${langName}`, 'blue');
+                }
+
+                if(target.closest('#addClientBtn')) showClientFormModal();
+                if(target.closest('#addExpenseBtn')) {
+                    showOutflowTypeModal();
+                }
+                if (target.closest('#logout-btn')) {
+                    stopRealtimeGeolocation(); 
+                    if (unsubscribeNotifications) {
+                        unsubscribeNotifications();
+                        unsubscribeNotifications = null;
+                    }
+                    signOut(auth).catch((error) => {
+                        console.error("Erro ao fazer logout:", error);
+                        showToast('Erro ao sair.', true);
+                    });
+                }
+                
+                const notificationCard = target.closest('.notification-card');
+                if (notificationCard) {
+                    const type = notificationCard.dataset.type;
+                    const clientId = notificationCard.dataset.clientId;
+                    const notificationId = notificationCard.dataset.notificationId;
+                    const loanIndex = parseInt(notificationCard.dataset.loanIndex, 10);
+                    const historyIndex = parseInt(notificationCard.dataset.historyIndex, 10);
+
+                    if (type === 'payment') {
+                        if (!isNaN(historyIndex) && !isNaN(loanIndex)) {
+                            showVerificationModal(clientId, historyIndex, loanIndex, notificationId);
+                        } else {
+                            showToast("Erro ao abrir detalhes da notificação.", true);
+                        }
+                    } else if (type === 'refinance' || type === 'refinance_admin_approved') {
+                        showRefinanceModal(clientId, notificationId); 
+                    }
+                }
+
+                const clearNotifsBtn = target.closest('#clear-collector-notifications-btn');
+                if (clearNotifsBtn) {
+                    e.preventDefault();
+                    handleClearCollectorNotifications(); 
+                }
+
+                if (target.closest('#export-report-btn')) showReportDateModal();
+                
+                if (target.closest('#payment-settings-btn')) {
+                    if (currentCollectorData) {
+                        showPaymentSettingsModal(currentCollectorData);
+                    }
+                }
+            });
             
-            try {
-                const collectorRef = doc(db, 'collectors', currentCollectorUsername);
-                await updateDoc(collectorRef, { isRealtimeTrackingActive: isActive });
-                
-                if (isActive) startRealtimeGeolocation();
-                else stopRealtimeGeolocation();
-                
-            } catch (error) {
-                console.error("Error GPS:", error);
-                showToast('Erro de conexão ao mudar GPS.', true);
-                toggle.checked = !isActive; 
-            } finally {
-                toggle.disabled = false;
+            window.addEventListener('popstate', (event) => {
+                document.querySelectorAll('.modal-view.active, .modal-overlay.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+                if (event.state && event.state.modal) {
+                    const modalToShow = document.getElementById(event.state.modal);
+                    if (modalToShow) {
+                        modalToShow.classList.add('active');
+                    }
+                    if (event.state.modal === 'clientDetailView') {
+                        currentDetailClientId = event.state.clientId;
+                        currentDetailLoanIndex = event.state.loanIndex;
+                    }
+                    return; 
+                }
+                currentDetailClientId = null;
+                currentDetailLoanIndex = null;
+                const viewName = location.hash.substring(1) || 'home';
+                showView(viewName);
+            });
+            
+            document.body.addEventListener('change', async e => {
+                if (e.target.id === 'realtime-tracking-toggle') {
+                    const isActive = e.target.checked;
+                    const toggle = e.target;
+                    toggle.disabled = true; 
+                    try {
+                        const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+                        await updateDoc(collectorRef, { isRealtimeTrackingActive: isActive });
+                        if (isActive) startRealtimeGeolocation();
+                        else stopRealtimeGeolocation();
+                    } catch (error) {
+                        console.error("Error GPS:", error);
+                        showToast('Erro de conexão ao mudar GPS.', true);
+                        toggle.checked = !isActive; 
+                    } finally {
+                        toggle.disabled = false;
+                    }
+                }
+                if (e.target.id === 'profile-pic-input') {
+                    const file = e.target.files[0];
+                    if (file) showCropperModal(file);
+                }
+            });
+
+            const clientsView = document.getElementById('clients-view');
+            if (clientsView) {
+                clientsView.addEventListener('input', e => {
+                    if (e.target.id === 'client-search-input') updateAllClientsList();
+                });
+                clientsView.addEventListener('click', e => {
+                    const filterBtn = e.target.closest('.filter-btn');
+                    if (filterBtn) {
+                        clientsView.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                        filterBtn.classList.add('active');
+                        updateAllClientsList();
+                    }
+                });
+            }
+
+            const expensesView = document.getElementById('expenses-view');
+            if (expensesView) {
+                expensesView.addEventListener('click', e => {
+                    const filterBtn = e.target.closest('.filter-btn');
+                    if(filterBtn) {
+                        const parent = filterBtn.parentElement;
+                        parent.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                        filterBtn.classList.add('active');
+                        updateExpensesView();
+                    }
+                });
             }
         }
-
-        if (e.target.id === 'profile-pic-input') {
-            const file = e.target.files[0];
-            if (file) showCropperModal(file);
-        }
-    });
-
-    const clientsView = document.getElementById('clients-view');
-    if (clientsView) {
-        clientsView.addEventListener('input', e => {
-            if (e.target.id === 'client-search-input') updateAllClientsList();
-        });
-        clientsView.addEventListener('click', e => {
-            const filterBtn = e.target.closest('.filter-btn');
-            if (filterBtn) {
-                clientsView.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-                filterBtn.classList.add('active');
-                updateAllClientsList();
-            }
-        });
-    }
-
-    const expensesView = document.getElementById('expenses-view');
-    if (expensesView) {
-        expensesView.addEventListener('click', e => {
-             const filterBtn = e.target.closest('.filter-btn');
-             if(filterBtn) {
-                 const parent = filterBtn.parentElement;
-                 parent.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-                 filterBtn.classList.add('active');
-                 updateExpensesView();
-             }
-        });
-    }
-}
 
 
 
@@ -7573,7 +7554,9 @@ function showReportDateModal() {
                 loginLogo: document.getElementById('login-logo')
             };
 
-            if (elements.headerLogoText) elements.headerLogoText.textContent = companyName;
+            // NOTA: Ya no sobrescribimos el texto del header para mantener "Portal del Cobrador" traducido.
+            // if (elements.headerLogoText) elements.headerLogoText.textContent = companyName; 
+
             if (elements.headerLogo) elements.headerLogo.src = companyLogo;
             if (elements.splashLogo) elements.splashLogo.src = companyLogo;
             if (elements.loginLogo) elements.loginLogo.src = companyLogo;
@@ -8186,6 +8169,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     }
                 }
             }
+            
             applyLanguage(currentLang);
         }, (error) => {
             console.error("Error al obtener clientes: ", error);
@@ -8256,11 +8240,18 @@ function renderVerificationResults(container, warnings, systemLoans) {
 
 
         
-        function init() {
+         function init() {
+            applyLanguage(currentLang); // Traducir Login inmediatamente
             // --- VARIABLE DE CONTROL DE DÍA ---
             let lastCheckedDate = new Date().getDate();
 
             document.body.classList.add('dark-mode');
+            
+            
+            // ----------------------------------------
+
+            // --- PWA Banner ---
+            // ... (resto de la función sigue igual)
 
             // --- PWA Banner ---
             window.addEventListener('beforeinstallprompt', (e) => {
@@ -8431,9 +8422,15 @@ function renderVerificationResults(container, warnings, systemLoans) {
                         await signOut(auth);
                     }
                 } else {
+                    // Usuário saiu ou não está logado
                     document.getElementById('app-container').style.display = 'none'; 
                     document.getElementById('login-view').style.display = 'flex'; 
                     loadGlobalSettings({}); 
+                    
+                    // --- [CORREÇÃO] APLICAR IDIOMA NO LOGIN/LOGOUT ---
+                    applyLanguage(currentLang); 
+                    // -------------------------------------------------
+
                     const loginForm = document.getElementById('login-form');
                     if (loginForm) {
                         loginForm.removeEventListener('submit', handleLogin); 
@@ -8447,3 +8444,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
