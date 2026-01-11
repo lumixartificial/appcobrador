@@ -2413,59 +2413,68 @@ async function showRefinanceModal(clientId, notificationId) {
         // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura")
          async function generateInvoicePDF(clientData, payment) {
             try {
+                // Feedback visual inmediato
+                showToast(currentLang === 'es' ? "Generando recibo..." : "Gerando recibo...", false);
+                
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ unit: 'mm', format: [80, 230] }); 
 
                 const realClient = allClients.find(c => c.id === clientData.id) || clientData;
                 
-                // Buscar el préstamo al que pertenece este pago
+                // Buscar el préstamo de forma segura
                 let activeLoan = null;
                 if (realClient.loans) {
                     activeLoan = realClient.loans.find(l => l.history && l.history.some(h => 
                         h === payment || (h.amount === payment.amount && h.date?.seconds === payment.date?.seconds)
                     ));
-                    if (!activeLoan) activeLoan = realClient.loans.find(l => l.status !== 'finished');
-                    if (!activeLoan && realClient.loans.length > 0) activeLoan = realClient.loans[realClient.loans.length - 1];
+                    if (!activeLoan && realClient.loans.length > 0) {
+                        activeLoan = realClient.loans[realClient.loans.length - 1];
+                    }
                 }
 
-                // --- CÁLCULOS FINANCIEROS ---
+                // --- CÁLCULOS FINANCIEROS Y PROGRESO ---
                 let totalLoanVal = 0;
                 let totalPaidVal = 0;
                 let remainingBalance = 0;
                 let lateFeesVal = 0;
+                let picoValue = 0;
+                let currentLateDays = 0;
                 let paidInstallments = 0;
                 let totalInstallments = 0;
-                let installmentValue = 0;
-                let picoValue = 0;
-                let statusDetails = { status: 'active', lateDays: 0 };
 
                 if (activeLoan) {
-                    const details = calculateLoanDetails(activeLoan);
-                    statusDetails = details;
-                    lateFeesVal = details.lateFeesAccumulated || 0;
+                    try {
+                        const details = calculateLoanDetails(activeLoan);
+                        lateFeesVal = details.lateFeesAccumulated || 0;
+                        currentLateDays = details.lateDays || 0;
 
-                    const historyPaid = (activeLoan.history || [])
-                        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
-                        .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
-                    
-                    const initialPaid = activeLoan.initialMigratedAmount || 0;
-                    totalPaidVal = initialPaid + historyPaid;
-                    totalLoanVal = (parseFloat(activeLoan.totalLoan) || 0) + lateFeesVal;
-                    remainingBalance = Math.max(0, totalLoanVal - totalPaidVal);
+                        const historyPaid = (activeLoan.history || [])
+                            .filter(h => h.status === 'approved' || h.method === 'migration')
+                            .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                        
+                        const initialPaid = activeLoan.initialMigratedAmount || 0;
+                        totalPaidVal = initialPaid + historyPaid;
+                        totalLoanVal = (parseFloat(activeLoan.totalLoan) || 0) + lateFeesVal;
+                        remainingBalance = Math.max(0, totalLoanVal - totalPaidVal);
 
-                    const totalInstallmentsStr = (activeLoan.installments || "0/0").split('/')[1];
-                    totalInstallments = parseInt(totalInstallmentsStr, 10) || 0;
-                    installmentValue = parseFloat(activeLoan.originalInstallmentAmount || activeLoan.amount || 1);
-                    
-                    if (installmentValue > 0) paidInstallments = Math.floor(totalPaidVal / installmentValue);
-                    if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
-
-                    if (installmentValue > 0 && totalPaidVal > 0) {
-                        const remainder = totalPaidVal % installmentValue;
-                        if (remainder > 0.05 && (installmentValue - remainder) > 0.05) {
-                            picoValue = remainder;
+                        // Cálculo de Parcelas
+                        const totalInstallmentsStr = (activeLoan.installments || "0/0").split('/')[1];
+                        totalInstallments = parseInt(totalInstallmentsStr, 10) || 0;
+                        const installmentValue = parseFloat(activeLoan.originalInstallmentAmount || activeLoan.amount || 1);
+                        
+                        if (installmentValue > 0) {
+                            paidInstallments = Math.floor(totalPaidVal / installmentValue);
                         }
-                    }
+                        if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
+
+                        // Cálculo de Pico
+                        if (installmentValue > 0 && totalPaidVal > 0) {
+                            const remainder = totalPaidVal % installmentValue;
+                            if (remainder > 0.05 && (installmentValue - remainder) > 0.05) {
+                                picoValue = remainder;
+                            }
+                        }
+                    } catch (e) { console.warn("Error calculando detalles préstamo:", e); }
                 }
 
                 // --- TEXTOS E IDIOMA ---
@@ -2473,6 +2482,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 const isEn = currentLang === 'en'; 
                 const localeCode = isEs ? 'es-ES' : (isEn ? 'en-US' : 'pt-BR');
 
+                // Fechas
                 let startDateStr = '--/--';
                 let endDateStr = '--/--';
 
@@ -2484,44 +2494,12 @@ async function showRefinanceModal(clientId, notificationId) {
 
                     if (startD && !isNaN(startD.getTime())) {
                         startDateStr = startD.toLocaleDateString(localeCode);
-                        if (totalInstallments > 0) {
-                            if (statusDetails.status === 'finished' && activeLoan.history && activeLoan.history.length > 0) {
-                                const lastPayment = activeLoan.history[activeLoan.history.length - 1];
-                                let endD = null;
-                                if (lastPayment.date?.seconds) endD = new Date(lastPayment.date.seconds * 1000);
-                                else if (lastPayment.date instanceof Date) endD = lastPayment.date;
-                                if (endD) endDateStr = endD.toLocaleDateString(localeCode);
-                            } else {
-                                let count = 0;
-                                let currentD = new Date(startD);
-                                currentD.setDate(currentD.getDate() + 1); 
-                                let safetyLoop = 0;
-                                while (count < totalInstallments && safetyLoop < 2000) { 
-                                    const dayW = currentD.getDay();
-                                    const dayM = currentD.getDate();
-                                    const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
-                                    const isHol = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(fDate) : false;
-                                    let isPayDay = false;
-                                    const freq = activeLoan.paymentFrequency || 'daily';
-                                    const pDays = activeLoan.paymentDays || [];
-                                    if (!isHol) {
-                                        if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
-                                        else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
-                                        else if (freq === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
-                                        else if (freq === 'biweekly') {
-                                            if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
-                                                const diffT = Math.abs(currentD - startD);
-                                                const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
-                                                if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
-                                            }
-                                        }
-                                    }
-                                    if (isPayDay) count++;
-                                    if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
-                                    safetyLoop++;
-                                }
-                                endDateStr = currentD.toLocaleDateString(localeCode);
-                            }
+                        const totalInst = parseInt((activeLoan.installments || "0/0").split('/')[1], 10) || 0;
+                        if(totalInst > 0) {
+                            let currentD = new Date(startD);
+                            const daysToAdd = totalInst * (activeLoan.paymentFrequency === 'weekly' ? 7 : (activeLoan.paymentFrequency === 'monthly' ? 30 : 1));
+                            currentD.setDate(currentD.getDate() + daysToAdd);
+                            endDateStr = currentD.toLocaleDateString(localeCode);
                         }
                     }
                 }
@@ -2529,7 +2507,9 @@ async function showRefinanceModal(clientId, notificationId) {
                 let paymentDateStr = "N/A";
                 if(payment.date) {
                     let d = payment.date.seconds ? new Date(payment.date.seconds * 1000) : (payment.date instanceof Date ? payment.date : new Date(payment.date));
-                    paymentDateStr = d.toLocaleDateString(localeCode) + ' ' + d.toLocaleTimeString(localeCode, {hour: '2-digit', minute:'2-digit'});
+                    if (!isNaN(d.getTime())) {
+                        paymentDateStr = d.toLocaleDateString(localeCode) + ' ' + d.toLocaleTimeString(localeCode, {hour: '2-digit', minute:'2-digit'});
+                    }
                 }
 
                 let methodText = '---';
@@ -2538,45 +2518,38 @@ async function showRefinanceModal(clientId, notificationId) {
                 else if (payment.method === 'cartao') methodText = isEs ? 'Tarjeta' : (isEn ? 'Card' : 'Cartão');
                 else if (payment.method === 'migration') methodText = isEs ? 'Migración' : (isEn ? 'Migration' : 'Migração');
 
-                const freqMap = { 
-                    'daily': isEs ? 'DIARIO' : (isEn ? 'DAILY' : 'DIÁRIO'), 
-                    'weekly': isEs ? 'SEMANAL' : (isEn ? 'WEEKLY' : 'SEMANAL'), 
-                    'biweekly': isEs ? 'QUINCENAL' : (isEn ? 'BIWEEKLY' : 'QUINZENAL'), 
-                    'monthly': isEs ? 'MENSUAL' : (isEn ? 'MONTHLY' : 'MENSAL') 
-                };
-                const modalidade = activeLoan ? (freqMap[activeLoan.paymentFrequency] || (isEn ? 'DAILY' : 'DIÁRIO')) : '---';
-
                 const texts = {
                     title: isEs ? "RECIBO DE PAGO" : (isEn ? "PAYMENT RECEIPT" : "RECIBO DE PAGAMENTO"),
                     company: currentCompanyData?.name || "LUMIX Finanças",
-                    client: isEs ? "Cliente:" : (isEn ? "Client:" : "Cliente:"),
-                    frequency: isEs ? "Modalidad:" : (isEn ? "Frequency:" : "Frequência:"),
+                    client: isEs ? "Cliente:" : "Cliente:",
                     contract_title: isEs ? "FECHAS DEL CONTRATO" : (isEn ? "CONTRACT DATES" : "DATAS DO CONTRATO"),
                     start_label: isEs ? "Inicio" : (isEn ? "Start" : "Início"),
                     end_label: isEs ? "Fin" : (isEn ? "End" : "Fim"),
-                    progress: isEs ? "Cuotas Pagadas:" : (isEn ? "Paid Installments:" : "Parcelas Pagas:"), 
-                    paid_msg: `${paidInstallments} / ${totalInstallments}`,
-                    loan_total: isEs ? "Total Préstamo:" : (isEn ? "Total Loan:" : "Total Empréstimo:"),
-                    late_fees: isEs ? "Multas/Mora:" : (isEn ? "Fees/Interest:" : "Multas/Juros:"),
-                    total_paid: isEs ? "Total Pagado:" : (isEn ? "Total Paid:" : "Total Pago:"),
-                    to_pay: isEs ? "RESTA POR PAGAR:" : (isEn ? "REMAINING BALANCE:" : "RESTA A PAGAR:"),
-                    pico_label: isEs ? "Valor Pico:" : (isEn ? "Partial Balance:" : "Valor Picado:"),
-                    method_label: isEs ? "Método de Pago:" : (isEn ? "Payment Method:" : "Método de Pagamento:"),
-                    payment_date_label: isEs ? "Fecha Pago:" : (isEn ? "Payment Date:" : "Data Pagto:"),
-                    val_paid_now: isEs ? "VALOR PAGADO" : (isEn ? "AMOUNT PAID" : "VALOR PAGO"),
-                    footer: isEs ? "Generado por LUMIX Finanzas" : (isEn ? "Generated by LUMIX Finance" : "Gerado por LUMIX Finanças"),
-                    signature: isEs ? "Firma del Recibidor" : (isEn ? "Receiver Signature" : "Assinatura do Recebedor")
+                    
+                    // Textos de Progreso
+                    progress_label: isEs ? "Cuotas Pagadas:" : (isEn ? "Paid Installments:" : "Parcelas Pagas:"),
+                    progress_count: `${paidInstallments} / ${totalInstallments}`,
+
+                    date: isEs ? "Fecha:" : "Data:",
+                    method: isEs ? "Método:" : "Método:",
+                    val_paid: isEs ? "VALOR PAGADO" : "VALOR PAGO",
+                    loan_total: isEs ? "Total Préstamo:" : "Total Empréstimo:",
+                    late_days_label: isEs ? "Días de Atraso:" : (isEn ? "Days Late:" : "Dias de Atraso:"),
+                    total_paid: isEs ? "Total Pagado:" : "Total Pago:",
+                    to_pay: isEs ? "RESTA POR PAGAR:" : "RESTA A PAGAR:",
+                    footer: isEs ? "Generado por LUMIX Finanzas" : "Gerado por LUMIX Finanças",
+                    signature: isEs ? "Firma del Recibidor" : "Assinatura do Recebedor"
                 };
 
                 let y = 0;
                 const centerX = 40;
 
-                // --- 1. ENCABEZADO "BONITO" (FONDO PASTEL) ---
-                doc.setFillColor(243, 232, 255); // Lila Pastel
+                // --- 1. ENCABEZADO PASTEL ---
+                doc.setFillColor(243, 232, 255); 
                 doc.rect(0, 0, 80, 25, 'F');
 
                 y = 10;
-                doc.setTextColor(111, 66, 193); // Morado oscuro
+                doc.setTextColor(111, 66, 193); 
                 doc.setFontSize(14); doc.setFont(undefined, 'bold');
                 doc.text(texts.company, centerX, y, { align: 'center' });
                 y += 7;
@@ -2585,10 +2558,11 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.text(texts.title, centerX, y, { align: 'center' });
                 y += 15; 
 
-                // --- 2. FECHAS DE CONTRATO (CENTRADAS) ---
+                // --- 2. FECHAS DE CONTRATO ---
                 doc.setFillColor(250, 250, 250); 
                 doc.setDrawColor(230); 
                 doc.roundedRect(5, y, 70, 14, 2, 2, 'FD');
+                
                 doc.setFontSize(8); doc.setTextColor(111, 66, 193); doc.setFont(undefined, 'bold');
                 doc.text(texts.contract_title, centerX, y + 4, { align: 'center' });
                 
@@ -2601,105 +2575,95 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.text(endDateStr, 57.5, y + 12, { align: 'center' }); 
                 y += 20;
 
-                // --- 3. CLIENTE Y FRECUENCIA ---
+                // --- 3. DATOS CLIENTE ---
                 doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
                 doc.text(texts.client, centerX, y, { align: 'center' });
                 y += 4;
                 doc.setFontSize(12); doc.setTextColor(0); doc.setFont(undefined, 'bold');
                 const splitName = doc.splitTextToSize(realClient.name, 70);
                 doc.text(splitName, centerX, y, { align: 'center' });
-                y += (splitName.length * 5) + 3;
+                y += (splitName.length * 5) + 5;
 
-                doc.setFontSize(8); doc.setTextColor(150); doc.setFont(undefined, 'normal');
-                doc.text(texts.frequency, centerX, y, { align: 'center' });
+                // --- 4. BARRA DE PROGRESO (NUEVO) ---
+                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(0);
+                doc.text(texts.progress_label, 5, y);
+                doc.text(texts.progress_count, 75, y, { align: 'right' });
                 y += 4;
-                doc.setFontSize(11); doc.setTextColor(0); doc.setFont(undefined, 'bold');
-                doc.text(modalidade, centerX, y, { align: 'center' });
-                y += 8;
-
-                // --- 4. BARRA PROGRESO ---
-                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text(texts.progress, 5, y);
-                doc.text(texts.paid_msg, 75, y, { align: 'right' });
-                y += 4;
+                
                 const barWidth = 70; 
                 const progressPct = totalInstallments > 0 ? paidInstallments / totalInstallments : 0;
-                doc.setFillColor(230, 230, 230); doc.rect(5, y, barWidth, 6, 'F');
-                doc.setFillColor(111, 66, 193); doc.rect(5, y, barWidth * progressPct, 6, 'F');
-                y += 10; doc.setLineWidth(0.2); doc.setDrawColor(200); doc.line(5, y, 75, y); y += 6;
-
-                // --- TABLA FINANCIERA ---
-                const addRow = (label, value, color='#000000', bold=false) => {
-                    doc.setFont(undefined, bold ? 'bold' : 'normal'); doc.setTextColor(color);
-                    doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
-                    y += 6;
-                };
-                doc.setFontSize(10);
-                addRow(texts.loan_total, totalLoanVal);
-                if (picoValue > 0) addRow(texts.pico_label, picoValue, '#fb923c');
-                if (lateFeesVal > 0) addRow(texts.late_fees, lateFeesVal, '#dc3545');
-                addRow(texts.total_paid, totalPaidVal, '#28a745');
-                addRow(texts.to_pay, remainingBalance, '#d97706', true); 
                 
-                doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
-                doc.text(texts.payment_date_label, 5, y);
-                doc.text(paymentDateStr, 75, y, { align: 'right' });
+                // Fondo barra
+                doc.setFillColor(230, 230, 230); 
+                doc.rect(5, y, barWidth, 6, 'F');
+                // Barra progreso
+                doc.setFillColor(111, 66, 193); 
+                doc.rect(5, y, barWidth * progressPct, 6, 'F');
+                
+                y += 10;
+                doc.setLineWidth(0.2); doc.setDrawColor(200); doc.line(5, y, 75, y); 
                 y += 6;
 
-                doc.setFont(undefined, 'normal'); doc.setTextColor('#000000');
-                doc.text(texts.method_label, 5, y); 
-                if (methodText.length > 10) doc.setFontSize(8); 
-                doc.text(methodText.toUpperCase(), 75, y, { align: 'right' });
-                doc.setFontSize(10); 
-                y += 6;
-                y += 4;
-                
-                // --- CAJA GRANDE ---
+                // --- 5. FECHA Y MÉTODO ---
+                doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(0);
+                doc.text(paymentDateStr, centerX, y, { align: 'center' });
+                y += 5;
+                doc.setFont(undefined, 'bold');
+                doc.text(methodText.toUpperCase(), centerX, y, { align: 'center' });
+                y += 10;
+
+                // --- 6. CAJA GRANDE (VALOR) ---
                 doc.setFillColor(245, 245, 245); doc.rect(5, y - 4, 70, 14, 'F');
                 doc.setFont(undefined, 'bold'); doc.setTextColor(0);
-                doc.text(texts.val_paid_now, centerX, y + 1, { align: 'center' }); 
+                doc.text(texts.val_paid, centerX, y + 1, { align: 'center' }); 
+                
                 doc.setFontSize(14); doc.setTextColor('#28a745');
                 doc.text(money(payment.amount), centerX, y + 7, { align: 'center' }); 
                 y += 18;
 
-                // FIRMA
-                y += 5; doc.setLineWidth(0.2); doc.setTextColor(0); doc.setDrawColor(0);
+                // --- 7. RESUMEN DE SALDO ---
+                const addRow = (label, value, color='#000000', bold=false) => {
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, bold ? 'bold' : 'normal'); doc.setTextColor(color);
+                    doc.text(label, 5, y); doc.text(money(value), 75, y, { align: 'right' });
+                    y += 6;
+                };
+
+                addRow(texts.loan_total, totalLoanVal);
+                
+                if (currentLateDays > 0) {
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'bold'); 
+                    doc.setTextColor('#dc3545'); 
+                    doc.text(texts.late_days_label, 5, y); 
+                    doc.text(currentLateDays.toString(), 75, y, { align: 'right' });
+                    y += 6;
+                }
+
+                if (lateFeesVal > 0) addRow("Multas/Mora:", lateFeesVal, '#dc3545');
+                addRow(texts.total_paid, totalPaidVal, '#28a745');
+                
+                y += 2; doc.setLineWidth(0.2); doc.setDrawColor(200); doc.line(5, y, 75, y); y += 4;
+                
+                addRow(texts.to_pay, remainingBalance, '#d97706', true); 
+
+                // --- 8. FIRMA Y FOOTER ---
+                y += 10; 
+                doc.setLineWidth(0.2); doc.setTextColor(0); doc.setDrawColor(0);
                 doc.line(15, y, 65, y); y += 4;
                 doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
                 doc.text(texts.signature, centerX, y, { align: 'center' });
+                
                 y += 8;
                 doc.text(texts.footer, centerX, y, { align: 'center' });
 
                 const fileName = `fatura_${realClient.name.replace(/\s/g, '_')}.pdf`;
-                
-                // === LÓGICA DE COMPARTIR DIRECTO (WEB SHARE API) ===
-                const pdfBlob = doc.output('blob');
-                const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
-
-                // Verificamos si el navegador soporta compartir archivos
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-                    const shareTitle = isEs ? `Recibo - ${realClient.name}` : `Recibo - ${realClient.name}`;
-                    const shareText = isEs ? `Hola ${realClient.name}, aquí tienes tu recibo de pago.` : `Olá ${realClient.name}, segue seu comprovante de pagamento.`;
-                    
-                    await navigator.share({
-                        files: [pdfFile],
-                        title: shareTitle,
-                        text: shareText
-                    });
-                    
-                    // Si se comparte exitosamente, mostramos un mensaje breve
-                    console.log('Recibo compartido exitosamente');
-                } else {
-                    // Fallback: Si no soporta compartir (ej. PC de escritorio), descarga el archivo
-                    doc.save(fileName);
-                    showToast(isEs ? "Recibo descargado (Compartir no soportado)." : "Recibo baixado.");
-                }
+                doc.save(fileName);
+                showToast(isEs ? "Recibo descargado." : "Recibo baixado.");
                 
             } catch (error) {
-                // Si el usuario cancela el compartir, puede dar error, lo ignoramos si es AbortError
-                if (error.name !== 'AbortError') {
-                    console.error("Erro fatura:", error);
-                    showToast("Erro ao gerar/compartilhar fatura.", true);
-                }
+                console.error("Erro crítico fatura:", error);
+                showToast("Erro ao gerar PDF.", true);
             }
         }
 
@@ -3048,6 +3012,8 @@ async function showRefinanceModal(clientId, notificationId) {
            let details = {
                lateDays: 0,
                lateFeesAccumulated: 0,
+               fixedFineApplied: 0, // Nueva propiedad para saber cuánto fue
+               hasFixedFine: false, // Nueva bandera
                status: 'pending', 
                nextDueDate: null, 
                amountDueToday: 0 
@@ -3059,7 +3025,6 @@ async function showRefinanceModal(clientId, notificationId) {
                .reduce((sum, h) => sum + (h.amount || 0), 0);
 
            // Si ya cubrió el total, finalizado
-           // CORRECCIÓN: Eliminamos "loan.status === 'finished'" para obligar al sistema a recalcular si el saldo cambia.
            if (!loan || !loan.totalLoan || (currentTotalPaid >= loan.totalLoan - 0.1)) {
                details.status = 'finished';
                return details;
@@ -3081,8 +3046,7 @@ async function showRefinanceModal(clientId, notificationId) {
            
            startDateObj.setHours(0, 0, 0, 0);
            
-           // --- CORRECCIÓN CLAVE: EMPEZAR A CONTAR DESDE EL DÍA SIGUIENTE ---
-           // El día que se crea el préstamo NO se cobra. El primer cobro posible es mañana.
+           // Empezar a contar desde el día siguiente
            let checkDate = new Date(startDateObj); 
            checkDate.setDate(checkDate.getDate() + 1); 
            
@@ -3120,10 +3084,8 @@ async function showRefinanceModal(clientId, notificationId) {
                        installmentsDueCount++; 
                        const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
                        
-                       // Compara deuda acumulada vs pagado total
                        const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
 
-                       // Si debe algo del pasado, suma un día de atraso
                        if (outstandingDueAmount > 0.9) { 
                            accumulatedLateDays++; 
                            if (dailyLateRate > 0) accumulatedLateFees += (outstandingDueAmount * dailyLateRate);
@@ -3133,12 +3095,9 @@ async function showRefinanceModal(clientId, notificationId) {
                    // === ANÁLISIS DEL PRESENTE (HOY) ===
                    else if (checkDate.getTime() === today.getTime()) {
                        const expectedTotalIncludingToday = (installmentsDueCount + 1) * installmentAmount;
-                       
-                       // Si debe la cuota de HOY, se marca el monto, pero NO aumenta 'accumulatedLateDays'
                        if (currentTotalPaid < expectedTotalIncludingToday - 0.1) {
                            details.amountDueToday = installmentAmount;
                        }
-                       
                        if (!details.nextDueDate) details.nextDueDate = new Date(checkDate);
                    } 
                    
@@ -3153,6 +3112,19 @@ async function showRefinanceModal(clientId, notificationId) {
            }
            
            details.lateDays = accumulatedLateDays;
+           
+           // --- NUEVA LÓGICA: MULTA FIJA (5 DÍAS - CONDICIONAL) ---
+           // 1. Obtener valor configurado (puede ser 0 o undefined)
+           const fixedFineAmount = parseFloat(loan.lateFeeAmount) || 0;
+           
+           // 2. Solo aplicamos si hay atraso >= 5 dias Y se configuró un monto > 0
+           if (accumulatedLateDays >= 5 && fixedFineAmount > 0) {
+               accumulatedLateFees += fixedFineAmount; // Se suma al total de mora
+               details.fixedFineApplied = fixedFineAmount; // Guardamos el valor
+               details.hasFixedFine = true; // Bandera para mostrar en UI
+           }
+           // ------------------------------------------
+
            details.lateFeesAccumulated = accumulatedLateFees;
            
            // --- 4. DETERMINAR ESTADO FINAL ---
@@ -3160,15 +3132,12 @@ async function showRefinanceModal(clientId, notificationId) {
                details.status = 'finished';
            } 
            else if (accumulatedLateDays > 0) { 
-               // Solo si debe días del PASADO (ayer o antes) se pone ROJO (Atrasado)
                details.status = 'late';
            } 
            else if (details.amountDueToday > 0) { 
-               // Si debe HOY pero está al día con el pasado -> AMARILLO (Pendiente)
                details.status = 'pending'; 
            } 
            else {
-               // Al día (o pagado hoy)
                details.status = 'pending'; 
            }
            
@@ -4284,7 +4253,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         </div>
                     </div>
 
-                    <section class="kpi-grid-profile" style="margin-bottom: 30px;">
+                     <section class="kpi-grid-profile" style="margin-bottom: 30px;">
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="coins"></i> Total</h3><p class="kpi-value">${money(loan.totalLoan)}</p></div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="receipt"></i> <span data-lang-key="installmentValue"></span></h3><p class="kpi-value" style="color: var(--accent-purple);">${money(loan.originalInstallmentAmount)}</p></div>
                         <div class="kpi-card" style="border-color: var(--accent-orange); border-width: 1px;">
@@ -4293,13 +4262,32 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         </div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
                        
-                        <!-- NUEVA TARJETA: MICRO SEGURO - SE OCULTA SI FINALIZADO -->
+                        <!-- MICRO SEGURO -->
                         ${currentStatus !== 'finished' ? `
                         <div class="kpi-card" style="background-color: color-mix(in srgb, #0ea5e9 10%, var(--surface)); border-color: #0ea5e9;">
                            <h3 class="kpi-title"><i data-lucide="shield-check" style="color: #0ea5e9;"></i> Micro Seguro</h3>
                            <p class="kpi-value" style="color: #0ea5e9;">${money(loan.microInsurance || 0)}</p>
                         </div>` : ''}
-                        <!-- FIN TARJETA -->
+
+                        <!-- TARJETA: MULTA CLIENTE (Siempre visible para mostrar la funcionalidad) -->
+                        ${(() => {
+                            const isApplied = loanDetails.fixedFineApplied > 0;
+                            // Visual: Naranja si no se ha aplicado (0.00), Rojo si se aplicó
+                            const fineColor = isApplied ? '#dc3545' : '#f59e0b'; 
+                            const fineBg = isApplied ? 'color-mix(in srgb, #dc3545 5%, var(--surface))' : 'var(--surface)';
+                            const fineIcon = isApplied ? 'alert-octagon' : 'alert-triangle';
+                            
+                            // Valor a mostrar
+                            const displayVal = isApplied ? loanDetails.fixedFineApplied : 0;
+
+                            return `
+                            <div class="kpi-card" style="background-color: ${fineBg}; border-color: ${fineColor}; border-width: 1px;">
+                               <h3 class="kpi-title"><i data-lucide="${fineIcon}" style="color: ${fineColor};"></i> Multa Cliente</h3>
+                               <p class="kpi-value" style="color: ${fineColor};">${money(displayVal)}</p>
+                               ${!isApplied ? `<small style="color: var(--text-secondary); font-size: 0.75em; display: block; margin-top: 4px;">(Ativa após 5 dias de atraso)</small>` : ''}
+                            </div>`;
+                        })()}
+                        <!-- FIN TARJETA MULTA -->
 
                        <div class="kpi-card" style="border-color: var(--danger-color);">
                            <h3 class="kpi-title"><i data-lucide="receipt-text"></i> Total Devido Agora</h3>
@@ -4913,10 +4901,9 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             // 6. Devolver como Blob (sin cambios)
             return doc.output('blob');
         }
+           
 
-
-        
-             function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0, prefillData = null) {
+           function showClientFormModal(clientId = null, isNewLoan = false, loanIndex = 0, prefillData = null) {
             const isEditMode = clientId !== null && !isNewLoan;
             const client = isEditMode ? allClients.find(c => c.id === clientId) : (clientId ? allClients.find(c => c.id === clientId) : {});
             const loan = (isEditMode && client && client.loans && client.loans[loanIndex]) ? client.loans[loanIndex] : {};
@@ -5057,7 +5044,19 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </div>
                         </div>
 
-                        <!-- CAMBIO: MICRO SEGURO EN LUGAR DE TASA DE MORA -->
+                        <!-- NUEVO CAMPO: MULTA POR 5 DÍAS DE ATRASO -->
+                        <div class="form-group">
+                            <label for="client-late-fee" style="color: #ef4444; font-weight: 700;">
+                                <i data-lucide="alert-triangle" style="width: 14px; height: 14px; vertical-align: middle;"></i> 
+                                Multa (5 Dias de Atraso)
+                            </label>
+                            <input type="number" id="client-late-fee" step="0.01" 
+                                   value="${loan.lateFeeAmount || '0'}" 
+                                   placeholder="Ex: 50.00"
+                                   style="border-color: #ef4444;">
+                        </div>
+
+                        <!-- MICRO SEGURO -->
                         <div class="form-group">
                             <label for="client-micro-insurance" style="color: #0ea5e9; font-weight: 700;">
                                 <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: middle;"></i> 
@@ -5385,9 +5384,10 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     const totalToPay = installmentValue * installments;
                     const principalAmount = loanAmount;
 
-                    // --- CAMBIO: GUARDAR MICRO SEGURO Y ANULAR TASA DE MORA ---
+                    // --- CAMBIO: GUARDAR MICRO SEGURO Y MULTA ---
                     const microInsurance = parseFloat(document.getElementById('client-micro-insurance').value) || 0;
-                    const lateFeeRate = 0; // Desactivada para usar Micro Seguro
+                    const lateFeeAmount = parseFloat(document.getElementById('client-late-fee').value) || 0; // NUEVO
+                    const lateFeeRate = 0; 
                     // ---------------------------------------------------------
 
                     const paymentFrequency = document.getElementById('payment-frequency').value;
@@ -5419,8 +5419,9 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
                     const loanSpecificData = {
                         principalAmount: principalAmount,
-                        lateFeeRate: lateFeeRate, // Siempre 0 ahora
-                        microInsurance: microInsurance, // NUEVO CAMPO
+                        lateFeeRate: lateFeeRate, 
+                        microInsurance: microInsurance, 
+                        lateFeeAmount: lateFeeAmount, // NUEVO CAMPO GUARDADO
                         totalLoan: totalToPay,
                         amount: installmentValue,
                         originalInstallmentAmount: installmentValue,
@@ -5485,8 +5486,9 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         const updatedLoans = [...client.loans];
                         updatedLoans[loanIndex] = {
                              ...updatedLoans[loanIndex], 
-                             lateFeeRate: lateFeeRate, // 0
-                             microInsurance: microInsurance, // ACTUALIZAR
+                             lateFeeRate: lateFeeRate, 
+                             microInsurance: microInsurance, 
+                             lateFeeAmount: lateFeeAmount, // ACTUALIZAR
                              totalLoan: totalToPay,
                              amount: installmentValue,
                              originalInstallmentAmount: installmentValue,
@@ -6563,12 +6565,13 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             }
         }
 
-         async function exportDailyReport(customDate = null) {
+           async function exportDailyReport(customDate = null) {
             const { jsPDF } = window.jspdf;
             const pdfDoc = new jsPDF();
             
             const todayLabel = currentLang === 'es' ? '(HOY)' : (currentLang === 'en' ? '(TODAY)' : '(HOJE)');
 
+            // --- TRADUCCIONES ---
             const t = {
                 title: currentLang === 'es' ? 'Reporte Diario' : (currentLang === 'en' ? 'Daily Report' : 'Relatório Diário'),
                 collector: translations[currentLang].reportCollector || 'Cobrador',
@@ -6583,9 +6586,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 expensesSection: currentLang === 'es' ? 'Gastos del Día' : (currentLang === 'en' ? 'Daily Expenses' : 'Gastos do Dia'),
                 newLoansSection: currentLang === 'es' ? 'Nuevos Préstamos / Renovaciones' : (currentLang === 'en' ? 'New Loans / Renewals' : 'Novos Empréstimos / Renovações'),
                 missedSection: currentLang === 'es' ? 'Restantes por Cobrar (Pendientes/Atrasados)' : (currentLang === 'en' ? 'Remaining to Collect' : 'Restantes a Receber (Pendentes/Atrasados)'),
+                finesSection: currentLang === 'es' ? 'Multas Aplicadas (Justificación de Caja)' : (currentLang === 'en' ? 'Applied Fines (Cash Justification)' : 'Multas Aplicadas (Justificativa de Caixa)'),
                 lateSection: currentLang === 'es' ? 'Reporte de Morosidad (Detalle)' : (currentLang === 'en' ? 'Delinquency Report' : 'Relatório de Inadimplência (Detalhe)'),
                 finishedSection: currentLang === 'es' ? 'Clientes Finalizados (Histórico)' : (currentLang === 'en' ? 'Finished Clients' : 'Clientes Finalizados (Histórico)'),
-                daysLate: currentLang === 'es' ? 'días' : 'dias',
+                daysLate: currentLang === 'es' ? 'días' : (currentLang === 'en' ? 'days' : 'dias'),
                 generatedBy: currentLang === 'es' ? 'Generado por LUMIX Finanzas' : (currentLang === 'en' ? 'Generated by LUMIX Finance' : 'Gerado por LUMIX Finanças'),
                 page: currentLang === 'es' ? 'Página' : (currentLang === 'en' ? 'Page' : 'Página'),
                 of: currentLang === 'es' ? 'de' : (currentLang === 'en' ? 'of' : 'de'),
@@ -6593,12 +6597,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 routeLabel: translations[currentLang].routeLabel || 'Rota:',
                 microInsurance: currentLang === 'es' ? 'Micro Seguro (Fondo)' : 'Micro Seguro (Fundo)',
                 accumulatedInsurance: currentLang === 'es' ? 'FONDO SEGURO ACUMULADO' : 'FUNDO SEGURO ACUMULADO',
+                activeFines: currentLang === 'es' ? 'MULTAS ACTIVAS (Generadas)' : (currentLang === 'en' ? 'ACTIVE FINES (Generated)' : 'MULTAS ATIVAS (Geradas)'), // Nueva etiqueta
                 injections: currentLang === 'es' ? 'Aportes' : 'Aportes',
                 newLoans: currentLang === 'es' ? 'Nuevos Préstamos' : 'Novos Empréstimos'
             };
             
             const reportDate = customDate || new Date();
-            const dateStr = reportDate.toLocaleDateString(currentLang === 'pt' ? 'pt-BR' : 'es-ES');
+            const localeCode = currentLang === 'es' ? 'es-ES' : (currentLang === 'en' ? 'en-US' : 'pt-BR');
+            const dateStr = reportDate.toLocaleDateString(localeCode);
             showToast(currentLang === 'es' ? `Generando PDF para ${dateStr}...` : `Gerando PDF para ${dateStr}...`, false);
 
             const checkDateMatch = (timestamp) => {
@@ -6617,8 +6623,9 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const dailyPaymentsList = [];
             const missedPaymentsList = [];
             const finishedClientsList = [];
+            const finedClientsList = []; 
 
-            // --- CÁLCULO DE FONDO DE SEGURO ACUMULADO (HISTÓRICO TOTAL) ---
+            // --- CÁLCULO DE FONDO DE SEGURO ACUMULADO ---
             let lifetimeInsuranceGenerated = 0;
             allClients.forEach(c => {
                 (c.loans || []).forEach(l => {
@@ -6633,9 +6640,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 }
             });
             
-            // Saldo disponible en la "Hucha" de seguros
             const insuranceFundBalance = Math.max(0, lifetimeInsuranceGenerated - lifetimeInsuranceWithdrawn);
-            // -------------------------------------------------------------
 
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, loanIndex) => { 
@@ -6651,8 +6656,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                                 else dailyTotalDigital += amt;
 
                                 let pTime = '00:00';
-                                if (h.date?.seconds) pTime = new Date(h.date.seconds*1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-                                else if (h.date instanceof Date) pTime = h.date.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                                if (h.date?.seconds) pTime = new Date(h.date.seconds*1000).toLocaleTimeString(localeCode, {hour:'2-digit', minute:'2-digit'});
+                                else if (h.date instanceof Date) pTime = h.date.toLocaleTimeString(localeCode, {hour:'2-digit', minute:'2-digit'});
 
                                 dailyPaymentsList.push({
                                     clientName: client.name,
@@ -6670,7 +6675,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                             clientName: client.name,
                             loanIndex: loanIndex + 1,
                             expectedAmount: loan.originalInstallmentAmount || 0,
-                            status: details.status === 'late' ? 'ATRASADO' : 'PENDENTE'
+                            status: details.status === 'late' ? (currentLang === 'es' ? 'ATRASADO' : 'ATRASADO') : (currentLang === 'es' ? 'PENDIENTE' : 'PENDENTE')
                         });
                     }
 
@@ -6682,18 +6687,31 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                             totalLoan: loan.totalLoan || 0
                         });
                     }
+
+                    // --- DETECCIÓN DE MULTAS ---
+                    if (details.hasFixedFine && details.fixedFineApplied > 0) {
+                        finedClientsList.push({
+                            clientName: client.name,
+                            loanIndex: loanIndex + 1,
+                            fineAmount: details.fixedFineApplied,
+                            lateDays: details.lateDays
+                        });
+                    }
                 });
             });
             
+            // --- TOTAL DE MULTAS ACTIVAS ---
+            const totalActiveFines = finedClientsList.reduce((sum, f) => sum + f.fineAmount, 0);
+
             missedPaymentsList.sort((a, b) => a.clientName.localeCompare(b.clientName));
             dailyPaymentsList.sort((a, b) => a.time.localeCompare(b.time));
             finishedClientsList.sort((a, b) => a.clientName.localeCompare(b.clientName)); 
+            finedClientsList.sort((a, b) => b.fineAmount - a.fineAmount);
 
             const dailyExpenses = allExpenses.filter(e => checkDateMatch(e.date));
             const totalExpenses = dailyExpenses.reduce((sum, e) => sum + e.value, 0);
             dailyExpenses.sort((a, b) => (a.date.seconds || 0) - (b.date.seconds || 0));
 
-            // Filtramos retiros de capital (los de seguro no afectan el flujo operativo del día)
             const dailySettlements = allSettlements.filter(s => checkDateMatch(s.date) && s.type !== 'insurance');
             const totalSettlements = dailySettlements.reduce((sum, s) => sum + s.amount, 0);
             
@@ -6710,7 +6728,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                              principal = loan.totalLoan / (1 + (rate/100));
                         }
                         let loanTime = '00:00';
-                        if (loan.startDate?.seconds) loanTime = new Date(loan.startDate.seconds*1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                        if (loan.startDate?.seconds) loanTime = new Date(loan.startDate.seconds*1000).toLocaleTimeString(localeCode, {hour:'2-digit', minute:'2-digit'});
                         
                         dailyNewLoans.push({
                             clientName: client.name,
@@ -6724,9 +6742,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             const totalLoansOutflow = dailyNewLoans.reduce((sum, l) => sum + l.amount, 0);
             
-            // Total seguro DEL DÍA (solo informativo)
-            const dailyMicroInsurance = dailyNewLoans.reduce((sum, l) => sum + l.microInsurance, 0);
-
             const lateClientsList = [];
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
@@ -6744,8 +6759,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             lateClientsList.sort((a, b) => b.lateDays - a.lateDays);
             
             const operationalResult = dailyTotal - totalExpenses;
-            
-            // Flujo de Caja Operativo (Sin seguros)
             const netCashFlow = (operationalResult + totalInjections) - (totalSettlements + totalLoansOutflow);
 
             const pageMargin = 15;
@@ -6844,9 +6857,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             addSummaryLine(`(-) ${t.settlements}:`, totalSettlements, '#dc3545');
             addSummaryLine(`(+) ${t.injections}:`, totalInjections, '#28a745');
             
-            // --- NUEVO: FONDO DE SEGURO (SEPARADO) ---
+            // --- NUEVO: LÍNEA DE MULTAS ACTIVAS (Informativa) ---
+            if (totalActiveFines > 0) {
+                y += 2;
+                addSummaryLine(`(+) ${t.activeFines}:`, totalActiveFines, '#d97706', true); // Naranja Quemado
+            }
+            // ----------------------------------------------------
+
             if (insuranceFundBalance > 0) {
-                // Línea separadora sutil
                 y += 4;
                 pdfDoc.setLineWidth(0.1);
                 pdfDoc.setDrawColor(220); 
@@ -6854,7 +6872,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y);
                 pdfDoc.setLineDash([]);
                 y += 2;
-                
                 addSummaryLine(`${t.accumulatedInsurance}:`, insuranceFundBalance, '#0ea5e9', true); 
             }
 
@@ -6886,11 +6903,15 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setFont(undefined, 'normal');
                     pdfDoc.setTextColor(0);
                     
-                    let methodDisplay = t.cash;
-                    if (p.method === 'pix') {
-                        methodDisplay = translations[currentLang].methodDigitalLabel || 'PIX';
+                    let methodDisplay = '---';
+                    if (p.method === 'dinheiro') {
+                        methodDisplay = currentLang === 'es' ? 'Efectivo' : (currentLang === 'en' ? 'Cash' : 'Dinheiro');
+                    } else if (p.method === 'pix') {
+                        methodDisplay = currentLang === 'es' ? 'Pago Electrónico' : (currentLang === 'en' ? 'Electronic' : 'PIX');
                     } else if (p.method === 'cartao') {
-                        methodDisplay = translations[currentLang].methodCardLabel || 'Cartão';
+                        methodDisplay = currentLang === 'es' ? 'Tarjeta' : (currentLang === 'en' ? 'Card' : 'Cartão');
+                    } else if (p.method === 'migration') {
+                        methodDisplay = currentLang === 'es' ? 'Migración' : (currentLang === 'en' ? 'Migration' : 'Migração');
                     }
 
                     pdfDoc.text(`${p.time} - ${p.clientName} (${methodDisplay})`, pageMargin + 5, y);
@@ -6910,13 +6931,45 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setTextColor(0);
                     pdfDoc.text(p.clientName, pageMargin + 5, y);
                     pdfDoc.setFont(undefined, 'bold');
-                    if (p.status === 'ATRASADO') pdfDoc.setTextColor('#dc3545'); else pdfDoc.setTextColor('#d97706'); 
+                    
+                    const isLate = p.status === 'ATRASADO' || p.status === 'LATE';
+                    if (isLate) pdfDoc.setTextColor('#dc3545'); else pdfDoc.setTextColor('#d97706'); 
+                    
                     pdfDoc.text(p.status, pageMargin + 100, y);
                     pdfDoc.setTextColor('#000000');
                     pdfDoc.text(money(p.expectedAmount), pageWidth - pageMargin - 5, y, { align: 'right' });
                     y += 7;
                 });
             }
+
+            // --- SECCIÓN DE MULTAS (DETALLE) ---
+            if (finedClientsList.length > 0) {
+                addSectionHeader(t.finesSection);
+                
+                pdfDoc.setFontSize(9);
+                pdfDoc.setTextColor(100);
+                pdfDoc.setFont(undefined, 'bold');
+                pdfDoc.text(currentLang === 'es' ? "Cliente" : "Cliente", pageMargin + 5, y);
+                pdfDoc.text(t.daysLate || 'Dias', pageMargin + 120, y, { align: 'right' }); 
+                pdfDoc.text(currentLang === 'es' ? "Multa" : "Multa", pageWidth - pageMargin - 5, y, { align: 'right' });
+                y += 6;
+
+                finedClientsList.forEach(f => {
+                    checkPageBreak(12);
+                    pdfDoc.setFontSize(10);
+                    pdfDoc.setFont(undefined, 'normal');
+                    pdfDoc.setTextColor(0);
+                    pdfDoc.text(`${f.clientName}`, pageMargin + 5, y);
+                    
+                    pdfDoc.setTextColor('#dc3545'); 
+                    pdfDoc.text(`+${f.lateDays}`, pageMargin + 120, y, { align: 'right' });
+                    
+                    pdfDoc.setFont(undefined, 'bold');
+                    pdfDoc.text(money(f.fineAmount), pageWidth - pageMargin - 5, y, { align: 'right' });
+                    y += 7;
+                });
+            }
+
             if (finishedClientsList.length > 0) {
                 addSectionHeader(t.finishedSection);
                 finishedClientsList.forEach(f => {
@@ -6938,12 +6991,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 addSectionHeader(t.expensesSection); 
                 dailyExpenses.forEach(e => {
                     checkPageBreak(12); 
-                    
-                    // === CORREÇÃO DO ERRO ===
-                    // Mudamos 'lang' para 'currentLang'
                     const cat = (translations[currentLang] && translations[currentLang][e.category]) ? translations[currentLang][e.category] : e.category;
-                    // ========================
-
                     pdfDoc.setFontSize(10);
                     pdfDoc.setFont(undefined, 'normal');
                     pdfDoc.setTextColor(0);
@@ -6965,9 +7013,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     const displayText = `${l.time} - ${l.clientName}`;
                     pdfDoc.text(displayText, pageMargin + 5, y);
                     
-                    // --- MOSTRAR SEGURO EN EL DETALLE ---
                     if (l.microInsurance > 0) {
-                        pdfDoc.setTextColor('#0ea5e9'); // Azul
+                        pdfDoc.setTextColor('#0ea5e9'); 
                         pdfDoc.setFont(undefined, 'bold');
                         pdfDoc.text(`(+Seguro: ${money(l.microInsurance)})`, pageMargin + 100, y);
                     }
@@ -7033,9 +7080,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const successMsg = currentLang === 'es' ? '¡Reporte PDF generado con éxito!' : (currentLang === 'en' ? 'PDF report generated successfully!' : 'Relatório PDF gerado com sucesso!');
             showToast(successMsg);
 
-            // --- BLOQUEO AUTOMÁTICO (5 min) ---
+            // --- BLOQUEO AUTOMÁTICO ---
             const isTodayReport = !customDate || (customDate.toDateString() === new Date().toDateString());
-
             if (isTodayReport) {
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData) {
                     currentCollectorData.lastReportDate = new Date(); 
@@ -7050,7 +7096,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     console.error("Erro ao salvar bloqueio:", err);
                 }
             }
-        } 
+        }
         
         
         
@@ -8301,4 +8347,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
