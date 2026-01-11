@@ -3854,7 +3854,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 // ---------------------------------------------------------
 
 
-        function showClientDetails(clientId, loanIndex = 0) {
+         function showClientDetails(clientId, loanIndex = 0) {
             currentDetailClientId = clientId;
             currentDetailLoanIndex = loanIndex;
             console.log(`[DIAG-STATE] Vista de detalles abierta para Cliente: ${currentDetailClientId}, Préstamo Índice: ${currentDetailLoanIndex}`);
@@ -4077,9 +4077,9 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             }
 
             const labels = {
-                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato' },
-                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato' },
-                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates' }
+                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'Apontamentos / Detalhes', notesPlaceholder: 'Escreva observações aqui...', saveNote: 'Salvar Nota' },
+                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'Apuntes / Detalles Cliente', notesPlaceholder: 'Escriba observaciones aquí...', saveNote: 'Guardar Nota' },
+                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates', totalDue: 'Total Due Now', notesTitle: 'Notes / Details', notesPlaceholder: 'Write observations here...', saveNote: 'Save Note' }
             };
             const l = labels[currentLang] || labels.pt;
 
@@ -4213,12 +4213,9 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     </div>
                     
                     <div class="kpi-card" style="margin-bottom: 20px; text-align: center; padding: 15px;">
-                        <!-- NUEVO TÍTULO AGREGADO AQUÍ -->
                         <h3 class="kpi-title" style="justify-content: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; font-weight: 700; color: var(--text-primary);">
                             ${l.contractDateTitle}
                         </h3>
-
-                        <!-- Grid de Fechas original (Sin cambios en los textos internos) -->
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div style="border-right: 1px solid var(--border-color);">
                                 <h3 class="kpi-title" style="justify-content: center; margin-bottom: 5px; color: var(--accent-purple);">
@@ -4262,22 +4259,17 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         </div>
                         <div class="kpi-card"><h3 class="kpi-title"><i data-lucide="trending-up"></i> Pago</h3><p class="kpi-value green">${money(displayTotalPaid)}</p></div>
                        
-                        <!-- MICRO SEGURO -->
                         ${currentStatus !== 'finished' ? `
                         <div class="kpi-card" style="background-color: color-mix(in srgb, #0ea5e9 10%, var(--surface)); border-color: #0ea5e9;">
                            <h3 class="kpi-title"><i data-lucide="shield-check" style="color: #0ea5e9;"></i> Micro Seguro</h3>
                            <p class="kpi-value" style="color: #0ea5e9;">${money(loan.microInsurance || 0)}</p>
                         </div>` : ''}
 
-                        <!-- TARJETA: MULTA CLIENTE (Siempre visible para mostrar la funcionalidad) -->
                         ${(() => {
                             const isApplied = loanDetails.fixedFineApplied > 0;
-                            // Visual: Naranja si no se ha aplicado (0.00), Rojo si se aplicó
                             const fineColor = isApplied ? '#dc3545' : '#f59e0b'; 
                             const fineBg = isApplied ? 'color-mix(in srgb, #dc3545 5%, var(--surface))' : 'var(--surface)';
                             const fineIcon = isApplied ? 'alert-octagon' : 'alert-triangle';
-                            
-                            // Valor a mostrar
                             const displayVal = isApplied ? loanDetails.fixedFineApplied : 0;
 
                             return `
@@ -4287,12 +4279,22 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                                ${!isApplied ? `<small style="color: var(--text-secondary); font-size: 0.75em; display: block; margin-top: 4px;">(Ativa após 5 dias de atraso)</small>` : ''}
                             </div>`;
                         })()}
-                        <!-- FIN TARJETA MULTA -->
 
                        <div class="kpi-card" style="border-color: var(--danger-color);">
-                           <h3 class="kpi-title"><i data-lucide="receipt-text"></i> Total Devido Agora</h3>
+                           <h3 class="kpi-title"><i data-lucide="receipt-text"></i> ${l.totalDue}</h3>
                            <p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loan.lateFeesAccumulated || 0)))}</p>
                        </div>
+
+                       <!-- TARJETA: APUNTES / DETALLES (NUEVA) -->
+                       <div class="kpi-card" style="border-color: var(--text-secondary);">
+                           <h3 class="kpi-title"><i data-lucide="file-pen-line"></i> ${l.notesTitle}</h3>
+                           <textarea id="loan-notes-input" rows="3" placeholder="${l.notesPlaceholder}" style="width: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; background-color: var(--bg); color: var(--text-primary); resize: vertical; font-family: inherit;">${loan.notes || ''}</textarea>
+                           <button id="save-notes-btn" class="btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px; font-size: 0.9em; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                               <i data-lucide="save" style="width: 16px; height: 16px;"></i> ${l.saveNote}
+                           </button>
+                       </div>
+                       <!-- FIN TARJETA APUNTES -->
+
                     </section>
                     <section>
                          <h2 class="section-title" data-lang-key="reputationScore"></h2>
@@ -4355,6 +4357,42 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             });
 
             document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
+
+            // --- LISTENER PARA GUARDAR NOTAS (NUEVO) ---
+            const saveNotesBtn = document.getElementById('save-notes-btn');
+            if (saveNotesBtn) {
+                saveNotesBtn.addEventListener('click', async () => {
+                    const noteText = document.getElementById('loan-notes-input').value.trim();
+                    const originalBtnContent = saveNotesBtn.innerHTML;
+                    
+                    saveNotesBtn.disabled = true;
+                    saveNotesBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite; width: 16px; height: 16px;"></i>`;
+                    lucide.createIcons({nodes: [saveNotesBtn.querySelector('i')]});
+
+                    try {
+                        const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
+                        // Re-fetch para asegurar datos frescos
+                        const freshClientIdx = allClients.findIndex(c => c.id === clientId);
+                        if (freshClientIdx === -1) throw new Error("Cliente não encontrado.");
+                        const freshClient = allClients[freshClientIdx];
+                        const updatedLoans = JSON.parse(JSON.stringify(freshClient.loans));
+                        
+                        // Actualizar nota en el préstamo actual
+                        updatedLoans[currentLoanIndex].notes = noteText;
+
+                        await updateDoc(clientRef, { loans: updatedLoans });
+                        showToast(currentLang === 'es' ? 'Nota guardada!' : 'Nota salva com sucesso!');
+                    } catch (err) {
+                        console.error("Error saving notes:", err);
+                        showToast('Erro ao salvar nota.', true);
+                    } finally {
+                        saveNotesBtn.disabled = false;
+                        saveNotesBtn.innerHTML = originalBtnContent;
+                        lucide.createIcons({nodes: [saveNotesBtn.querySelector('i')]});
+                    }
+                });
+            }
+            // -------------------------------------------
 
             if (currentStatus === 'finished') {
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
@@ -8347,3 +8385,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
