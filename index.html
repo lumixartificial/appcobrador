@@ -2413,6 +2413,41 @@ async function showRefinanceModal(clientId, notificationId) {
                 doc.text(money(bigBoxValue), centerX, y + 7, { align: 'center' }); 
                 y += 18;
 
+                // --- NUEVO: ETIQUETA DE TIPO (SOLO SI ES HOY) ---
+                let isLoanFromToday = false;
+                if (loan.startDate) {
+                    const todayCheck = new Date();
+                    todayCheck.setHours(0,0,0,0);
+                    
+                    let loanStart = null;
+                    if (loan.startDate.seconds) loanStart = new Date(loan.startDate.seconds * 1000);
+                    else if (loan.startDate instanceof Date) loanStart = loan.startDate;
+                    else loanStart = new Date(loan.startDate);
+
+                    if (loanStart) {
+                        isLoanFromToday = loanStart.getDate() === todayCheck.getDate() &&
+                                          loanStart.getMonth() === todayCheck.getMonth() &&
+                                          loanStart.getFullYear() === todayCheck.getFullYear();
+                    }
+                }
+
+                if (isLoanFromToday) {
+                    const typeTexts = {
+                        pt: { new: 'NOVO EMPRÉSTIMO', renew: 'RENOVAÇÃO' },
+                        es: { new: 'NUEVO PRÉSTAMO', renew: 'RENOVACIÓN' },
+                        en: { new: 'NEW LOAN', renew: 'RENEWAL' }
+                    };
+                    const tType = typeTexts[currentLang] || typeTexts.pt;
+                    const loanTypeLabel = loanIndex > 0 ? tType.renew : tType.new;
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor('#0ea5e9'); // Azul bonito
+                    doc.setFont(undefined, 'bold');
+                    doc.text(loanTypeLabel, centerX, y + 2, { align: 'center' });
+                    y += 8; 
+                }
+                // ---------------------------------------------------
+
                 // Estado
                 let statusColor = '#28a745'; 
                 let statusText = texts.up_to_date; 
@@ -4115,8 +4150,37 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
             const loanDetails = calculateLoanDetails(loan);
             const currentStatus = loanDetails.status;
-            const statusClass = `status-${currentStatus}`;
-            const statusText = (translations[currentLang] && translations[currentLang][currentStatus]) || currentStatus;
+            
+            // --- LÓGICA DE ESTADO MEJORADA (VERDE "AL DÍA") ---
+            // Por defecto la clase sigue el estado, PERO...
+            let statusClass = `status-${currentStatus}`; 
+            let statusText = '';
+
+            if (currentStatus === 'pending') {
+                // 1. Texto: "AL DÍA"
+                statusText = { 
+                    pt: 'EM DIA', 
+                    es: 'AL DÍA', 
+                    en: 'UP TO DATE' 
+                }[currentLang] || 'EM DIA';
+
+                // 2. Color: Forzamos el estilo VERDE (status-paid) para que se vea positivo
+                statusClass = 'status-paid'; 
+            } 
+            else if (currentStatus === 'late') {
+                // Mantiene el ROJO y los días de atraso
+                let baseText = (translations[currentLang] && translations[currentLang][currentStatus]) || currentStatus;
+                if (loanDetails.lateDays > 0) {
+                    const daysLabel = { pt: 'dias', es: 'días', en: 'days' }[currentLang] || 'dias';
+                    baseText += ` (${loanDetails.lateDays} ${daysLabel})`;
+                }
+                statusText = baseText;
+            } 
+            else {
+                // Para 'finished' (Azul) o 'paid' (Verde)
+                statusText = (translations[currentLang] && translations[currentLang][currentStatus]) || currentStatus;
+            }
+            // --------------------------------------------------------
 
             const lateDays = loanDetails.lateDays;
             const score = Math.max(0, 10 - lateDays);
@@ -5036,6 +5100,26 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const autoUsername = client.username || `user${timestampSuffix}`;
             const autoPassword = client.password || Math.random().toString(36).slice(-6).toUpperCase();
 
+            // --- TRADUCCIONES DINÁMICAS LOCALES (Para Días, Títulos y Botones) ---
+            const t_personalData = { pt: 'Dados Pessoais', es: 'Datos Personales', en: 'Personal Data' }[currentLang] || 'Dados Pessoais';
+            const t_gpsBtn = { pt: 'Obter Localização GPS', es: 'Obtener Ubicación GPS', en: 'Get GPS Location' }[currentLang] || 'Obter Localização GPS';
+            
+            let t_loanDetailsTitle = '';
+            if (currentLang === 'es') {
+                t_loanDetailsTitle = isNewLoan ? 'Detalles del Nuevo Préstamo' : (isEditMode ? 'Detalles del Préstamo' : 'Detalles del Primer Préstamo');
+            } else if (currentLang === 'en') {
+                t_loanDetailsTitle = isNewLoan ? 'New Loan Details' : (isEditMode ? 'Loan Details' : 'First Loan Details');
+            } else {
+                t_loanDetailsTitle = isNewLoan ? 'Detalhes do Novo Empréstimo' : (isEditMode ? 'Detalhes do Empréstimo' : 'Detalhes do Primeiro Empréstimo');
+            }
+
+            const t_dayLabels = {
+                pt: ['D','S','T','Q','Q','S','S'], // Dom, Seg, Ter, Qua, Qui, Sex, Sáb
+                es: ['D','L','M','X','J','V','S'], // Dom, Lun, Mar, Mié(X), Jue, Vie, Sáb
+                en: ['S','M','T','W','T','F','S']  // Sun, Mon, Tue, Wed, Thu, Fri, Sat
+            }[currentLang] || ['D','S','T','Q','Q','S','S'];
+            // ---------------------------------------------------------------------
+
             clientFormModal.innerHTML = `
                 <header class="modal-header">
                     <button id="closeClientFormModal"><i data-lucide="arrow-left"></i></button>
@@ -5046,7 +5130,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     <form id="client-form">
                         
                         <h3 class="section-title" style="margin-top: 10px; border: none; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
-                            <i data-lucide="user-round"></i> Dados Pessoais
+                            <i data-lucide="user-round"></i> ${t_personalData}
                         </h3>
                         <hr style="border: 1px solid var(--border-color); margin-top: 10px; margin-bottom: 25px;">
 
@@ -5073,7 +5157,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             <label data-lang-key="location"></label>
                             <input type="text" id="client-location" readonly placeholder="Clique no botão para obter" value="${client.location || ''}">
                             <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%; margin-top: 10px;">
-                                <i data-lucide="map-pin"></i> Obter Localização GPS
+                                <i data-lucide="map-pin"></i> ${t_gpsBtn}
                             </button>
                         </div>
                         
@@ -5094,7 +5178,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
                         <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
                            <i data-lucide="dollar-sign"></i> 
-                           ${isNewLoan ? 'Detalhes do Novo Empréstimo' : (isEditMode ? 'Detalhes do Empréstimo' : 'Detalhes do Primeiro Empréstimo')}
+                           ${t_loanDetailsTitle}
                         </h3>
                         
                         <div class="form-group" id="migration-toggle-group" style="display: ${isEditMode || isNewLoan ? 'none' : 'block'}; background-color: var(--border-color); padding: 15px; border-radius: 12px;">
@@ -5165,7 +5249,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         <div class="form-group">
                             <label for="client-micro-insurance" style="color: #0ea5e9; font-weight: 700;">
                                 <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: middle;"></i> 
-                                Micro Seguro (Valor a Descontar)
+                                ${translations[currentLang].microInsuranceLabelSimple || 'Micro Seguro'}
                             </label>
                             <input type="number" id="client-micro-insurance" step="0.01" 
                                    value="${loan.microInsurance || '0'}" 
@@ -5197,7 +5281,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             <div id="daily-payment-selector">
                                 <label data-lang-key="paymentDays"></label>
                                 <div class="day-selector">
-                                    ${['D','S','T','Q','Q','S','S'].map((day, i) => `<div><input type="checkbox" id="form-day-${i}" value="${i}"><label for="form-day-${i}">${day}</label></div>`).join('')}
+                                    ${t_dayLabels.map((day, i) => `<div><input type="checkbox" id="form-day-${i}" value="${i}"><label for="form-day-${i}">${day}</label></div>`).join('')}
                                 </div>
                             </div>
                             <div id="weekly-payment-selector" style="display: none;">
@@ -8444,4 +8528,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
