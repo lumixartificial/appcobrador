@@ -8227,7 +8227,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 }
 
                 
-                let isRestricted = false;
+                let isRestricted = hour >= 0 && hour < 7;
                 let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
 
                 // 3. REGLA: Bloqueo 5 minutos después del reporte
@@ -8375,4 +8375,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
