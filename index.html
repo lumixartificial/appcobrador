@@ -1097,7 +1097,34 @@ const BLACKLIST_DATA = {
         const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
         
 
-        const money = val => (typeof val !== 'number' || isNaN(val)) ? (currentLang === 'pt' ? 'R$ 0,00' : '$ 0.00') : val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const money = val => {
+            const safeVal = (typeof val !== 'number' || isNaN(val)) ? 0 : val;
+            
+            // 1. Intentamos usar la moneda específica del cobrador
+            let currencyCode = typeof currentCollectorData !== 'undefined' ? currentCollectorData?.paymentSettings?.currency : null;
+            
+            // 2. Si no, usamos la moneda global de la empresa
+            if (!currencyCode && typeof currentCompanyData !== 'undefined') {
+                currencyCode = currentCompanyData.settings?.currency;
+            }
+            
+            // 3. Fallback a BRL si no hay nada configurado
+            if (!currencyCode) currencyCode = 'BRL';
+
+            // Mapas de formato para que los puntos y comas se vean bien según el país
+            const localeMap = {
+                'USD': 'en-US', 'MXN': 'es-MX', 'COP': 'es-CO', // Colombia usa $ 1.000,00 o $ 1,000.00 según preferencia, es-CO suele ser punto miles coma decimales estándar.
+                'ARS': 'es-AR', 'CLP': 'es-CL', 'EUR': 'es-ES',
+                'BRL': 'pt-BR', 'PYG': 'es-PY', 'PEN': 'es-PE',
+                'UYU': 'es-UY', 'VES': 'es-VE', 'CRC': 'es-CR',
+                'GTQ': 'es-GT', 'HNL': 'es-HN', 'NIO': 'es-NI',
+                'PAB': 'es-PA', 'USD_SV': 'es-SV', 'USD_EC': 'es-EC',
+                'CAD': 'en-CA'
+            };
+            const locale = localeMap[currencyCode] || 'pt-BR'; 
+
+            return safeVal.toLocaleString(locale, { style: 'currency', currency: currencyCode });
+        };
 
 
         function calculateDailyTotals() {
@@ -8399,3 +8426,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
