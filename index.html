@@ -4021,10 +4021,16 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 // ---------------------------------------------------------
 
 
-          function showClientDetails(clientId, loanIndex = 0) {
+         function showClientDetails(clientId, loanIndex = 0, isUpdate = false) {
             currentDetailClientId = clientId;
             currentDetailLoanIndex = loanIndex;
-            console.log(`[DIAG-STATE] Vista de detalles abierta para Cliente: ${currentDetailClientId}, Préstamo Índice: ${currentDetailLoanIndex}`);
+            
+            // Si NO es una actualización silenciosa, registramos en el historial para navegación
+            if (!isUpdate) {
+                console.log(`[DIAG-STATE] Navegando a detalles: Cliente ${clientId}`);
+                // Solo hacemos pushState si es una navegación normal
+            }
+
             const clientDetailView = document.getElementById('clientDetailView');
             const client = allClients.find(c => c.id == clientId);
 
@@ -4145,12 +4151,24 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             };
             const labels = l[currentLang] || l.pt;
 
-            // Fechas Contrato
-            let startDateStr = '--/--', endDateStr = 'Calculando...';
+            // --- LÓGICA FECHAS CONTRATO (RESTAURADA) ---
+            let startDateStr = '--/--', endDateStr = '--/--';
             if (loan.startDate) {
                 let startD = loan.startDate.seconds ? new Date(loan.startDate.seconds * 1000) : (loan.startDate instanceof Date ? loan.startDate : new Date(loan.startDate));
-                if (startD && !isNaN(startD.getTime())) { startDateStr = startD.toLocaleDateString('pt-BR'); endDateStr = '--/--'; }
+                if (startD && !isNaN(startD.getTime())) { 
+                    startDateStr = startD.toLocaleDateString('pt-BR'); 
+                    // Cálculo aproximado de fecha fin
+                    const totalInst = parseInt((loan.installments || "0/0").split('/')[1], 10) || 0;
+                    if(totalInst > 0) {
+                        let currentD = new Date(startD);
+                        const daysToAdd = totalInst * (loan.paymentFrequency === 'weekly' ? 7 : (loan.paymentFrequency === 'monthly' ? 30 : (loan.paymentFrequency === 'biweekly' ? 14 : 1)));
+                        const finalDays = loan.paymentFrequency === 'daily' ? Math.ceil(totalInst * 1.2) : daysToAdd;
+                        currentD.setDate(currentD.getDate() + finalDays);
+                        endDateStr = currentD.toLocaleDateString('pt-BR');
+                    }
+                }
             }
+            // ------------------------------------------
 
             // Botones
             let receiptBtnText = currentLang === 'es' ? 'Enviar<br>Recibo' : (currentLang === 'en' ? 'Send<br>Receipt' : 'Enviar<br>Comprovante');
@@ -4167,15 +4185,11 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
             // --- LÓGICA DEL CHAT ---
             let messages = loan.chatHistory || [];
-            // Si no hay historial pero hay nota antigua, la mostramos como mensaje del admin
             if (messages.length === 0 && loan.notes && loan.notes.trim() !== '') {
                 messages.push({ sender: 'admin', text: loan.notes, timestamp: new Date() });
             }
 
             const chatBubblesHtml = messages.map(msg => {
-                // En la APP del Cobrador:
-                // 'collector' (yo) -> clase 'collector' (Verde/Derecha)
-                // 'admin' (otro) -> clase 'admin' (Blanco/Izquierda)
                 const isMe = msg.sender === 'collector'; 
                 const time = msg.timestamp ? new Date(msg.timestamp.seconds ? msg.timestamp.seconds * 1000 : msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
                 return `
@@ -4203,6 +4217,25 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         <div class="progress-circle"><svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="client-detail-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292; stroke: var(--accent-purple);"></circle></svg><div class="progress-text" id="client-detail-progress-text"></div></div>
                     </div>
                     
+                    <!-- TARJETA FECHAS CONTRATO (MEJORADA: CENTRADA CON GAP) -->
+                    <div class="kpi-card" style="margin-bottom: 20px; padding: 15px; text-align: center;">
+                        <h3 class="kpi-title" style="justify-content: center; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">
+                            <i data-lucide="calendar-days"></i> ${labels.contractDateTitle}
+                        </h3>
+                        <div style="display: flex; justify-content: center; gap: 40px; align-items: center;"> 
+                            <div>
+                                <span style="font-size: 0.8em; color: var(--text-secondary); display: block;">Início</span>
+                                <strong style="font-size: 1.1em; color: var(--accent-purple);">${startDateStr}</strong>
+                            </div>
+                            <div style="width: 1px; height: 30px; background-color: var(--border-color);"></div>
+                            <div>
+                                <span style="font-size: 0.8em; color: var(--text-secondary); display: block;">Fim (Prev.)</span>
+                                <strong style="font-size: 1.1em; color: var(--text-primary);">${endDateStr}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- FIN TARJETA MEJORADA -->
+
                     <div class="kpi-card" style="margin-bottom: 20px; text-align: center;"><h3 class="kpi-title" style="justify-content: center;">${labels.status} ${currentLoanIndex + 1}</h3><span class="payment-status ${statusClass}" style="font-size: 1.2em; font-weight: 600; padding: 8px 20px;">${statusText}</span></div>
 
                     <div class="kpi-card" style="margin-bottom: 20px; padding: 15px; display: flex; align-items: center; gap: 15px; background-color: var(--surface);">
@@ -4227,7 +4260,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
                        <div class="kpi-card" style="border-color: var(--danger-color);"><h3 class="kpi-title"><i data-lucide="receipt-text"></i> ${labels.totalDue}</h3><p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loanDetails.lateFeesAccumulated || 0)))}</p></div>
 
-                       <!-- SECCIÓN CHAT NUEVA -->
+                       <!-- SECCIÓN CHAT -->
                        <div class="kpi-card" style="border-color: var(--border-color); border-width: 1px;">
                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                <h3 class="kpi-title" style="color: var(--accent-purple); font-weight: 700; font-size: 1.1em; margin: 0;">
@@ -4249,7 +4282,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                                 </button>
                            </div>
                        </div>
-                       <!-- FIN CHAT -->
 
                     </section>
                     <section><h2 class="section-title">Reputação</h2><div class="kpi-card"><div class="reputation-bar-container"><div class="reputation-bar ${barStatusClass}" style="width: ${score * 10}%"></div></div><div class="reputation-status"><span class="reputation-value">${score} / 10</span></div></div></section>
@@ -4257,8 +4289,11 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                   </div></div>
                 <div class="action-buttons">${actionButtonsHtml}</div>`;
 
-            history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: currentLoanIndex }, `Details`, `#client/${clientId}/${currentLoanIndex}`);
-            clientDetailView.classList.add('active');
+            // SOLO AGREGAMOS AL HISTORIAL SI NO ES UPDATE EN SEGUNDO PLANO
+            if (!isUpdate) {
+                history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: currentLoanIndex }, `Details`, `#client/${clientId}/${currentLoanIndex}`);
+                clientDetailView.classList.add('active');
+            }
 
             // Scroll chat al fondo
             const chatContainer = document.getElementById('chat-history-container');
@@ -4306,30 +4341,18 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
                     try {
                         const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-                        
-                        // 1. Crear el mensaje (sender: 'collector')
-                        const newMessage = {
-                            sender: 'collector',
-                            text: text,
-                            timestamp: new Date()
-                        };
-
+                        const newMessage = { sender: 'collector', text: text, timestamp: new Date() };
                         const updatedLoans = JSON.parse(JSON.stringify(allLoans));
                         
-                        // 2. Asegurar que el array existe
                         if (!updatedLoans[currentLoanIndex].chatHistory) {
                             updatedLoans[currentLoanIndex].chatHistory = [];
                         }
                         
-                        // 3. Agregar mensaje
                         updatedLoans[currentLoanIndex].chatHistory.push(newMessage);
-                        
-                        // 4. Actualizar 'notes' para compatibilidad con vistas viejas
                         updatedLoans[currentLoanIndex].notes = text; 
 
                         await updateDoc(clientRef, { loans: updatedLoans });
 
-                        // 5. Limpiar input
                         chatInput.value = '';
                         setTimeout(() => {
                              const cContainer = document.getElementById('chat-history-container');
@@ -4424,7 +4447,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     else { showPaymentDetailModal(clientId, currentLoanIndex, historyIndex); }
                 });
             });
-        }
+        } 
                 
 
 
@@ -8067,22 +8090,23 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 const clientStillExists = allClients.some(c => c.id === currentDetailClientId);
                 if (clientStillExists) {
                     const detailView = document.getElementById('clientDetailView');
-                    const expectedHash = `#client/${currentDetailClientId}/${currentDetailLoanIndex}`;
                     
-                    if (detailView && location.hash === expectedHash && detailView.classList.contains('active')) {
+                    // AHORA ACTUALIZAMOS SIEMPRE QUE LA VISTA EXISTA Y ESTÉ ACTIVA (AUNQUE ESTÉ DETRÁS DEL FORMULARIO)
+                    // Esto permite que al cerrar el formulario, la info ya esté nueva.
+                    if (detailView && detailView.classList.contains('active')) {
                         // 1. MEMORIZAR POSICIÓN ACTUAL DEL SCROLL
                         const contentWrapper = detailView.querySelector('.modal-content-wrapper');
                         const scrollPos = contentWrapper ? contentWrapper.scrollTop : 0;
                         
-                        // 2. ACTUALIZAR VISTA
-                        showClientDetails(currentDetailClientId, currentDetailLoanIndex);
+                        // 2. ACTUALIZAR VISTA (Pasamos TRUE para que no cree historial nuevo)
+                        showClientDetails(currentDetailClientId, currentDetailLoanIndex, true);
                         
-                        // 3. RESTAURAR POSICIÓN DEL SCROLL (Para que no salte al inicio)
+                        // 3. RESTAURAR POSICIÓN DEL SCROLL
                         const newWrapper = detailView.querySelector('.modal-content-wrapper');
                         if (newWrapper) {
                             newWrapper.scrollTop = scrollPos;
                             
-                            // 4. SI HAY CHAT, BAJAR AL ÚLTIMO MENSAJE (Solo si estaba cerca del fondo)
+                            // 4. MANTENER CHAT AL FONDO
                             const chatContainer = document.getElementById('chat-history-container');
                             if (chatContainer) {
                                 chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -8375,5 +8399,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
-
