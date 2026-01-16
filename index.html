@@ -5679,7 +5679,30 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     }
                 } catch (error) {
                     console.error("Error al guardar cliente:", error);
-                    showToast(error.message || 'Ocurrió un error al guardar los datos.', true);
+                    
+                    let finalMessage = error.message || 'Ocurrió un error al guardar los datos.';
+
+                    // --- [SOLUCIÓN AUTO-CORRECCIÓN PARA CAMPOS OCULTOS] ---
+                    // Si el servidor dice que el usuario ya existe, lo cambiamos automáticamente.
+                    if (finalMessage.includes("conta") || finalMessage.includes("exists") || finalMessage.includes("email")) {
+                        
+                        // 1. Generamos un nuevo ID único (Timestamp + Número Aleatorio)
+                        const randomId = Math.floor(Math.random() * 9000) + 1000;
+                        const timestamp = Date.now().toString().slice(-5);
+                        const newHiddenUser = `user${timestamp}${randomId}`;
+                        
+                        // 2. Inyectamos este nuevo valor en el campo oculto
+                        const userInput = document.getElementById('client-username');
+                        if (userInput) {
+                            userInput.value = newHiddenUser;
+                            
+                            // 3. Avisamos al cobrador para que intente de nuevo
+                            finalMessage = "⚠️ Conflicto de sistema resuelto (ID duplicado). Se ha generado un nuevo código interno. Por favor, haga clic en 'Guardar' nuevamente.";
+                        }
+                    }
+                    // -----------------------------------------------------
+
+                    showToast(finalMessage, true);
                 } finally {
                     if (clientFormModal.classList.contains('active')) {
                         saveButton.disabled = false;
@@ -8495,5 +8518,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
-
