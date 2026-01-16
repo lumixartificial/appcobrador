@@ -3208,8 +3208,8 @@ async function showRefinanceModal(clientId, notificationId) {
            let details = {
                lateDays: 0,
                lateFeesAccumulated: 0,
-               fixedFineApplied: 0, // Nueva propiedad para saber cuánto fue
-               hasFixedFine: false, // Nueva bandera
+               fixedFineApplied: 0, 
+               hasFixedFine: false, 
                status: 'pending', 
                nextDueDate: null, 
                amountDueToday: 0 
@@ -3220,16 +3220,14 @@ async function showRefinanceModal(clientId, notificationId) {
                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
                .reduce((sum, h) => sum + (h.amount || 0), 0);
 
-           // Si ya cubrió el total, finalizado
            if (!loan || !loan.totalLoan || (currentTotalPaid >= loan.totalLoan - 0.1)) {
                details.status = 'finished';
                return details;
            }
-           
 
            // --- 2. CONFIGURAR FECHAS ---
            const today = new Date();
-           today.setHours(0, 0, 0, 0); // Hoy a las 00:00
+           today.setHours(0, 0, 0, 0); 
            
            let startDateObj = null;
            if (loan.startDate) {
@@ -3242,7 +3240,6 @@ async function showRefinanceModal(clientId, notificationId) {
            
            startDateObj.setHours(0, 0, 0, 0);
            
-           // Empezar a contar desde el día siguiente
            let checkDate = new Date(startDateObj); 
            checkDate.setDate(checkDate.getDate() + 1); 
            
@@ -3252,9 +3249,8 @@ async function showRefinanceModal(clientId, notificationId) {
            const installmentAmount = loan.originalInstallmentAmount || 0;
            let installmentsDueCount = 0; 
            
-           // Límite de seguridad
            let stopDate = new Date(today);
-           stopDate.setDate(stopDate.getDate() + 60);
+           stopDate.setDate(stopDate.getDate() + 60); // Límite de seguridad
 
            if (checkDate > stopDate) return details;
 
@@ -3267,19 +3263,18 @@ async function showRefinanceModal(clientId, notificationId) {
                
                const frequency = loan.paymentFrequency || 'daily';
                let isPaymentDay = false;
-               const pDays = loan.paymentDays || [];
+               
+               // [CORRECCIÓN] Fallback robusto: Si no hay paymentDays, asume Lunes(1) a Sábado(6)
+               const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1, 2, 3, 4, 5, 6];
                
                if (frequency === 'daily') isPaymentDay = pDays.some(d => String(d) === String(dayOfWeek));
                else if (frequency === 'weekly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfWeek);
                else if (frequency === 'monthly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfMonth);
 
                if (isPaymentDay && !isHoliday) {
-                   
-                   // === ANÁLISIS DEL PASADO (AYER HACIA ATRÁS) ===
                    if (checkDate.getTime() < today.getTime()) {
                        installmentsDueCount++; 
                        const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                       
                        const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
 
                        if (outstandingDueAmount > 0.9) { 
@@ -3287,8 +3282,6 @@ async function showRefinanceModal(clientId, notificationId) {
                            if (dailyLateRate > 0) accumulatedLateFees += (outstandingDueAmount * dailyLateRate);
                        }
                    } 
-                   
-                   // === ANÁLISIS DEL PRESENTE (HOY) ===
                    else if (checkDate.getTime() === today.getTime()) {
                        const expectedTotalIncludingToday = (installmentsDueCount + 1) * installmentAmount;
                        if (currentTotalPaid < expectedTotalIncludingToday - 0.1) {
@@ -3296,8 +3289,6 @@ async function showRefinanceModal(clientId, notificationId) {
                        }
                        if (!details.nextDueDate) details.nextDueDate = new Date(checkDate);
                    } 
-                   
-                   // === FUTURO ===
                    else if (checkDate > today && !details.nextDueDate) {
                        details.nextDueDate = new Date(checkDate);
                    }
@@ -3309,21 +3300,15 @@ async function showRefinanceModal(clientId, notificationId) {
            
            details.lateDays = accumulatedLateDays;
            
-           // --- NUEVA LÓGICA: MULTA FIJA (5 DÍAS - CONDICIONAL) ---
-           // 1. Obtener valor configurado (puede ser 0 o undefined)
            const fixedFineAmount = parseFloat(loan.lateFeeAmount) || 0;
-           
-           // 2. Solo aplicamos si hay atraso >= 5 dias Y se configuró un monto > 0
            if (accumulatedLateDays >= 5 && fixedFineAmount > 0) {
-               accumulatedLateFees += fixedFineAmount; // Se suma al total de mora
-               details.fixedFineApplied = fixedFineAmount; // Guardamos el valor
-               details.hasFixedFine = true; // Bandera para mostrar en UI
+               accumulatedLateFees += fixedFineAmount; 
+               details.fixedFineApplied = fixedFineAmount; 
+               details.hasFixedFine = true; 
            }
-           // ------------------------------------------
 
            details.lateFeesAccumulated = accumulatedLateFees;
            
-           // --- 4. DETERMINAR ESTADO FINAL ---
            if (currentTotalPaid >= loan.totalLoan - 0.1) {
                details.status = 'finished';
            } 
@@ -3339,7 +3324,7 @@ async function showRefinanceModal(clientId, notificationId) {
            
            return details;
        }
-
+           
 
 
         function renderClientCards(container, clientsData) {
@@ -3371,11 +3356,8 @@ async function showRefinanceModal(clientId, notificationId) {
                     .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
                     .reduce((sum, h) => sum + (h.amount || 0), 0);
 
-                // --- CORRECCIÓN CLAVE: USAR EL CÁLCULO EN VIVO DE MORA ---
-                // Usamos details.lateFeesAccumulated para que incluya la multa de 5 días si corresponde
                 const totalDebt = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
                 const remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
-                // ---------------------------------------------------------
 
                 const getPaymentDate = (dateObj) => {
                     if (!dateObj) return null;
@@ -3523,6 +3505,15 @@ async function showRefinanceModal(clientId, notificationId) {
                     <i data-lucide="trending-down" style="width: 14px; height: 14px; vertical-align: text-bottom;"></i> Resta: ${remainingDisplay}
                 </span>`;
 
+                // --- [MODIFICADO] INDICADOR DE ORDEN EN RUTA ---
+                let routeOrderHtml = '';
+                if (loan.routeOrder && loan.routeOrder > 0) {
+                    const orderText = `CLIENTE ${loan.routeOrder}`;
+                    // Estilo de etiqueta (Badge) IDÉNTICO, solo cambiamos la posición abajo
+                    routeOrderHtml = `<span style="font-size: 0.65em; background-color: #fdf4ff; color: #d946ef; font-weight: 800; padding: 2px 8px; border-radius: 12px; border: 1px solid #f0abfc; white-space: nowrap; display: inline-block; flex-shrink: 0; margin-left: 10px;">${orderText}</span>`;
+                }
+                // ----------------------------------------------
+
                 const card = document.createElement('div');
                 card.className = 'client-card';
                 card.style.flexDirection = 'column'; 
@@ -3541,9 +3532,22 @@ async function showRefinanceModal(clientId, notificationId) {
                     ? `<span style="font-size: 0.6em; font-weight: 700; color: ${typeColor}; margin-top: 2px; letter-spacing: 0.5px; animation: pulse 2s infinite;">${typeLabel}</span>`
                     : '';
 
+                // INDICADOR DE PRÉSTAMO (Prést. 1, Prést. 2)
+                const totalLoans = client.loans ? client.loans.length : 0;
+                let loanIndexBadge = '';
+                if (totalLoans > 1) {
+                    const lLabel = { pt: 'Emp.', es: 'Prést.', en: 'Loan' }[langCode] || 'Emp.';
+                    loanIndexBadge = `<span style="font-size: 0.75em; color: var(--text-secondary); font-weight: 400; margin-left: 6px; background-color: var(--border-color); padding: 1px 6px; border-radius: 10px;">${lLabel} ${loanIndex + 1}</span>`;
+                }
+
                 card.innerHTML = `
-                    <div style="width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 2px;">
-                        <h4 class="client-name" style="margin: 0; font-size: 1.1em; color: var(--text-primary); font-weight: 700; line-height: 1.2;">${client.name}</h4>
+                    <!-- HEADER: NOMBRE A LA IZQUIERDA, ETIQUETA A LA DERECHA -->
+                    <div style="width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center;">
+                        <h4 class="client-name" style="margin: 0; font-size: 1.1em; color: var(--text-primary); font-weight: 700; line-height: 1.2; display: flex; align-items: center; flex-wrap: wrap;">
+                            ${client.name} 
+                            ${loanIndexBadge}
+                        </h4>
+                        ${routeOrderHtml} <!-- AQUÍ ESTÁ EL CAMBIO: A LA DERECHA EXTREMA -->
                     </div>
 
                     <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
@@ -3560,6 +3564,7 @@ async function showRefinanceModal(clientId, notificationId) {
                         </div>
                         
                         <div class="payment-info" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; flex-shrink: 0;">
+                            
                             <span class="payment-amount" style="color: ${mainValueColor}; font-size: 1.5em; line-height: 1;">
                                 ${money(mainValueToDisplay)}
                             </span> 
@@ -3815,11 +3820,7 @@ async function showRefinanceModal(clientId, notificationId) {
         }
 
         
-        /**
-         * INSTRUCCIÓN: Reemplaza tu función 'updateTodaysRouteList' (aprox. línea 955)
-         * con este bloque de código completo.
-         */
-        function updateTodaysRouteList() {
+         function updateTodaysRouteList() {
            const today = new Date();
            today.setHours(0, 0, 0, 0);
            const dayOfWeek = today.getDay();
@@ -3848,10 +3849,7 @@ async function showRefinanceModal(clientId, notificationId) {
                    const paymentDays = loan.paymentDays || [];
 
                    if (frequency === 'daily') {
-                       // --- CAMBIO CLAVE: SI ES DIARIO, APARECE SIEMPRE ---
-                       // Antes verificábamos si hoy estaba marcado en 'paymentDays'.
-                       // Ahora forzamos true para que aparezcan todos los días hasta que paguen.
-                       isScheduledForToday = true; 
+                       isScheduledForToday = true; // Diarios siempre aparecen
                    } else if (frequency === 'weekly') {
                        isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
                    } else if (frequency === 'biweekly') {
@@ -3882,8 +3880,6 @@ async function showRefinanceModal(clientId, notificationId) {
                    const isLate = (currentStatus === 'late');
                    const isFinished = (currentStatus === 'finished');
                    
-                   // Muestra si: (Toca Hoy O es Atrasado) Y (No pagó) Y (No terminó)
-                   // Nota: Al poner isScheduledForToday = true para diarios, aseguramos que siempre pasen este filtro.
                    if ((isScheduledForToday || isLate) && !hasPaidToday && !isFinished) {
                        const loanToRender = { 
                            ...loan, 
@@ -3896,8 +3892,17 @@ async function showRefinanceModal(clientId, notificationId) {
                });
            });
  
-           // Ordenar: Atrasados primero, luego alfabéticamente
-           clientsForRoute.sort((a, b) => {
+           // --- NUEVA LÓGICA DE ORDENAMIENTO (PRIORIDAD MANUAL) ---
+           
+           // Separamos los que tienen ORDEN MANUAL de los que NO
+           const manualOrderClients = clientsForRoute.filter(c => c.loan.routeOrder && c.loan.routeOrder > 0);
+           const autoOrderClients = clientsForRoute.filter(c => !c.loan.routeOrder || c.loan.routeOrder <= 0);
+
+           // 1. Ordenamos los manuales por su número (1, 2, 3...)
+           manualOrderClients.sort((a, b) => a.loan.routeOrder - b.loan.routeOrder);
+
+           // 2. Ordenamos los automáticos (Lógica antigua: Atrasados > Alfabético)
+           autoOrderClients.sort((a, b) => {
                if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
                if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
                const daysA = a.loan.lateDays || 0;
@@ -3907,13 +3912,19 @@ async function showRefinanceModal(clientId, notificationId) {
                return a.client.name.localeCompare(b.client.name);
            });
 
-           const optimizedClients = optimizeRoute(clientsForRoute, collectorCurrentLocation);
-           
-           updateDashboard(optimizedClients); 
+           // 3. Optimizamos SOLO los automáticos por GPS (para no romper el orden manual)
+           // Pasamos los manuales tal cual, y optimizamos el resto
+           const optimizedAutoClients = optimizeRoute(autoOrderClients, collectorCurrentLocation);
+
+           // 4. COMBINAMOS: Primero los manuales fijos, luego los optimizados
+           const finalRoute = [...manualOrderClients, ...optimizedAutoClients];
+
+           updateDashboard(finalRoute); 
            
            if (document.querySelector('#map-view.active')) plotClientsOnMap();
-           renderClientCards(document.getElementById('todays-route-list'), optimizedClients);
-       }
+           renderClientCards(document.getElementById('todays-route-list'), finalRoute);
+       } 
+        
 
 
 
@@ -4052,10 +4063,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             currentDetailClientId = clientId;
             currentDetailLoanIndex = loanIndex;
             
-            // Si NO es una actualización silenciosa, registramos en el historial para navegación
             if (!isUpdate) {
                 console.log(`[DIAG-STATE] Navegando a detalles: Cliente ${clientId}`);
-                // Solo hacemos pushState si es una navegación normal
             }
 
             const clientDetailView = document.getElementById('clientDetailView');
@@ -4142,14 +4151,12 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 }).reverse().join(''); 
             }
 
-            // Cálculos Financieros
             const historyPaid = (loan.history || []).filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration').reduce((sum, h) => sum + (h.amount || 0), 0);
             const initialPaid = loan.initialMigratedAmount || 0;
             const displayTotalPaid = initialPaid + historyPaid;
             const loanDetails = calculateLoanDetails(loan);
             const currentStatus = loanDetails.status;
             
-            // Estado y Colores
             let statusClass = `status-${currentStatus}`; 
             let statusText = '';
             if (currentStatus === 'pending') { statusText = { pt: 'EM DIA', es: 'AL DÍA', en: 'UP TO DATE' }[currentLang] || 'EM DIA'; statusClass = 'status-paid'; } 
@@ -4159,18 +4166,15 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 statusText = baseText;
             } else { statusText = (translations[currentLang] && translations[currentLang][currentStatus]) || currentStatus; }
 
-            // Reputación
             const score = Math.max(0, 10 - loanDetails.lateDays);
             let barStatusClass = score === 10 ? 'status-perfect' : (score >= 7 ? 'status-good' : (score >= 3 ? 'status-regular' : 'status-bad'));
             
-            // Pico
             let picoValue = 0;
             if (originalInstallment > 0 && displayTotalPaid > 0) {
                 const remainder = displayTotalPaid % originalInstallment;
                 if (remainder > 0.05 && (originalInstallment - remainder) > 0.05) picoValue = remainder;
             }
 
-            // Etiquetas
             const l = {
                 pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'CHAT COM ADMINISTRAÇÃO', notesPlaceholder: 'Escreva uma mensagem...', saveNote: 'Enviar Mensagem', clearChat: 'Limpar Conversa' },
                 es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'CHAT CON ADMINISTRACIÓN', notesPlaceholder: 'Escribe un mensaje...', saveNote: 'Enviar Mensaje', clearChat: 'Borrar Chat' },
@@ -4178,26 +4182,56 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             };
             const labels = l[currentLang] || l.pt;
 
-            // --- LÓGICA FECHAS CONTRATO (RESTAURADA) ---
+            // --- LÓGICA DE CÁLCULO DE FECHAS PRECISA ---
             let startDateStr = '--/--', endDateStr = '--/--';
             if (loan.startDate) {
                 let startD = loan.startDate.seconds ? new Date(loan.startDate.seconds * 1000) : (loan.startDate instanceof Date ? loan.startDate : new Date(loan.startDate));
+                
                 if (startD && !isNaN(startD.getTime())) { 
                     startDateStr = startD.toLocaleDateString('pt-BR'); 
-                    // Cálculo aproximado de fecha fin
+                    
                     const totalInst = parseInt((loan.installments || "0/0").split('/')[1], 10) || 0;
                     if(totalInst > 0) {
                         let currentD = new Date(startD);
-                        const daysToAdd = totalInst * (loan.paymentFrequency === 'weekly' ? 7 : (loan.paymentFrequency === 'monthly' ? 30 : (loan.paymentFrequency === 'biweekly' ? 14 : 1)));
-                        const finalDays = loan.paymentFrequency === 'daily' ? Math.ceil(totalInst * 1.2) : daysToAdd;
-                        currentD.setDate(currentD.getDate() + finalDays);
+                        // Avanzamos al día siguiente para empezar a contar
+                        currentD.setDate(currentD.getDate() + 1);
+                        
+                        let count = 0;
+                        let safety = 0;
+                        // Usamos paymentDays por defecto si no existen
+                        const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6]; 
+
+                        // Simulamos el calendario real día a día
+                        while(count < totalInst && safety < 2000) {
+                            const dayW = currentD.getDay();
+                            const dayM = currentD.getDate();
+                            const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
+                            const isHol = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(fDate) : false;
+                            
+                            let isPayDay = false;
+                            if (!isHol) {
+                                if (loan.paymentFrequency === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
+                                else if (loan.paymentFrequency === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                else if (loan.paymentFrequency === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                else if (loan.paymentFrequency === 'biweekly') {
+                                    if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
+                                        const diffT = Math.abs(currentD - startD);
+                                        const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
+                                        if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
+                                    }
+                                }
+                            }
+                            
+                            if (isPayDay) count++;
+                            if (count < totalInst) currentD.setDate(currentD.getDate() + 1);
+                            safety++;
+                        }
                         endDateStr = currentD.toLocaleDateString('pt-BR');
                     }
                 }
             }
-            // ------------------------------------------
+            // --------------------------------------------------------
 
-            // Botones
             let receiptBtnText = currentLang === 'es' ? 'Enviar<br>Recibo' : (currentLang === 'en' ? 'Send<br>Receipt' : 'Enviar<br>Comprovante');
             let payBtnText = currentLang === 'es' ? 'Registrar Pago' : (currentLang === 'en' ? 'Register Payment' : 'Registrar Pagamento');
             const actionButtonsHtml = currentStatus === 'finished' ? `
@@ -4210,7 +4244,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> ${payBtnText}</button>
             `;
 
-            // --- LÓGICA DEL CHAT ---
             let messages = loan.chatHistory || [];
             if (messages.length === 0 && loan.notes && loan.notes.trim() !== '') {
                 messages.push({ sender: 'admin', text: loan.notes, timestamp: new Date() });
@@ -4219,15 +4252,43 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const chatBubblesHtml = messages.map(msg => {
                 const isMe = msg.sender === 'collector'; 
                 const time = msg.timestamp ? new Date(msg.timestamp.seconds ? msg.timestamp.seconds * 1000 : msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-                return `
-                    <div class="chat-bubble ${isMe ? 'collector' : 'admin'}">
-                        ${msg.text}
-                        <span class="chat-time">${time}</span>
-                    </div>
-                `;
+                return `<div class="chat-bubble ${isMe ? 'collector' : 'admin'}">${msg.text}<span class="chat-time">${time}</span></div>`;
             }).join('') || `<div style="text-align:center; color:gray; font-size:0.8em; margin-top:10px;">${currentLang === 'es' ? 'Inicia la conversación...' : 'Inicie a conversa...'}</div>`;
 
-            // HTML
+            // --- [CORRECCIÓN] RENDERIZADO DE PESTAÑAS (TRADUCCIÓN CORRECTA DE ACTIVO) ---
+            const renderTabs = () => {
+                if (!hasMultipleLoans) return '';
+                
+                const t_loan = { pt: 'Empréstimo', es: 'Préstamo', en: 'Loan' }[currentLang] || 'Empréstimo';
+                // [NUEVO] Etiqueta dinámica para el estado activo
+                const t_active = { pt: 'ATIVO', es: 'ACTIVO', en: 'ACTIVE' }[currentLang] || 'ATIVO';
+                const t_finished = { pt: 'FINALIZADO', es: 'FINALIZADO', en: 'FINISHED' }[currentLang] || 'FINALIZADO';
+
+                return `
+                <div class="loan-tabs-wrapper">
+                    <div class="loan-tabs-container" id="loan-tabs-container">
+                        ${allLoans.map((l, index) => {
+                            const lDetails = calculateLoanDetails(l);
+                            const isActive = lDetails.status !== 'finished';
+                            
+                            const subText = isActive 
+                                ? `<span style="display:block; font-size: 0.7em; color: var(--accent-green); font-weight: 700; margin-top: 2px;">${t_active}</span>` 
+                                : `<span style="display:block; font-size: 0.7em; color: var(--text-secondary); margin-top: 2px;">${t_finished}</span>`;
+                            
+                            const activeClass = index === currentLoanIndex ? 'active' : '';
+                            
+                            return `
+                            <button class="loan-tab ${activeClass}" data-loan-index="${index}" 
+                                style="flex-direction: column; align-items: center; padding: 8px 16px; line-height: 1.1; height: auto;">
+                                <span style="font-size: 0.95em;">${t_loan} ${index + 1}</span>
+                                ${subText}
+                            </button>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+            };
+            // -----------------------------------------------------------------
+
             clientDetailView.innerHTML = `
                 <header class="modal-header" style="justify-content: space-between;">
                     <div style="display: flex; align-items: center;">
@@ -4236,7 +4297,9 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">${whatsappButtonHtml}<button id="editClientBtn" class="header-btn" title="Editar"><i data-lucide="edit"></i></button></div>
                 </header>
-                ${hasMultipleLoans ? `<div class="loan-tabs-wrapper"><div class="loan-tabs-container" id="loan-tabs-container">${allLoans.map((l, index) => { const lSt = calculateLoanDetails(l).status; return `<button class="loan-tab ${index === currentLoanIndex ? 'active' : ''}" data-loan-index="${index}" style="${lSt === 'finished' ? 'opacity: 0.7;' : ''}">Préstamo ${index + 1} ${lSt === 'finished' ? '(Finalizado)' : ''}</button>`; }).join('')}</div></div>` : ''}
+                
+                ${renderTabs()} 
+
                 <div class="modal-content-wrapper"><div class="container">
                     
                     <div class="kpi-card progress-card" style="margin-bottom: 20px;">
@@ -4244,7 +4307,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         <div class="progress-circle"><svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="client-detail-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292; stroke: var(--accent-purple);"></circle></svg><div class="progress-text" id="client-detail-progress-text"></div></div>
                     </div>
                     
-                    <!-- TARJETA FECHAS CONTRATO (MEJORADA: CENTRADA CON GAP) -->
                     <div class="kpi-card" style="margin-bottom: 20px; padding: 15px; text-align: center;">
                         <h3 class="kpi-title" style="justify-content: center; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">
                             <i data-lucide="calendar-days"></i> ${labels.contractDateTitle}
@@ -4261,7 +4323,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                             </div>
                         </div>
                     </div>
-                    <!-- FIN TARJETA MEJORADA -->
 
                     <div class="kpi-card" style="margin-bottom: 20px; text-align: center;"><h3 class="kpi-title" style="justify-content: center;">${labels.status} ${currentLoanIndex + 1}</h3><span class="payment-status ${statusClass}" style="font-size: 1.2em; font-weight: 600; padding: 8px 20px;">${statusText}</span></div>
 
@@ -4287,7 +4348,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
                        <div class="kpi-card" style="border-color: var(--danger-color);"><h3 class="kpi-title"><i data-lucide="receipt-text"></i> ${labels.totalDue}</h3><p class="kpi-value" style="color: var(--danger-color); font-size: 1.4em;">${money(Math.max(0, (loan.totalLoan - displayTotalPaid) + (loanDetails.lateFeesAccumulated || 0)))}</p></div>
 
-                       <!-- SECCIÓN CHAT -->
                        <div class="kpi-card" style="border-color: var(--border-color); border-width: 1px;">
                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                <h3 class="kpi-title" style="color: var(--accent-purple); font-weight: 700; font-size: 1.1em; margin: 0;">
@@ -4316,17 +4376,14 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                   </div></div>
                 <div class="action-buttons">${actionButtonsHtml}</div>`;
 
-            // SOLO AGREGAMOS AL HISTORIAL SI NO ES UPDATE EN SEGUNDO PLANO
             if (!isUpdate) {
                 history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: currentLoanIndex }, `Details`, `#client/${clientId}/${currentLoanIndex}`);
                 clientDetailView.classList.add('active');
             }
 
-            // Scroll chat al fondo
             const chatContainer = document.getElementById('chat-history-container');
             if(chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Barra de progreso
             const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
             const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
             let paidInstallments = 0;
@@ -4339,7 +4396,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const progressText = document.getElementById('client-detail-progress-text');
             if(progressBar && progressText) { progressBar.style.strokeDashoffset = strokeDashoffset; progressText.textContent = `${paidInstallments}/${totalInstallments}`; }
 
-            // Listeners
             if (hasMultipleLoans) {
                 clientDetailView.querySelectorAll('.loan-tab').forEach(tab => {
                     tab.addEventListener('click', (e) => {
@@ -4353,7 +4409,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             document.getElementById('closeDetailView').addEventListener('click', () => { window.history.back(); });
             document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
 
-            // --- LÓGICA DEL CHAT (ENVIAR MENSAJE) ---
             const sendChatBtn = document.getElementById('send-chat-btn');
             const chatInput = document.getElementById('chat-input-field');
             const clearChatBtn = document.getElementById('clear-chat-btn');
@@ -4402,7 +4457,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 });
             }
 
-            // --- LÓGICA PAPELERA (BORRAR CHAT) ---
             if (clearChatBtn) {
                 clearChatBtn.addEventListener('click', async () => {
                     const title = currentLang === 'es' ? '¿Borrar Chat?' : 'Limpar Chat?';
@@ -4426,7 +4480,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 });
             }
 
-            // Resto de lógica de botones...
             if (currentStatus === 'finished') {
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
                 document.getElementById('updateClientDataBtn').addEventListener('click', (e) => showClientFormModal(clientId, false, parseInt(e.currentTarget.dataset.loanIndex, 10)));
@@ -4474,7 +4527,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     else { showPaymentDetailModal(clientId, currentLoanIndex, historyIndex); }
                 });
             });
-        } 
+        }
                 
 
 
@@ -5056,6 +5109,21 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                            ${t_loanDetailsTitle}
                         </h3>
                         
+                        <!-- NUEVO CAMPO: ORDEN EN RUTA -->
+                        <div class="form-group" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface)); padding: 15px; border-radius: 8px; border: 1px dashed var(--accent-purple);">
+                            <label for="client-route-order" style="font-weight: 700; color: var(--accent-purple); display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="list-ordered" style="width: 16px; height: 16px;"></i>
+                                ${currentLang === 'es' ? 'Orden en Ruta (Prioridad)' : 'Ordem na Rota (Prioridade)'}
+                            </label>
+                            <input type="number" id="client-route-order" min="1" 
+                                   value="${loan.routeOrder || ''}" 
+                                   placeholder="${currentLang === 'es' ? 'Ej: 1 (Primero), 2 (Segundo)...' : 'Ex: 1 (Primeiro), 2 (Segundo)...'}"
+                                   style="border-color: var(--accent-purple);">
+                            <p style="font-size: 0.8em; color: var(--text-secondary); margin: 5px 0 0;">
+                                ${currentLang === 'es' ? 'Si defines un número, este cliente aparecerá en ese orden exacto, ignorando el GPS.' : 'Se definir um número, este cliente aparecerá nessa ordem exata, ignorando o GPS.'}
+                            </p>
+                        </div>
+                        
                         <div class="form-group" id="migration-toggle-group" style="display: ${isEditMode || isNewLoan ? 'none' : 'block'}; background-color: var(--border-color); padding: 15px; border-radius: 12px;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <label for="migration-toggle-input" style="font-weight: 600; font-size: 1.05em; color: var(--text-primary); margin: 0;">
@@ -5108,7 +5176,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </div>
                         </div>
 
-                        <!-- NUEVO CAMPO: MULTA POR 5 DÍAS DE ATRASO -->
                         <div class="form-group">
                             <label for="client-late-fee" style="color: #ef4444; font-weight: 700;">
                                 <i data-lucide="alert-triangle" style="width: 14px; height: 14px; vertical-align: middle;"></i> 
@@ -5120,7 +5187,6 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                    style="border-color: #ef4444;">
                         </div>
 
-                        <!-- MICRO SEGURO -->
                         <div class="form-group">
                             <label for="client-micro-insurance" style="color: #0ea5e9; font-weight: 700;">
                                 <i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: middle;"></i> 
@@ -5448,9 +5514,10 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     const totalToPay = installmentValue * installments;
                     const principalAmount = loanAmount;
 
-                    // --- CAMBIO: GUARDAR MICRO SEGURO Y MULTA ---
+                    // --- CAMBIO: GUARDAR MICRO SEGURO, MULTA Y ORDEN DE RUTA ---
                     const microInsurance = parseFloat(document.getElementById('client-micro-insurance').value) || 0;
-                    const lateFeeAmount = parseFloat(document.getElementById('client-late-fee').value) || 0; // NUEVO
+                    const lateFeeAmount = parseFloat(document.getElementById('client-late-fee').value) || 0;
+                    const routeOrder = parseInt(document.getElementById('client-route-order').value) || 0; // NUEVO
                     const lateFeeRate = 0; 
                     // ---------------------------------------------------------
 
@@ -5485,7 +5552,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         principalAmount: principalAmount,
                         lateFeeRate: lateFeeRate, 
                         microInsurance: microInsurance, 
-                        lateFeeAmount: lateFeeAmount, // NUEVO CAMPO GUARDADO
+                        lateFeeAmount: lateFeeAmount,
+                        routeOrder: routeOrder, // NUEVO CAMPO GUARDADO
                         totalLoan: totalToPay,
                         amount: installmentValue,
                         originalInstallmentAmount: installmentValue,
@@ -5552,7 +5620,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                              ...updatedLoans[loanIndex], 
                              lateFeeRate: lateFeeRate, 
                              microInsurance: microInsurance, 
-                             lateFeeAmount: lateFeeAmount, // ACTUALIZAR
+                             lateFeeAmount: lateFeeAmount, 
+                             routeOrder: routeOrder, // ACTUALIZAR
                              totalLoan: totalToPay,
                              amount: installmentValue,
                              originalInstallmentAmount: installmentValue,
@@ -8426,4 +8495,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
