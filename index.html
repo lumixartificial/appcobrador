@@ -6296,11 +6296,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const totalPaidSoFar = initialPaid + historyPaid;
             const totalDebt = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
             let remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
-            remainingBalance = Math.round(remainingBalance * 100) / 100;
+            remainingBalance = Math.round(remainingBalance * 100) / 100; // Redondeo seguro a 2 decimales
 
             const standardInstallment = loan.amount || loan.originalInstallmentAmount || 0;
             let suggestedValue = standardInstallment;
-            if (remainingBalance < (standardInstallment - 0.05)) {
+            
+            // Si lo que falta es MENOR que una cuota, sugerimos solo lo que falta
+            // Usamos 0.01 de margen aquí para evitar sugerir valores negativos por error de redondeo
+            if (remainingBalance < (standardInstallment - 0.01)) {
                 suggestedValue = remainingBalance;
             }
             // --- FIN CÁLCULO INTELIGENTE ---
@@ -6413,7 +6416,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const postponeBtn = paymentModal.querySelector('#postponePaymentBtnInModal');
             if (postponeBtn) {
                 postponeBtn.addEventListener('click', async () => {
-                     // CORRECCIÓN: Usamos await
                      const confirmed = await showConfirmationModal(
                         translations[currentLang].postponeConfirmTitle || 'Confirmar Adiamento',
                         translations[currentLang].postponeConfirmMsg || 'Isso moverá a data de vencimento em 1 dia. Deseja continuar?',
@@ -6458,11 +6460,44 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             paymentModal.querySelector('#confirmPaymentBtn').addEventListener('click', async (e) => {
                 const confirmBtn = e.currentTarget;
                 const originalBtnHTML = confirmBtn.innerHTML;
+                
+                const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+                const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
+
+                // 1. VALIDACIÓN BÁSICA (NÚMERO)
+                if (isNaN(actualPaidAmount) || actualPaidAmount <= 0) {
+                    showToast('Por favor, insira um valor de pagamento válido.', true);
+                    return;
+                }
+
+                // --- 2. VALIDACIÓN ESTRICTA: BLOQUEO POR EXCESO DE PAGO ---
+                // Margen de 0.001 solo para evitar errores de coma flotante de JS (ej: 2.2300000001)
+                // Esto bloqueará 2.24 si la deuda es 2.23
+                if (actualPaidAmount > (remainingBalance + 0.001)) {
+                    const errorMsg = currentLang === 'es' 
+                        ? `Error: El valor ingresado (${money(actualPaidAmount)}) es mayor que la deuda total (${money(remainingBalance)}).`
+                        : `Erro: O valor inserido (${money(actualPaidAmount)}) é maior que a dívida total (${money(remainingBalance)}).`;
+                    
+                    showToast(errorMsg, true);
+                    
+                    // Resaltar input visualmente
+                    const input = document.getElementById('payment-amount-input');
+                    input.style.borderColor = 'var(--danger-color)';
+                    input.style.color = 'var(--danger-color)';
+                    setTimeout(() => {
+                        input.style.borderColor = '';
+                        input.style.color = 'var(--accent-green)';
+                    }, 3000);
+                    
+                    // IMPORTANTE: DETIENE EL PROCESO AQUÍ
+                    return; 
+                }
+                // ---------------------------------------------------------
+
+                // SI PASA LA VALIDACIÓN, AHORA SÍ BLOQUEAMOS Y PROCESAMOS
                 confirmBtn.disabled = true;
                 confirmBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Processando...`;
                 lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
-
-                const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
 
                 try {
                     const clientIndex = allClients.findIndex(c => c.id === clientId);
@@ -6486,15 +6521,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                              console.error("Error al subir recibo a Firebase Storage:", storageError);
                              showToast('Falha ao subir o recibo. O pagamento será salvo sem ele.', true);
                         }
-                    }
-
-                    const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
-                    if (isNaN(actualPaidAmount) || actualPaidAmount < 0) {
-                        showToast('Por favor, insira um valor de pagamento válido.', true);
-                        confirmBtn.disabled = false; 
-                        confirmBtn.innerHTML = originalBtnHTML;
-                        lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
-                        return;
                     }
 
                     const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
@@ -8518,3 +8544,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
