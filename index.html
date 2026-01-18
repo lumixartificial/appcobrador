@@ -933,6 +933,7 @@ try {
         let allClients = [];
         let currentDetailClientId = null; // Guarda el ID del cliente en vista detallada
         let currentDetailLoanIndex = null; // Guarda el índice del préstamo en vista detallada
+        let currentPaymentDetailState = null;
         let allExpenses = [];
         let allSettlements = [];
         let allCapitalInjections = []; // <-- AÑADE ESTA LÍNEA
@@ -1883,7 +1884,10 @@ async function showRefinanceModal(clientId, notificationId) {
 
 // Fin del bloque para pegar
 
-     function showPaymentDetailModal(clientId, loanIndex, historyIndex) {
+       function showPaymentDetailModal(clientId, loanIndex, historyIndex, isUpdate = false) {
+            // 1. Guardamos el estado actual globalmente para poder refrescarlo después
+            currentPaymentDetailState = { clientId, loanIndex, historyIndex };
+
             const modal = document.getElementById('paymentDetailModal');
             const client = allClients.find(c => c.id === clientId);
             
@@ -1914,7 +1918,7 @@ async function showRefinanceModal(clientId, notificationId) {
             const dateStr = paymentDateObj.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
             const timeStr = paymentDateObj.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
             
-            // --- 2. CÁLCULO DE FECHAS DE CONTRATO (Igual que en el PDF) ---
+            // --- 2. CÁLCULO DE FECHAS DE CONTRATO ---
             let startDateStr = '--/--';
             let endDateStr = '--/--';
             const totalInstallmentsStr = (loan.installments || "0/0").split('/')[1];
@@ -1983,8 +1987,8 @@ async function showRefinanceModal(clientId, notificationId) {
                 method: isEs ? 'Método' : (isEn ? 'Method' : 'Método'),
                 receipt: isEs ? 'Comprobante' : (isEn ? 'Receipt' : 'Comprovante'),
                 download: isEs ? 'Descargar' : (isEn ? 'Download' : 'Baixar'),
-                sendReceipt: isEs ? 'Enviar Recibo' : (isEn ? 'Send Receipt' : 'Enviar Recibo'), // Texto Nuevo
-                delete: isEs ? 'Eliminar Pago' : (isEn ? 'Delete Payment' : 'Excluir Pagamento'),
+                sendReceipt: isEs ? 'Enviar Recibo' : (isEn ? 'Send Receipt' : 'Enviar Recibo'),
+                delete: isEs ? 'Eliminar' : (isEn ? 'Delete' : 'Excluir'), 
                 methodCash: isEs ? 'Efectivo' : (isEn ? 'Cash' : 'Dinheiro'),
                 methodPix: isEs ? 'Pago Electrónico' : (isEn ? 'Electronic' : 'PIX'),
                 methodCard: isEs ? 'Tarjeta' : (isEn ? 'Card' : 'Cartão'),
@@ -1997,7 +2001,7 @@ async function showRefinanceModal(clientId, notificationId) {
             else if (payment.method === 'cartao') { methodLabel = txt.methodCard; methodIcon = 'credit-card'; }
             else if (payment.method === 'migration') { methodLabel = 'Migração'; methodIcon = 'arrow-right-circle'; }
 
-            // --- 4. LÓGICA DE EXCLUSIÓN ROBUSTA (INTACTA) ---
+            // --- 4. LÓGICA DE EXCLUSIÓN ROBUSTA Y PERMISOS ---
             let canDelete = false;
             const today = new Date(); today.setHours(0, 0, 0, 0);
             const paymentDay = new Date(paymentDateObj); paymentDay.setHours(0, 0, 0, 0);
@@ -2012,19 +2016,22 @@ async function showRefinanceModal(clientId, notificationId) {
             const isLastPayment = (payment === lastPayment) || 
                                   (payment.amount === lastPayment.amount && paymentDateObj.getTime() === (lastPayment.date?.seconds ? lastPayment.date.seconds*1000 : lastPayment.date.getTime()));
 
-            if (isToday && isLastPayment) canDelete = true;
+            // [NUEVO] Verificar Permiso del Cobrador
+            const hasPermission = currentCollectorData?.permissions?.allowDeletePayment === true;
+
+            // Solo permitir si es HOY, es el ÚLTIMO pago y tiene PERMISO
+            if (isToday && isLastPayment && hasPermission) canDelete = true;
             
             // --- 5. RENDERIZADO VISUAL ---
             
-            // Foto del cliente
             const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
             const avatarUrl = client.profilePictureUrl || `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
 
-            // Botón Borrar (Lógica visual original)
+            // Botón Borrar: Si no tiene permiso o no cumple reglas, aparece desactivado
             let deleteButtonHtml = `
                 <button id="delete-payment-btn" class="btn-danger" 
                     ${canDelete ? '' : 'disabled'} 
-                    style="display: none !important; ${canDelete ? '' : 'opacity: 0.5; cursor: not-allowed;'}">
+                    style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; ${canDelete ? '' : 'opacity: 0.4; cursor: not-allowed; background-color: var(--text-secondary); border-color: var(--border-color);'}">
                     <i data-lucide="trash-2"></i> ${txt.delete}
                 </button>`;
 
@@ -2038,14 +2045,13 @@ async function showRefinanceModal(clientId, notificationId) {
             if (payment.receiptUrl) {
                 receiptContentHtml = `<img src="${payment.receiptUrl}" alt="Comprovante" style="width: 100%; max-height: 40vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color); background-color: #000;">`;
                 downloadBtnHtml = `
-                    <a href="${payment.receiptUrl}" target="_blank" class="btn-secondary" style="flex: 1; border-color: var(--text-secondary); color: var(--text-secondary);">
+                    <a href="${payment.receiptUrl}" target="_blank" class="btn-secondary" style="width: 100%; justify-content: center; margin-bottom: 10px; border-color: var(--text-secondary); color: var(--text-secondary);">
                         <i data-lucide="download"></i> ${txt.download}
                     </a>`;
             }
 
-            // BOTÓN "ENVIAR RECIBO" (Reemplaza a Fatura, Diseño Principal)
             const sendReceiptBtnHtml = `
-                <button id="generate-invoice-btn" class="btn-primary" style="flex: 2; background-color: var(--accent-purple); color: white; box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);">
+                <button id="generate-invoice-btn" class="btn-primary" style="flex: 1; background-color: var(--accent-purple); color: white; box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3); display: flex; align-items: center; justify-content: center; gap: 6px;">
                     <i data-lucide="send"></i> ${txt.sendReceipt}
                 </button>`;
 
@@ -2056,7 +2062,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 </header>
                 <div class="modal-content-wrapper container">
                     
-                    <!-- 1. TARJETA CLIENTE (Header) -->
+                    <!-- 1. TARJETA CLIENTE -->
                     <div class="kpi-card" style="margin-bottom: 15px; display: flex; align-items: center; gap: 15px; padding: 15px;">
                         <img src="${avatarUrl}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-purple);">
                         <div>
@@ -2065,7 +2071,7 @@ async function showRefinanceModal(clientId, notificationId) {
                         </div>
                     </div>
 
-                    <!-- 2. TARJETA FECHAS CONTRATO (Estilo Pastel Centrado) -->
+                    <!-- 2. TARJETA FECHAS -->
                     <div class="kpi-card" style="margin-bottom: 20px; text-align: center; padding: 15px; background-color: var(--surface);">
                         <h3 class="kpi-title" style="justify-content: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; font-weight: 700; color: var(--text-primary);">
                             ${txt.contractDates}
@@ -2086,7 +2092,7 @@ async function showRefinanceModal(clientId, notificationId) {
                         </div>
                     </div>
 
-                    <!-- 3. TARJETA DETALLE PAGO (Grande y Bonita) -->
+                    <!-- 3. TARJETA DETALLE PAGO -->
                     <div class="kpi-card" style="margin-bottom: 20px; padding: 20px; text-align: center; border: 1px solid var(--accent-green);">
                         <p style="font-size: 0.9em; color: var(--text-secondary); margin: 0 0 5px; font-weight: 600; text-transform: uppercase;">${txt.paidAmount}</p>
                         
@@ -2113,29 +2119,30 @@ async function showRefinanceModal(clientId, notificationId) {
                     </div>
                 </div>
 
-                <div class="action-buttons" style="flex-direction: column; gap: 10px;">
+                <div class="action-buttons" style="flex-direction: column; gap: 0;">
+                    ${downloadBtnHtml}
                     <div style="display: flex; gap: 10px; width: 100%;">
-                        ${downloadBtnHtml}
+                        ${deleteButtonHtml}
                         ${sendReceiptBtnHtml}
                     </div>
-                    ${deleteButtonHtml}
                 </div>
             `;
 
-            history.pushState({ modal: 'paymentDetailModal' }, 'Payment Details', '#payment-detail');
-            modal.classList.add('active');
+            // Si es una actualización en vivo, NO empujamos nuevo estado al historial
+            if (!isUpdate) {
+                history.pushState({ modal: 'paymentDetailModal' }, 'Payment Details', '#payment-detail');
+                modal.classList.add('active');
+            }
 
             lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
             
             modal.querySelector('#closePaymentDetailModal').addEventListener('click', () => window.history.back());
             
-            // Botón GENERAR RECIBO (Ahora "Enviar Recibo")
             const genInvoiceBtn = modal.querySelector('#generate-invoice-btn');
             if(genInvoiceBtn) {
                 genInvoiceBtn.addEventListener('click', () => generateInvoicePDF(client, payment));
             }
             
-            // LÓGICA DE BORRADO (INTACTA)
             const deleteBtn = modal.querySelector('#delete-payment-btn');
             if (deleteBtn && canDelete) {
                 deleteBtn.addEventListener('click', async () => {
@@ -2199,7 +2206,7 @@ async function showRefinanceModal(clientId, notificationId) {
                     );
                 });
             }
-        }   
+        }
 
         async function generateStatusReceiptPDF(clientId, loanIndex) {
             try {
@@ -4086,6 +4093,13 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 ? `<a id="whatsappClientBtn" href="https://api.whatsapp.com/send?phone=${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp"><img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px;"></a>`
                 : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível"><img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px; opacity: 0.5;"></button>`;
         
+            // --- [NUEVO] VERIFICAR PERMISO EDITAR ---
+            const canEdit = currentCollectorData?.permissions?.allowEditClient === true;
+            const editButtonHtml = canEdit 
+                ? `<button id="editClientBtn" class="header-btn" title="Editar"><i data-lucide="edit"></i></button>` 
+                : '';
+            // ----------------------------------------
+
             const allLoans = client.loans || [];
             const firstActiveIndex = allLoans.findIndex(l => calculateLoanDetails(l).status !== 'finished');
             let targetIndex = loanIndex;
@@ -4182,32 +4196,23 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             };
             const labels = l[currentLang] || l.pt;
 
-            // --- LÓGICA DE CÁLCULO DE FECHAS PRECISA ---
             let startDateStr = '--/--', endDateStr = '--/--';
             if (loan.startDate) {
                 let startD = loan.startDate.seconds ? new Date(loan.startDate.seconds * 1000) : (loan.startDate instanceof Date ? loan.startDate : new Date(loan.startDate));
-                
                 if (startD && !isNaN(startD.getTime())) { 
                     startDateStr = startD.toLocaleDateString('pt-BR'); 
-                    
                     const totalInst = parseInt((loan.installments || "0/0").split('/')[1], 10) || 0;
                     if(totalInst > 0) {
                         let currentD = new Date(startD);
-                        // Avanzamos al día siguiente para empezar a contar
                         currentD.setDate(currentD.getDate() + 1);
-                        
                         let count = 0;
                         let safety = 0;
-                        // Usamos paymentDays por defecto si no existen
                         const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6]; 
-
-                        // Simulamos el calendario real día a día
                         while(count < totalInst && safety < 2000) {
                             const dayW = currentD.getDay();
                             const dayM = currentD.getDate();
                             const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
                             const isHol = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(fDate) : false;
-                            
                             let isPayDay = false;
                             if (!isHol) {
                                 if (loan.paymentFrequency === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
@@ -4221,7 +4226,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                                     }
                                 }
                             }
-                            
                             if (isPayDay) count++;
                             if (count < totalInst) currentD.setDate(currentD.getDate() + 1);
                             safety++;
@@ -4230,12 +4234,17 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     }
                 }
             }
-            // --------------------------------------------------------
 
             let receiptBtnText = currentLang === 'es' ? 'Enviar<br>Recibo' : (currentLang === 'en' ? 'Send<br>Receipt' : 'Enviar<br>Comprovante');
             let payBtnText = currentLang === 'es' ? 'Registrar Pago' : (currentLang === 'en' ? 'Register Payment' : 'Registrar Pagamento');
+            
+            // --- [MODIFICADO] BOTONES DE ACCIÓN ---
+            const updateBtnHtml = canEdit 
+                ? `<button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>`
+                : '';
+
             const actionButtonsHtml = currentStatus === 'finished' ? `
-                <button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>
+                ${updateBtnHtml}
                 <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
             ` : `
                 <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
@@ -4243,6 +4252,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
                 <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> ${payBtnText}</button>
             `;
+            // ---------------------------------------
 
             let messages = loan.chatHistory || [];
             if (messages.length === 0 && loan.notes && loan.notes.trim() !== '') {
@@ -4255,12 +4265,9 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 return `<div class="chat-bubble ${isMe ? 'collector' : 'admin'}">${msg.text}<span class="chat-time">${time}</span></div>`;
             }).join('') || `<div style="text-align:center; color:gray; font-size:0.8em; margin-top:10px;">${currentLang === 'es' ? 'Inicia la conversación...' : 'Inicie a conversa...'}</div>`;
 
-            // --- [CORRECCIÓN] RENDERIZADO DE PESTAÑAS (TRADUCCIÓN CORRECTA DE ACTIVO) ---
             const renderTabs = () => {
                 if (!hasMultipleLoans) return '';
-                
                 const t_loan = { pt: 'Empréstimo', es: 'Préstamo', en: 'Loan' }[currentLang] || 'Empréstimo';
-                // [NUEVO] Etiqueta dinámica para el estado activo
                 const t_active = { pt: 'ATIVO', es: 'ACTIVO', en: 'ACTIVE' }[currentLang] || 'ATIVO';
                 const t_finished = { pt: 'FINALIZADO', es: 'FINALIZADO', en: 'FINISHED' }[currentLang] || 'FINALIZADO';
 
@@ -4270,13 +4277,10 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         ${allLoans.map((l, index) => {
                             const lDetails = calculateLoanDetails(l);
                             const isActive = lDetails.status !== 'finished';
-                            
                             const subText = isActive 
                                 ? `<span style="display:block; font-size: 0.7em; color: var(--accent-green); font-weight: 700; margin-top: 2px;">${t_active}</span>` 
                                 : `<span style="display:block; font-size: 0.7em; color: var(--text-secondary); margin-top: 2px;">${t_finished}</span>`;
-                            
                             const activeClass = index === currentLoanIndex ? 'active' : '';
-                            
                             return `
                             <button class="loan-tab ${activeClass}" data-loan-index="${index}" 
                                 style="flex-direction: column; align-items: center; padding: 8px 16px; line-height: 1.1; height: auto;">
@@ -4287,7 +4291,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     </div>
                 </div>`;
             };
-            // -----------------------------------------------------------------
 
             clientDetailView.innerHTML = `
                 <header class="modal-header" style="justify-content: space-between;">
@@ -4295,7 +4298,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                         <button id="closeDetailView" class="header-btn" style="margin-right: 10px;"><i data-lucide="arrow-left"></i></button>
                         <div><span class="modal-title">${client.name}</span>${client.documentNumber ? `<span style="font-size: 0.8em; color: var(--text-secondary); display: block;">Doc: ${client.documentNumber}</span>` : ''}</div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">${whatsappButtonHtml}<button id="editClientBtn" class="header-btn" title="Editar"><i data-lucide="edit"></i></button></div>
+                    <div style="display: flex; align-items: center; gap: 8px;">${whatsappButtonHtml}${editButtonHtml}</div>
                 </header>
                 
                 ${renderTabs()} 
@@ -4407,7 +4410,13 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
             applyLanguage(currentLang);
             document.getElementById('closeDetailView').addEventListener('click', () => { window.history.back(); });
-            document.getElementById('editClientBtn').addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
+            
+            // --- [MODIFICADO] LISTENERS CONDICIONALES ---
+            const editBtn = document.getElementById('editClientBtn');
+            if (editBtn) {
+                editBtn.addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
+            }
+            // --------------------------------------------
 
             const sendChatBtn = document.getElementById('send-chat-btn');
             const chatInput = document.getElementById('chat-input-field');
@@ -4482,7 +4491,14 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
             if (currentStatus === 'finished') {
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
-                document.getElementById('updateClientDataBtn').addEventListener('click', (e) => showClientFormModal(clientId, false, parseInt(e.currentTarget.dataset.loanIndex, 10)));
+                
+                // --- [MODIFICADO] LISTENER CONDICIONAL ---
+                const updateBtn = document.getElementById('updateClientDataBtn');
+                if (updateBtn) {
+                    updateBtn.addEventListener('click', (e) => showClientFormModal(clientId, false, parseInt(e.currentTarget.dataset.loanIndex, 10)));
+                }
+                // ----------------------------------------
+
             } else {
                 document.getElementById('registerPaymentBtn').addEventListener('click', (e) => showPaymentModal(clientId, parseInt(e.currentTarget.dataset.loanIndex, 10)));
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
@@ -8219,6 +8235,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
         currentCollectorUsername = collectorDoc.id; 
         console.log(`Documento do cobrador encontrado. Username (Firestore ID): ${currentCollectorUsername}`);
 
+        // Listener del Cobrador (Perfil y PERMISOS EN TIEMPO REAL)
         onSnapshot(doc(db, 'collectors', currentCollectorUsername), (docSnap) => {
             if (docSnap.exists()) {
                 currentCollectorData = docSnap.data(); 
@@ -8235,12 +8252,34 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 if (headerImg) headerImg.src = imageUrl || placeholderUrl.replace('120x120', '80x80');
                 if (profileImg) profileImg.src = imageUrl || placeholderUrl;
 
-                // --- NUEVO: ACTUALIZAR INPUT DE NOMBRE DE RUTA ---
+                // ACTUALIZAR INPUT DE NOMBRE DE RUTA
                 const routeInput = document.getElementById('route-name-input');
                 if (routeInput && currentCollectorData.routeName) {
                     routeInput.value = currentCollectorData.routeName;
                 }
-                // --- FIN NUEVO ---
+
+                // === LÓGICA DE ACTUALIZACIÓN EN TIEMPO REAL (PERMISOS) ===
+                
+                // 1. Si la Ficha de Cliente está abierta -> Refrescar (Botón Editar)
+                const clientDetailView = document.getElementById('clientDetailView');
+                if (clientDetailView && clientDetailView.classList.contains('active') && currentDetailClientId) {
+                     const contentWrapper = clientDetailView.querySelector('.modal-content-wrapper');
+                     const scrollPos = contentWrapper ? contentWrapper.scrollTop : 0;
+                     
+                     // Llamamos con true para que sea una actualización silenciosa
+                     showClientDetails(currentDetailClientId, currentDetailLoanIndex, true);
+                     
+                     const newWrapper = clientDetailView.querySelector('.modal-content-wrapper');
+                     if (newWrapper) newWrapper.scrollTop = scrollPos;
+                }
+
+                // 2. Si el Detalle de Pago está abierto -> Refrescar (Botón Borrar)
+                const paymentModal = document.getElementById('paymentDetailModal');
+                if (paymentModal && paymentModal.classList.contains('active') && typeof currentPaymentDetailState !== 'undefined' && currentPaymentDetailState) {
+                    // Refrescamos el modal de pago usando el estado guardado
+                    showPaymentDetailModal(currentPaymentDetailState.clientId, currentPaymentDetailState.loanIndex, currentPaymentDetailState.historyIndex, true);
+                }
+                // ==========================================================
 
             } else {
                  console.error(`Documento do cobrador ${currentCollectorUsername} foi excluído ou inacessível?`);
@@ -8251,7 +8290,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
              console.error(`Erro ao escutar dados do cobrador ${currentCollectorUsername}:`, error);
              showBlockedView("Erro de conexão ao carregar seus dados.");
              signOut(auth);
-        }); 
+        });
 
         // Listener de Clientes
         const clientsQuery = query(
@@ -8606,4 +8645,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
