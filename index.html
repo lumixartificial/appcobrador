@@ -7022,9 +7022,26 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.setTextColor(color);
                 pdfDoc.text(money(value), pageWidth - pageMargin - 5, y, { align: 'right' });
             };
+                // --- INICIO: CAJA ANTERIOR Y CAPITAL ACTUAL (SIN EMOJIS) ---
+            
+            // 1. Calcular Caja Anterior
+            const previousCapital = currentCapitalOnHand - netCashFlow;
+            
+            // 2. Definir etiqueta de texto según idioma
+            const t_prev = currentLang === 'es' ? 'Caja Anterior (Inicio):' : (currentLang === 'en' ? 'Previous Balance:' : 'Caixa Anterior (Início):');
 
-            // 1. Línea de Total General
-            addSummaryLine(`(+) ${t.received} (Total):`, dailyTotal, '#15803d', true);
+            // 3. Imprimir CAJA ANTERIOR (Solo texto, Gris Oscuro)
+            addSummaryLine(t_prev, previousCapital, '#4b5563', true); 
+
+            // 4. Imprimir CAPITAL EN MANOS (Solo texto, Negro)
+            addSummaryLine(`${t.capitalHand}:`, currentCapitalOnHand, '#000000', true);
+            
+            // Línea separadora
+            y += 3;
+            pdfDoc.setLineWidth(0.1);
+            pdfDoc.setDrawColor(200); 
+            pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y);
+            // --- FIN BLOQUE ---
 
             // 2. Desglose: Efectivo
             if (dailyTotalCash > 0) {
@@ -8579,5 +8596,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
