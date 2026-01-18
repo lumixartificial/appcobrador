@@ -4093,12 +4093,11 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 ? `<a id="whatsappClientBtn" href="https://api.whatsapp.com/send?phone=${cleanedWhatsapp}" target="_blank" class="header-btn" title="Enviar WhatsApp"><img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px;"></a>`
                 : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível"><img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px; opacity: 0.5;"></button>`;
         
-            // --- [NUEVO] VERIFICAR PERMISO EDITAR ---
+            // --- VERIFICAR PERMISO EDITAR ---
             const canEdit = currentCollectorData?.permissions?.allowEditClient === true;
             const editButtonHtml = canEdit 
                 ? `<button id="editClientBtn" class="header-btn" title="Editar"><i data-lucide="edit"></i></button>` 
                 : '';
-            // ----------------------------------------
 
             const allLoans = client.loans || [];
             const firstActiveIndex = allLoans.findIndex(l => calculateLoanDetails(l).status !== 'finished');
@@ -4115,6 +4114,12 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const currentLoanIndex = targetIndex;
             const loan = allLoans[currentLoanIndex];
             const hasMultipleLoans = allLoans.length > 1;
+
+            // --- [CORRECCIÓN CRÍTICA] DEFINICIÓN TEMPRANA DE VARIABLES ---
+            // Calculamos totalInstallments AQUÍ para que esté disponible en toda la función
+            const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
+            const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
+            // -------------------------------------------------------------
 
             const originalInstallment = loan.originalInstallmentAmount || 0;
             let approvedCumulativePaidForNumbering = 0;
@@ -4189,10 +4194,20 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 if (remainder > 0.05 && (originalInstallment - remainder) > 0.05) picoValue = remainder;
             }
 
+            // --- TRADUCCIONES LOCALES PARA LA FICHA ---
             const l = {
-                pt: { progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'CHAT COM ADMINISTRAÇÃO', notesPlaceholder: 'Escreva uma mensagem...', saveNote: 'Enviar Mensagem', clearChat: 'Limpar Conversa' },
-                es: { progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'CHAT CON ADMINISTRACIÓN', notesPlaceholder: 'Escribe un mensaje...', saveNote: 'Enviar Mensaje', clearChat: 'Borrar Chat' },
-                en: { progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates', totalDue: 'Total Due Now', notesTitle: 'CHAT WITH ADMIN', notesPlaceholder: 'Type a message...', saveNote: 'Send Message', clearChat: 'Clear Chat' }
+                pt: { 
+                    progress: 'Progresso do Empréstimo', status: 'Estado do Empréstimo', loc: 'Endereço', pico: 'Valor Picado (Pago Parcial)', contractDateTitle: 'Datas do Contrato', totalDue: 'Total Devido Agora', notesTitle: 'CHAT COM ADMINISTRAÇÃO', notesPlaceholder: 'Escreva uma mensagem...', saveNote: 'Enviar Mensagem', clearChat: 'Limpar Conversa',
+                    reputation: 'Reputação', history: 'Histórico de Pagamentos' 
+                },
+                es: { 
+                    progress: 'Progreso del Préstamo', status: 'Estado del Préstamo', loc: 'Dirección', pico: 'Valor Pico (Pago Parcial)', contractDateTitle: 'Fechas del Contrato', totalDue: 'Total Deuda Actual', notesTitle: 'CHAT CON ADMINISTRACIÓN', notesPlaceholder: 'Escribe un mensaje...', saveNote: 'Enviar Mensaje', clearChat: 'Borrar Chat',
+                    reputation: 'Reputación', history: 'Historial de Pagos'
+                },
+                en: { 
+                    progress: 'Loan Progress', status: 'Loan Status', loc: 'Address', pico: 'Partial Payment Balance', contractDateTitle: 'Contract Dates', totalDue: 'Total Due Now', notesTitle: 'CHAT WITH ADMIN', notesPlaceholder: 'Type a message...', saveNote: 'Send Message', clearChat: 'Clear Chat',
+                    reputation: 'Reputation', history: 'Payment History'
+                }
             };
             const labels = l[currentLang] || l.pt;
 
@@ -4201,14 +4216,14 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 let startD = loan.startDate.seconds ? new Date(loan.startDate.seconds * 1000) : (loan.startDate instanceof Date ? loan.startDate : new Date(loan.startDate));
                 if (startD && !isNaN(startD.getTime())) { 
                     startDateStr = startD.toLocaleDateString('pt-BR'); 
-                    const totalInst = parseInt((loan.installments || "0/0").split('/')[1], 10) || 0;
-                    if(totalInst > 0) {
+                    // [CORRECCIÓN] Usamos la variable ya definida arriba, evitando el error de inicialización
+                    if(totalInstallments > 0) {
                         let currentD = new Date(startD);
                         currentD.setDate(currentD.getDate() + 1);
                         let count = 0;
                         let safety = 0;
                         const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6]; 
-                        while(count < totalInst && safety < 2000) {
+                        while(count < totalInstallments && safety < 2000) {
                             const dayW = currentD.getDay();
                             const dayM = currentD.getDate();
                             const fDate = `${String(dayM).padStart(2, '0')}/${String(currentD.getMonth() + 1).padStart(2, '0')}`;
@@ -4227,7 +4242,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                                 }
                             }
                             if (isPayDay) count++;
-                            if (count < totalInst) currentD.setDate(currentD.getDate() + 1);
+                            if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
                             safety++;
                         }
                         endDateStr = currentD.toLocaleDateString('pt-BR');
@@ -4238,7 +4253,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             let receiptBtnText = currentLang === 'es' ? 'Enviar<br>Recibo' : (currentLang === 'en' ? 'Send<br>Receipt' : 'Enviar<br>Comprovante');
             let payBtnText = currentLang === 'es' ? 'Registrar Pago' : (currentLang === 'en' ? 'Register Payment' : 'Registrar Pagamento');
             
-            // --- [MODIFICADO] BOTONES DE ACCIÓN ---
+            // --- BOTONES DE ACCIÓN ---
             const updateBtnHtml = canEdit 
                 ? `<button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>`
                 : '';
@@ -4252,7 +4267,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
                 <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> ${payBtnText}</button>
             `;
-            // ---------------------------------------
 
             let messages = loan.chatHistory || [];
             if (messages.length === 0 && loan.notes && loan.notes.trim() !== '') {
@@ -4374,8 +4388,24 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                        </div>
 
                     </section>
-                    <section><h2 class="section-title">Reputação</h2><div class="kpi-card"><div class="reputation-bar-container"><div class="reputation-bar ${barStatusClass}" style="width: ${score * 10}%"></div></div><div class="reputation-status"><span class="reputation-value">${score} / 10</span></div></div></section>
-                    <section style="margin-top: 30px;"><h2 class="section-title">Histórico</h2><div class="client-list">${historyHtml}</div></section>
+                    
+                    <section>
+                        <h2 class="section-title">${labels.reputation}</h2>
+                        <div class="kpi-card">
+                            <div class="reputation-bar-container">
+                                <div class="reputation-bar ${barStatusClass}" style="width: ${score * 10}%"></div>
+                            </div>
+                            <div class="reputation-status">
+                                <span class="reputation-value">${score} / 10</span>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <section style="margin-top: 30px;">
+                        <h2 class="section-title">${labels.history}</h2>
+                        <div class="client-list">${historyHtml}</div>
+                    </section>
+
                   </div></div>
                 <div class="action-buttons">${actionButtonsHtml}</div>`;
 
@@ -4387,8 +4417,6 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             const chatContainer = document.getElementById('chat-history-container');
             if(chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            const totalInstallmentsString = (loan.installments || "0/0").split('/')[1];
-            const totalInstallments = totalInstallmentsString ? parseInt(totalInstallmentsString, 10) : 0;
             let paidInstallments = 0;
             if (originalInstallment > 0) { paidInstallments = Math.floor(displayTotalPaid / originalInstallment); }
             if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
@@ -4411,7 +4439,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             applyLanguage(currentLang);
             document.getElementById('closeDetailView').addEventListener('click', () => { window.history.back(); });
             
-            // --- [MODIFICADO] LISTENERS CONDICIONALES ---
+            // --- LISTENERS CONDICIONALES ---
             const editBtn = document.getElementById('editClientBtn');
             if (editBtn) {
                 editBtn.addEventListener('click', () => showClientFormModal(clientId, false, currentLoanIndex));
@@ -4492,7 +4520,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             if (currentStatus === 'finished') {
                 document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
                 
-                // --- [MODIFICADO] LISTENER CONDICIONAL ---
+                // --- LISTENER CONDICIONAL ---
                 const updateBtn = document.getElementById('updateClientDataBtn');
                 if (updateBtn) {
                     updateBtn.addEventListener('click', (e) => showClientFormModal(clientId, false, parseInt(e.currentTarget.dataset.loanIndex, 10)));
@@ -8645,3 +8673,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
