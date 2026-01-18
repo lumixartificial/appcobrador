@@ -7023,7 +7023,31 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.text(money(value), pageWidth - pageMargin - 5, y, { align: 'right' });
             };
 
-            addSummaryLine(`(+) ${t.received} (${dateStr}):`, dailyTotal, '#28a745');
+            // 1. Línea de Total General
+            addSummaryLine(`(+) ${t.received} (Total):`, dailyTotal, '#15803d', true);
+
+            // 2. Desglose: Efectivo
+            if (dailyTotalCash > 0) {
+                const cashLabel = currentLang === 'es' ? '   > En Efectivo:' : (currentLang === 'en' ? '   > Cash:' : '   > Em Dinheiro:');
+                y += 5; 
+                pdfDoc.setFontSize(10);
+                pdfDoc.setFont(undefined, 'normal');
+                pdfDoc.setTextColor(50);
+                pdfDoc.text(cashLabel, pageMargin + 10, y);
+                pdfDoc.text(money(dailyTotalCash), pageWidth - pageMargin - 5, y, { align: 'right' });
+            }
+
+            // 3. Desglose: Digital (Aquí aparecerán tus pagos electrónicos)
+            if (dailyTotalDigital > 0) {
+                const digitalLabel = currentLang === 'es' ? '   > Digital (Electrónico):' : (currentLang === 'en' ? '   > Digital:' : '   > Digital (PIX/Cartão):');
+                y += 5;
+                pdfDoc.setFontSize(10);
+                pdfDoc.setFont(undefined, 'normal');
+                pdfDoc.setTextColor(111, 66, 193); // Morado para diferenciar
+                pdfDoc.text(digitalLabel, pageMargin + 10, y);
+                pdfDoc.text(money(dailyTotalDigital), pageWidth - pageMargin - 5, y, { align: 'right' });
+            }
+            y += 3;
             addSummaryLine(`(-) ${t.expenses}:`, totalExpenses, '#dc3545');
             
             y += 2;
@@ -7062,12 +7086,23 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             pdfDoc.setDrawColor(0); 
             pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); 
             
+            // --- INICIO BLOQUE MEJORADO: Variación de Caja con Color ---
             y += 8;
             pdfDoc.setFontSize(12);
             pdfDoc.setFont(undefined, 'bold');
-            pdfDoc.setTextColor(netCashFlow >= 0 ? '#000000' : '#dc3545');
+            
+            // Define el color: Verde (#28a745) si sube la caja, Rojo (#dc3545) si baja
+            const isPositiveFlow = netCashFlow >= 0;
+            const flowColor = isPositiveFlow ? '#28a745' : '#dc3545';
+            
+            pdfDoc.setTextColor(flowColor);
             pdfDoc.text(`${t.cashFlow}:`, pageMargin + 5, y);
-            pdfDoc.text(money(netCashFlow), pageWidth - pageMargin - 5, y, { align: 'right' });
+            
+            // Agregamos el signo '+' visualmente si es positivo
+            // (La función money() ya suele poner el '-' si es negativo)
+            const signPrefix = isPositiveFlow ? '+' : ''; 
+            pdfDoc.text(signPrefix + money(netCashFlow), pageWidth - pageMargin - 5, y, { align: 'right' });
+            // --- FIN BLOQUE MEJORADO ---
             
             y += 10;
             pdfDoc.setFontSize(14);
@@ -8544,4 +8579,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
