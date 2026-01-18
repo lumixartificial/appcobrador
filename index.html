@@ -6779,9 +6779,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 routeLabel: translations[currentLang].routeLabel || 'Rota:',
                 microInsurance: currentLang === 'es' ? 'Micro Seguro (Fondo)' : 'Micro Seguro (Fundo)',
                 accumulatedInsurance: currentLang === 'es' ? 'FONDO SEGURO ACUMULADO' : 'FUNDO SEGURO ACUMULADO',
-                activeFines: currentLang === 'es' ? 'MULTAS ACTIVAS (Generadas)' : (currentLang === 'en' ? 'ACTIVE FINES (Generated)' : 'MULTAS ATIVAS (Geradas)'), // Nueva etiqueta
+                activeFines: currentLang === 'es' ? 'MULTAS ACTIVAS (Generadas)' : (currentLang === 'en' ? 'ACTIVE FINES (Generated)' : 'MULTAS ATIVAS (Geradas)'),
                 injections: currentLang === 'es' ? 'Aportes' : 'Aportes',
-                newLoans: currentLang === 'es' ? 'Nuevos Préstamos' : 'Novos Empréstimos'
+                newLoans: currentLang === 'es' ? 'Nuevos Préstamos' : 'Novos Empréstimos',
+                previousBox: currentLang === 'es' ? 'Caja del Día Anterior' : (currentLang === 'en' ? 'Previous Day Balance' : 'Caixa do Dia Anterior')
             };
             
             const reportDate = customDate || new Date();
@@ -6798,7 +6799,64 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 return d.toLocaleDateString('pt-BR') === reportDate.toLocaleDateString('pt-BR');
             };
 
-            // --- VARIABLES DEL DÍA ---
+            // ==========================================================================================
+            // 1. OBTENER SALDO INICIAL DEL DÍA (CAJA ANTERIOR)
+            // ==========================================================================================
+            // Intentamos calcularlo matemáticamente para que sea exacto al centavo.
+            
+            const startOfDay = new Date(reportDate);
+            startOfDay.setHours(0,0,0,0);
+            
+            // Base: Capital Inicial configurado en el sistema
+            let previousCapital = (currentCollectorData?.startingCapitalOnHand !== undefined) 
+                ? parseFloat(currentCollectorData.startingCapitalOnHand) 
+                : (parseFloat(currentCollectorData?.startingCapital) || 0);
+
+            // Rastreo: Sumamos/Restamos todo lo ocurrido ANTES de hoy para reconstruir la caja de ayer
+            
+            // (+) Entradas (Aportes)
+            allCapitalInjections.forEach(i => {
+                const d = i.date?.seconds ? new Date(i.date.seconds * 1000) : new Date(i.date);
+                if (i.status === 'approved' && d < startOfDay) previousCapital += (parseFloat(i.amount) || 0);
+            });
+
+            // (-) Salidas (Gastos)
+            allExpenses.forEach(e => {
+                const d = e.date?.seconds ? new Date(e.date.seconds * 1000) : new Date(e.date);
+                if (d < startOfDay) previousCapital -= (parseFloat(e.value) || 0);
+            });
+
+            // (-) Salidas (Retiros al Admin) - El seguro no se resta de la caja operativa
+            allSettlements.forEach(s => {
+                const d = s.date?.seconds ? new Date(s.date.seconds * 1000) : new Date(s.date);
+                if (s.status === 'approved' && s.type !== 'insurance' && d < startOfDay) previousCapital -= (parseFloat(s.amount) || 0);
+            });
+
+            // (+/-) Movimientos con Clientes (Préstamos y Cobros)
+            allClients.forEach(c => {
+                (c.loans || []).forEach(l => {
+                    const dStart = l.startDate?.seconds ? new Date(l.startDate.seconds * 1000) : new Date(l.startDate);
+                    // Si prestamos dinero antes de hoy, restamos de la caja
+                    if (!l.migrationDate && dStart < startOfDay) {
+                        let principal = parseFloat(l.principalAmount);
+                        if (!principal && l.totalLoan) principal = l.totalLoan / (1 + ((c.interestRate||20)/100));
+                        previousCapital -= (principal || 0);
+                    }
+
+                    // Si cobramos dinero antes de hoy, sumamos a la caja
+                    (l.history || []).forEach(h => {
+                        const dPay = h.date?.seconds ? new Date(h.date.seconds * 1000) : new Date(h.date);
+                        if (h.status === 'approved' && h.method !== 'migration' && dPay < startOfDay) {
+                            previousCapital += (parseFloat(h.amount) || 0);
+                        }
+                    });
+                });
+            });
+
+
+            // ==========================================================================================
+            // 2. OBTENER MOVIMIENTOS DE HOY
+            // ==========================================================================================
             let dailyTotal = 0;
             let dailyTotalCash = 0;
             let dailyTotalDigital = 0;
@@ -6807,32 +6865,23 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const finishedClientsList = [];
             const finedClientsList = []; 
 
-            // --- CÁLCULO DE FONDO DE SEGURO ACUMULADO ---
+            // Cálculo Fondo Seguro
             let lifetimeInsuranceGenerated = 0;
-            allClients.forEach(c => {
-                (c.loans || []).forEach(l => {
-                    lifetimeInsuranceGenerated += (parseFloat(l.microInsurance) || 0);
-                });
-            });
-
+            allClients.forEach(c => { (c.loans || []).forEach(l => { lifetimeInsuranceGenerated += (parseFloat(l.microInsurance) || 0); }); });
             let lifetimeInsuranceWithdrawn = 0;
-            allSettlements.forEach(s => {
-                if (s.status === 'approved' && s.type === 'insurance') {
-                    lifetimeInsuranceWithdrawn += (s.amount || 0);
-                }
-            });
-            
+            allSettlements.forEach(s => { if (s.status === 'approved' && s.type === 'insurance') lifetimeInsuranceWithdrawn += (s.amount || 0); });
             const insuranceFundBalance = Math.max(0, lifetimeInsuranceGenerated - lifetimeInsuranceWithdrawn);
 
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, loanIndex) => { 
                     const details = calculateLoanDetails(loan);
                     let hasPaidToday = false;
+                    
                     (loan.history || []).forEach(h => {
                         if (h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
                             if (checkDateMatch(h.date)) {
                                 hasPaidToday = true;
-                                const amt = h.amount || 0;
+                                const amt = parseFloat(h.amount) || 0;
                                 dailyTotal += amt;
                                 if (h.method === 'dinheiro') dailyTotalCash += amt;
                                 else dailyTotalDigital += amt;
@@ -6870,7 +6919,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                         });
                     }
 
-                    // --- DETECCIÓN DE MULTAS ---
                     if (details.hasFixedFine && details.fixedFineApplied > 0) {
                         finedClientsList.push({
                             clientName: client.name,
@@ -6882,7 +6930,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             });
             
-            // --- TOTAL DE MULTAS ACTIVAS ---
             const totalActiveFines = finedClientsList.reduce((sum, f) => sum + f.fineAmount, 0);
 
             missedPaymentsList.sort((a, b) => a.clientName.localeCompare(b.clientName));
@@ -6904,7 +6951,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, index) => {
                     if (checkDateMatch(loan.startDate) && !loan.migrationDate) {
-                        let principal = loan.principalAmount;
+                        let principal = parseFloat(loan.principalAmount);
                         if (!principal && loan.totalLoan) {
                              const rate = client.interestRate || 20;
                              principal = loan.totalLoan / (1 + (rate/100));
@@ -6940,9 +6987,17 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             lateClientsList.sort((a, b) => b.lateDays - a.lateDays);
             
+            // --- CÁLCULOS FINALES ---
             const operationalResult = dailyTotal - totalExpenses;
             const netCashFlow = (operationalResult + totalInjections) - (totalSettlements + totalLoansOutflow);
+            
+            // Capital Final = Caja Anterior + Flujo Neto
+            const closingCapitalThisDay = previousCapital + netCashFlow;
 
+
+            // ==========================================================================================
+            // 3. GENERACIÓN DEL PDF
+            // ==========================================================================================
             const pageMargin = 15;
             const pageWidth = pdfDoc.internal.pageSize.getWidth();
             const pageHeight = pdfDoc.internal.pageSize.getHeight();
@@ -6971,6 +7026,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 y += 8;
             };
 
+            // HEADER
             y = 25;
             pdfDoc.setFontSize(16);
             pdfDoc.setFont(undefined, 'bold');
@@ -7003,6 +7059,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
             checkPageBreak(80); 
 
+            // --- BLOQUE RESUMEN CONTABLE ---
             y += 15;
             pdfDoc.setFontSize(14);
             pdfDoc.setFont(undefined, 'bold');
@@ -7012,6 +7069,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             pdfDoc.setDrawColor(200);
             pdfDoc.line(pageMargin, y, pageWidth - pageMargin, y);
 
+            // Función auxiliar interna
             const addSummaryLine = (label, value, color = '#000000', isBold = false) => {
                 y += 8;
                 pdfDoc.setFontSize(11);
@@ -7022,32 +7080,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.setTextColor(color);
                 pdfDoc.text(money(value), pageWidth - pageMargin - 5, y, { align: 'right' });
             };
-                // --- INICIO BLOQUE CORREGIDO: CAJA ANTERIOR Y RECIBIDO HOY ---
-            
-            // 1. Calcular y Mostrar CAJA ANTERIOR (Inicio del día)
-            const previousCapital = currentCapitalOnHand - netCashFlow;
-            const t_prev = currentLang === 'es' ? 'Caja Anterior (Inicio):' : (currentLang === 'en' ? 'Previous Balance:' : 'Caixa Anterior (Início):');
-            addSummaryLine(t_prev, previousCapital, '#4b5563', true); 
 
-            // 2. Mostrar TOTAL RECIBIDO HOY (¡Esta es la línea que faltaba!)
-            // Se muestra en verde y negrita para destacar el ingreso del día
-            addSummaryLine(`(+) ${t.received}:`, dailyTotal, '#15803d', true);
-            
-            // 3. Línea separadora para los desgloses que siguen
-            y += 3;
-            pdfDoc.setLineWidth(0.1);
-            pdfDoc.setDrawColor(200); 
-            pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y);
-            // --- FIN BLOQUE ---
-            
-            // Línea separadora
-            y += 3;
-            pdfDoc.setLineWidth(0.1);
-            pdfDoc.setDrawColor(200); 
-            pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y);
-            // --- FIN BLOQUE ---
+            // A. CAJA DEL DÍA ANTERIOR (Valor Detectado)
+            addSummaryLine(t.previousBox, previousCapital, '#4b5563', true);
 
-            // 2. Desglose: Efectivo
+            // B. TOTAL RECIBIDO HOY
+            addSummaryLine(`(+) ${t.received} (Total):`, dailyTotal, '#15803d', true);
+
+            // C. DESGLOSE (Efectivo vs Digital)
             if (dailyTotalCash > 0) {
                 const cashLabel = currentLang === 'es' ? '   > En Efectivo:' : (currentLang === 'en' ? '   > Cash:' : '   > Em Dinheiro:');
                 y += 5; 
@@ -7057,81 +7097,60 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.text(cashLabel, pageMargin + 10, y);
                 pdfDoc.text(money(dailyTotalCash), pageWidth - pageMargin - 5, y, { align: 'right' });
             }
-
-            // 3. Desglose: Digital (Aquí aparecerán tus pagos electrónicos)
             if (dailyTotalDigital > 0) {
                 const digitalLabel = currentLang === 'es' ? '   > Digital (Electrónico):' : (currentLang === 'en' ? '   > Digital:' : '   > Digital (PIX/Cartão):');
-                y += 5;
+                y += 5; 
                 pdfDoc.setFontSize(10);
                 pdfDoc.setFont(undefined, 'normal');
-                pdfDoc.setTextColor(111, 66, 193); // Morado para diferenciar
+                pdfDoc.setTextColor(111, 66, 193); // Morado
                 pdfDoc.text(digitalLabel, pageMargin + 10, y);
                 pdfDoc.text(money(dailyTotalDigital), pageWidth - pageMargin - 5, y, { align: 'right' });
             }
             y += 3;
-            addSummaryLine(`(-) ${t.expenses}:`, totalExpenses, '#dc3545');
-            
-            y += 2;
-            pdfDoc.setLineWidth(0.1);
-            pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); 
-            y += 2;
 
+            // D. GASTOS
+            addSummaryLine(`(-) ${t.expenses}:`, totalExpenses, '#dc3545');
+            y += 2; pdfDoc.setLineWidth(0.1); pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); y += 2;
+
+            // E. RESULTADO OPERATIVO
             addSummaryLine(`(=) ${t.generatedToday}:`, operationalResult, operationalResult >= 0 ? '#6f42c1' : '#dc3545', true);
 
             y += 5; 
-
             addSummaryLine(`(-) ${t.newLoans}:`, totalLoansOutflow, '#dc3545');
             addSummaryLine(`(-) ${t.settlements}:`, totalSettlements, '#dc3545');
             addSummaryLine(`(+) ${t.injections}:`, totalInjections, '#28a745');
             
-            // --- NUEVO: LÍNEA DE MULTAS ACTIVAS (Informativa) ---
             if (totalActiveFines > 0) {
-                y += 2;
-                addSummaryLine(`(+) ${t.activeFines}:`, totalActiveFines, '#d97706', true); // Naranja Quemado
+                y += 2; addSummaryLine(`(+) ${t.activeFines}:`, totalActiveFines, '#d97706', true);
             }
-            // ----------------------------------------------------
-
             if (insuranceFundBalance > 0) {
-                y += 4;
-                pdfDoc.setLineWidth(0.1);
-                pdfDoc.setDrawColor(220); 
-                pdfDoc.setLineDash([1, 1], 0);
-                pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y);
-                pdfDoc.setLineDash([]);
-                y += 2;
+                y += 4; pdfDoc.setLineWidth(0.1); pdfDoc.setDrawColor(220); pdfDoc.setLineDash([1, 1], 0);
+                pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); pdfDoc.setLineDash([]); y += 2;
                 addSummaryLine(`${t.accumulatedInsurance}:`, insuranceFundBalance, '#0ea5e9', true); 
             }
 
-            y += 3;
-            pdfDoc.setLineWidth(0.5);
-            pdfDoc.setDrawColor(0); 
+            // F. VARIACIÓN DE CAJA (NETO)
+            y += 3; pdfDoc.setLineWidth(0.5); pdfDoc.setDrawColor(0); 
             pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y); 
-            
-            // --- INICIO BLOQUE MEJORADO: Variación de Caja con Color ---
             y += 8;
-            pdfDoc.setFontSize(12);
-            pdfDoc.setFont(undefined, 'bold');
             
-            // Define el color: Verde (#28a745) si sube la caja, Rojo (#dc3545) si baja
             const isPositiveFlow = netCashFlow >= 0;
             const flowColor = isPositiveFlow ? '#28a745' : '#dc3545';
-            
-            pdfDoc.setTextColor(flowColor);
-            pdfDoc.text(`${t.cashFlow}:`, pageMargin + 5, y);
-            
-            // Agregamos el signo '+' visualmente si es positivo
-            // (La función money() ya suele poner el '-' si es negativo)
             const signPrefix = isPositiveFlow ? '+' : ''; 
-            pdfDoc.text(signPrefix + money(netCashFlow), pageWidth - pageMargin - 5, y, { align: 'right' });
-            // --- FIN BLOQUE MEJORADO ---
             
+            pdfDoc.setFontSize(12); pdfDoc.setFont(undefined, 'bold'); pdfDoc.setTextColor(flowColor);
+            pdfDoc.text(`${t.cashFlow}:`, pageMargin + 5, y);
+            pdfDoc.text(signPrefix + money(netCashFlow), pageWidth - pageMargin - 5, y, { align: 'right' });
+
+            // G. CAPITAL EN MANOS (Cierre de Caja del Día)
             y += 10;
             pdfDoc.setFontSize(14);
-            pdfDoc.setTextColor(currentCapitalOnHand >= 0 ? '#000000' : '#dc3545');
-            pdfDoc.text(`${t.capitalHand} ${todayLabel}:`, pageMargin + 5, y);
-            pdfDoc.text(money(currentCapitalOnHand), pageWidth - pageMargin - 5, y, { align: 'right' });
+            pdfDoc.setTextColor(closingCapitalThisDay >= 0 ? '#000000' : '#dc3545');
+            pdfDoc.text(`${t.capitalHand}:`, pageMargin + 5, y); 
+            pdfDoc.text(money(closingCapitalThisDay), pageWidth - pageMargin - 5, y, { align: 'right' });
 
             y += 10;
+            // --- FIN BLOQUE RESUMEN ---
 
             if (dailyPaymentsList.length > 0) {
                 addSectionHeader(t.paymentsSection);
@@ -7142,15 +7161,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setTextColor(0);
                     
                     let methodDisplay = '---';
-                    if (p.method === 'dinheiro') {
-                        methodDisplay = currentLang === 'es' ? 'Efectivo' : (currentLang === 'en' ? 'Cash' : 'Dinheiro');
-                    } else if (p.method === 'pix') {
-                        methodDisplay = currentLang === 'es' ? 'Pago Electrónico' : (currentLang === 'en' ? 'Electronic' : 'PIX');
-                    } else if (p.method === 'cartao') {
-                        methodDisplay = currentLang === 'es' ? 'Tarjeta' : (currentLang === 'en' ? 'Card' : 'Cartão');
-                    } else if (p.method === 'migration') {
-                        methodDisplay = currentLang === 'es' ? 'Migración' : (currentLang === 'en' ? 'Migration' : 'Migração');
-                    }
+                    if (p.method === 'dinheiro') methodDisplay = currentLang === 'es' ? 'Efectivo' : 'Cash';
+                    else if (p.method === 'pix') methodDisplay = currentLang === 'es' ? 'Pago Electrónico' : 'Electronic';
+                    else if (p.method === 'cartao') methodDisplay = currentLang === 'es' ? 'Tarjeta' : 'Card';
+                    else if (p.method === 'migration') methodDisplay = currentLang === 'es' ? 'Migración' : 'Migration';
 
                     pdfDoc.text(`${p.time} - ${p.clientName} (${methodDisplay})`, pageMargin + 5, y);
                     pdfDoc.setFont(undefined, 'bold');
@@ -7180,10 +7194,8 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 });
             }
 
-            // --- SECCIÓN DE MULTAS (DETALLE) ---
             if (finedClientsList.length > 0) {
                 addSectionHeader(t.finesSection);
-                
                 pdfDoc.setFontSize(9);
                 pdfDoc.setTextColor(100);
                 pdfDoc.setFont(undefined, 'bold');
@@ -7191,17 +7203,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.text(t.daysLate || 'Dias', pageMargin + 120, y, { align: 'right' }); 
                 pdfDoc.text(currentLang === 'es' ? "Multa" : "Multa", pageWidth - pageMargin - 5, y, { align: 'right' });
                 y += 6;
-
                 finedClientsList.forEach(f => {
                     checkPageBreak(12);
                     pdfDoc.setFontSize(10);
                     pdfDoc.setFont(undefined, 'normal');
                     pdfDoc.setTextColor(0);
                     pdfDoc.text(`${f.clientName}`, pageMargin + 5, y);
-                    
                     pdfDoc.setTextColor('#dc3545'); 
                     pdfDoc.text(`+${f.lateDays}`, pageMargin + 120, y, { align: 'right' });
-                    
                     pdfDoc.setFont(undefined, 'bold');
                     pdfDoc.text(money(f.fineAmount), pageWidth - pageMargin - 5, y, { align: 'right' });
                     y += 7;
@@ -7250,13 +7259,11 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setTextColor(0);
                     const displayText = `${l.time} - ${l.clientName}`;
                     pdfDoc.text(displayText, pageMargin + 5, y);
-                    
                     if (l.microInsurance > 0) {
                         pdfDoc.setTextColor('#0ea5e9'); 
                         pdfDoc.setFont(undefined, 'bold');
                         pdfDoc.text(`(+Seguro: ${money(l.microInsurance)})`, pageMargin + 100, y);
                     }
-
                     pdfDoc.setFont(undefined, 'bold');
                     pdfDoc.setTextColor('#dc3545'); 
                     pdfDoc.text(`-${money(l.amount)}`, pageWidth - pageMargin - 5, y, { align: 'right' });
@@ -7274,7 +7281,6 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.text('Dias', pageMargin + 100, y);
                 pdfDoc.text('Status', pageMargin + 140, y);
                 y += 6;
-
                 lateClientsList.forEach(c => {
                     checkPageBreak(12);
                     pdfDoc.setFontSize(10);
@@ -7285,12 +7291,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     pdfDoc.setFont(undefined, 'bold');
                     pdfDoc.setTextColor('#dc3545'); 
                     pdfDoc.text(`${c.lateDays} ${t.daysLate}`, pageMargin + 100, y);
-                    
                     const maxBarWidth = 30; 
                     const maxDaysScale = 30; 
                     const daysToDraw = Math.min(c.lateDays, maxDaysScale);
                     const currentBarWidth = (daysToDraw / maxDaysScale) * maxBarWidth;
-
                     pdfDoc.setFillColor(230, 230, 230);
                     pdfDoc.rect(pageMargin + 140, y - 3, maxBarWidth, 4, 'F');
                     pdfDoc.setFillColor(220, 53, 69); 
@@ -7318,7 +7322,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const successMsg = currentLang === 'es' ? '¡Reporte PDF generado con éxito!' : (currentLang === 'en' ? 'PDF report generated successfully!' : 'Relatório PDF gerado com sucesso!');
             showToast(successMsg);
 
-            // --- BLOQUEO AUTOMÁTICO ---
+            // --- BLOQUEO AUTOMÁTICO Y "MEMORIA" ---
             const isTodayReport = !customDate || (customDate.toDateString() === new Date().toDateString());
             if (isTodayReport) {
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData) {
@@ -7326,8 +7330,11 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 }
                 try {
                     const collectorRef = doc(db, 'collectors', currentCollectorUsername);
+                    // Aquí intentamos crear "memoria" guardando el saldo de cierre de hoy
+                    // para que pueda ser usado en el futuro si se implementa lectura.
                     updateDoc(collectorRef, {
-                        lastReportDate: serverTimestamp()
+                        lastReportDate: serverTimestamp(),
+                        lastClosingBalance: closingCapitalThisDay // Guardamos este dato
                     });
                     showToast("Bloqueio ativado (5 min).", false);
                 } catch (err) {
@@ -8451,7 +8458,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     return; 
                 }
 
-                
                 let isRestricted = hour >= 0 && hour < 7;
                 let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
 
@@ -8600,3 +8606,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
