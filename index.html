@@ -7022,19 +7022,23 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.setTextColor(color);
                 pdfDoc.text(money(value), pageWidth - pageMargin - 5, y, { align: 'right' });
             };
-                // --- INICIO: CAJA ANTERIOR Y CAPITAL ACTUAL (SIN EMOJIS) ---
+                // --- INICIO BLOQUE CORREGIDO: CAJA ANTERIOR Y RECIBIDO HOY ---
             
-            // 1. Calcular Caja Anterior
+            // 1. Calcular y Mostrar CAJA ANTERIOR (Inicio del día)
             const previousCapital = currentCapitalOnHand - netCashFlow;
-            
-            // 2. Definir etiqueta de texto según idioma
             const t_prev = currentLang === 'es' ? 'Caja Anterior (Inicio):' : (currentLang === 'en' ? 'Previous Balance:' : 'Caixa Anterior (Início):');
-
-            // 3. Imprimir CAJA ANTERIOR (Solo texto, Gris Oscuro)
             addSummaryLine(t_prev, previousCapital, '#4b5563', true); 
 
-            // 4. Imprimir CAPITAL EN MANOS (Solo texto, Negro)
-            addSummaryLine(`${t.capitalHand}:`, currentCapitalOnHand, '#000000', true);
+            // 2. Mostrar TOTAL RECIBIDO HOY (¡Esta es la línea que faltaba!)
+            // Se muestra en verde y negrita para destacar el ingreso del día
+            addSummaryLine(`(+) ${t.received}:`, dailyTotal, '#15803d', true);
+            
+            // 3. Línea separadora para los desgloses que siguen
+            y += 3;
+            pdfDoc.setLineWidth(0.1);
+            pdfDoc.setDrawColor(200); 
+            pdfDoc.line(pageMargin + 5, y, pageWidth - pageMargin - 5, y);
+            // --- FIN BLOQUE ---
             
             // Línea separadora
             y += 3;
@@ -8596,6 +8600,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
-
-
