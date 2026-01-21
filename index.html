@@ -3221,17 +3221,17 @@ async function showRefinanceModal(clientId, notificationId) {
                amountDueToday: 0 
            };
 
-           // --- 1. CALCULAR TOTAL PAGADO REAL ---
-           const currentTotalPaid = (loan.history || [])
-               .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
-               .reduce((sum, h) => sum + (h.amount || 0), 0);
+           // 1. Filtrar pagos válidos
+           const validPayments = (loan.history || []).filter(h => 
+               h.status !== 'pending_verification' && 
+               h.status !== 'rejected' && 
+               h.status !== 'postponed'
+           );
 
-           if (!loan || !loan.totalLoan || (currentTotalPaid >= loan.totalLoan - 0.1)) {
-               details.status = 'finished';
-               return details;
-           }
+           // 2. Calcular Total Pagado Global (para el balance final)
+           const currentTotalPaidGlobal = validPayments.reduce((sum, h) => sum + (h.amount || 0), 0);
 
-           // --- 2. CONFIGURAR FECHAS ---
+           // 3. Configurar Fechas
            const today = new Date();
            today.setHours(0, 0, 0, 0); 
            
@@ -3256,21 +3256,19 @@ async function showRefinanceModal(clientId, notificationId) {
            let installmentsDueCount = 0; 
            
            let stopDate = new Date(today);
-           stopDate.setDate(stopDate.getDate() + 60); // Límite de seguridad
+           stopDate.setDate(stopDate.getDate() + 60); 
 
            if (checkDate > stopDate) return details;
 
-           // --- 3. BUCLE DE COMPROBACIÓN ---
+           // 4. Bucle de Comprobación Histórica
            while (checkDate <= stopDate) {
                const dayOfWeek = checkDate.getDay();
                const dayOfMonth = checkDate.getDate();
                const formattedDate = `${String(checkDate.getDate()).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
-               const isHoliday = typeof nationalHolidays !== 'undefined' ? nationalHolidays.includes(formattedDate) : false;
-               
+               const isHoliday = false; // El sistema ignorará festivos y cobrará según la frecuencia normal.
                const frequency = loan.paymentFrequency || 'daily';
                let isPaymentDay = false;
                
-               // [CORRECCIÓN] Fallback robusto: Si no hay paymentDays, asume Lunes(1) a Sábado(6)
                const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1, 2, 3, 4, 5, 6];
                
                if (frequency === 'daily') isPaymentDay = pDays.some(d => String(d) === String(dayOfWeek));
@@ -3278,10 +3276,28 @@ async function showRefinanceModal(clientId, notificationId) {
                else if (frequency === 'monthly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfMonth);
 
                if (isPaymentDay && !isHoliday) {
+                   
+                   // [CORRECCIÓN CLAVE]: Calculamos cuánto se había pagado HASTA ESA FECHA
+                   const endOfCheckDate = new Date(checkDate);
+                   endOfCheckDate.setHours(23, 59, 59, 999);
+
+                   const paidByThisDate = validPayments.reduce((sum, h) => {
+                       // Pagos de migración cuentan desde el día 0
+                       if (h.method === 'migration') return sum + (h.amount || 0);
+                       
+                       let pDate = h.date?.seconds ? new Date(h.date.seconds * 1000) : new Date(h.date);
+                       if (pDate <= endOfCheckDate) {
+                           return sum + (h.amount || 0);
+                       }
+                       return sum;
+                   }, 0);
+
                    if (checkDate.getTime() < today.getTime()) {
                        installmentsDueCount++; 
                        const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - currentTotalPaid);
+                       
+                       // Comparamos contra lo que había pagado ESE DÍA, no el total de hoy
+                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - paidByThisDate);
 
                        if (outstandingDueAmount > 0.9) { 
                            accumulatedLateDays++; 
@@ -3290,7 +3306,8 @@ async function showRefinanceModal(clientId, notificationId) {
                    } 
                    else if (checkDate.getTime() === today.getTime()) {
                        const expectedTotalIncludingToday = (installmentsDueCount + 1) * installmentAmount;
-                       if (currentTotalPaid < expectedTotalIncludingToday - 0.1) {
+                       // Para hoy, sí usamos el total global
+                       if (currentTotalPaidGlobal < expectedTotalIncludingToday - 0.1) {
                            details.amountDueToday = installmentAmount;
                        }
                        if (!details.nextDueDate) details.nextDueDate = new Date(checkDate);
@@ -3304,9 +3321,23 @@ async function showRefinanceModal(clientId, notificationId) {
                checkDate.setDate(checkDate.getDate() + 1);
            }
            
-           details.lateDays = accumulatedLateDays;
+            // [CORRECCIÓN] Calcular días de atraso reales HOY (Saldo Deudor / Valor Cuota)
+           // Usamos installmentsDueCount que ya contó cuántas cuotas vencieron hasta ayer
+           const totalExpectedUpToYesterday = installmentsDueCount * installmentAmount;
+           
+           // Calculamos cuánto le falta para cubrir lo vencido
+           const currentGap = totalExpectedUpToYesterday - currentTotalPaidGlobal;
+
+           // Si debe dinero vencido, calculamos cuántas cuotas representa
+           if (currentGap > 0.5 && installmentAmount > 0) {
+               // Ejemplo: Debe 100, Cuota 50 -> 2 días de atraso
+               details.lateDays = Math.ceil(currentGap / installmentAmount);
+           } else {
+               details.lateDays = 0; // Está al día con lo vencido
+           }
            
            const fixedFineAmount = parseFloat(loan.lateFeeAmount) || 0;
+           // La multa fija se mantiene si hubo atraso histórico, aunque ya haya pagado
            if (accumulatedLateDays >= 5 && fixedFineAmount > 0) {
                accumulatedLateFees += fixedFineAmount; 
                details.fixedFineApplied = fixedFineAmount; 
@@ -3315,10 +3346,14 @@ async function showRefinanceModal(clientId, notificationId) {
 
            details.lateFeesAccumulated = accumulatedLateFees;
            
-           if (currentTotalPaid >= loan.totalLoan - 0.1) {
+           // 5. Verificación Final: ¿Cubrió Prestamo + Multas?
+           const totalDebtWithFines = (parseFloat(loan.totalLoan) || 0) + accumulatedLateFees;
+           
+           // Solo finaliza si paga TODO (incluyendo multas)
+           if (currentTotalPaidGlobal >= totalDebtWithFines - 0.1) {
                details.status = 'finished';
            } 
-           else if (accumulatedLateDays > 0) { 
+            else if (details.lateDays > 0) {
                details.status = 'late';
            } 
            else if (details.amountDueToday > 0) { 
@@ -8672,3 +8707,4 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
