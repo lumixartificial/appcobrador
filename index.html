@@ -999,9 +999,11 @@ const BLACKLIST_DATA = {
                 confirmInjection: 'Confirmar Aporte',
                 capitalOnHandLabel: 'Capital em Mãos',
                 microInsuranceLabelSimple: 'Micro Seguro',
-                last24h: 'Últimas 24h', last48h: 'Últimas 48h', lastWeek: 'Última Semana', lastMonth: 'Último Mês'
+                last24h: 'Últimas 24h', last48h: 'Últimas 48h', lastWeek: 'Última Semana', lastMonth: 'Último Mês',
+                didNotPayToday: 'Não Pagou Hoje',
             },
             es: { 
+                didNotPayToday: 'No Pagó Hoy',
                 portalTitle: 'Portal del Cobrador',
                 noClientsFound: 'Ningún cliente encontrado.', 
                 biweekly: 'QUINCENAL', registerOutflow: 'Registrar Nueva Salida', addExpenseOption: 'Añadir Gasto', expenseOptionDesc: 'Registrar combustible, comida, etc.', cashWithdrawal: 'Retiro de Caja', withdrawalOptionDesc: 'Enviar dinero entregado al admin.', amountDeliveredAdmin: 'Monto entregado al Admin:', sendForApproval: 'Enviar para Aprobación',
@@ -1040,6 +1042,7 @@ const BLACKLIST_DATA = {
                 last24h: 'Últimas 24h', last48h: 'Últimas 48h', lastWeek: 'Última Semana', lastMonth: 'Último Mes'
             },
             en: { 
+                didNotPayToday: 'Did Not Pay Today',
                 portalTitle: 'Collector Portal',
                 noClientsFound: 'No clients found.',
                 biweekly: 'BIWEEKLY', registerOutflow: 'Register New Outflow', addExpenseOption: 'Add Expense', expenseOptionDesc: 'Register fuel, food, etc.', cashWithdrawal: 'Cash Withdrawal', withdrawalOptionDesc: 'Send money delivered to admin.', amountDeliveredAdmin: 'Amount delivered to Admin:', sendForApproval: 'Send for Approval',
@@ -3997,7 +4000,6 @@ async function showRefinanceModal(clientId, notificationId) {
 
             // --- LÓGICA ESPECIAL PARA "FINALIZADOS" (SIN DUPLICADOS) ---
             if (filter === 'finished') {
-                // 1. Verificamos si coincide con la búsqueda (si hay texto escrito)
                 let matchesSearch = true;
                 if (searchTerm) {
                     const nameMatch = client.name.toLowerCase().includes(searchTerm);
@@ -4006,28 +4008,32 @@ async function showRefinanceModal(clientId, notificationId) {
                 }
 
                 if (matchesSearch) {
-                    // 2. Verificamos si el cliente está TOTALMENTE finalizado
-                    // (Es decir, que NO tenga ningún préstamo pendiente o atrasado)
                     const hasActiveLoan = client.loans.some(l => calculateLoanDetails(l).status !== 'finished');
-                    
                     if (!hasActiveLoan) {
-                        // 3. Si está limpio, mostramos SOLO UNA tarjeta (la del último préstamo registrado)
                         const lastLoanIndex = client.loans.length - 1;
                         const lastLoan = client.loans[lastLoanIndex];
                         clientsWithLoans.push({ client, loan: lastLoan, loanIndex: lastLoanIndex });
                     }
                 }
-                return; // IMPORTANTE: Saltamos el resto del bucle para este cliente en este filtro
+                return; 
             }
 
-            // --- LÓGICA ESTÁNDAR PARA OTROS FILTROS (Por préstamo) ---
+            // --- LÓGICA ESTÁNDAR PARA OTROS FILTROS ---
             client.loans.forEach((loan, loanIndex) => {
                 const details = calculateLoanDetails(loan);
                 const currentStatus = details.status; 
                 
-                // Verificar si PAGÓ HOY
-                const hasPaidToday = (loan.history || []).some(h => {
+                // 1. Verificar si tiene CUALQUIER actividad hoy (Pagado O No Pagó Hoy)
+                const hasActivityToday = (loan.history || []).some(h => {
                     if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false; 
+                    const pDate = getPaymentDate(h.date);
+                    return pDate && pDate >= todayStart;
+                });
+
+                // 2. Verificar si PAGÓ DINERO REAL hoy (Solo Aprobados)
+                // Esto excluye a los que marcaste como "No Pagó Hoy" (skipped)
+                const hasPaidMoneyToday = (loan.history || []).some(h => {
+                    if (h.status !== 'approved') return false; 
                     const pDate = getPaymentDate(h.date);
                     return pDate && pDate >= todayStart;
                 });
@@ -4035,15 +4041,14 @@ async function showRefinanceModal(clientId, notificationId) {
                 let passesCategory = true;
 
                 if (searchTerm) {
-                    // Si buscas por nombre, muestra TODO lo que coincida
                     const nameMatch = client.name.toLowerCase().includes(searchTerm);
                     const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
                     if (!nameMatch && !addressMatch) passesCategory = false;
                 
                 } else {
                     if (filter === 'all') {
-                        // "TODOS": Solo mostrar si PAGÓ HOY.
-                        if (!hasPaidToday) passesCategory = false;
+                        // "TODOS": Muestra cualquier actividad (Pago o Visita fallida)
+                        if (!hasActivityToday) passesCategory = false;
                     }
                     else if (filter === 'weekly') {
                         if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
@@ -4052,11 +4057,14 @@ async function showRefinanceModal(clientId, notificationId) {
                         if (loan.paymentFrequency !== 'biweekly' || currentStatus === 'finished') passesCategory = false;
                     }
                     else if (filter === 'todo_today') {
-                        // "Falta por Pagar": Activos o atrasados que no pagaron hoy
-                        if (currentStatus === 'finished' || hasPaidToday) passesCategory = false;
+                        // "Falta por Pagar": 
+                        // Muestra si NO está finalizado Y NO ha pagado dinero hoy.
+                        // (Si marcaste "No Pagó Hoy", hasPaidMoneyToday es false, así que SÍ APARECE AQUÍ)
+                        if (currentStatus === 'finished' || hasPaidMoneyToday) passesCategory = false;
                     }
                     else if (filter === 'paid') {
-                        if (!hasPaidToday) passesCategory = false;
+                        // "PAGADOS": Solo muestra si pagó dinero real
+                        if (!hasPaidMoneyToday) passesCategory = false;
                     }
                     else if (filter === 'late') {
                         if (currentStatus !== 'late') passesCategory = false;
@@ -4168,40 +4176,90 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     if (typeof dateObj === 'string') { const d = new Date(dateObj); if (!isNaN(d.getTime())) return d.getTime(); }
                     return 0;
                 };
+                // Ordenamos el historial
                 const sortedHistory = loan.history.map((p, index) => ({ ...p, originalIndex: index })).sort((a, b) => getSortableTimestamp(a.date) - getSortableTimestamp(b.date));
 
-                historyHtml = sortedHistory.map(p => {
-                    let title = '', description = '', dateString = 'Data inválida', timeString = '', statusStyle = '', statusText = '', amountDisplay = money(p.amount || 0);
+                 // Generamos el HTML de las tarjetas
+                 // Generamos el HTML de las tarjetas
+                 historyHtml = sortedHistory.map(p => {
+                    let title = '', description = '', dateString = '', timeString = '', statusStyle = '', statusText = '', amountDisplay = money(p.amount || 0);
                     let hasReceipt = p.receiptUrl ? '<i data-lucide="file-text" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>' : '';
-                    let d;
-                    if (p.date?.toDate) d = p.date.toDate(); else if (p.date instanceof Date) d = p.date; else if (typeof p.date === 'string') d = new Date(p.date);
-                    if (d && !isNaN(d.getTime())) { dateString = d.toLocaleDateString('pt-BR'); timeString = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+                    
+                    // --- CORRECCIÓN DE FECHAS E IDIOMA ---
+                    let d = null;
+                    if (p.date) {
+                        if (p.date.seconds) d = new Date(p.date.seconds * 1000); // Timestamp Firestore
+                        else if (p.date instanceof Date) d = p.date; // Objeto Date JS
+                        else if (typeof p.date === 'string') {
+                            // Soporte para fechas antiguas guardadas como texto
+                            d = new Date(p.date);
+                        }
+                    }
 
+                    // Configuración de idioma para la fecha
+                    const dateLocale = currentLang === 'es' ? 'es-ES' : (currentLang === 'en' ? 'en-US' : 'pt-BR');
+                    const invalidText = currentLang === 'es' ? 'Fecha Inválida' : (currentLang === 'en' ? 'Invalid Date' : 'Data Inválida');
+
+                    if (d && !isNaN(d.getTime())) { 
+                        dateString = d.toLocaleDateString(dateLocale); 
+                        timeString = d.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' }); 
+                    } else {
+                        dateString = invalidText;
+                    }
+                    // -------------------------------------
+
+                    // --- ESTILOS DINÁMICOS POR ESTADO ---
+                    let cardBackground = 'var(--surface)';
+                    
                     if (p.status === 'pending_verification') {
                          statusText = 'Pendente'; statusStyle = 'color: var(--warning-color); font-weight: bold;';
-                         title = 'Pagamento Enviado'; description = `Aguardando aprovação do admin`;
+                         title = 'Pagamento Enviado'; description = `Aguardando aprovação`;
                     } else if (p.status === 'rejected') {
                          statusText = 'Rejeitado'; statusStyle = 'color: var(--danger-color); font-weight: bold;';
                          title = 'Pagamento Rejeitado'; description = `Comprovante não aceito`;
                          amountDisplay = `<span style="text-decoration: line-through;">${money(p.amount || 0)}</span>`;
                     } else if (p.status === 'postponed') {
                          statusText = 'Adiado'; statusStyle = 'color: var(--text-secondary); font-style: italic;';
-                         title = 'Pagamento Adiado'; description = `Data de vencimento movida`;
+                         title = 'Pagamento Adiado'; description = `Data movida`;
                          amountDisplay = ''; hasReceipt = ''; 
+                    } else if (p.status === 'skipped') {
+                         // --- ESTILO PARA "NO PAGÓ HOY" ---
+                         statusText = translations[currentLang].didNotPayToday || 'Não Pagou Hoje'; 
+                         statusStyle = 'color: #dc3545; font-weight: 700;';
+                         title = 'Visita sem Pagamento'; description = 'Cliente não pagou.';
+                         amountDisplay = '<span style="color: #dc3545;">R$ 0,00</span>'; hasReceipt = '';
+                         cardBackground = 'rgba(220, 53, 69, 0.05)'; 
                     } else if (p.method === 'migration') {
-                        statusText = 'Aprovado (Migração)'; statusStyle = 'color: var(--accent-green); font-style: italic;'; hasReceipt = ''; 
-                        title = 'Registro de Migração'; description = `Valor inicial registrado.`;
+                        statusText = 'Migração'; statusStyle = 'color: var(--accent-green);'; hasReceipt = ''; 
+                        title = 'Registro de Migração'; description = `Saldo inicial.`;
                         approvedCumulativePaidForNumbering += (p.amount || 0);
+                        cardBackground = 'rgba(40, 167, 69, 0.05)';
                     } else { 
+                        // --- ESTILO PARA PAGOS APROBADOS ---
                         statusText = 'Aprovado'; statusStyle = 'color: var(--accent-green);';
-                        title = "Pagamento Recebido"; description = "Valor creditado ao saldo.";
+                        title = "Pagamento Recebido"; description = "Creditado.";
                         approvedCumulativePaidForNumbering += (p.amount || 0);
+                        cardBackground = 'rgba(40, 167, 69, 0.08)'; 
                     }
-                    return `<div class="payment-history-item" data-history-index="${p.originalIndex}" style="cursor: ${p.status !== 'postponed' ? 'pointer' : 'default'};">
+
+                    // --- BORDES A AMBOS LADOS (DERECHA E IZQUIERDA) ---
+                    let borderColor = 'var(--border-color)'; 
+                    if (p.status === 'skipped') borderColor = '#dc3545'; // Rojo si no pagó
+                    else if (p.status === 'approved' || p.method === 'migration') borderColor = 'var(--accent-green)'; // Verde si pagó
+                    else if (p.status === 'rejected') borderColor = 'var(--danger-color)'; // Rojo rechazo
+                    
+                    const doubleBorderStyle = `border-left: 5px solid ${borderColor}; border-right: 5px solid ${borderColor};`;
+
+                    return `<div class="payment-history-item" data-history-index="${p.originalIndex}" 
+                                style="cursor: ${p.status !== 'postponed' ? 'pointer' : 'default'}; 
+                                       background-color: ${cardBackground}; 
+                                       border-top: 1px solid var(--border-color); 
+                                       border-bottom: 1px solid var(--border-color); 
+                                       ${doubleBorderStyle}">
                                 <div class="payment-history-details"><h4 class="payment-history-title">${title}</h4><p class="payment-history-description">${description}</p><p class="payment-history-description" style="${statusStyle}; font-size: 0.8em; margin-top: 5px;">${statusText}</p></div>
-                                <div class="payment-history-info"><span class="payment-date">${dateString} - ${timeString}</span><span class="payment-history-amount" style="${p.status === 'rejected' ? 'color: var(--danger-color);' : ''}">${amountDisplay}</span>${hasReceipt}</div>
+                                <div class="payment-history-info"><span class="payment-date">${dateString}<br>${timeString}</span><span class="payment-history-amount" style="${p.status === 'rejected' ? 'color: var(--danger-color);' : ''}">${amountDisplay}</span>${hasReceipt}</div>
                             </div>`;
-                }).reverse().join(''); 
+                }).reverse().join('');
             }
 
             const historyPaid = (loan.history || []).filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration').reduce((sum, h) => sum + (h.amount || 0), 0);
@@ -6364,32 +6422,34 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const client = allClients.find(c => c.id === clientId);
             const loan = client.loans[loanIndex];
 
-            // --- INICIO: CÁLCULO INTELIGENTE DE DEUDA RESTANTE ---
+            // --- CÁLCULO DE DEUDA RESTANTE ---
             const details = calculateLoanDetails(loan);
             const historyPaid = (loan.history || [])
-                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
+                .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration' && h.status !== 'skipped')
                 .reduce((sum, h) => sum + (h.amount || 0), 0);
             
             const initialPaid = loan.initialMigratedAmount || 0;
             const totalPaidSoFar = initialPaid + historyPaid;
             const totalDebt = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
             let remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
-            remainingBalance = Math.round(remainingBalance * 100) / 100; // Redondeo seguro a 2 decimales
+            remainingBalance = Math.round(remainingBalance * 100) / 100;
 
             const standardInstallment = loan.amount || loan.originalInstallmentAmount || 0;
             let suggestedValue = standardInstallment;
             
-            // Si lo que falta es MENOR que una cuota, sugerimos solo lo que falta
-            // Usamos 0.01 de margen aquí para evitar sugerir valores negativos por error de redondeo
             if (remainingBalance < (standardInstallment - 0.01)) {
                 suggestedValue = remainingBalance;
             }
-            // --- FIN CÁLCULO INTELIGENTE ---
+
+            // --- TEXTOS DINÁMICOS ---
+            const t_postpone = translations[currentLang].postponePayment || 'Adiar';
+            const t_didNotPay = translations[currentLang].didNotPayToday || 'Não Pagou Hoje';
+            const t_confirm = translations[currentLang].confirm || 'Confirmar';
 
             paymentModal.innerHTML = `
                 <header class="modal-header">
                     <button id="closePaymentModal"><i data-lucide="arrow-left"></i></button>
-                    <span class="modal-title">Registrar Pagamento para ${client.name} (Préstamo ${loanIndex + 1})</span>
+                    <span class="modal-title">Registrar (${client.name})</span>
                 </header>
                 <div class="modal-content-wrapper container">
                     
@@ -6408,44 +6468,53 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     <div class="form-group" style="margin-top: 20px;">
                         <label for="payment-amount-input" data-lang-key="amountPaid"></label>
                         <input type="number" id="payment-amount-input" step="0.01" value="${suggestedValue.toFixed(2)}" style="font-size: 1.6em; text-align: center; font-weight: 700; color: var(--accent-green); padding: 15px;">
-                        
-                        ${suggestedValue < standardInstallment ? 
-                            `<p style="text-align: center; font-size: 0.85em; color: var(--accent-purple); margin-top: 8px; font-weight: 600;">
-                                <i data-lucide="sparkles" style="width: 14px; height: 14px; vertical-align: middle;"></i> Valor ajustado para liquidar o restante.
-                            </p>` : ''
-                        }
+                        ${suggestedValue < standardInstallment ? `<p style="text-align: center; font-size: 0.85em; color: var(--accent-purple); margin-top: 8px; font-weight: 600;"><i data-lucide="sparkles" style="width: 14px; height: 14px; vertical-align: middle;"></i> Valor ajustado.</p>` : ''}
                     </div>
 
-                    <h3 class="section-title" style="margin-top: 30px;">Método de Pagamento</h3>
+                    <h3 class="section-title" style="margin-top: 30px;">Método</h3>
                     <div class="radio-group" id="payment-method-selector">
                         <input type="radio" name="paymentMethod" id="method-dinheiro" value="dinheiro" checked>
                         <label for="method-dinheiro"><i class="icon" data-lucide="banknote"></i><span data-lang-key="receivedInCash"></span></label>
-                        
                         <input type="radio" name="paymentMethod" id="method-pix" value="pix">
                         <label for="method-pix"><i class="icon" data-lucide="smartphone"></i><span data-lang-key="methodDigitalLabel"></span></label>
-                        
                         <input type="radio" name="paymentMethod" id="method-cartao" value="cartao">
                         <label for="method-cartao"><i class="icon" data-lucide="credit-card"></i><span data-lang-key="methodCardLabel"></span></label>
                     </div>
                     <div class="form-group" id="receipt-upload-section" style="display: none; margin-top: 20px;">
                         <label data-lang-key="uploadReceipt"></label>
                         <label for="payment-receipt-input" style="border: 2px dashed var(--border-color); padding: 20px; border-radius: 12px; cursor: pointer; text-align: center; display: block;">
-                            <i data-lucide="upload-cloud"></i>
-                            <span id="payment-upload-label-text">Clique para anexar</span>
+                            <i data-lucide="upload-cloud"></i> <span id="payment-upload-label-text">Anexar</span>
                             <img id="payment-receipt-preview" style="display:none; max-width: 100px; max-height: 100px; margin-top: 10px; border-radius: 8px;">
                         </label>
                         <input type="file" id="payment-receipt-input" accept="image/*" style="display:none;">
                     </div>
                 </div>
-                <div class="action-buttons">
-                    <!-- BOTÓN ADIAR TRADUCIDO -->
-                    <button class="btn-secondary" id="postponePaymentBtnInModal" style="border-color: var(--text-secondary); color: var(--text-secondary);">
-                        <i data-lucide="calendar-plus"></i> <span data-lang-key="postponePayment">Adiar</span>
-                    </button>
+
+                <!-- CONTENEDOR DE ACCIONES (Relative para que el botón flote respecto a esto) -->
+                <div class="action-buttons" style="flex-direction: column; gap: 12px; padding-top: 15px; position: relative;">
                     
-                    <button class="btn-primary" id="confirmPaymentBtn" style="flex-grow: 2;">
-                        <i data-lucide="check-circle"></i> Confirmar Pagamento
+                    <!-- BOTÓN ADIAR FLOTANTE (VERDE) -->
+                    <!-- Position absolute lo saca del flujo y lo pone arriba a la derecha -->
+                    <button id="postponePaymentBtnInModal" title="${t_postpone}"
+                        style="position: absolute; top: -60px; right: 20px; 
+                               width: 50px; height: 50px; border-radius: 50%; 
+                               background-color: #10b981; color: white; border: none; 
+                               box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+                               display: flex; align-items: center; justify-content: center; z-index: 10;">
+                        <i data-lucide="calendar-clock" style="width: 24px; height: 24px;"></i>
                     </button>
+
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        <!-- BOTÓN: NO PAGÓ HOY (ROJO) -->
+                        <button id="didNotPayBtn" style="flex: 1; background-color: #dc3545; color: white; border: none; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                            <i data-lucide="x-circle"></i> ${t_didNotPay}
+                        </button>
+                        
+                        <!-- BOTÓN CONFIRMAR (AZUL/MORADO) -->
+                        <button id="confirmPaymentBtn" class="btn-primary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                            <i data-lucide="check-circle"></i> ${t_confirm}
+                        </button>
+                    </div>
                 </div>`;
             
             history.pushState({ modal: 'paymentModal' }, 'Payment', '#payment');
@@ -6463,19 +6532,11 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 const selectedInputs = document.querySelectorAll('input[name="paymentMethod"]');
                 selectedInputs.forEach(input => {
                     const method = input.value;
-                     if(input.checked && (method === 'pix' || method === 'cartao')) {
-                        receiptUploadSection.style.display = 'block';
-                     } else if (input.checked && method === 'dinheiro') {
+                     if(input.checked && (method === 'pix' || method === 'cartao')) receiptUploadSection.style.display = 'block';
+                     else if (input.checked && method === 'dinheiro') {
                         receiptUploadSection.style.display = 'none';
                         receiptFile = null;
-                        const preview = document.getElementById('payment-receipt-preview');
-                        if (preview) {
-                            preview.style.display = 'none';
-                            preview.src = '';
-                        }
-                        const label = document.getElementById('payment-upload-label-text');
-                        if (label) label.textContent = 'Clique para anexar';
-                     }
+                    }
                 });
             });
 
@@ -6483,173 +6544,103 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 if (e.target.files && e.target.files[0]) {
                     receiptFile = e.target.files[0];
                     const preview = document.getElementById('payment-receipt-preview');
-                    const uploadLabel = document.getElementById('payment-upload-label-text');
                     preview.src = URL.createObjectURL(receiptFile);
                     preview.style.display = 'block';
-                    uploadLabel.textContent = receiptFile.name;
+                    document.getElementById('payment-upload-label-text').textContent = receiptFile.name;
                 }
             });
-            
-            // --- LÓGICA BOTÓN ADIAR (CORREGIDA PARA NUEVO MODAL) ---
+
+            // ACCIÓN 1: ADIAR (Postpone)
             const postponeBtn = paymentModal.querySelector('#postponePaymentBtnInModal');
-            if (postponeBtn) {
-                postponeBtn.addEventListener('click', async () => {
-                     const confirmed = await showConfirmationModal(
-                        translations[currentLang].postponeConfirmTitle || 'Confirmar Adiamento',
-                        translations[currentLang].postponeConfirmMsg || 'Isso moverá a data de vencimento em 1 dia. Deseja continuar?',
-                        translations[currentLang].confirm || 'Confirmar',
-                        'btn-secondary'
-                    );
+            postponeBtn.addEventListener('click', async () => {
+                 const confirmed = await showConfirmationModal(
+                    translations[currentLang].postponeConfirmTitle || 'Confirmar',
+                    translations[currentLang].postponeConfirmMsg || 'Mover vencimento?',
+                    translations[currentLang].confirm || 'Confirmar', 'btn-secondary'
+                );
+                if (!confirmed) return;
+                processPaymentAction(clientId, loanIndex, 0, 'postponed', null);
+            });
 
-                    if (!confirmed) return;
+            // ACCIÓN 2: NO PAGÓ HOY (Skipped)
+            const didNotPayBtn = paymentModal.querySelector('#didNotPayBtn');
+            didNotPayBtn.addEventListener('click', async () => {
+                const confirmed = await showConfirmationModal(
+                    translations[currentLang].confirm || 'Confirmar', 
+                    `${translations[currentLang].didNotPayToday}?`, 
+                    translations[currentLang].confirm || 'Sim', 'btn-primary'
+                );
+                if (!confirmed) return;
+                processPaymentAction(clientId, loanIndex, 0, 'skipped', 'skipped');
+            });
 
-                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-                    try {
-                        const freshClientIdx = allClients.findIndex(c => c.id === clientId);
-                        const freshClient = allClients[freshClientIdx];
-                        const loansCopy = JSON.parse(JSON.stringify(freshClient.loans));
-                        const targetLoan = loansCopy[loanIndex];
-                        
-                        if (!targetLoan.history) targetLoan.history = [];
-                        
-                        targetLoan.history.push({ 
-                            amount: 0, 
-                            date: new Date(), 
-                            status: 'postponed' 
-                        });
-                        
-                        await updateDoc(clientRef, { loans: loansCopy });
-
-                        showToast('Pagamento adiado com sucesso!');
-                        window.history.back(); // Cierra modal de pago
-                        
-                        // Refrescamos todo
-                        showClientDetails(clientId, loanIndex);
-                        updateTodaysRouteList();
-                        updateAllClientsList();
-                    } catch(error) {
-                        console.error("Error postponing:", error);
-                        showToast('Erro ao adiar.', true);
-                    }
-                });
-            }
-            
-
-            paymentModal.querySelector('#confirmPaymentBtn').addEventListener('click', async (e) => {
-                const confirmBtn = e.currentTarget;
-                const originalBtnHTML = confirmBtn.innerHTML;
+            // ACCIÓN 3: CONFIRMAR PAGO
+            paymentModal.querySelector('#confirmPaymentBtn').addEventListener('click', () => {
+                const amount = parseFloat(document.getElementById('payment-amount-input').value);
+                const method = document.querySelector('input[name="paymentMethod"]:checked').value;
                 
-                const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
-                const actualPaidAmount = parseFloat(document.getElementById('payment-amount-input').value);
+                if (isNaN(amount) || amount <= 0) { showToast('Valor inválido', true); return; }
+                if (amount > (remainingBalance + 0.001)) { showToast('Valor maior que a dívida!', true); return; }
 
-                // 1. VALIDACIÓN BÁSICA (NÚMERO)
-                if (isNaN(actualPaidAmount) || actualPaidAmount <= 0) {
-                    showToast('Por favor, insira um valor de pagamento válido.', true);
-                    return;
-                }
+                processPaymentAction(clientId, loanIndex, amount, 'approved', method, receiptFile);
+            });
 
-                // --- 2. VALIDACIÓN ESTRICTA: BLOQUEO POR EXCESO DE PAGO ---
-                // Margen de 0.001 solo para evitar errores de coma flotante de JS (ej: 2.2300000001)
-                // Esto bloqueará 2.24 si la deuda es 2.23
-                if (actualPaidAmount > (remainingBalance + 0.001)) {
-                    const errorMsg = currentLang === 'es' 
-                        ? `Error: El valor ingresado (${money(actualPaidAmount)}) es mayor que la deuda total (${money(remainingBalance)}).`
-                        : `Erro: O valor inserido (${money(actualPaidAmount)}) é maior que a dívida total (${money(remainingBalance)}).`;
-                    
-                    showToast(errorMsg, true);
-                    
-                    // Resaltar input visualmente
-                    const input = document.getElementById('payment-amount-input');
-                    input.style.borderColor = 'var(--danger-color)';
-                    input.style.color = 'var(--danger-color)';
-                    setTimeout(() => {
-                        input.style.borderColor = '';
-                        input.style.color = 'var(--accent-green)';
-                    }, 3000);
-                    
-                    // IMPORTANTE: DETIENE EL PROCESO AQUÍ
-                    return; 
-                }
-                // ---------------------------------------------------------
-
-                // SI PASA LA VALIDACIÓN, AHORA SÍ BLOQUEAMOS Y PROCESAMOS
-                confirmBtn.disabled = true;
-                confirmBtn.innerHTML = `<i data-lucide="loader-circle" style="animation: spin 1s linear infinite;"></i> Processando...`;
-                lucide.createIcons({nodes: confirmBtn.querySelectorAll('[data-lucide]')});
-
+            async function processPaymentAction(cId, lIndex, amount, status, method, file = null) {
+                const btns = paymentModal.querySelectorAll('button');
+                btns.forEach(b => b.disabled = true);
+                
                 try {
-                    const clientIndex = allClients.findIndex(c => c.id === clientId);
-                    if (clientIndex === -1) throw new Error("Cliente não encontrado em allClients.");
-                    
-                    const currentClient = allClients[clientIndex]; 
-                    if (!currentClient || !currentClient.loans || !currentClient.loans[loanIndex]) {
-                         throw new Error("Cliente ou empréstimo não encontrado para registrar o pagamento.");
-                    }
-                    
-                    const currentLoan = currentClient.loans[loanIndex]; 
-
                     let receiptUrl = '';
-                    if (receiptFile && (selectedMethod === 'pix' || selectedMethod === 'cartao')) {
-                        try {
-                            const tempPaymentId = `payment_${Date.now()}`;
-                            const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${clientId}/payments/${tempPaymentId}/${receiptFile.name.replace(/\s+/g, '_')}`);
-                            await uploadBytes(storageRef, receiptFile);
-                            receiptUrl = await getDownloadURL(storageRef);
-                        } catch (storageError) {
-                             console.error("Error al subir recibo a Firebase Storage:", storageError);
-                             showToast('Falha ao subir o recibo. O pagamento será salvo sem ele.', true);
-                        }
+                    if (file && (method === 'pix' || method === 'cartao')) {
+                        const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${cId}/payments/${Date.now()}_${file.name}`);
+                        await uploadBytes(storageRef, file);
+                        receiptUrl = await getDownloadURL(storageRef);
                     }
 
-                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-
-                    const newPayment = {
-                        amount: actualPaidAmount,
-                        date: new Date(), 
-                        status: 'approved', 
-                        method: selectedMethod
-                    };
-                    
-                    if(receiptUrl) {
-                        newPayment.receiptUrl = receiptUrl;
-                    }
+                    const clientRef = doc(db, 'companies', currentCompanyId, "clients", cId);
+                    const currentClient = allClients.find(c => c.id === cId);
+                    const currentLoan = JSON.parse(JSON.stringify(currentClient.loans[lIndex]));
 
                     if (!currentLoan.history) currentLoan.history = [];
-                    currentLoan.history.push(newPayment);
-
-                    const newTotalPaid = (currentLoan.history || [])
-                        .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
-                        .reduce((sum, h) => sum + (h.amount || 0), 0);
-                        
-                    const installmentValue = currentLoan.originalInstallmentAmount || 0; 
-                    const paidInstallmentsCount = installmentValue > 0 ? Math.floor(newTotalPaid / installmentValue) : 0;
-                    const newBalance = installmentValue > 0 ? newTotalPaid - (paidInstallmentsCount * installmentValue) : newTotalPaid;
-
-                    currentLoan.paid = newTotalPaid;
-                    currentLoan.paymentBalance = newBalance;
-                    const totalInstallmentsStr = (currentLoan.installments || '0/0').split('/')[1] || '0';
-                    currentLoan.installments = `${paidInstallmentsCount}/${totalInstallmentsStr}`;
                     
-                    await updateDoc(clientRef, {
-                        loans: currentClient.loans 
+                    currentLoan.history.push({
+                        amount: amount,
+                        date: new Date(),
+                        status: status,
+                        method: method || 'dinheiro',
+                        receiptUrl: receiptUrl
                     });
 
-                    showToast('Pagamento registrado com sucesso!');
-                    window.history.back(); 
-                    showClientDetails(clientId, loanIndex); 
-                    updateTodaysRouteList();
-                    updateRouteProgress(); 
-                    updateAllClientsList(); 
-                    updateProfileView(currentCollectorData); 
+                    const validHistory = currentLoan.history.filter(h => h.status === 'approved' || h.method === 'migration');
+                    const newTotalPaid = validHistory.reduce((sum, h) => sum + (h.amount || 0), 0);
                     
-                } catch(error) {
-                    console.error("Error updating document: ", error);
-                    showToast('Falha ao registrar pagamento.', true);
-                    confirmBtn.disabled = false;
-                    confirmBtn.innerHTML = originalBtnHTML;
-                    lucide.createIcons({nodes: [confirmBtn.querySelector('i')]});
+                    const instVal = currentLoan.originalInstallmentAmount || 1;
+                    const totalInst = parseInt((currentLoan.installments || '0/0').split('/')[1] || 0);
+                    let paidCount = instVal > 0 ? Math.floor(newTotalPaid / instVal) : 0;
+                    if (paidCount > totalInst) paidCount = totalInst;
+
+                    currentLoan.paid = newTotalPaid;
+                    currentLoan.installments = `${paidCount}/${totalInst}`;
+                    
+                    const updatedLoans = [...currentClient.loans];
+                    updatedLoans[lIndex] = currentLoan;
+                    
+                    await updateDoc(clientRef, { loans: updatedLoans });
+
+                    
+                    // --- CORRECCIÓN IDIOMA MENSAJE ---
+                    const successMsg = currentLang === 'es' ? '¡Acción registrada con éxito!' : (currentLang === 'en' ? 'Action registered successfully!' : 'Ação registrada com sucesso!');
+
+                    // Agregamos 'success' aquí para que salga VERDE
+                    showToast(successMsg, 'success');
+                    window.history.back();
+
+                } catch (error) {
+                    console.error(error);
+                    showToast('Erro ao processar.', true);
+                    btns.forEach(b => b.disabled = false);
                 }
-            });
+            }
         }
         
         // --- MAPA E OUTRAS FUNÇÕES ---
@@ -8707,4 +8698,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
