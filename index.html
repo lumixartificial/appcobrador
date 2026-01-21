@@ -2017,8 +2017,7 @@ async function showRefinanceModal(clientId, notificationId) {
                                   (payment.amount === lastPayment.amount && paymentDateObj.getTime() === (lastPayment.date?.seconds ? lastPayment.date.seconds*1000 : lastPayment.date.getTime()));
 
             // [NUEVO] Verificar Permiso del Cobrador
-            const hasPermission = currentCollectorData?.permissions?.allowDeletePayment === true;
-
+            const hasPermission = !currentCollectorData?.blockPayments;
             // Solo permitir si es HOY, es el ÚLTIMO pago y tiene PERMISO
             if (isToday && isLastPayment && hasPermission) canDelete = true;
             
@@ -4094,7 +4093,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 : `<button class="header-btn" disabled style="opacity: 0.3;" title="WhatsApp não disponível"><img src="${whatsappLogoUrl}" alt="WhatsApp" style="width: 24px; height: 24px; opacity: 0.5;"></button>`;
         
             // --- VERIFICAR PERMISO EDITAR ---
-            const canEdit = currentCollectorData?.permissions?.allowEditClient === true;
+            const canEdit = !currentCollectorData?.blockClientEdit;
             const editButtonHtml = canEdit 
                 ? `<button id="editClientBtn" class="header-btn" title="Editar"><i data-lucide="edit"></i></button>` 
                 : '';
@@ -8673,6 +8672,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
-
-
