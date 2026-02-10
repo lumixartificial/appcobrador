@@ -1493,6 +1493,7 @@ const BLACKLIST_DATA = {
                             <button class="filter-btn active" data-filter="all">TODOS</button>
                             <button class="filter-btn" data-filter="weekly">SEMANALES</button>
                             <button class="filter-btn" data-filter="biweekly">QUINCENAL</button>
+                            <button class="filter-btn" data-filter="monthly">MENSUALES</button>
                             <button class="filter-btn" data-filter="todo_today">FALTA POR PAGAR</button>
                             <button class="filter-btn" data-filter="paid">PAGADOS</button>
                             <button class="filter-btn" data-filter="late">ATRASADOS</button>
@@ -4087,14 +4088,22 @@ async function showRefinanceModal(clientId, notificationId) {
                         // "TODOS": Muestra cualquier actividad (Pago o Visita fallida)
                         if (!hasActivityToday) passesCategory = false;
                     }
-                    else if (filter === 'weekly') {
+                     else if (filter === 'weekly') {
                         if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                     }
                     else if (filter === 'biweekly') {
                         if (loan.paymentFrequency !== 'biweekly' || currentStatus === 'finished') passesCategory = false;
                     }
+                    
+                    // --- COPIA Y PEGA ESTO AQUÍ ---
+                    else if (filter === 'monthly') {
+                        // Muestra solo si es Mensual Y no está finalizado
+                        if (loan.paymentFrequency !== 'monthly' || currentStatus === 'finished') passesCategory = false;
+                    }
+                    // --- FIN DE LO NUEVO ---
+
                     else if (filter === 'todo_today') {
-                        // "Falta por Pagar": 
+                        // "Falta por Pagar":
                         // Muestra si NO está finalizado Y NO ha pagado dinero hoy.
                         // (Si marcaste "No Pagó Hoy", hasPaidMoneyToday es false, así que SÍ APARECE AQUÍ)
                         if (currentStatus === 'finished' || hasPaidMoneyToday) passesCategory = false;
@@ -8734,4 +8743,5 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
