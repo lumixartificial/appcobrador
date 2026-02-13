@@ -2654,12 +2654,15 @@ async function showRefinanceModal(clientId, notificationId) {
                         lateFeesVal = details.lateFeesAccumulated || 0;
                         currentLateDays = details.lateDays || 0;
 
+                        // === CORRECCIÓN: EVITAR DUPLICAR MIGRACIÓN EN EL RECIBO ===
                         const historyPaid = (activeLoan.history || [])
-                            .filter(h => h.status === 'approved' || h.method === 'migration')
+                            .filter(h => h.status === 'approved' && h.method !== 'migration') // <--- ESTE ES EL CAMBIO IMPORTANTE
                             .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
                         
                         const initialPaid = activeLoan.initialMigratedAmount || 0;
                         totalPaidVal = initialPaid + historyPaid;
+                        // ==========================================================
+                        
                         totalLoanVal = (parseFloat(activeLoan.totalLoan) || 0) + lateFeesVal;
                         remainingBalance = Math.max(0, totalLoanVal - totalPaidVal);
 
@@ -3432,9 +3435,16 @@ async function showRefinanceModal(clientId, notificationId) {
                     amountDueToday: details.amountDueToday || 0
                 };
 
-                const totalPaidSoFar = (loan.history || [])
+                // === CORRECCIÓN: Sumar Saldo Inicial Migrado + Pagos del Historial ===
+                
+                // 1. Sumamos solo pagos reales del historial (excluyendo la ficha de migración para no duplicar)
+                const historyPaid = (loan.history || [])
                     .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration')
                     .reduce((sum, h) => sum + (h.amount || 0), 0);
+
+                // 2. Sumamos el Saldo Inicial (Migración) + Historial
+                const totalPaidSoFar = (loan.initialMigratedAmount || 0) + historyPaid;
+                // ====================================================================
 
                 const totalDebt = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
                 const remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
@@ -8743,5 +8753,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
+
 
 
