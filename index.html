@@ -3241,8 +3241,15 @@ async function showRefinanceModal(clientId, notificationId) {
                return dateA - dateB;
            });
 
-           // 2. Totales Básicos
-           const currentTotalPaidGlobal = validPayments.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+           // 2. Totales Básicos (CORREGIDO PARA MIGRACIONES - TODAS LAS FRECUENCIAS)
+           const hasInitialMigratedField = loan.initialMigratedAmount !== undefined;
+           const initialPaid = parseFloat(loan.initialMigratedAmount) || 0;
+           
+           const currentTotalPaidGlobal = validPayments.reduce((sum, h) => {
+               if (hasInitialMigratedField && h.method === 'migration') return sum; // Evitar duplicar
+               return sum + (parseFloat(h.amount) || 0);
+           }, 0) + initialPaid;
+
            const totalOriginalDebt = parseFloat(loan.totalLoan) || 0;
 
            // Estado forzado si ya estaba finalizado (Legacy)
@@ -3311,13 +3318,15 @@ async function showRefinanceModal(clientId, notificationId) {
                    endOfCheckDate.setHours(23, 59, 59, 999);
 
                    const paidByThisDate = validPayments.reduce((sum, h) => {
-                       if (h.method === 'migration') return sum + (parseFloat(h.amount) || 0);
+                       if (hasInitialMigratedField && h.method === 'migration') return sum; 
+                       if (!hasInitialMigratedField && h.method === 'migration') return sum + (parseFloat(h.amount) || 0);
+                       
                        let pDate = h.date?.seconds ? new Date(h.date.seconds * 1000) : new Date(h.date);
                        if (pDate <= endOfCheckDate) {
                            return sum + (parseFloat(h.amount) || 0);
                        }
                        return sum;
-                   }, 0);
+                   }, 0) + initialPaid;
 
                    // A) Días Pasados (Atraso)
                    if (checkDate.getTime() < today.getTime()) {
@@ -8753,6 +8762,3 @@ function renderVerificationResults(container, warnings, systemLoans) {
     </script>
 </body>
     </html>
-
-
-
