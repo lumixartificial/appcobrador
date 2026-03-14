@@ -4691,22 +4691,26 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 if (sendReceiptBtn) sendReceiptBtn.addEventListener('click', () => generateStatusReceiptPDF(clientId, currentLoanIndex));
                 
                 const startRouteBtn = document.getElementById('startRouteBtn');
-                let navigationUrl = client.location;
+                let navigationUrl = client.location || '';
                 
-                // --- INICIO: LIMPIEZA EXTREMA DE COORDENADAS ---
-                if (navigationUrl && navigationUrl.includes('query=')) {
-                    // Extrae los números puros ignorando espacios o errores
-                    const match = navigationUrl.match(/(-?\d+\.\d+)[\s,%]+(-?\d+\.\d+)/);
-                    if (match) {
-                        // Usa el "Modo Ruta" (dir) de Google Maps que NUNCA falla en el mar
-                        navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${match[1]},${match[2]}`;
-                    }
-                } else if (!navigationUrl || navigationUrl.trim() === '') {
-                    if (client.address && client.address.trim() !== '') {
-                        navigationUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.city || ''}`)}`;
-                    }
+                // --- INICIO: BLINDAJE ANTI-MAR AZUL ---
+                // Esta fórmula acepta puntos o comas e ignora cualquier basura entre los números
+                const coordRegex = /(-?\d+[.,]\d+).*?(-?\d+[.,]\d+)/;
+                const matchCoords = navigationUrl.match(coordRegex);
+                
+                if (matchCoords) {
+                    // Convertimos comas a puntos obligatoriamente para Google Maps
+                    const lat = matchCoords[1].replace(',', '.');
+                    const lng = matchCoords[2].replace(',', '.');
+                    
+                    navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+                } else if (client.address && client.address.trim() !== '') {
+                    // Si falla el GPS, busca por dirección escrita
+                    navigationUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.city || ''}`)}`;
+                } else {
+                    navigationUrl = ''; 
                 }
-                // --- FIN: LIMPIEZA EXTREMA ---
+                // --- FIN: BLINDAJE ANTI-MAR AZUL ---
                 if (startRouteBtn) {
                     if (navigationUrl) {
                         startRouteBtn.disabled = false; startRouteBtn.style.opacity = '1'; startRouteBtn.title = 'Navegar'; 
@@ -5700,12 +5704,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     }
                     
                     // Expresión regular que busca cualquier número que parezca latitud y longitud
-                    const regex = /(-?\d+\.\d+)[, ]+(-?\d+\.\d+)/;
+                    const regex = /(-?\d+[.,]\d+).*?(-?\d+[.,]\d+)/;
                     const match = text.match(regex);
                     
                     if (match && match.length >= 3) {
-                        const lat = match[1];
-                        const lng = match[2];
+                        const lat = match[1].replace(',', '.');
+                        const lng = match[2].replace(',', '.');
                         
                         // Convierte las coordenadas al formato que tu mapa necesita
                         locInput.value = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
@@ -6824,10 +6828,10 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             allClients.forEach((client) => {
                 
                 if (client.location) {
-                    const match = client.location.match(/(-?\d+\.\d+)[\s,%]+(-?\d+\.\d+)/);
+                    const match = client.location.match(/(-?\d+[.,]\d+).*?(-?\d+[.,]\d+)/);
                     if (match) {
-                        const lat = parseFloat(match[1]);
-                        const lng = parseFloat(match[2]);
+                        const lat = parseFloat(match[1].replace(',', '.'));
+                        const lng = parseFloat(match[2].replace(',', '.'));
                         locations.push([lat, lng]);
 
                         // Buscamos el préstamo activo para mostrar el estado correcto en el mapa
