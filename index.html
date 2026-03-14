@@ -5284,10 +5284,18 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         
                         <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
                             <label data-lang-key="location"></label>
-                            <input type="text" id="client-location" readonly placeholder="Clique no botão para obter" value="${client.location || ''}">
-                            <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%; margin-top: 10px;">
-                                <i data-lucide="map-pin"></i> ${t_gpsBtn}
-                            </button>
+                            <input type="text" id="client-location" placeholder="GPS ou cole coordenadas aqui..." value="${client.location || ''}" style="margin-bottom: 10px;">
+                            <div style="display: flex; gap: 10px;">
+                                <button type="button" class="btn-secondary" id="get-location-btn" style="flex: 1; padding: 10px;">
+                                    <i data-lucide="map-pin"></i> ${t_gpsBtn}
+                                </button>
+                                <button type="button" class="btn-secondary" id="manual-location-btn" style="flex: 1; padding: 10px; color: var(--accent-purple); border-color: var(--accent-purple);">
+                                    <i data-lucide="link"></i> Extrair Manual
+                                </button>
+                            </div>
+                            <p style="font-size: 0.75em; color: var(--text-secondary); margin-top: 8px; line-height: 1.3;">
+                                * Se o cliente mandar a localização pelo WhatsApp, abra no mapa, copie as coordenadas numéricas (ex: -16.68, -49.25), cole acima e clique em <strong>Extrair Manual</strong>.
+                            </p>
                         </div>
                         
                         <div style="display: none;">
@@ -5667,6 +5675,45 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             
             const gpsBtn = document.getElementById('get-location-btn');
             if(gpsBtn) { gpsBtn.addEventListener('click', () => showMapPinModal()); }
+
+            
+            // --- NUEVO: BOTÓN DE UBICACIÓN MANUAL ---
+            const manualLocBtn = document.getElementById('manual-location-btn');
+            const locInput = document.getElementById('client-location');
+            
+            if (manualLocBtn && locInput) {
+                manualLocBtn.addEventListener('click', () => {
+                    const text = locInput.value.trim();
+                    if (!text) {
+                        showToast('Cole o texto ou link com as coordenadas primeiro.', true);
+                        return;
+                    }
+                    
+                    // Expresión regular que busca cualquier número que parezca latitud y longitud
+                    const regex = /(-?\d+\.\d+)[, ]+(-?\d+\.\d+)/;
+                    const match = text.match(regex);
+                    
+                    if (match && match.length >= 3) {
+                        const lat = match[1];
+                        const lng = match[2];
+                        
+                        // Convierte las coordenadas al formato que tu mapa necesita
+                        locInput.value = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                        
+                        // Efecto visual de éxito
+                        manualLocBtn.style.backgroundColor = 'var(--accent-green)';
+                        manualLocBtn.style.color = 'white';
+                        manualLocBtn.style.borderColor = 'var(--accent-green)';
+                        manualLocBtn.innerHTML = '<i data-lucide="check-circle"></i> Sucesso!';
+                        lucide.createIcons({nodes: [manualLocBtn.querySelector('i')]});
+                        
+                        showToast(`Coordenadas salvas: ${lat}, ${lng}`, 'success');
+                    } else {
+                        showToast('Coordenadas não encontradas. Certifique-se de colar os números (Lat, Lng).', true);
+                    }
+                });
+            }
+            // --- FIN NUEVO BOTÓN ---
             
             document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
             
