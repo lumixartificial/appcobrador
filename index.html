@@ -4692,11 +4692,21 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 
                 const startRouteBtn = document.getElementById('startRouteBtn');
                 let navigationUrl = client.location;
-                if (!navigationUrl || navigationUrl.trim() === '') {
+                
+                // --- INICIO: LIMPIEZA EXTREMA DE COORDENADAS ---
+                if (navigationUrl && navigationUrl.includes('query=')) {
+                    // Extrae los números puros ignorando espacios o errores
+                    const match = navigationUrl.match(/(-?\d+\.\d+)[\s,%]+(-?\d+\.\d+)/);
+                    if (match) {
+                        // Usa el "Modo Ruta" (dir) de Google Maps que NUNCA falla en el mar
+                        navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${match[1]},${match[2]}`;
+                    }
+                } else if (!navigationUrl || navigationUrl.trim() === '') {
                     if (client.address && client.address.trim() !== '') {
                         navigationUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.city || ''}`)}`;
                     }
                 }
+                // --- FIN: LIMPIEZA EXTREMA ---
                 if (startRouteBtn) {
                     if (navigationUrl) {
                         startRouteBtn.disabled = false; startRouteBtn.style.opacity = '1'; startRouteBtn.title = 'Navegar'; 
@@ -6814,7 +6824,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             allClients.forEach((client) => {
                 
                 if (client.location) {
-                    const match = client.location.match(/query=([\d.-]+),([\d.-]+)/);
+                    const match = client.location.match(/(-?\d+\.\d+)[\s,%]+(-?\d+\.\d+)/);
                     if (match) {
                         const lat = parseFloat(match[1]);
                         const lng = parseFloat(match[2]);
@@ -8006,7 +8016,7 @@ function showReportDateModal() {
         // Extrae las coordenadas de una URL de Google Maps
         function parseCoordinates(locationUrl) {
             if (!locationUrl) return null;
-            const match = locationUrl.match(/query=([\d.-]+),([\d.-]+)/);
+            const match = locationUrl.match(/(-?\d+\.\d+)[\s,%]+(-?\d+\.\d+)/);
             if (match) {
                 return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
             }
