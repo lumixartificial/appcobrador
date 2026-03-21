@@ -2238,7 +2238,7 @@ async function showRefinanceModal(clientId, notificationId) {
                 
                 let paidInstallments = 0;
                 if (installmentValue > 0) {
-                    paidInstallments = Math.floor(totalPaid / installmentValue);
+                    paidInstallments = Math.floor((totalPaid / installmentValue) + 0.01);
                 }
                 if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
 
@@ -2672,7 +2672,7 @@ async function showRefinanceModal(clientId, notificationId) {
                         const installmentValue = parseFloat(activeLoan.originalInstallmentAmount || activeLoan.amount || 1);
                         
                         if (installmentValue > 0) {
-                            paidInstallments = Math.floor(totalPaidVal / installmentValue);
+                           paidInstallments = Math.floor((totalPaidVal / installmentValue) + 0.01); 
                         }
                         if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
 
@@ -4575,7 +4575,7 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             if(chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
 
             let paidInstallments = 0;
-            if (originalInstallment > 0) { paidInstallments = Math.floor(displayTotalPaid / originalInstallment); }
+            if (originalInstallment > 0) { paidInstallments = Math.floor((displayTotalPaid / originalInstallment) + 0.01); }
             if (paidInstallments > totalInstallments) paidInstallments = totalInstallments;
             const progressPercentage = totalInstallments > 0 ? (paidInstallments / totalInstallments) * 100 : 0;
             const circleCircumference = 2 * Math.PI * 54;
