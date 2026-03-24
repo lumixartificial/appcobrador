@@ -4202,6 +4202,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
         
             // --- VERIFICAR PERMISO EDITAR ---
             const canEdit = !currentCollectorData?.blockClientEdit;
+            // --- VERIFICAR PERMISO NUEVOS PRÉSTAMOS ---
+            const canCreateLoan = !currentCollectorData?.blockNewLoans;
             const editButtonHtml = canEdit 
                 ? `<button id="editClientBtn" class="header-btn" title="Editar"><i data-lucide="edit"></i></button>` 
                 : '';
@@ -4415,15 +4417,18 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 ? `<button class="btn-secondary" id="updateClientDataBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="user-cog"></i> <span data-lang-key="updateClientData"></span></button>`
                 : '';
 
+             const newLoanBtnFinished = canCreateLoan ? `<button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>` : '';
+            const newLoanBtnActive = canCreateLoan ? `<button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>` : '';
+
             const actionButtonsHtml = currentStatus === 'finished' ? `
                 ${updateBtnHtml}
-                <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
+                ${newLoanBtnFinished}
             ` : `
                 <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
                 <button class="btn-secondary" id="sendReceiptBtn" style="line-height: 1.2;"><i data-lucide="file-text"></i><span style="text-align: center;">${receiptBtnText}</span></button>
-                <button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>
+                ${newLoanBtnActive}
                 <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> ${payBtnText}</button>
-            `;
+            `; 
 
             let messages = loan.chatHistory || [];
             if (messages.length === 0 && loan.notes && loan.notes.trim() !== '') {
@@ -4673,9 +4678,10 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                     }
                 });
             }
-
-            if (currentStatus === 'finished') {
-                document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
+    
+                 if (currentStatus === 'finished') {
+                const createBtn = document.getElementById('createNewLoanBtn');
+                if (createBtn) createBtn.addEventListener('click', () => showClientFormModal(clientId, true));
                 
                 // --- LISTENER CONDICIONAL ---
                 const updateBtn = document.getElementById('updateClientDataBtn');
@@ -4686,7 +4692,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 
             } else {
                 document.getElementById('registerPaymentBtn').addEventListener('click', (e) => showPaymentModal(clientId, parseInt(e.currentTarget.dataset.loanIndex, 10)));
-                document.getElementById('createNewLoanBtn').addEventListener('click', () => showClientFormModal(clientId, true));
+                const createBtn = document.getElementById('createNewLoanBtn');
+                if (createBtn) createBtn.addEventListener('click', () => showClientFormModal(clientId, true));
                 const sendReceiptBtn = document.getElementById('sendReceiptBtn');
                 if (sendReceiptBtn) sendReceiptBtn.addEventListener('click', () => generateStatusReceiptPDF(clientId, currentLoanIndex));
                 
@@ -7586,7 +7593,8 @@ function showReportDateModal() {
             const viewEl = document.getElementById(`${viewName}-view`);
             if (viewEl) viewEl.classList.add('active');
 
-            document.getElementById('addClientBtn').classList.toggle('hidden', !['home', 'clients'].includes(viewName));
+            const canCreateLoanGlobal = !currentCollectorData?.blockNewLoans;
+            document.getElementById('addClientBtn').classList.toggle('hidden', !['home', 'clients'].includes(viewName) || !canCreateLoanGlobal);
             document.getElementById('addExpenseBtn').classList.toggle('hidden', viewName !== 'expenses');
             
             if (viewName === 'map') {
