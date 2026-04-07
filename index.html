@@ -3646,6 +3646,12 @@ async function showRefinanceModal(clientId, notificationId) {
                             ${client.name} 
                             ${loanIndexBadge}
                         </h4>
+                        <button class="collection-wp-btn" 
+                         data-client-id="${client.id}" 
+                         data-loan-index="${loanIndex}" 
+                         style="background: #25D366; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 0.7em; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: auto; position: relative; z-index: 10;">
+                        <i data-lucide="message-circle" style="width: 12px; height: 12px;"></i> COBRAR
+                    </button>
                         ${routeOrderHtml} <!-- AQUÍ ESTÁ EL CAMBIO: A LA DERECHA EXTREMA -->
                     </div>
 
@@ -3676,7 +3682,15 @@ async function showRefinanceModal(clientId, notificationId) {
                         </div>
                     </div>`;
                 
-                container.appendChild(card); 
+                container.appendChild(card);
+                 container.querySelectorAll('.collection-wp-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Evita que se abra la ficha del cliente
+        const cid = e.currentTarget.dataset.clientId;
+        const lidx = parseInt(e.currentTarget.dataset.loanIndex);
+        sendWhatsAppCollection(cid, lidx);
+    });
+});
             }); 
 
             lucide.createIcons({ nodes: container.querySelectorAll('[data-lucide]') });
@@ -4428,6 +4442,10 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 <button class="btn-secondary" id="sendReceiptBtn" style="line-height: 1.2;"><i data-lucide="file-text"></i><span style="text-align: center;">${receiptBtnText}</span></button>
                 ${newLoanBtnActive}
                 <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> ${payBtnText}</button>
+                <button class="btn-secondary" id="fastCollectionBtn" style="border-color: #25D366; color: #25D366;">
+                <i data-lucide="message-circle"></i> 
+                <span style="text-align: center;">${currentLang === 'es' ? 'Cobro<br>Rápido' : (currentLang === 'en' ? 'Quick<br>Collect' : 'Cobrança<br>Rápida')}</span>
+                </button>
             `; 
 
             let messages = loan.chatHistory || [];
@@ -4696,6 +4714,14 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
                 if (createBtn) createBtn.addEventListener('click', () => showClientFormModal(clientId, true));
                 const sendReceiptBtn = document.getElementById('sendReceiptBtn');
                 if (sendReceiptBtn) sendReceiptBtn.addEventListener('click', () => generateStatusReceiptPDF(clientId, currentLoanIndex));
+                // --- PEGAR DEBAJO DEL LISTENER DE sendReceiptBtn ---
+                const fastCollBtn = document.getElementById('fastCollectionBtn');
+              if (fastCollBtn) {
+                fastCollBtn.addEventListener('click', () => {
+                          // Usa las variables clientId y currentLoanIndex que ya existen en la función
+                sendWhatsAppCollection(clientId, currentLoanIndex);
+            });
+           }
                 
                 const startRouteBtn = document.getElementById('startRouteBtn');
                 let navigationUrl = client.location;
@@ -8765,7 +8791,64 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 }
             });
         }
+        // --- FUNÇÃO DE COBRANÇA DINÂMICA VIA WHATSAPP (Pegar antes de init();) ---
+function sendWhatsAppCollection(clientId, loanIndex) {
+    const client = allClients.find(c => c.id === clientId);
+    if (!client) return;
+    const loan = client.loans[loanIndex];
+    const details = calculateLoanDetails(loan);
 
+    // 1. Configuración de Mensajes por Idioma
+    const messages = {
+        pt: {
+            morning: "Bom dia", afternoon: "Boa tarde", night: "Boa noite",
+            intro: "como está? Me poderia, por favor, mandar o pagamento de hoje?",
+            upToDate: "Você está em dia.",
+            late: "Você está atrasado em {days} dias."
+        },
+        es: {
+            morning: "Buenos días", afternoon: "Buenas tardes", night: "Buenas noches",
+            intro: "¿cómo está? ¿Me podría, por favor, enviar el pago de hoy?",
+            upToDate: "Usted está al día.",
+            late: "Usted está atrasado en {days} días."
+        },
+        en: {
+            morning: "Good morning", afternoon: "Good afternoon", night: "Good evening",
+            intro: "how are you? Could you please send today's payment?",
+            upToDate: "You are up to date.",
+            late: "You are late by {days} days."
+        }
+    };
+
+    const lang = messages[currentLang] || messages.pt;
+
+    // 2. Determinar saludo según la hora (0-24h)
+    const hour = new Date().getHours();
+    let greeting = lang.morning;
+    if (hour >= 12 && hour < 18) greeting = lang.afternoon;
+    if (hour >= 18 || hour < 5) greeting = lang.night;
+
+    // 3. Determinar estado de deuda
+    let statusMsg = lang.upToDate;
+    if (details.status === 'late') {
+        statusMsg = lang.late.replace('{days}', details.lateDays);
+    }
+
+    // 4. Construir el mensaje final
+    const finalMessage = `${greeting} ${client.name}, ${lang.intro} ${statusMsg}`;
+
+    // 5. Formatear número de teléfono (DDI)
+    let phone = (client.whatsapp || '').toString().replace(/\D/g, '');
+    const currencyToDDI = { 'BRL': '55', 'ARS': '54', 'COP': '57', 'MXN': '52', 'USD': '1' };
+    const collectorCurrency = currentCollectorData?.paymentSettings?.currency || 'BRL';
+    const countryDDI = currencyToDDI[collectorCurrency] || '55';
+    
+    if (phone.length <= 11 && phone.length > 0) phone = countryDDI + phone;
+
+    // 6. Abrir WhatsApp
+    const wpUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(finalMessage)}`;
+    window.open(wpUrl, '_blank');
+}
         init();
     </script>
 </body>
