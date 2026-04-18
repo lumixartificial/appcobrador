@@ -3435,6 +3435,29 @@ async function showRefinanceModal(clientId, notificationId) {
 
             clientsData.forEach(item => {
                const { client, loan, loanIndex } = item;
+               // --- INICIO: LÓGICA DÍA DE PAGO ---
+const dayNamesMapping = {
+    pt: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
+    es: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+    en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+};
+const dayNames = dayNamesMapping[currentLang] || dayNamesMapping.pt;
+let pDayDisplay = '';
+
+if (loan.paymentFrequency === 'weekly' || loan.paymentFrequency === 'biweekly') {
+    const dIdx = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays[0] : null;
+    pDayDisplay = dIdx !== null ? dayNames[dIdx] : '';
+} else if (loan.paymentFrequency === 'monthly') {
+    pDayDisplay = `Día ${(loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays[0] : ''}`;
+} else {
+    pDayDisplay = (translations[currentLang].daily || 'Diário');
+}
+
+const paymentDayLabelHtml = `
+    <div style="color: #dc3545; font-size: 0.75em; font-weight: 800; text-transform: uppercase; margin-top: 1px;">
+        ${currentLang === 'es' ? 'Día de pago' : 'Dia de pagamento'}: ${pDayDisplay}
+    </div>`;
+// --- FIN: LÓGICA DÍA DE PAGO ---
                 
                 const details = calculateLoanDetails(loan);
                 const displayLoan = { 
@@ -3646,6 +3669,7 @@ async function showRefinanceModal(clientId, notificationId) {
                             ${client.name} 
                             ${loanIndexBadge}
                         </h4>
+                        ${paymentDayLabelHtml}
                         <button class="collection-wp-btn" 
                          data-client-id="${client.id}" 
                          data-loan-index="${loanIndex}" 
