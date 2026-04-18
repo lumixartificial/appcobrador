@@ -3981,16 +3981,30 @@ async function showRefinanceModal(clientId, notificationId) {
                    } else if (frequency === 'monthly') {
                        isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
                    }
+                    // 2. REGLA DE LIMPIEZA (Blindaje: Sale de ruta si hubo gestión hoy)
+let hasPaidToday = false;
+const todayStr = today.toLocaleDateString('pt-BR'); // Ejemplo: "18/04/2026"
 
-                   // 2. REGLA DE LIMPIEZA (Si pagó hoy, se va de la ruta activa)
-                   let hasPaidToday = false;
-                   if (loan.history && loan.history.length > 0) {
-                        hasPaidToday = loan.history.some(h => {
-                            if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false;
-                            const pDate = getPaymentDate(h.date);
-                            return pDate && pDate >= today;
-                        });
-                   }
+if (loan.history && loan.history.length > 0) {
+    hasPaidToday = loan.history.some(h => {
+        // No sacamos de ruta si el pago fue rechazado, aplazado o es una migración antigua
+        if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
+
+        const pDate = getPaymentDate(h.date);
+        if (!pDate) return false;
+
+        // Comparamos solo DIA/MES/AÑO como texto para evitar errores de milisegundos
+        const isSameDay = pDate.toLocaleDateString('pt-BR') === todayStr;
+
+        // CONSIDERAMOS GESTIÓN TERMINADA SI:
+        // - El pago es aprobado ('approved')
+        // - Se marcó como "No Pagó Hoy" ('skipped')
+        // - Está pendiente de que tú lo verifiques ('pending_verification')
+        const isFinishedTask = (h.status === 'approved' || h.status === 'skipped' || h.status === 'pending_verification');
+
+        return isSameDay && isFinishedTask;
+    });
+} 
 
                    // 3. FILTRO FINAL
                    const isLate = (currentStatus === 'late');
