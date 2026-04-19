@@ -4129,6 +4129,11 @@ if (loan.history && loan.history.length > 0) {
 
             // --- LÓGICA ESTÁNDAR PARA OTROS FILTROS ---
             client.loans.forEach((loan, loanIndex) => {
+                // --- INICIO: DEFINICIÓN DE VARIABLES DE APOYO ---
+const hasMigrationHistory = (loan.history || []).some(x => x.method === 'migration');
+const instVal = parseFloat(loan.originalInstallmentAmount || loan.amount || 1);
+const totalInstCount = (loan.installments || "0/0").split('/')[1];
+// --- FIN ---
                 const details = calculateLoanDetails(loan);
                 const currentStatus = details.status; 
                 
@@ -7079,9 +7084,14 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
             allClients.forEach(client => {
                 (client.loans || []).forEach((loan, loanIndex) => { 
+                    // 1. Definición global para este préstamo (evita el error ReferenceError)
+                    const hasMigrationHistory = (loan.history || []).some(x => x.method === 'migration');
+                    const instVal = parseFloat(loan.originalInstallmentAmount || loan.amount || 1);
+                    const totalInstCount = (loan.installments || "0/0").split('/')[1];
                     const details = calculateLoanDetails(loan);
                     let hasPaidToday = false;
                     
+                    // 2. Procesar pagos realizados HOY
                     (loan.history || []).forEach(h => {
                         if (h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
                             if (checkDateMatch(h.date)) {
@@ -7095,26 +7105,59 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                                 if (h.date?.seconds) pTime = new Date(h.date.seconds*1000).toLocaleTimeString(localeCode, {hour:'2-digit', minute:'2-digit'});
                                 else if (h.date instanceof Date) pTime = h.date.toLocaleTimeString(localeCode, {hour:'2-digit', minute:'2-digit'});
 
+                                // Cálculo de progreso para este pago específico
+                                const getSecs = (d) => d?.seconds ? d.seconds : (d instanceof Date ? Math.floor(d.getTime()/1000) : 0);
+                                const currentPaymentTime = getSecs(h.date);
+                                const historyPaidUntilNow = (loan.history || [])
+                                    .filter(hp => (hp.status === 'approved' || hp.method === 'migration') && getSecs(hp.date) <= currentPaymentTime)
+                                    .reduce((sum, hp) => sum + (parseFloat(hp.amount) || 0), 0);
+                                
+                                const totalPaidAtThisPoint = (hasMigrationHistory ? 0 : (loan.initialMigratedAmount || 0)) + historyPaidUntilNow;
+                                let currentPaidCount = instVal > 0 ? Math.round(totalPaidAtThisPoint / instVal) : 0;
+                                if (details.status === 'finished') currentPaidCount = totalInstCount;
+
+                                // Saldo restante tras este pago
+                                const hPaid_report = (loan.history || [])
+                                    .filter(hp => (hp.status === 'approved' || hp.method === 'migration'))
+                                    .reduce((sum, hp) => sum + (parseFloat(hp.amount) || 0), 0);
+                                const totalSoFar_report = (hasMigrationHistory ? 0 : (loan.initialMigratedAmount || 0)) + hPaid_report;
+                                const debtTotal_report = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
+                                const remainingAmount_report = Math.max(0, debtTotal_report - totalSoFar_report);
+
                                 dailyPaymentsList.push({
                                     clientName: client.name,
                                     amount: amt,
                                     time: pTime,
                                     method: h.method || 'dinheiro', 
-                                    loanIndex: loanIndex + 1
+                                    loanIndex: loanIndex + 1,
+                                    totalLoanContract: loan.totalLoan,
+                                    paidInstallmentProgress: `${currentPaidCount}/${totalInstCount}`,
+                                    lateDays: details.lateDays || 0,
+                                    remaining: remainingAmount_report
                                 });
                             }
                         }
                     });
 
+                    // 3. Procesar si el cliente NO pagó hoy (y no ha finalizado)
                     if (details.status !== 'finished' && !hasPaidToday) {
+                        const hPaid = (loan.history || [])
+                            .filter(hp => (hp.status === 'approved' || hp.method === 'migration'))
+                            .reduce((sum, hp) => sum + (parseFloat(hp.amount) || 0), 0);
+                        const totalSoFar = (hasMigrationHistory ? 0 : (loan.initialMigratedAmount || 0)) + hPaid;
+                        const debtTotal = (loan.totalLoan || 0) + (details.lateFeesAccumulated || 0);
+                        const remainingAmount = Math.max(0, debtTotal - totalSoFar);
+
                         missedPaymentsList.push({
                             clientName: client.name,
                             loanIndex: loanIndex + 1,
                             expectedAmount: loan.originalInstallmentAmount || 0,
-                            status: details.status === 'late' ? (currentLang === 'es' ? 'ATRASADO' : 'ATRASADO') : (currentLang === 'es' ? 'PENDIENTE' : 'PENDENTE')
-                        });
+                            status: details.status === 'late' ? 'ATRASADO' : 'PENDIENTE',
+                            remaining: remainingAmount
+                        });  
                     }
 
+                    // 4. Clientes Finalizados
                     const hasActiveLoan = client.loans.some(l => calculateLoanDetails(l).status !== 'finished');
                     if (details.status === 'finished' && !hasActiveLoan && loanIndex === client.loans.length - 1) {
                         finishedClientsList.push({
@@ -7124,6 +7167,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                         });
                     }
 
+                    // 5. Multas Aplicadas
                     if (details.hasFixedFine && details.fixedFineApplied > 0) {
                         finedClientsList.push({
                             clientName: client.name,
@@ -7134,6 +7178,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     }
                 });
             });
+            
             
             const totalActiveFines = finedClientsList.reduce((sum, f) => sum + f.fineAmount, 0);
 
@@ -7181,11 +7226,20 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 (client.loans || []).forEach((loan, index) => {
                     const details = calculateLoanDetails(loan);
                     if (details.status === 'late') {
+                        // Calculamos el saldo real pendiente del contrato
+                        const hPaid_late = (loan.history || [])
+                            .filter(h => h.status === 'approved' || h.method === 'migration')
+                            .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                        
+                        // Saldo = (Total del Préstamo + Intereses de mora acumulados) - Pagos realizados
+                        const totalDebt = (parseFloat(loan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+                        const realOwed = Math.max(0, totalDebt - hPaid_late);
+
                         lateClientsList.push({
                             clientName: client.name,
                             loanIndex: index + 1,
                             lateDays: details.lateDays || 0,
-                            amountDue: details.amountDueToday || loan.originalInstallmentAmount || 0
+                            amountDue: realOwed // Ahora mostrará los 680 reales del ejemplo
                         });
                     }
                 });
@@ -7360,43 +7414,65 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             if (dailyPaymentsList.length > 0) {
                 addSectionHeader(t.paymentsSection);
                 dailyPaymentsList.forEach(p => {
-                    checkPageBreak(12);
-                    pdfDoc.setFontSize(10);
-                    pdfDoc.setFont(undefined, 'normal');
-                    pdfDoc.setTextColor(0);
+                    checkPageBreak(15); 
                     
                     let methodDisplay = '---';
-                    if (p.method === 'dinheiro') methodDisplay = currentLang === 'es' ? 'Efectivo' : 'Cash';
-                    else if (p.method === 'pix') methodDisplay = currentLang === 'es' ? 'Pago Electrónico' : 'Electronic';
-                    else if (p.method === 'cartao') methodDisplay = currentLang === 'es' ? 'Tarjeta' : 'Card';
-                    else if (p.method === 'migration') methodDisplay = currentLang === 'es' ? 'Migración' : 'Migration';
+                    if (p.method === 'dinheiro') methodDisplay = currentLang === 'es' ? 'Efectivo' : 'Dinheiro';
+                    else if (p.method === 'pix') methodDisplay = currentLang === 'es' ? 'Pago Elect.' : 'PIX';
+                    else if (p.method === 'cartao') methodDisplay = currentLang === 'es' ? 'Tarjeta' : 'Cartão';
+                    else if (p.method === 'migration') methodDisplay = currentLang === 'es' ? 'Migración' : 'Migração';
 
-                    pdfDoc.text(`${p.time} - ${p.clientName} (${methodDisplay})`, pageMargin + 5, y);
+                    pdfDoc.setFontSize(10);
+                    pdfDoc.setTextColor(0); 
                     pdfDoc.setFont(undefined, 'bold');
-                    pdfDoc.setTextColor('#28a745');
+                    pdfDoc.text(`${p.time} - ${p.clientName} (${methodDisplay})`, pageMargin + 5, y);
+                    pdfDoc.setTextColor(21, 128, 61); 
                     pdfDoc.text(money(p.amount), pageWidth - pageMargin - 5, y, { align: 'right' });
-                    y += 7;
+
+                    y += 5;
+                    if (p.lateDays >= 5) pdfDoc.setTextColor(220, 38, 38); 
+                    else pdfDoc.setTextColor(234, 179, 8); 
+
+                    pdfDoc.setFontSize(8); 
+                    pdfDoc.setFont(undefined, 'normal');
+                    const infoDetalle = `[Total: ${money(p.totalLoanContract)} | Cuota: ${p.paidInstallmentProgress} | Resta: ${money(p.remaining)}]`;
+                    pdfDoc.text(infoDetalle, pageMargin + 12, y);
+
+                    y += 8; 
                 });
             }
             
             if (missedPaymentsList.length > 0) {
                 addSectionHeader(t.missedSection);
                 missedPaymentsList.forEach(p => {
-                    checkPageBreak(12);
-                    pdfDoc.setFontSize(10);
-                    pdfDoc.setFont(undefined, 'normal');
-                    pdfDoc.setTextColor(0);
-                    pdfDoc.text(p.clientName, pageMargin + 5, y);
-                    pdfDoc.setFont(undefined, 'bold');
-                    
-                    const isLate = p.status === 'ATRASADO' || p.status === 'LATE';
-                    if (isLate) pdfDoc.setTextColor('#dc3545'); else pdfDoc.setTextColor('#d97706'); 
-                    
-                    pdfDoc.text(p.status, pageMargin + 100, y);
-                    pdfDoc.setTextColor('#000000');
-                    pdfDoc.text(money(p.expectedAmount), pageWidth - pageMargin - 5, y, { align: 'right' });
-                    y += 7;
-                });
+    checkPageBreak(12);
+    pdfDoc.setFontSize(9);
+    pdfDoc.setFont(undefined, 'normal');
+    pdfDoc.setTextColor(0);
+
+    // 1. NOMBRE DEL CLIENTE (Cortado a 25 caracteres para que no invada otras columnas)
+    const shortName = p.clientName.length > 25 ? p.clientName.substring(0, 25) + "..." : p.clientName;
+    pdfDoc.text(shortName, pageMargin + 5, y);
+
+    // 2. ESTADO (Atrasado/Pendiente) - Posición fija a los 80mm de la página
+    const isLate = p.status === 'ATRASADO' || p.status === 'LATE';
+    pdfDoc.setFont(undefined, 'bold');
+    if (isLate) pdfDoc.setTextColor(220, 38, 38); // Rojo
+    else pdfDoc.setTextColor(217, 119, 6); // Naranja/Dorado
+    pdfDoc.text(p.status, pageMargin + 80, y); 
+
+    // 3. LA RESTA (Deuda Total) - Alineado a la derecha en la posición -55mm
+    pdfDoc.setFontSize(8);
+    pdfDoc.setTextColor(100); // Gris para que no distraiga del valor principal
+    pdfDoc.text(`Resta: ${money(p.remaining)}`, pageWidth - pageMargin - 55, y, { align: 'right' });
+
+    // 4. VALOR CUOTA HOY - Alineado a la derecha al final de la línea
+    pdfDoc.setFontSize(10);
+    if (isLate) pdfDoc.setTextColor(220, 38, 38); else pdfDoc.setTextColor(0);
+    pdfDoc.text(money(p.expectedAmount), pageWidth - pageMargin - 5, y, { align: 'right' });
+
+    y += 7; // Salto de línea para el siguiente cliente
+});
             }
 
             if (finedClientsList.length > 0) {
@@ -7487,25 +7563,34 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 pdfDoc.text('Status', pageMargin + 140, y);
                 y += 6;
                 lateClientsList.forEach(c => {
-                    checkPageBreak(12);
-                    pdfDoc.setFontSize(10);
-                    pdfDoc.setTextColor(0);
-                    pdfDoc.setFont(undefined, 'normal');
-                    const name = c.clientName.length > 25 ? c.clientName.substring(0, 25) + '...' : c.clientName;
-                    pdfDoc.text(name, pageMargin + 5, y);
-                    pdfDoc.setFont(undefined, 'bold');
-                    pdfDoc.setTextColor('#dc3545'); 
-                    pdfDoc.text(`${c.lateDays} ${t.daysLate}`, pageMargin + 100, y);
-                    const maxBarWidth = 30; 
-                    const maxDaysScale = 30; 
-                    const daysToDraw = Math.min(c.lateDays, maxDaysScale);
-                    const currentBarWidth = (daysToDraw / maxDaysScale) * maxBarWidth;
-                    pdfDoc.setFillColor(230, 230, 230);
-                    pdfDoc.rect(pageMargin + 140, y - 3, maxBarWidth, 4, 'F');
-                    pdfDoc.setFillColor(220, 53, 69); 
-                    pdfDoc.rect(pageMargin + 140, y - 3, currentBarWidth, 4, 'F');
-                    y += 8; 
-                });
+    checkPageBreak(12);
+    pdfDoc.setFontSize(9);
+    
+    // TODO EN ROJO como pediste para alertar la mora
+    pdfDoc.setTextColor(220, 38, 38); 
+    pdfDoc.setFont(undefined, 'normal');
+    
+    // 1. Nombre y el Valor de la cuota que debe hoy entre paréntesis
+    const nameText = c.clientName.length > 25 ? c.clientName.substring(0, 25) + '...' : c.clientName;
+    pdfDoc.text(`${nameText} (${money(c.amountDue)})`, pageMargin + 5, y);
+    
+    // 2. Cantidad de días de atraso
+    pdfDoc.setFont(undefined, 'bold');
+    pdfDoc.text(`${c.lateDays} ${t.daysLate}`, pageMargin + 105, y);
+    
+    // 3. BARRA DE INTENSIDAD (Fondo rojo suave, barra rojo fuerte)
+    const maxBarWidth = 30; 
+    const daysToDraw = Math.min(c.lateDays, 30);
+    const currentBarWidth = (daysToDraw / 30) * maxBarWidth;
+    
+    pdfDoc.setFillColor(254, 226, 226); // Rojo muy claro (fondo)
+    pdfDoc.rect(pageMargin + 145, y - 3, maxBarWidth, 4, 'F');
+    
+    pdfDoc.setFillColor(220, 38, 38); // Rojo intenso (progreso)
+    pdfDoc.rect(pageMargin + 145, y - 3, currentBarWidth, 4, 'F');
+    
+    y += 8; 
+});
             } else {
                 checkPageBreak(20);
                 pdfDoc.setFontSize(11);
