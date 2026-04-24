@@ -3192,7 +3192,12 @@ async function showRefinanceModal(clientId, notificationId) {
                 .reduce((sum, i) => sum + (i.amount || 0), 0);
 
             // Fórmula Limpia: Inicio + Aportes + Pagos - Préstamos - Gastos - Retiros(Solo Capital)
-            const capitalTotal = currentStartingCapital + totalCapitalInjected + totalPaymentsReceived - totalLoansMade - totalExpenses - totalSettledByThisCollector;
+            // --- NUEVA LÓGICA SINCRONIZADA CON ADMINISTRADOR ---
+            // Extraemos el balance histórico del documento del cobrador (dinero de clientes eliminados)
+            const historicalBalance = (collectorData?.historicalBalance || 0);
+
+            // La nueva fórmula suma el historicalBalance para que la caja no baje al borrar clientes
+            const capitalTotal = currentStartingCapital + totalCapitalInjected + totalPaymentsReceived + historicalBalance - totalLoansMade - totalExpenses - totalSettledByThisCollector;
             
             if (typeof currentCapitalOnHand !== 'undefined') {
                 currentCapitalOnHand = capitalTotal; 
@@ -8514,6 +8519,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
         onSnapshot(doc(db, 'collectors', currentCollectorUsername), (docSnap) => {
             if (docSnap.exists()) {
                 currentCollectorData = docSnap.data(); 
+                updateProfileView(currentCollectorData);
                 
                 // ACTUALIZAR DATOS DE PERFIL
                 document.querySelectorAll('.profile-name').forEach(el => el.textContent = currentCollectorData.name || 'Cobrador'); 
