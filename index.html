@@ -964,6 +964,9 @@ const BLACKLIST_DATA = {
         // === PEGA ESTE BLOQUE COMPLETO DEBAJO DE let currentLang ===
         const translations = {
             pt: {
+                newClientStatus: 'NOVO CLIENTE',
+                renewalStatus: 'RENOVAÇÃO',
+                pre_sale: 'PREVENDA',
                 portalTitle: 'Portal do Cobrador', 
                 noClientsFound: 'Nenhum cliente encontrado.', 
                 biweekly: 'QUINZENAL', registerOutflow: 'Registrar Nova Saída', addExpenseOption: 'Adicionar Gasto', expenseOptionDesc: 'Registrar combustível, alimentação, etc.', cashWithdrawal: 'Retirada de Caixa', withdrawalOptionDesc: 'Enviar dinheiro entregue ao admin.', amountDeliveredAdmin: 'Valor entregue ao Admin:', sendForApproval: 'Enviar para Aprovação',
@@ -1003,6 +1006,9 @@ const BLACKLIST_DATA = {
                 didNotPayToday: 'Não Pagou Hoje',
             },
             es: { 
+                newClientStatus: 'CLIENTE NUEVO',
+                renewalStatus: 'RENOVACIÓN',
+                pre_sale: 'PREVENTA',
                 didNotPayToday: 'No Pagó Hoy',
                 portalTitle: 'Portal del Cobrador',
                 noClientsFound: 'Ningún cliente encontrado.', 
@@ -1042,6 +1048,9 @@ const BLACKLIST_DATA = {
                 last24h: 'Últimas 24h', last48h: 'Últimas 48h', lastWeek: 'Última Semana', lastMonth: 'Último Mes'
             },
             en: { 
+                newClientStatus: 'NEW CUSTOMER',
+                renewalStatus: 'RENEWAL',
+                pre_sale: 'PRE-SALE',
                 didNotPayToday: 'Did Not Pay Today',
                 portalTitle: 'Collector Portal',
                 noClientsFound: 'No clients found.',
@@ -1450,14 +1459,35 @@ const BLACKLIST_DATA = {
                     <div id="home-view" class="view active container">
                         
                         <!-- KPI CARD (Progresso da Rota) -->
-                        <div class="kpi-card progress-card" style="margin-bottom: 20px; display: flex; flex-direction: column; align-items: center;">
+                        <div class="kpi-card progress-card" style="margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; padding: 20px 15px;">
                             <h3 class="kpi-title" style="justify-content: center; width: 100%;" data-lang-key="routeProgress">Progresso da Rota</h3>
                             
-                            <div class="progress-circle" style="margin: 0 auto 15px auto;">
-                                <svg><circle class="bg-circle" cx="60" cy="60" r="54"></circle><circle id="route-progress-bar" class="progress-bar" cx="60" cy="60" r="54" style="stroke-dasharray: 339.292;"></circle></svg>
-                                <div class="progress-text" id="route-progress-text">0/0</div>
-                            </div>
-                            
+                            <!-- CÍRCULO AGRANDADO (150px) -->
+<div class="progress-circle" style="width: 150px; height: 150px; margin: 0 auto 10px auto;">
+    <svg viewBox="0 0 150 150" style="transform: rotate(-90deg); width: 100%; height: 100%;">
+        <circle class="bg-circle" cx="75" cy="75" r="68" style="fill: none; stroke-width: 10; stroke: var(--border-color);"></circle>
+        <circle id="route-progress-bar" class="progress-bar" cx="75" cy="75" r="68" 
+                style="fill: none; stroke-width: 10; stroke: var(--accent-green); stroke-linecap: round; stroke-dasharray: 427.25; transition: stroke-dashoffset 1s ease-out;"></circle>
+    </svg>
+    <div class="progress-text" id="route-progress-text" style="font-size: 1.8em; font-weight: 800;">0/0</div>
+</div>
+                          
+                           <!-- BLOQUE DE TIEMPO - POSICIÓN AJUSTADA Y COLOR CLARO SUAVE -->
+<div style="width: 100%; padding-left: 30px; margin-top: -5px; margin-bottom: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 0;">
+    
+    <!-- Día y Fecha en una línea para ahorrar espacio -->
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span id="txt-day-name" style="font-size: 0.85em; font-weight: 900; color: #a855f7; text-transform: uppercase; letter-spacing: 1px;">---</span>
+        <span style="color: var(--text-secondary); font-size: 0.8em; opacity: 0.5;">|</span>
+        <span id="txt-date-full" style="font-size: 0.9em; font-weight: 700; color: var(--text-secondary);">--/--/--</span>
+    </div>
+
+    <!-- Reloj: Más claro, sin sombra pesada -->
+    <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+        <i data-lucide="clock" style="width: 18px; height: 18px; color: #c084fc;"></i>
+        <span id="txt-clock-now" style="font-size: 2.1em; font-weight: 900; color: #c084fc; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1;">00:00:00</span>
+    </div>
+</div>
                             <!-- NOMBRE DE LA RUTA (COLOR SUAVE Y SIN BRILLO MOLESTO) -->
                             <div style="width: 100%; display: flex; justify-content: center; margin-bottom: 5px; position: relative;">
                                 <input type="text" id="route-name-input" placeholder="Nome da Rota" disabled
@@ -1491,6 +1521,7 @@ const BLACKLIST_DATA = {
 
                         <div class="filter-buttons">
                             <button class="filter-btn active" data-filter="all">TODOS</button>
+                            <button class="filter-btn" data-filter="pre_sale">PREVENTA</button>
                             <button class="filter-btn" data-filter="weekly">SEMANALES</button>
                             <button class="filter-btn" data-filter="biweekly">QUINCENAL</button>
                             <button class="filter-btn" data-filter="monthly">MENSUALES</button>
@@ -2929,7 +2960,8 @@ async function showRefinanceModal(clientId, notificationId) {
             };
 
             allClients.forEach(client => {
-                if (!client.loans) return;
+    // Escudo: Si el cliente no tiene préstamos (es preventa), no cuenta para el progreso de la ruta
+    if (!client.loans || client.loans.length === 0) return;
                 
                 client.loans.forEach(loan => {
                      const details = calculateLoanDetails(loan);
@@ -2989,7 +3021,7 @@ async function showRefinanceModal(clientId, notificationId) {
             const progressText = document.getElementById('route-progress-text');
 
             if (progressBar && progressText) {
-                const circleCircumference = 2 * Math.PI * 54;
+                const circleCircumference = 2 * Math.PI * 68; // Ajustado al nuevo tamaño del círculo
                 const strokeDashoffset = circleCircumference - (progressPercentage / 100) * circleCircumference;
                 progressBar.style.strokeDashoffset = strokeDashoffset;
                 progressText.textContent = `${paidTodayCount}/${totalRouteCount}`;
@@ -3440,6 +3472,29 @@ async function showRefinanceModal(clientId, notificationId) {
 
             clientsData.forEach(item => {
                const { client, loan, loanIndex } = item;
+               // Si es un prospecto de preventa (sin préstamos)
+if (!loan) {
+    const preSaleCard = document.createElement('div');
+    preSaleCard.className = 'client-card';
+    preSaleCard.style.borderLeft = "5px solid #3b82f6"; // Azul para preventa
+    preSaleCard.dataset.clientId = client.id;
+    preSaleCard.dataset.loanIndex = 0;
+    // Cableado directo del clic para evitar que se pierda el evento
+preSaleCard.onclick = () => showClientDetails(client.id, 0);
+    
+    preSaleCard.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div>
+                <h4 class="client-name" style="margin:0;">${client.name}</h4>
+                <span style="font-size: 0.7em; color: #3b82f6; font-weight: 800; text-transform: uppercase;">PROSPECTO / PREVENTA</span>
+            </div>
+            <div style="text-align: right;">
+                <span style="color: var(--text-secondary); font-size: 0.8em;">Captación de datos</span>
+            </div>
+        </div>`;
+    container.appendChild(preSaleCard);
+    return; // Muy importante para no intentar leer datos de préstamo inexistentes
+}
                // --- INICIO: LÓGICA DÍA DE PAGO ---
 const dayNamesMapping = {
     pt: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
@@ -3602,20 +3657,20 @@ const paymentDayLabelHtml = `
                     mainValueColor = 'var(--accent-green)';
 
                     if (isLoanFromToday) {
-                        bottomStatusText = translations[currentLang].statusPending; 
-                        bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
-                    } 
-                    else if (displayLoan.amountDueToday > 0) {
-                        bottomStatusText = translations[currentLang].statusToPay;
-                        bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
-                    } else {
-                        if (displayLoan.paymentFrequency === 'weekly' || displayLoan.paymentFrequency === 'monthly') {
-                            bottomStatusText = translations[currentLang].statusPending;
-                            bottomStatusStyle = 'color: #856404; background-color: #fff3cd; font-weight: 700; border: 1px solid #ffeeba;';
+                        // NOVEDAD DEL DÍA: Identificar si es nuevo o renovación
+                        if (loanIndex === 0 && (!client.loans || client.loans.length === 1)) {
+                            bottomStatusText = translations[currentLang].newClientStatus;
+                            // Estilo Azul Cielo para Cliente Nuevo
+                            bottomStatusStyle = 'color: #0369a1; background-color: #e0f2fe; font-weight: 800; border: 1px solid #7dd3fc;';
                         } else {
-                            bottomStatusText = translations[currentLang].statusToPay;
-                            bottomStatusStyle = 'color: #ff0000; background-color: #ffe6e6; font-weight: 800; border: 1px solid #ff0000;';
+                            bottomStatusText = translations[currentLang].renewalStatus;
+                            // Estilo Morado Suave para Renovación
+                            bottomStatusStyle = 'color: #7e22ce; background-color: #f3e8ff; font-weight: 800; border: 1px solid #d8b4fe;';
                         }
+                    } else {
+                        // CLIENTES DE DÍAS ANTERIORES: Volver al estado normal (ROJO)
+                        bottomStatusText = translations[currentLang].statusToPay; 
+                        bottomStatusStyle = 'color: #ffffff; background-color: #dc3545; font-weight: 800; border: 1px solid #b91c1c; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);';
                     }
                 }
 
@@ -4110,29 +4165,24 @@ if (loan.history && loan.history.length > 0) {
         let clientsWithLoans = [];
 
         allClients.forEach(client => {
-            if (!client.loans || client.loans.length === 0) return;
+            const hasNoLoans = !client.loans || client.loans.length === 0;
 
-            // --- LÓGICA ESPECIAL PARA "FINALIZADOS" (SIN DUPLICADOS) ---
-            if (filter === 'finished') {
-                let matchesSearch = true;
-                if (searchTerm) {
-                    const nameMatch = client.name.toLowerCase().includes(searchTerm);
-                    const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
-                    if (!nameMatch && !addressMatch) matchesSearch = false;
-                }
-
-                if (matchesSearch) {
-                    const hasActiveLoan = client.loans.some(l => calculateLoanDetails(l).status !== 'finished');
-                    if (!hasActiveLoan) {
-                        const lastLoanIndex = client.loans.length - 1;
-                        const lastLoan = client.loans[lastLoanIndex];
-                        clientsWithLoans.push({ client, loan: lastLoan, loanIndex: lastLoanIndex });
+            // FILTRO PREVENTA: Solo pasan los que NO tienen préstamos
+            if (filter === 'pre_sale') {
+                if (hasNoLoans) {
+                    let matchesSearch = true;
+                    if (searchTerm) {
+                        matchesSearch = client.name.toLowerCase().includes(searchTerm);
+                    }
+                    if (matchesSearch) {
+                        clientsWithLoans.push({ client, loan: null, loanIndex: 0 });
                     }
                 }
-                return; 
+                return; // IMPORTANTE: Si estamos en filtro preventa, ignoramos el resto de la lógica para este cliente
             }
 
-            // --- LÓGICA ESTÁNDAR PARA OTROS FILTROS ---
+            // OTROS FILTROS: Si el cliente no tiene préstamos, lo ignoramos por completo
+            if (hasNoLoans) return;
             client.loans.forEach((loan, loanIndex) => {
                 // --- INICIO: DEFINICIÓN DE VARIABLES DE APOYO ---
 const hasMigrationHistory = (loan.history || []).some(x => x.method === 'migration');
@@ -4276,14 +4326,46 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             if (targetIndex < 0 || targetIndex >= allLoans.length) {
                 targetIndex = firstActiveIndex !== -1 ? firstActiveIndex : (allLoans.length - 1);
             }
-            if (targetIndex === -1 && allLoans.length === 0) {
-                 showToast("Erro: Cliente sem empréstimos.", true);
-                 if(clientDetailView.classList.contains('active')) window.history.back();
-                 return; 
-            }
+            
 
-            const currentLoanIndex = targetIndex;
-            const loan = allLoans[currentLoanIndex];
+            const currentLoanIndex = allLoans.length > 0 ? targetIndex : 0;
+const loan = allLoans.length > 0 ? allLoans[currentLoanIndex] : null;
+
+// PANTALLA ESPECIAL PARA CLIENTE SIN PRÉSTAMO
+if (!loan) {
+    clientDetailView.innerHTML = `
+        <header class="modal-header">
+            <button id="closeDetailView"><i data-lucide="arrow-left"></i></button>
+            <span class="modal-title">${client.name} (<span data-lang-key="pre_sale">PREVENTA</span>)</span>
+        </header>
+        <div class="modal-content-wrapper">
+            <div class="container" style="text-align: center; padding-top: 60px;">
+                <div style="background: var(--surface); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color);">
+                    <i data-lucide="user-plus" style="width: 60px; height: 60px; color: #3b82f6; margin-bottom: 20px;"></i>
+                    <h3 style="margin-bottom: 10px;">Cliente en Preventa</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.95em; line-height: 1.5;">
+                        Este cliente ha sido registrado pero aún no tiene un préstamo activo. 
+                        Haga clic abajo para asignar capital y activarlo.
+                    </p>
+                    <button class="btn-primary" id="activate-loan-btn" style="margin-top: 30px; width: 100%; padding: 18px;">
+                        <i data-lucide="zap"></i> ACTIVAR PRÉSTAMO
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    
+   // Mostramos el modal y guardamos el estado en el historial
+        clientDetailView.classList.add('active'); // Mostrar el modal
+            history.pushState({ modal: 'clientDetailView', clientId: clientId, loanIndex: 0 }, "Preventa", `#preventa/${clientId}`);
+            // Liga o botão de ativação à função showClientFormModal
+            const activateBtn = clientDetailView.querySelector('#activate-loan-btn');
+            if (activateBtn) {
+                activateBtn.onclick = () => showClientFormModal(client.id, true);
+            }
+    clientDetailView.querySelector('#closeDetailView').onclick = () => window.history.back();
+    lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
+    return; // Salir para no procesar el resto de la función
+}
             const hasMultipleLoans = allLoans.length > 1;
 
             // --- [CORRECCIÓN CRÍTICA] DEFINICIÓN TEMPRANA DE VARIABLES ---
@@ -5548,7 +5630,16 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                   </div>
                 </div>
                 <div class="action-buttons">
-                    <button class="btn-primary" id="saveClientBtn"><i data-lucide="save"></i> <span data-lang-key="${saveButtonKey}"></span></button>
+                <div style="display: flex; gap: 10px; width: 100%;">
+    <!-- Botón de Preventa: Solo aparece si NO estamos editando un préstamo existente -->
+    ${!isEditMode && !isNewLoan ? `
+    <button type="button" class="btn-secondary" id="preSaleBtn" style="flex: 1;">
+        <i data-lucide="user-plus"></i> Preventa
+    </button>` : ''}
+    <button class="btn-primary" id="saveClientBtn" style="flex: 1;">
+        <i data-lucide="save"></i> <span data-lang-key="${saveButtonKey}"></span>
+    </button>
+</div>
                 </div>`;
             
             history.pushState({ modal: 'clientFormModal' }, 'Client Form', '#client-form');
@@ -5752,6 +5843,15 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
             
             const saveButton = document.getElementById('saveClientBtn');
+let isPreSaleAction = false; // Flag para saber si es preventa
+const preSaleBtn = document.getElementById('preSaleBtn');
+
+if (preSaleBtn) {
+    preSaleBtn.addEventListener('click', () => {
+        isPreSaleAction = true;
+        saveButton.click(); // Activa el proceso de guardado normal
+    });
+}
             saveButton.dataset.isRefinance = prefillData ? 'true' : 'false';
             const clientIdToSave = isEditMode || isNewLoan ? client.id : null; 
 
@@ -5937,12 +6037,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         
                         const newClientId = username; 
                         const newClientData = {
-                            ...clientGeneralData,
-                            authUid: newClientAuthUid,
-                            loans: [loanSpecificData],
-                            fcmTokens: [],
-                            notifications: []
-                        };
+    ...clientGeneralData,
+    authUid: newClientAuthUid,
+    // Si el botón de preventa fue presionado, el array de préstamos va vacío
+    loans: isPreSaleAction ? [] : [loanSpecificData], 
+    fcmTokens: [],
+    notifications: []
+};
                         const newClientRef = doc(db, 'companies', currentCompanyId, "clients", newClientId);
                         await setDoc(newClientRef, newClientData);
                     }
@@ -8492,6 +8593,30 @@ function renderVerificationResults(container, warnings, systemLoans) {
     document.getElementById('app-container').style.display = 'flex';
 
     renderMainLayout();
+    
+    // --- LÓGICA DEL RELOJ Y FECHA EN TIEMPO REAL ---
+    const updateLiveClock = () => {
+        const now = new Date();
+        const clockEl = document.getElementById('txt-clock-now');
+        const dayEl = document.getElementById('txt-day-name');
+        const dateEl = document.getElementById('txt-date-full');
+        
+        if (clockEl) clockEl.textContent = now.toLocaleTimeString('pt-BR');
+        
+        if (dayEl && dateEl) {
+            const days = {
+                pt: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'],
+                es: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+                en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            };
+            const currentDays = days[currentLang] || days.pt;
+            dayEl.textContent = currentDays[now.getDay()];
+            dateEl.textContent = now.toLocaleDateString('pt-BR');
+        }
+    };
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock(); // Ejecución inmediata inicial
+
     lucide.createIcons();
     setupEventListeners();
     const preferredTheme = localStorage.getItem('theme') || 'light';
