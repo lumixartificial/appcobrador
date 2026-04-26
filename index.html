@@ -895,6 +895,9 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         const auth = getAuth(app);
+        const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+        const nombreDiaHoy = diasSemana[new Date().getDay()];
+        const nombreDiaCap = nombreDiaHoy.charAt(0).toUpperCase() + nombreDiaHoy.slice(1);
         
         // --- INICIO CÓDIGO PARA HABILITAR MODO OFFLINE ---
 try {
@@ -1014,7 +1017,7 @@ const BLACKLIST_DATA = {
                 noClientsFound: 'Ningún cliente encontrado.', 
                 biweekly: 'QUINCENAL', registerOutflow: 'Registrar Nueva Salida', addExpenseOption: 'Añadir Gasto', expenseOptionDesc: 'Registrar combustible, comida, etc.', cashWithdrawal: 'Retiro de Caja', withdrawalOptionDesc: 'Enviar dinero entregado al admin.', amountDeliveredAdmin: 'Monto entregado al Admin:', sendForApproval: 'Enviar para Aprobación',
                 postponePayment: 'Aplazar Pago', postponeConfirmTitle: 'Confirmar Aplazamiento', postponeConfirmMsg: 'Esto moverá la fecha de vencimiento del cliente un día hábil, sin generar atraso. ¿Desea continuar?', confirm: 'Confirmar', paymentApproved: '¡Pago aprobado con éxito!', paymentRejected: 'Pago rechazado.', approve: 'Aprobar', reject: 'Rechazar', paymentReceipt: 'Comprobante de Pago', sentAmount: 'Monto Enviado', paymentVerification: 'Verificación de Pago', reputation: 'Reputación', reputationScore: 'Puntuación de Reputación', reputationPerfect: 'Excelente', reputationGood: 'Bueno', reputationRegular: 'Regular', reputationBad: 'Mala', reputationInfo: 'Mantén tus pagos al día para tener una buena reputación.', collector: 'Cobrador', dailyGoal: 'Meta Diaria', receivedToday: 'Recibido Hoy', clientsRemaining: 'Clientes Restantes', 
-                todaysRoute: 'Ruta de Cobro (Activos)', navHome: 'Ruta', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport: 'Exportar Reporte Diario (PDF)', logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', 
+                todaysRoute: 'Ruta de Cobro (Activos)', navHome: 'Ruta', navClients: 'Clientes', navMap: 'Mapa', navProfile: 'Perfil', pending: 'Pendiente', paid: 'Pagado', late: 'Atrasado', addNewClient: 'Añadir Nuevo Cliente', clientName: 'Nombre del Cliente', address: 'Dirección', totalLoan: 'Valor del Préstamo', installmentValue: 'Valor de la Cuota', numInstallments: 'Número de Cuotas', paymentDays: 'Días de Pago', saveClient: 'Guardar Cliente', city: 'Ciudad', location: 'Ubicación GPS', interest: 'Interés (%)', totalToPay: 'Valor Total a Pagar', clientDocs: 'Documentos del Cliente (Opcional)', takePhoto: 'Tomar Foto', uploadFile: 'Cargar Archivo', attachedDocs: 'Documentos Adjuntos', editClient: 'Editar Cliente', saveChanges: 'Guardar Cambios', startRoute: 'IR', searchClient: 'Buscar cliente...', all: 'Todos', navigate: 'Navegar', capitalTotal: 'Capital en Mano', dailyTotal: 'Total del Día', weeklyTotal: 'Total Semanal', monthlyTotal: 'Total Mensual', accountSettings: 'Ajustes de la Cuenta', changePassword: 'Cambiar Contraseña', exportReport:'Cuadre de ruta diario PDF',logout: 'Cerrar Sesión', reportTitle: 'Reporte Diario de Cobranza', reportDate: 'Fecha', reportCollector: 'Cobrador', reportTotalCollected: 'Total Recaudado', reportNumPayments: 'Nº de Pagos', reportClient: 'Cliente', reportAmount: 'Valor', reportTime: 'Hora', noPaymentsToday: 'No hay pagos registrados hoy.', cropImage: 'Recortar Imagen', confirmCrop: 'Confirmar Recorte', cancel: 'Cancelar', 
                 navExpenses: 'Gastos<br>Retiros', myExpenses: 'Mis Gastos', addExpense: 'Añadir Gasto', expenseType: 'Tipo de Gasto', expenseValue: 'Valor del Gasto', observations: 'Observaciones (Opcional)', uploadReceipt: 'Adjuntar Recibo (Opcional)', saveExpense: 'Guardar Gasto', fuel: 'Combustible', food: 'Alimentación', rent: 'Alquiler', mechanics: 'Mecánica', other: 'Otros', filterPeriod: 'Filtrar por Período', filterCategory: 'Filtrar por Categoría', today: 'Hoy', thisWeek: 'Esta Semana', thisMonth: 'Este Mes', fromBeginning: 'Desde el Inicio', reportTotalExpenses: 'Total de Gastos', reportNetBalance: 'Saldo Neto', clientAccess: 'Acceso del Cliente', username: 'Usuario', password: 'Contraseña', usernameTaken: 'Este usuario ya existe.', usernameAvailable: 'Usuario disponible.', usernameRequired: 'El nombre de usuario es obligatorio.', whatsapp: 'WhatsApp', shareOnWhatsApp: 'Compartir por WhatsApp', clientRegisteredSuccess: '¡Cliente Registrado con Éxito!', clientUpdatedSuccess: '¡Cliente Actualizado con Éxito!', accessData: 'Datos de Acceso', appInstructions: 'Usa estos datos para acceder a la app del cliente:', appLink: 'Link de la App', whatsappMessageTemplate: `¡Hola {clientName}! 👋 Tu acceso a nuestra app ha sido creado con éxito.\n\n*LINK DE LA APP*\n{appLink}\n\n*EMAIL*\n{email}\n\n*CONTRASEÑA*\n{password}`, navNotifications: 'Notificaciones', paymentSent: 'envió un pago de', pleaseVerify: 'Por favor, verifique.', noNotifications: 'Ninguna notificación pendiente.', refinanceRequested: 'solicitó un refinanciamiento de', reviewRequest: 'Revisar solicitud.', installAppMsg: '¡Instala la app para una mejor experiencia!', installBtn: 'Instalar', receivedInCash: 'Recibido en Efectivo', receivedInDigital: 'Recibido en PIX/Tarjeta', finished: 'Finalizado', createNewLoan: 'Crear Nuevo Préstamo', updateClientData: 'Actualizar Datos', paymentFrequency: 'Forma de Pago', daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensal', dayOfWeek: 'Día de la Semana', dayOfMonth: 'Día del Mes', sunday: 'Domingo', monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', collectionTimeLabel: 'Hora de Cobro Preferida', documentNumber: 'Número de Documento', systemHistory: 'Historial en el Sistema', verifySystem: 'Verificar en el Sistema', searchingSystem: 'Buscando en el sistema...', clientClean: 'Cliente Limpo', clientCleanMsg: 'No se encontraron otros préstamos activos para este documento en el sistema.', loansFound: 'Préstamos Encontrados', loansFoundMsg: 'Se encontraron los siguientes préstamos activos para este documento:', otherLoanCollector: 'Cobrador', otherLoanStatus: 'Estado', loanDetails: 'Detalles del Préstamo', amountPaid: 'Monto Pagado', paymentApprovedClientTitle: 'Pago Aprobado', paymentApprovedClientBody: '¡Tu pago de {amount} ha sido aprobado!', paymentRejectedClientTitle: 'Pago Rechazado', paymentRejectedClientBody: 'Tu comprobante fue rechazado. Por favor, contacta a tu cobrador.', refinanceApprovedClientTitle: 'Refinanciación Aprobada', refinanceApprovedClientBody: 'Tu solicitud de refinanciación ha sido aprobada con éxito.', refinanceRejectedClientTitle: 'Refinanciación Rechazada', refinanceRejectedClientBody: 'Tu solicitud de refinanciación ha sido rechazada.', realtimeTracking: 'Seguimiento en Tiempo Real', 
                 paymentTitle: 'Pago Cuota #{start}', paymentTitleRange: 'Pago Cuotas #{start} - #{end}', paymentDescFull: 'Cuota #{start} pagada en su totalidad.', paymentDescPartial: 'Pago parcial ({percent}%) de la cuota.', paymentDescMultiple: 'Cubre {fullInstallments} cuota(s) y {percent}% de la próxima.', paymentDescOverpay: 'Cubre la cuota #{start} y adelanta {overpayAmount} para la próxima.', paymentInstallmentTitle: 'Pago Cuota #{installment}', paymentInstallmentsTitle: 'Pago Cuotas #{start} - #{end}', fullPaymentDesc: 'Cuota #{installment} pagada completamente.', partialPaymentDesc: 'Pago parcial ({percent}%) de la cuota.', multiplePaymentDesc: 'Cubre {count} cuota(s) y un {percent}% de la siguiente.', multipleFullPaymentDesc: 'Cubre {count} cuota(s) completamente.', emailLogin: 'Email (Login)', username: 'Usuário (Login)', collectorOnTheWayTitle: '¡Cobrador en camino!', collectorOnTheWayBody: 'Nuestro cobrador está en camino y llegará en unos minutos.', paymentSettings: 'Configuración de Pagos', currency: 'Moneda de Operación', paymentMethods: 'Métodos de Pago', 
                 save: 'Guardar', statusPaidToday: 'PAGADO HOY', statusToPay: 'FALTA POR PAGAR', statusPending: 'PENDIENTE', adminApprovedRefinance: 'Admin aprobó la solicitud de', approveToCreate: 'Aprueba para crear el nuevo préstamo.', settlementHistory: 'Historial de Liquidaciones', noExpenses: 'Ningún gasto encontrado.', noSettlements: 'Ninguna liquidación encontrada.', loadingSettlements: 'Cargando liquidaciones...', totalAssets: 'Capital Total (Patrimonio)', distributedCapital: 'Capital Distribuido', routeLabel: 'Ruta:', methodDigitalLabel: 'Pago Electrónico', methodCardLabel: 'Tarjeta', salary: 'Salario', routeProgress: 'Progreso de la Ruta', microInsuranceLabel: 'Micro Seguro (A Descontar)',
@@ -1106,8 +1109,10 @@ const BLACKLIST_DATA = {
         let unsubscribeNotifications = null;
         let internalNotifications = [];
 
-        
-        const nationalHolidays = [ '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '25/12' ];
+        const nationalHolidays = [ 
+    '01/01', '21/04', '01/05', '07/09', '12/10', '02/11', '15/11', '20/11', '25/12',
+    '01/05', '24/06', '29/06' // Agrega aquí todos los que necesites
+];
         
 
         const money = val => {
@@ -1519,16 +1524,23 @@ const BLACKLIST_DATA = {
                         </div>
 
                         <div class="filter-buttons">
-                            <button class="filter-btn active" data-filter="all">TODOS</button>
-                            <button class="filter-btn" data-filter="pre_sale">PREVENTA</button>
-                            <button class="filter-btn" data-filter="weekly">SEMANALES</button>
-                            <button class="filter-btn" data-filter="biweekly">QUINCENAL</button>
-                            <button class="filter-btn" data-filter="monthly">MENSUALES</button>
-                            <button class="filter-btn" data-filter="todo_today">FALTA POR PAGAR</button>
-                            <button class="filter-btn" data-filter="paid">PAGADOS</button>
-                            <button class="filter-btn" data-filter="late">ATRASADOS</button>
-                            <button class="filter-btn" data-filter="finished">FINALIZADOS</button>
-                        </div>
+    <button class="filter-btn active" data-filter="all" style="border-color: #6366f1; color: #6366f1;">TODOS</button>
+    <button class="filter-btn" data-filter="pre_sale" style="border-color: #3b82f6; color: #3b82f6;">PREVENTA</button>
+    <button class="filter-btn" data-filter="weekly" style="border-color: #a855f7; color: #a855f7;">SEMANALES</button>
+    <button class="filter-btn" data-filter="biweekly" style="border-color: #ec4899; color: #ec4899;">QUINCENAL</button>
+    <button class="filter-btn" data-filter="monthly" style="border-color: #f97316; color: #f97316;">MENSUALES</button>
+    
+    <!-- BOTÓN: NO PAGAN HOY -->
+    <button class="filter-btn" data-filter="no_pay_today" style="border-color: #ef4444; color: #ef4444; line-height: 1.2; padding: 5px 15px;">
+        <span style="font-weight: 800; font-size: 0.85em;">NO PAGAN HOY</span><br>
+        <small id="day-label" style="text-transform: uppercase; font-size: 0.75em; opacity: 0.8;"></small>
+    </button>
+
+    <button class="filter-btn" data-filter="todo_today" style="border-color: #10b981; color: #10b981;">FALTA POR PAGAR</button>
+    <button class="filter-btn" data-filter="paid" style="border-color: #06b6d4; color: #06b6d4;">PAGADOS</button>
+    <button class="filter-btn" data-filter="late" style="border-color: #dc2626; color: #dc2626;">ATRASADOS</button>
+    <button class="filter-btn" data-filter="finished" style="border-color: #64748b; color: #64748b;">FINALIZADOS</button>
+</div>
 
                         <div class="client-list" id="all-clients-list"></div>
                     </div>
@@ -3057,6 +3069,9 @@ async function showRefinanceModal(clientId, notificationId) {
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     const isFinished = loan.status === 'finished';
+                    // REGLA DE FESTIVOS: Si hoy es festivo, la meta es 0
+                    const todayMonthDay = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}`;
+                    if (nationalHolidays.includes(todayMonthDay)) return;
 
                     // Cuánto ha pagado hoy
                     const paidToday = (loan.history || []).reduce((sum, h) => {
@@ -3328,7 +3343,9 @@ async function showRefinanceModal(clientId, notificationId) {
            while (checkDate <= stopDate) {
                const dayOfWeek = checkDate.getDay();
                const dayOfMonth = checkDate.getDate();
-               const isHoliday = false; 
+               // --- DETECCIÓN REAL DE FESTIVOS ---
+               const fDate = `${String(dayOfMonth).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
+               const isHoliday = nationalHolidays.includes(fDate);
                const frequency = loan.paymentFrequency || 'daily';
                let isPaymentDay = false;
                
@@ -4045,7 +4062,7 @@ const paymentDayLabelHtml = `
                    const paymentDays = loan.paymentDays || [];
 
                    if (frequency === 'daily') {
-                       isScheduledForToday = true; // Diarios siempre aparecen
+                       isScheduledForToday = paymentDays.includes(dayOfWeek); 
                    } else if (frequency === 'weekly') {
                        isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
                    } else if (frequency === 'biweekly') {
@@ -4064,6 +4081,7 @@ const paymentDayLabelHtml = `
                    } else if (frequency === 'monthly') {
                        isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
                    }
+                   if (!isScheduledForToday) return;
                     // 2. REGLA DE LIMPIEZA (Blindaje: Sale de ruta si hubo gestión hoy)
 let hasPaidToday = false;
 const todayStr = today.toLocaleDateString('pt-BR'); // Ejemplo: "18/04/2026"
@@ -4231,7 +4249,26 @@ const totalInstCount = (loan.installments || "0/0").split('/')[1];
                         if (loan.paymentFrequency !== 'monthly' || currentStatus === 'finished') passesCategory = false;
                     }
                     // --- FIN DE LO NUEVO ---
+                    else if (filter === 'no_pay_today') {
+                // 1. Solo préstamos activos
+                if (currentStatus === 'finished') passesCategory = false;
+                
+                // 2. Solo el último préstamo
+                if (loanIndex !== client.loans.length - 1) passesCategory = false;
 
+                // 3. Lógica: Si el cliente SÍ está programado para hoy, lo ocultamos de aquí
+                let isScheduled = false;
+                const freq = loan.paymentFrequency || 'daily';
+                const pDays = loan.paymentDays || [];
+                const dWeek = todayStart.getDay();
+                const dMonth = todayStart.getDate();
+
+                if (freq === 'daily') isScheduled = pDays.includes(dWeek);
+                else if (freq === 'weekly' || freq === 'biweekly') isScheduled = pDays.length > 0 && parseInt(pDays[0]) === dWeek;
+                else if (freq === 'monthly') isScheduled = pDays.length > 0 && parseInt(pDays[0]) === dMonth;
+
+                if (isScheduled) passesCategory = false;
+            }
                     else if (filter === 'todo_today') {
                         // "Falta por Pagar":
                         // Muestra si NO está finalizado Y NO ha pagado dinero hoy.
@@ -6325,6 +6362,8 @@ function renderSettlementsList(settlements) {
 
     // Filter by period (la lógica existente está bien)
     const now = new Date();
+    const dayLabel = document.getElementById('day-label');
+if (dayLabel) dayLabel.textContent = nombreDiaCap;
     
     let startDate;
 let endDate; // <-- AÑADE ESTA LÍNEA
@@ -7067,7 +7106,7 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 mapInstance.fitBounds(locations, { padding: [50, 50] });
             }
         }
-
+           
            async function exportDailyReport(customDate = null) {
             const { jsPDF } = window.jspdf;
             const pdfDoc = new jsPDF();
@@ -7119,7 +7158,39 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 else d = new Date(timestamp);
                 return d.toLocaleDateString('pt-BR') === reportDate.toLocaleDateString('pt-BR');
             };
+            // --- INICIO CÁLCULO META DIARIA PARA EL REPORTE ---
+            let totalGoal_report = 0;
+            const reportDayOfWeek = reportDate.getDay();
+            const reportDayOfMonth = reportDate.getDate();
 
+            allClients.forEach(c => {
+                (c.loans || []).forEach(l => {
+                    const details = calculateLoanDetails(l);
+                    if (details.status === 'finished') return;
+
+                    let isToday = false;
+                    const freq = l.paymentFrequency || 'daily';
+                    const pDays = l.paymentDays || [];
+
+                    if (freq === 'daily') isToday = pDays.includes(reportDayOfWeek);
+                    else if (freq === 'weekly') isToday = pDays.length > 0 && parseInt(pDays[0]) === reportDayOfWeek;
+                    else if (freq === 'monthly') isToday = pDays.length > 0 && parseInt(pDays[0]) === reportDayOfMonth;
+                    else if (freq === 'biweekly') {
+                        if (pDays.length > 0 && parseInt(pDays[0]) === reportDayOfWeek) {
+                            const startDate = l.startDate?.seconds ? new Date(l.startDate.seconds * 1000) : new Date(l.startDate);
+                            startDate.setHours(0,0,0,0);
+                            const diffTime = Math.abs(reportDate.getTime() - startDate.getTime());
+                            const diffDays = Math.round(diffTime / 86400000);
+                            if (Math.floor(diffDays / 7) % 2 === 0) isToday = true;
+                        }
+                    }
+
+                    if (isToday) {
+                        totalGoal_report += (parseFloat(l.originalInstallmentAmount) || parseFloat(l.amount) || 0);
+                    }
+                });
+            });
+            // --- FIN CÁLCULO META DIARIA ---
             // ==========================================================================================
             // 1. OBTENER SALDO INICIAL DEL DÍA (CAJA ANTERIOR)
             // ==========================================================================================
@@ -7453,6 +7524,9 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
             // A. CAJA DEL DÍA ANTERIOR (Valor Detectado)
             addSummaryLine(t.previousBox, previousCapital, '#4b5563', true);
+            // Mostrar Meta Diaria debajo de la caja anterior
+            const metaLabel = currentLang === 'es' ? 'Meta Diaria de la Ruta:' : 'Meta Diária da Rota:';
+            addSummaryLine(metaLabel, totalGoal_report, '#6366f1', true);
 
             // B. TOTAL RECIBIDO HOY
             addSummaryLine(`(+) ${t.received} (Total):`, dailyTotal, '#15803d', true);
