@@ -7158,21 +7158,33 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 else d = new Date(timestamp);
                 return d.toLocaleDateString('pt-BR') === reportDate.toLocaleDateString('pt-BR');
             };
-            // --- INICIO CÁLCULO META DIARIA PARA EL REPORTE ---
+            // --- INICIO CÁLCULO META DIARIA PARA EL REPORTE (SINCRONIZADO) ---
             let totalGoal_report = 0;
             const reportDayOfWeek = reportDate.getDay();
             const reportDayOfMonth = reportDate.getDate();
+            const reportDateStr = reportDate.toLocaleDateString('pt-BR');
 
             allClients.forEach(c => {
                 (c.loans || []).forEach(l => {
                     const details = calculateLoanDetails(l);
-                    if (details.status === 'finished') return;
+                    
+                    // 1. Cuánto ha pagado específicamente en la fecha del reporte
+                    const paidOnReportDate = (l.history || []).reduce((sum, h) => {
+                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkDateMatch(h.date)) {
+                            return sum + (parseFloat(h.amount) || 0);
+                        }
+                        return sum;
+                    }, 0);
 
+                    // Si el préstamo terminó antes de esta fecha y no hubo pago ese día, lo ignoramos
+                    if (details.status === 'finished' && paidOnReportDate === 0) return;
+
+                    // 2. Determinar si esa fecha era día de pago (Uso de parseInt obligatorio)
                     let isToday = false;
                     const freq = l.paymentFrequency || 'daily';
                     const pDays = l.paymentDays || [];
 
-                    if (freq === 'daily') isToday = pDays.includes(reportDayOfWeek);
+                    if (freq === 'daily') isToday = pDays.some(d => parseInt(d) === reportDayOfWeek);
                     else if (freq === 'weekly') isToday = pDays.length > 0 && parseInt(pDays[0]) === reportDayOfWeek;
                     else if (freq === 'monthly') isToday = pDays.length > 0 && parseInt(pDays[0]) === reportDayOfMonth;
                     else if (freq === 'biweekly') {
@@ -7186,7 +7198,24 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                     }
 
                     if (isToday) {
-                        totalGoal_report += (parseFloat(l.originalInstallmentAmount) || parseFloat(l.amount) || 0);
+                        // 3. Calcular deuda al inicio de ese día para no cobrar de más
+                        const totalPaidAllTime = (l.history || []).reduce((sum, h) => 
+                            (h.status === 'approved' || h.method === 'migration') ? sum + (parseFloat(h.amount) || 0) : sum, 0
+                        );
+                        const totalLoanAmount = parseFloat(l.totalLoan) || 0;
+                        const currentBalance = Math.max(0, totalLoanAmount - totalPaidAllTime);
+                        
+                        // La deuda que había al amanecer de ese día
+                        const debtAtStart = currentBalance + paidOnReportDate;
+
+                        let installment = parseFloat(l.originalInstallmentAmount) || parseFloat(l.amount) || 0;
+                        
+                        // Si lo que debía era menos que la cuota, la meta es solo el saldo restante
+                        if (installment > debtAtStart) {
+                            installment = debtAtStart;
+                        }
+
+                        totalGoal_report += installment;
                     }
                 });
             });
