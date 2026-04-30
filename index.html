@@ -779,28 +779,30 @@
             background-color: var(--surface);
             color: var(--text-primary);
         }
-      /* --- AJUSTE AUTOMÁTICO DE ÁREA SEGURA (IPHONE/NOTCH) - REVERSIÓN Y CORRECCIÓN --- */
+      /* --- AJUSTE AUTOMÁTICO DE ÁREA SEGURA (IPHONE/NOTCH) - BARRA BAJA --- */
 @supports (padding-top: env(safe-area-inset-top)) {
     /* 1. Mantenemos la cabecera bajada para que la foto y el idioma sean clicables */
     .main-header, .modal-header {
         padding-top: calc(15px + env(safe-area-inset-top)) !important;
     }
 
-    /* 2. Eliminamos el hueco de 2cm de abajo pegando la barra al borde del iPhone */
+    /* 2. Bajamos los iconos de la barra: eliminamos el margen extra y reducimos el superior */
     .bottom-nav {
-        padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+        /* Quitamos los 10px base para que los iconos bajen al límite del área segura */
+        padding-bottom: env(safe-area-inset-bottom) !important;
+        padding-top: 5px !important; 
         height: auto !important;
     }
 
-    /* 3. CORRECCIÓN: Subimos el botón (+) para que LIBERE el botón de Mapa en iPhone */
+    /* 3. Bajamos el botón (+) para que acompañe el descenso de la barra */
     .fab {
-        /* Aumentamos el valor a 120px para que flote bien arriba del menú */
-        bottom: calc(120px + env(safe-area-inset-bottom)) !important;
+        /* Lo bajamos de 120px a 100px para que no quede tan "volando" en iPhone */
+        bottom: calc(100px + env(safe-area-inset-bottom)) !important;
     }
 
     /* 4. Ajuste para los botones internos de los modales */
     .action-buttons {
-        padding-bottom: calc(15px + env(safe-area-inset-bottom)) !important;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
     }
 }
 /* --- FIN DEL AJUSTE --- */
