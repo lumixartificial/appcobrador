@@ -779,8 +779,29 @@
             background-color: var(--surface);
             color: var(--text-primary);
         }
+        /* --- AJUSTE AUTOMÁTICO DE ÁREA SEGURA (IPHONE/NOTCH) --- */
+@supports (padding-top: env(safe-area-inset-top)) {
+    /* Solo se aplica si el dispositivo reporta un área segura (como el notch de iOS) */
+    .main-header, .modal-header {
+        /* Mantiene tu diseño original pero suma el espacio de la barra de estado de iOS */
+        padding-top: calc(15px + env(safe-area-inset-top)) !important;
+    }
+
+    .bottom-nav {
+        /* Elimina el hueco de abajo en iPhone pegando la barra al borde físico */
+        padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+        height: auto !important;
+    }
+
+    .action-buttons {
+        /* Evita que los botones de los modales queden tapados por la raya de inicio de iOS */
+        padding-bottom: calc(15px + env(safe-area-inset-bottom)) !important;
+    }
+}
+/* --- FIN DEL AJUSTE --- */
 
     </style>
+    
 </head>
 <body>
     
