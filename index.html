@@ -779,22 +779,29 @@
             background-color: var(--surface);
             color: var(--text-primary);
         }
-        /* --- AJUSTE AUTOMÁTICO DE ÁREA SEGURA (IPHONE/NOTCH) --- */
+       /* --- AJUSTE AUTOMÁTICO DE ÁREA SEGURA (IPHONE/NOTCH) --- */
 @supports (padding-top: env(safe-area-inset-top)) {
-    /* Solo se aplica si el dispositivo reporta un área segura (como el notch de iOS) */
+    /* 1. Mantiene el ajuste superior que ya te funcionó */
     .main-header, .modal-header {
-        /* Mantiene tu diseño original pero suma el espacio de la barra de estado de iOS */
         padding-top: calc(15px + env(safe-area-inset-top)) !important;
     }
 
+    /* 2. Ajuste de la barra inferior: se pega al borde físico del iPhone */
     .bottom-nav {
-        /* Elimina el hueco de abajo en iPhone pegando la barra al borde físico */
-        padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+        /* Rellena el espacio del "Home Indicator" con el color de la barra */
+        padding-bottom: env(safe-area-inset-bottom) !important;
         height: auto !important;
     }
 
+    /* 3. Ajuste del Botón Flotante (+): lo bajamos para que no tape el mapa */
+    .fab {
+        /* Bajamos la posición de 90px a unos 65px más el área segura */
+        /* Esto lo deja justo encima de la barra de navegación en iPhone */
+        bottom: calc(65px + env(safe-area-inset-bottom)) !important;
+    }
+
+    /* 4. Ajuste de botones de acción en modales */
     .action-buttons {
-        /* Evita que los botones de los modales queden tapados por la raya de inicio de iOS */
         padding-bottom: calc(15px + env(safe-area-inset-bottom)) !important;
     }
 }
