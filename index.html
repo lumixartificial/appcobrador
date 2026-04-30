@@ -3213,92 +3213,80 @@ async function showRefinanceModal(clientId, notificationId) {
         
 
     function updateProfileView(collectorData = null) {
-            const dailyTotalEl = document.getElementById('kpi-daily-total');
-            const capitalTotalEl = document.getElementById('kpi-capital-total'); 
-            const distributedCapitalEl = document.getElementById('kpi-distributed-capital'); 
-            const dailyCashEl = document.getElementById('kpi-daily-cash');
-            const dailyDigitalEl = document.getElementById('kpi-daily-digital');
-            const totalPatrimonioEl = document.getElementById('kpi-total-patrimonio'); 
-            
-            if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return; 
+        const dailyTotalEl = document.getElementById('kpi-daily-total');
+        const capitalTotalEl = document.getElementById('kpi-capital-total'); 
+        const distributedCapitalEl = document.getElementById('kpi-distributed-capital'); 
+        const dailyCashEl = document.getElementById('kpi-daily-cash');
+        const dailyDigitalEl = document.getElementById('kpi-daily-digital');
+        const totalPatrimonioEl = document.getElementById('kpi-total-patrimonio'); 
+        
+        if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return; 
 
-            let totalLoansMade = 0; 
-            let totalPaymentsReceived = 0; 
-            let totalDistributedCapital_Outstanding = 0; 
-            
-            const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
-            
-            const collectorId = typeof currentCollectorUsername !== 'undefined' ? currentCollectorUsername : (collectorData?.id);
-            const collectorClients = allClients.filter(c => c.collectorId === collectorId);
-
-            collectorClients.forEach(client => {
-                (client.loans || []).forEach(loan => {
-                    
-                    if (!loan.migrationDate) {
-                        if (loan.principalAmount) {
-                            totalLoansMade += loan.principalAmount;
-                            // CORRECCIÓN: NO SUMAMOS EL SEGURO AQUÍ.
-                            // Dejamos que el préstamo reste el total completo, "escondiendo" el seguro.
-                        } else if (loan.totalLoan && client.interestRate) { 
-                            totalLoansMade += (loan.totalLoan / (1 + (client.interestRate / 100)));
-                        }
+        // --- CÁLCULO UNIFICADO (IGUAL AL PDF) ---
+        let totalLoansMade = 0; 
+        let totalPaymentsReceived = 0; 
+        let totalDistributedCapital_Outstanding = 0; 
+        
+        const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
+        
+        allClients.forEach(client => {
+            (client.loans || []).forEach(loan => {
+                // 1. Préstamos realizados (Salida de caja)
+                if (!loan.migrationDate) {
+                    let principal = parseFloat(loan.principalAmount);
+                    if (!principal && loan.totalLoan) {
+                        const rate = client.interestRate || 20;
+                        principal = loan.totalLoan / (1 + (rate / 100));
                     }
+                    totalLoansMade += (principal || 0);
+                }
 
-                    (loan.history || []).forEach(h => {
-                        if (h.date?.seconds && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
-                            totalPaymentsReceived += (h.amount || 0);
-                        }
-                    });
-                    
-                    const loanDetails = calculateLoanDetails(loan);
-                    if (loanDetails.status !== 'finished') {
-                        const totalPaidForThisLoan = (loan.history || [])
-                            .filter(h => h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed')
-                            .reduce((sum, h) => sum + (h.amount || 0), 0);
-                        const outstandingBalance = (loan.totalLoan || 0) - totalPaidForThisLoan;
-                        totalDistributedCapital_Outstanding += outstandingBalance;
+                // 2. Pagos recibidos (Entrada a caja)
+                (loan.history || []).forEach(h => {
+                    if (h.status === 'approved' && h.method !== 'migration') {
+                        totalPaymentsReceived += (parseFloat(h.amount) || 0);
                     }
                 });
+                
+                // 3. Capital en la calle
+                const loanDetails = calculateLoanDetails(loan);
+                if (loanDetails.status !== 'finished') {
+                    const totalPaidForThisLoan = (loan.history || [])
+                        .filter(h => h.status === 'approved')
+                        .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                    const outstandingBalance = (parseFloat(loan.totalLoan) || 0) - totalPaidForThisLoan;
+                    totalDistributedCapital_Outstanding += outstandingBalance;
+                }
             });
-                        
-            const totalExpenses = allExpenses.reduce((sum, expense) => sum + expense.value, 0);
-            
-            const currentStartingCapital = (collectorData && collectorData.startingCapitalOnHand !== undefined) 
-                ? collectorData.startingCapitalOnHand 
-                : (collectorData && collectorData.startingCapital) || 0;
+        });
 
-            // === CORRECCIÓN CRÍTICA ===
-            // Solo restamos los retiros de CAPITAL. 
-            // Ignoramos los de SEGURO (type !== 'insurance') porque ese dinero es "invisible" en esta caja.
-            const totalSettledByThisCollector = allSettlements
-                .filter(s => s.status === 'approved' && s.type !== 'insurance') 
-                .reduce((sum, s) => sum + (s.amount || 0), 0);
+        const totalExpenses = allExpenses.reduce((sum, e) => sum + (parseFloat(e.value) || 0), 0);
+        const totalSettled = allSettlements
+            .filter(s => s.status === 'approved' && s.type !== 'insurance')
+            .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+        const totalInjected = allCapitalInjections
+            .filter(i => i.status === 'approved')
+            .reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
 
-            const totalCapitalInjected = allCapitalInjections
-                .filter(i => i.status === 'approved')
-                .reduce((sum, i) => sum + (i.amount || 0), 0);
+        const currentStartingCapital = (collectorData?.startingCapitalOnHand !== undefined) 
+            ? parseFloat(collectorData.startingCapitalOnHand) 
+            : (parseFloat(collectorData?.startingCapital) || 0);
 
-            // Fórmula Limpia: Inicio + Aportes + Pagos - Préstamos - Gastos - Retiros(Solo Capital)
-            // --- NUEVA LÓGICA SINCRONIZADA CON ADMINISTRADOR ---
-            // Extraemos el balance histórico del documento del cobrador (dinero de clientes eliminados)
-            const historicalBalance = (collectorData?.historicalBalance || 0);
+        const historicalBalance = parseFloat(collectorData?.historicalBalance || 0);
 
-            // La nueva fórmula suma el historicalBalance para que la caja no baje al borrar clientes
-            const capitalTotal = currentStartingCapital + totalCapitalInjected + totalPaymentsReceived + historicalBalance - totalLoansMade - totalExpenses - totalSettledByThisCollector;
-            
-            if (typeof currentCapitalOnHand !== 'undefined') {
-                currentCapitalOnHand = capitalTotal; 
-            }
+        // LA FÓRMULA FINAL
+        const capitalTotal = currentStartingCapital + totalInjected + totalPaymentsReceived + historicalBalance - totalLoansMade - totalExpenses - totalSettled;
+        
+        currentCapitalOnHand = capitalTotal;
 
-            dailyTotalEl.textContent = money(dailyTotal);
-            capitalTotalEl.textContent = money(capitalTotal); 
-            distributedCapitalEl.textContent = money(totalDistributedCapital_Outstanding); 
-            
-            const totalPatrimonio = capitalTotal + totalDistributedCapital_Outstanding;
-            totalPatrimonioEl.textContent = money(totalPatrimonio); 
-            
-            if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
-            if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
+        // Renderizado en pantalla
+        dailyTotalEl.textContent = money(dailyTotal);
+        capitalTotalEl.textContent = money(capitalTotal); 
+        distributedCapitalEl.textContent = money(totalDistributedCapital_Outstanding); 
+        totalPatrimonioEl.textContent = money(capitalTotal + totalDistributedCapital_Outstanding); 
+        
+        if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
+        if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
     }
 
 
@@ -7269,58 +7257,48 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             // --- FIN CÁLCULO META DIARIA ---
             // ==========================================================================================
-            // 1. OBTENER SALDO INICIAL DEL DÍA (CAJA ANTERIOR)
             // ==========================================================================================
-            // Intentamos calcularlo matemáticamente para que sea exacto al centavo.
+            // 1. CÁLCULO UNIFICADO DE CAPITAL (COINCIDENCIA TOTAL CON LA APP)
+            // ==========================================================================================
             
-            const startOfDay = new Date(reportDate);
-            startOfDay.setHours(0,0,0,0);
-            
-            // Base: Capital Inicial configurado en el sistema
-            let previousCapital = (currentCollectorData?.startingCapitalOnHand !== undefined) 
+            // A. Valores Base y Saldo Histórico (Clientes eliminados)
+            const startingCap = (currentCollectorData?.startingCapitalOnHand !== undefined) 
                 ? parseFloat(currentCollectorData.startingCapitalOnHand) 
                 : (parseFloat(currentCollectorData?.startingCapital) || 0);
-
-            // Rastreo: Sumamos/Restamos todo lo ocurrido ANTES de hoy para reconstruir la caja de ayer
             
-            // (+) Entradas (Aportes)
-            allCapitalInjections.forEach(i => {
-                const d = i.date?.seconds ? new Date(i.date.seconds * 1000) : new Date(i.date);
-                if (i.status === 'approved' && d < startOfDay) previousCapital += (parseFloat(i.amount) || 0);
-            });
+            const histBalance = parseFloat(currentCollectorData?.historicalBalance || 0);
 
-            // (-) Salidas (Gastos)
-            allExpenses.forEach(e => {
-                const d = e.date?.seconds ? new Date(e.date.seconds * 1000) : new Date(e.date);
-                if (d < startOfDay) previousCapital -= (parseFloat(e.value) || 0);
-            });
+            // B. Totales de toda la historia para llegar al saldo de este momento
+            let totalLoansAllTime = 0;
+            let totalPaymentsAllTime = 0;
 
-            // (-) Salidas (Retiros al Admin) - El seguro no se resta de la caja operativa
-            allSettlements.forEach(s => {
-                const d = s.date?.seconds ? new Date(s.date.seconds * 1000) : new Date(s.date);
-                if (s.status === 'approved' && s.type !== 'insurance' && d < startOfDay) previousCapital -= (parseFloat(s.amount) || 0);
-            });
-
-            // (+/-) Movimientos con Clientes (Préstamos y Cobros)
             allClients.forEach(c => {
                 (c.loans || []).forEach(l => {
-                    const dStart = l.startDate?.seconds ? new Date(l.startDate.seconds * 1000) : new Date(l.startDate);
-                    // Si prestamos dinero antes de hoy, restamos de la caja
-                    if (!l.migrationDate && dStart < startOfDay) {
+                    // Préstamos realizados (salida de caja)
+                    if (!l.migrationDate) {
                         let principal = parseFloat(l.principalAmount);
-                        if (!principal && l.totalLoan) principal = l.totalLoan / (1 + ((c.interestRate||20)/100));
-                        previousCapital -= (principal || 0);
+                        if (!principal && l.totalLoan) principal = l.totalLoan / (1 + ((c.interestRate || 20) / 100));
+                        totalLoansAllTime += (principal || 0);
                     }
-
-                    // Si cobramos dinero antes de hoy, sumamos a la caja
+                    // Pagos recibidos (entrada a caja)
                     (l.history || []).forEach(h => {
-                        const dPay = h.date?.seconds ? new Date(h.date.seconds * 1000) : new Date(h.date);
-                        if (h.status === 'approved' && h.method !== 'migration' && dPay < startOfDay) {
-                            previousCapital += (parseFloat(h.amount) || 0);
+                        if (h.status === 'approved' && h.method !== 'migration') {
+                            totalPaymentsAllTime += (parseFloat(h.amount) || 0);
                         }
                     });
                 });
             });
+
+            const totalExpensesAllTime = allExpenses.reduce((sum, e) => sum + (parseFloat(e.value) || 0), 0);
+            const totalSettlementsAllTime = allSettlements
+                .filter(s => s.status === 'approved' && s.type !== 'insurance')
+                .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+            const totalInjectionsAllTime = allCapitalInjections
+                .filter(i => i.status === 'approved')
+                .reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+
+            // C. CAPITAL ACTUAL (El "Cerebro" de la App)
+            const currentBalanceRealTime = startingCap + totalInjectionsAllTime + totalPaymentsAllTime + histBalance - totalLoansAllTime - totalExpensesAllTime - totalSettlementsAllTime;
 
 
             // ==========================================================================================
@@ -7505,12 +7483,15 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             lateClientsList.sort((a, b) => b.lateDays - a.lateDays);
             
-            // --- CÁLCULOS FINALES ---
+            // --- CÁLCULOS FINALES (SINCRONIZADOS) ---
             const operationalResult = dailyTotal - totalExpenses;
             const netCashFlow = (operationalResult + totalInjections) - (totalSettlements + totalLoansOutflow);
             
-            // Capital Final = Caja Anterior + Flujo Neto
-            const closingCapitalThisDay = previousCapital + netCashFlow;
+            // Forzamos que el cierre del PDF sea igual al saldo actual de la App
+            const closingCapitalThisDay = currentBalanceRealTime; 
+            
+            // Calculamos la "Caja Anterior" de forma inversa para que el resumen cuadre visualmente
+            const previousCapital = closingCapitalThisDay - netCashFlow;
 
 
             // ==========================================================================================
