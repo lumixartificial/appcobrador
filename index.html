@@ -203,13 +203,7 @@
         }
         .container { padding: 20px; }
         
-        .main-header { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    /* Esta nueva línea sustituye a la anterior */
-    padding: calc(10px + env(safe-area-inset-top)) 20px 15px 20px; 
-    background-color: var(--surface);
+        .main-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: var(--surface); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; transition: background-color 0.3s, border-color 0.3s; flex-shrink: 0; }
         .logo { display: flex; align-items: center; gap: 10px; }
         .logo img { height: 40px; width: 40px; object-fit: cover; }
         .logo-text { font-size: 1.2em; font-weight: 700; color: var(--text-primary); }
@@ -302,18 +296,7 @@
         body.dark-mode .reputation-text.status-regular { color: var(--accent-yellow); background-color: rgba(253, 224, 71, 0.1); }
         .reputation-text.status-bad { color: var(--danger-color); background-color: rgba(220, 53, 69, 0.1); }
 
-        .bottom-nav {
-    position: static;
-    flex-shrink: 0;
-    background-color: var(--surface);
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-around;
-    /* Esto ajusta el espacio del indicador de inicio del iPhone */
-    padding: 10px 0 calc(10px + env(safe-area-inset-bottom)) 0; 
-    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
-    transition: background-color 0.3s, border-color 0.3s;
-    z-index: 150;
+        .bottom-nav { position: static; flex-shrink: 0; background-color: var(--surface); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05); transition: background-color 0.3s, border-color 0.3s; z-index: 150; }
         body.dark-mode .bottom-nav { box-shadow: none; }
         .nav-item { 
             display: flex; 
@@ -402,17 +385,7 @@
     opacity: 1; /* Lo hace visible */
 }
 /* --- FIN REGLA AÑADIDA --- */
-        .modal-header {
-    display: flex;
-    align-items: center;
-    /* Empuja el título y el botón de volver debajo del notch */
-    padding: calc(10px + env(safe-area-inset-top)) 20px 15px 20px;
-    background-color: var(--surface);
-    border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    z-index: 210;
-    flex-shrink: 0;
+        .modal-header { display: flex; align-items: center; padding: 15px 20px; background-color: var(--surface); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 210; flex-shrink: 0; }
         .modal-header button { background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 0; margin-right: 15px; }
         .modal-title { font-size: 1.2em; font-weight: 600; }
         .modal-content-wrapper { flex-grow: 1; overflow-y: auto; }
