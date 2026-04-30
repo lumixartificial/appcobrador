@@ -779,30 +779,30 @@
             background-color: var(--surface);
             color: var(--text-primary);
         }
-      /* --- AJUSTE AUTOMÁTICO DE ÁREA SEGURA (IPHONE/NOTCH) - BARRA BAJA --- */
+      /* --- AJUSTE DEFINITIVO PARA IPHONE (AL BORDE) --- */
 @supports (padding-top: env(safe-area-inset-top)) {
-    /* 1. Mantenemos la cabecera bajada para que la foto y el idioma sean clicables */
+    /* 1. Mantenemos la cabecera con el margen superior para el notch */
     .main-header, .modal-header {
         padding-top: calc(15px + env(safe-area-inset-top)) !important;
     }
 
-    /* 2. Bajamos los iconos de la barra: eliminamos el margen extra y reducimos el superior */
+    /* 2. Ajuste de la barra inferior: Restamos espacio para bajar los iconos al borde */
     .bottom-nav {
-        /* Quitamos los 10px base para que los iconos bajen al límite del área segura */
-        padding-bottom: env(safe-area-inset-bottom) !important;
-        padding-top: 5px !important; 
+        /* Restamos 20px (aprox. 1cm) al área segura para que los botones bajen */
+        padding-bottom: calc(env(safe-area-inset-bottom) - 20px) !important;
+        padding-top: 8px !important; 
         height: auto !important;
     }
 
-    /* 3. Bajamos el botón (+) para que acompañe el descenso de la barra */
+    /* 3. Ajuste del Botón Flotante (+): Lo bajamos para que no quede "volando" */
     .fab {
-        /* Lo bajamos de 120px a 100px para que no quede tan "volando" en iPhone */
-        bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+        /* Ajustamos la altura para que mantenga la proporción con la nueva barra baja */
+        bottom: calc(85px + env(safe-area-inset-bottom) - 20px) !important;
     }
 
-    /* 4. Ajuste para los botones internos de los modales */
+    /* 4. Botones de acción en modales */
     .action-buttons {
-        padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
     }
 }
 /* --- FIN DEL AJUSTE --- */
