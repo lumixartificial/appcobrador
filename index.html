@@ -1174,40 +1174,38 @@ const BLACKLIST_DATA = {
 
 
         function calculateDailyTotals() {
+            // --- LÓGICA DE CIERRE SINCRONIZADA ---
+            const now = new Date();
+            let todayStart;
+            const closureMode = currentCollectorData?.closureMode || 'auto';
+            const lastClosure = currentCollectorData?.lastClosure;
+
+            if (closureMode === 'manual' && lastClosure) {
+                todayStart = lastClosure.toDate ? lastClosure.toDate() : new Date(lastClosure);
+            } else {
+                todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+            }
+            // -------------------------------------
+
             let dailyTotal = 0;
             let dailyTotalCash = 0;
             let dailyTotalDigital = 0;
-            
-            const now = new Date();
-            const todayStr = now.toLocaleDateString('pt-BR');
 
             allClients.forEach(client => {
                 (client.loans || []).forEach(loan => {
                     (loan.history || []).forEach(h => {
-                        
-                        // --- [INICIO DE LA CORRECCIÓN (calculateDailyTotals)] ---
-                        
-                        // 1. Obtener la fecha (ya sea JS Date o Firestore Timestamp)
                         let paymentDate = null;
-                        if (h.date?.seconds) { // Es un Firestore Timestamp
+                        if (h.date?.seconds) { 
                             paymentDate = new Date(h.date.seconds * 1000);
-                        } else if (h.date instanceof Date) { // Es un JS Date (pago local)
+                        } else if (h.date instanceof Date) { 
                             paymentDate = h.date;
                         }
 
-                        // 2. Comprobar si la fecha es válida Y el pago es válido
-                        //    (Se ignora 'migration' como antes)
                         if (paymentDate && h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.method !== 'migration') {
-                        // --- [FIN DE LA CORRECCIÓN] ---
-
-                            // 3. Filtro de Fecha (sin cambios)
-                            if (paymentDate.toLocaleDateString('pt-BR') === todayStr) {
+                            // Comparamos si el pago se hizo después del último cierre
+                            if (paymentDate >= todayStart) {
                                 const amount = h.amount || 0;
-                                
-                                // 4. Suma al Total del Día (sin cambios)
                                 dailyTotal += amount; 
-                                
-                                // 5. Lógica de Categoría (sin cambios)
                                 if (h.method === 'dinheiro') {
                                     dailyTotalCash += amount;
                                 } else {
@@ -1218,8 +1216,6 @@ const BLACKLIST_DATA = {
                     });
                 });
             });
-            
-            // Devuelve un objeto con los 3 valores correctos
             return { dailyTotal, dailyTotalCash, dailyTotalDigital };
         }
 
@@ -1366,8 +1362,16 @@ const BLACKLIST_DATA = {
 
         function getAllTodaysClients() {
            const clientsForToday = [];
-           const today = new Date();
-           today.setHours(0, 0, 0, 0);
+           const now = new Date();
+            let today;
+            const closureMode = currentCollectorData?.closureMode || 'auto';
+            const lastClosure = currentCollectorData?.lastClosure;
+
+            if (closureMode === 'manual' && lastClosure) {
+                today = lastClosure.toDate ? lastClosure.toDate() : new Date(lastClosure);
+            } else {
+                today = new Date(new Date().setHours(0, 0, 0, 0));
+            }
            const dayOfWeek = today.getDay();
            const dayOfMonth = today.getDate();
 
@@ -2077,7 +2081,16 @@ async function showRefinanceModal(clientId, notificationId) {
 
             // --- 4. LÓGICA DE EXCLUSIÓN ROBUSTA Y PERMISOS ---
             let canDelete = false;
-            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const now = new Date();
+           let today;
+           const closureMode = currentCollectorData?.closureMode || 'auto';
+           const lastClosure = currentCollectorData?.lastClosure;
+
+           if (closureMode === 'manual' && lastClosure) {
+               today = lastClosure.toDate ? lastClosure.toDate() : new Date(lastClosure);
+           } else {
+               today = new Date(new Date().setHours(0, 0, 0, 0));
+           }
             const paymentDay = new Date(paymentDateObj); paymentDay.setHours(0, 0, 0, 0);
             const isToday = paymentDay.getTime() === today.getTime();
             
@@ -5014,9 +5027,11 @@ if (!loan) {
                 confirmBtn.disabled = false;
                 mapContainer.style.opacity = '1';
                 
-                const map = L.map(mapContainer).setView(centerCoords, 18); // Zoom cercano para precisión
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap'
+               // Mapa con máximo detalle de calles, barrios y autopistas
+                L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                    attribution: '&copy; Google Maps'
                 }).addTo(map);
 
                 // Botón Confirmar: Guarda el centro actual del mapa
@@ -6967,10 +6982,15 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             if (mapInstance) {
                 mapInstance.invalidateSize();
                 return;
-            };
+            }
             mapInstance = L.map('map-container').setView([-16.68, -49.25], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            
+            // Usamos CartoDB para evitar el error 403 de OpenStreetMap
+            // Mapa con máximo detalle de calles, barrios y autopistas
+            L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps'
             }).addTo(mapInstance);
         }
 
