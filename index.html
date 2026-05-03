@@ -1180,11 +1180,13 @@ const BLACKLIST_DATA = {
             const closureMode = currentCollectorData?.closureMode || 'auto';
             const lastClosure = currentCollectorData?.lastClosure;
 
-            if (closureMode === 'manual' && lastClosure) {
-                todayStart = lastClosure.toDate ? lastClosure.toDate() : new Date(lastClosure);
-            } else {
-                todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+            // --- INICIO NUEVA LÓGICA: EL DÍA TERMINA A LAS 5:00 AM ---
+            todayStart = new Date();
+            if (todayStart.getHours() < 5) {
+                todayStart.setDate(todayStart.getDate() - 1);
             }
+            todayStart.setHours(0, 0, 0, 0);
+            // --- FIN NUEVA LÓGICA ---
             // -------------------------------------
 
             let dailyTotal = 0;
@@ -1420,7 +1422,11 @@ const BLACKLIST_DATA = {
             const todaysClients = getAllTodaysClients();
             
             // 2. Obtiene el inicio del día de HOY (medianoche)
+            // 2. Obtiene el inicio del día de HOY (Lógica 5 AM)
             const todayStart = new Date();
+            if (todayStart.getHours() < 5) {
+                todayStart.setDate(todayStart.getDate() - 1);
+            }
             todayStart.setHours(0, 0, 0, 0);
 
             // 3. Filtra la lista
@@ -9040,8 +9046,9 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     return; 
                 }
 
-                let isRestricted = hour >= 0 && hour < 7;
-                let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>00:00</strong> e as <strong>07:00</strong>.";
+                // Ahora el bloqueo empieza a las 5 AM y termina a las 7 AM
+                let isRestricted = hour >= 5 && hour < 7;
+                let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>05:00</strong> e as <strong>07:00</strong>.";
 
                 // 3. REGLA: Bloqueo 5 minutos después del reporte
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
@@ -9051,10 +9058,19 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     else if (rawDate instanceof Date) lastReport = rawDate;
 
                     if (lastReport) {
-                        const isReportFromToday = lastReport.getDate() === now.getDate() && lastReport.getMonth() === now.getMonth() && lastReport.getFullYear() === now.getFullYear();
-                        
-                        // [MODIFICADO] Cambiamos 7 por 0 para que funcione en cualquier horario/país
-                        if (isReportFromToday && lastReport.getHours() >= 0) {
+                        // --- INICIO AJUSTE PARA MADRUGADAS ---
+                        let logicalNow = new Date(now);
+                        if (logicalNow.getHours() < 5) logicalNow.setDate(logicalNow.getDate() - 1);
+
+                        let logicalReport = new Date(lastReport);
+                        if (logicalReport.getHours() < 5) logicalReport.setDate(logicalReport.getDate() - 1);
+
+                        const isReportFromToday = logicalReport.getDate() === logicalNow.getDate() && 
+                                                  logicalReport.getMonth() === logicalNow.getMonth() && 
+                                                  logicalReport.getFullYear() === logicalNow.getFullYear();
+                        // --- FIN AJUSTE ---
+
+                        if (isReportFromToday) {
                             const diffMinutes = (now.getTime() - lastReport.getTime()) / 1000 / 60;
                             if (diffMinutes > 5) {
                                 isRestricted = true; 
