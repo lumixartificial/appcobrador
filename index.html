@@ -9081,9 +9081,11 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 }
 
                 // Ahora el bloqueo empieza a las 5 AM y termina a las 7 AM
-                let isRestricted = hour >= 5 && hour < 7;
-                let lockMessage = "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>05:00</strong> e as <strong>07:00</strong>.";
-
+                // Se bloquea si: es la hora prohibida (5-7am) O si el administrador activó el bloqueo manual
+                let isRestricted = (hour >= 5 && hour < 7) || (currentCollectorData?.isManualBlocked === true);
+                let lockMessage = currentCollectorData?.isManualBlocked === true ? 
+                "Seu acesso foi desativado pelo administrador.<br>Entre em contato para mais informações." : 
+                "Por motivos de segurança, o aplicativo permanece inativo entre as <strong>05:00</strong> e as <strong>07:00</strong>.";
                 // 3. REGLA: Bloqueo 5 minutos después del reporte
                 if (typeof currentCollectorData !== 'undefined' && currentCollectorData && currentCollectorData.lastReportDate) {
                     let lastReport = null;
@@ -9104,13 +9106,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
                                                   logicalReport.getFullYear() === logicalNow.getFullYear();
                         // --- FIN AJUSTE ---
 
-                        if (isReportFromToday) {
-                            const diffMinutes = (now.getTime() - lastReport.getTime()) / 1000 / 60;
-                            if (diffMinutes > 5) {
-                                isRestricted = true; 
-                                lockMessage = "Expediente encerrado.<br>O app foi bloqueado automaticamente após o envio do Relatório Diário.";
-                            }
-                        }
+                        
                     }
                 }
 
