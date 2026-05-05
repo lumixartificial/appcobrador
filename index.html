@@ -1372,8 +1372,10 @@ const BLACKLIST_DATA = {
             if (closureMode === 'manual' && lastClosure) {
                 today = lastClosure.toDate ? lastClosure.toDate() : new Date(lastClosure);
             } else {
-                today = new Date(new Date().setHours(0, 0, 0, 0));
-            }
+    today = new Date();
+    if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+    today.setHours(0, 0, 0, 0);
+}
            const dayOfWeek = today.getDay();
            const dayOfMonth = today.getDate();
 
@@ -1442,15 +1444,24 @@ const BLACKLIST_DATA = {
                     
                     // Función auxiliar robusta para obtener la fecha (igual a la de showClientDetails)
                     const getPaymentDate = (dateObj) => {
-                        if (!dateObj) return null;
-                        if (typeof dateObj.toDate === 'function') {
-                            return dateObj.toDate(); // Es un Timestamp de Firestore
-                        }
-                        if (dateObj instanceof Date) {
-                            return dateObj; // Es un JS Date (pago local recién hecho)
-                        }
-                        return null;
-                    };
+    if (!dateObj) return null;
+    let d;
+    if (typeof dateObj.toDate === 'function') d = dateObj.toDate();
+    else if (dateObj instanceof Date) d = dateObj;
+    else if (typeof dateObj === 'string') d = new Date(dateObj);
+    
+    if (d && !isNaN(d.getTime())) {
+        // APLICAMOS EL ESCUDO: Si el pago se hizo antes de las 5 AM, 
+        // lo tratamos como si fuera del día anterior para que coincida con la ruta.
+        let logicalDate = new Date(d);
+        if (logicalDate.getHours() < 5) {
+            logicalDate.setDate(logicalDate.getDate() - 1);
+        }
+        logicalDate.setHours(0, 0, 0, 0);
+        return logicalDate;
+    }
+    return null;
+};
 
                     hasPaidToday = loan.history.some(h => {
                         // Ignorar pagos que no sean 'approved' (o 'migracion')
@@ -3005,17 +3016,32 @@ async function showRefinanceModal(clientId, notificationId) {
             let paidTodayCount = 0;
 
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            if (today.getHours() < 5) {
+            today.setDate(today.getDate() - 1);
+        }
+        today.setHours(0, 0, 0, 0);
             const dayOfWeek = today.getDay();
             const dayOfMonth = today.getDate();
 
             const getPaymentDate = (dateObj) => {
-                if (!dateObj) return null;
-                if (typeof dateObj.toDate === 'function') return dateObj.toDate();
-                if (dateObj instanceof Date) return dateObj;
-                if (typeof dateObj === 'string') { const d = new Date(dateObj); if (!isNaN(d.getTime())) return d; }
-                return null;
-            };
+    if (!dateObj) return null;
+    let d;
+    if (typeof dateObj.toDate === 'function') d = dateObj.toDate();
+    else if (dateObj instanceof Date) d = dateObj;
+    else if (typeof dateObj === 'string') d = new Date(dateObj);
+    
+    if (d && !isNaN(d.getTime())) {
+        // ESCUDO: Si el pago se hizo antes de las 5 AM, 
+        // lo tratamos como si fuera del día anterior para que coincida con la ruta.
+        let logicalDate = new Date(d);
+        if (logicalDate.getHours() < 5) {
+            logicalDate.setDate(logicalDate.getDate() - 1);
+        }
+        logicalDate.setHours(0, 0, 0, 0);
+        return logicalDate;
+    }
+    return null;
+};
 
             allClients.forEach(client => {
     // Escudo: Si el cliente no tiene préstamos (es preventa), no cuenta para el progreso de la ruta
@@ -3098,7 +3124,8 @@ async function showRefinanceModal(clientId, notificationId) {
             let calculatedDailyGoal = 0;      
             
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
+if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+today.setHours(0, 0, 0, 0);
             const dayOfWeek = today.getDay(); 
             const dayOfMonth = today.getDate();
             const todayStr = today.toLocaleDateString('pt-BR');
@@ -3346,7 +3373,8 @@ async function showRefinanceModal(clientId, notificationId) {
 
            // 3. Configurar Fechas (Normalización estricta a medianoche)
            const today = new Date();
-           today.setHours(0, 0, 0, 0); 
+if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+today.setHours(0, 0, 0, 0);
            
            let startDateObj = null;
            if (loan.startDate) {
@@ -3516,10 +3544,13 @@ async function showRefinanceModal(clientId, notificationId) {
                 return;
             }
 
-            container.innerHTML = ''; 
+           container.innerHTML = ''; 
 
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
+const todayStart = new Date(); // <--- Aquí agregamos 'const'
+if (todayStart.getHours() < 5) {
+    todayStart.setDate(todayStart.getDate() - 1);
+}
+todayStart.setHours(0, 0, 0, 0);
 
             clientsData.forEach(item => {
                const { client, loan, loanIndex } = item;
@@ -3593,11 +3624,24 @@ const paymentDayLabelHtml = `
                 const remainingBalance = Math.max(0, totalDebt - totalPaidSoFar);
 
                 const getPaymentDate = (dateObj) => {
-                    if (!dateObj) return null;
-                    if (typeof dateObj.toDate === 'function') return dateObj.toDate();
-                    if (dateObj instanceof Date) return dateObj;
-                    return null;
-                };
+    if (!dateObj) return null;
+    let d;
+    if (typeof dateObj.toDate === 'function') d = dateObj.toDate();
+    else if (dateObj instanceof Date) d = dateObj;
+    else if (typeof dateObj === 'string') d = new Date(dateObj);
+    
+    if (d && !isNaN(d.getTime())) {
+        // ESCUDO: Si el pago se hizo antes de las 5 AM, 
+        // lo tratamos como si fuera del día anterior para que coincida con la ruta.
+        let logicalDate = new Date(d);
+        if (logicalDate.getHours() < 5) {
+            logicalDate.setDate(logicalDate.getDate() - 1);
+        }
+        logicalDate.setHours(0, 0, 0, 0);
+        return logicalDate;
+    }
+    return null;
+};
 
                 let amountPaidToday = 0;
                 if (displayLoan.history && displayLoan.history.length > 0) {
@@ -4067,20 +4111,34 @@ const paymentDayLabelHtml = `
             return result;
         }
 
-        
-         function updateTodaysRouteList() {
-           const today = new Date();
-           today.setHours(0, 0, 0, 0);
+        function updateTodaysRouteList() {
+   const today = new Date(); // <--- Aquí añadimos 'const'
+   if (today.getHours() < 5) {
+       today.setDate(today.getDate() - 1);
+   }
+   today.setHours(0, 0, 0, 0);
            const dayOfWeek = today.getDay();
            const dayOfMonth = today.getDate();
 
            const getPaymentDate = (dateObj) => {
-               if (!dateObj) return null;
-               if (typeof dateObj.toDate === 'function') return dateObj.toDate();
-               if (dateObj instanceof Date) return dateObj;
-               if (typeof dateObj === 'string') { const d = new Date(dateObj); if (!isNaN(d.getTime())) return d; }
-               return null;
-           };
+    if (!dateObj) return null;
+    let d;
+    if (typeof dateObj.toDate === 'function') d = dateObj.toDate();
+    else if (dateObj instanceof Date) d = dateObj;
+    else if (typeof dateObj === 'string') d = new Date(dateObj);
+    
+    if (d && !isNaN(d.getTime())) {
+        // ESCUDO: Si el pago se registró antes de las 5 AM, 
+        // lo tratamos como si fuera de la jornada de ayer para que coincida con la ruta.
+        let logicalDate = new Date(d);
+        if (logicalDate.getHours() < 5) {
+            logicalDate.setDate(logicalDate.getDate() - 1);
+        }
+        logicalDate.setHours(0, 0, 0, 0);
+        return logicalDate;
+    }
+    return null;
+};
 
            let clientsForRoute = [];
 
@@ -4204,15 +4262,28 @@ if (loan.history && loan.history.length > 0) {
 
         const searchTerm = searchInput.value.toLowerCase().trim();
         const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+if (todayStart.getHours() < 5) todayStart.setDate(todayStart.getDate() - 1);
+todayStart.setHours(0, 0, 0, 0);
 
         const getPaymentDate = (dateObj) => {
-            if (!dateObj) return null;
-            if (typeof dateObj.toDate === 'function') return dateObj.toDate();
-            if (dateObj instanceof Date) return dateObj;
-            if (typeof dateObj === 'string') { const d = new Date(dateObj); if (!isNaN(d.getTime())) return d; }
-            return null;
-        };
+    if (!dateObj) return null;
+    let d;
+    if (typeof dateObj.toDate === 'function') d = dateObj.toDate();
+    else if (dateObj instanceof Date) d = dateObj;
+    else if (typeof dateObj === 'string') d = new Date(dateObj);
+    
+    if (d && !isNaN(d.getTime())) {
+        // ESCUDO: Si el pago se registró antes de las 5 AM, 
+        // lo tratamos como si fuera de la jornada de ayer para que coincida con la ruta.
+        let logicalDate = new Date(d);
+        if (logicalDate.getHours() < 5) {
+            logicalDate.setDate(logicalDate.getDate() - 1);
+        }
+        logicalDate.setHours(0, 0, 0, 0);
+        return logicalDate;
+    }
+    return null;
+};
 
         let clientsWithLoans = [];
 
