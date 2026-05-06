@@ -5046,7 +5046,7 @@ if (!loan) {
                 confirmBtn.disabled = false;
                 mapContainer.style.opacity = '1';
                 
-                const map = L.map('pin-map-container').setView(centerCoords, 18);
+                const map = L.map('pin-map-container').setView(centerCoords, centerCoords[0] === -16.6868 ? 13 : 18);
                // Mapa con máximo detalle de calles, barrios y autopistas
                 L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
                     maxZoom: 20,
@@ -5074,39 +5074,38 @@ if (!loan) {
 
             mapPinModal.querySelector('#closeMapPinModal').addEventListener('click', () => window.history.back());
             
-            // --- LÓGICA INTELIGENTE DE UBICACIÓN ---
-            // 1. ¿El cliente ya tiene ubicación guardada?
-            const existingUrl = document.getElementById('client-location')?.value;
-            let existingCoords = null;
+            // --- LÓGICA DE ALTA PRECISIÓN Y APERTURA FORZADA ---
+            const currentUrl = document.getElementById('client-location')?.value || '';
+            const regexCoords = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+            const matchCoords = currentUrl.match(regexCoords);
             
-            if (existingUrl) {
-                const match = existingUrl.match(/query=([\d.-]+),([\d.-]+)/);
-                if (match) {
-                    existingCoords = [parseFloat(match[1]), parseFloat(match[2])];
-                }
-            }
-
-            if (existingCoords) {
-                // Si ya tiene, abrimos el mapa DIRECTAMENTE ahí
-                console.log("Usando ubicación existente del cliente...");
-                initializeMap(existingCoords);
+            if (matchCoords) {
+                // PRIORIDAD 1: Si ya hay coordenadas en el texto, abrir el mapa ahí
+                initializeMap([parseFloat(matchCoords[1]), parseFloat(matchCoords[2])]);
             } else {
-                // Si no tiene, buscamos GPS
-                console.log("Buscando GPS actual...");
+                // PRIORIDAD 2: Buscar tu casa con el sensor GPS real
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            initializeMap([position.coords.latitude, position.coords.longitude]);
+                        (pos) => {
+                            // ÉXITO: Encontró tu ubicación exacta del teléfono
+                            initializeMap([pos.coords.latitude, pos.coords.longitude]);
                         },
-                        (error) => {
-                            console.warn(`Error GPS: ${error.message}`);
-                            showToast('Não foi possível obter GPS. Usando padrão.', true);
-                            initializeMap([-16.68, -49.25]); // Fallback
+                        (err) => {
+                            // FALLO: Abrir el mapa en Goiânia para que no quede en blanco y sea útil
+                            console.warn("GPS tardó demasiado o fue denegado.");
+                            loadingOverlay.style.display = 'none';
+                            showToast('GPS não detectado. Usando centro de Goiânia como base.', true);
+                            initializeMap([-16.6868, -49.2647]); 
                         },
-                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        { 
+                            enableHighAccuracy: true, // FUERZA el uso del chip GPS real
+                            timeout: 10000,           // Espera 10 segundos
+                            maximumAge: 0             // No usa memoria caché
+                        }
                     );
                 } else {
-                    initializeMap([-16.68, -49.25]); // Fallback no soporte
+                    // Si el navegador no soporta GPS
+                    initializeMap([-16.6868, -49.2647]);
                 }
             }
         }
