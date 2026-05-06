@@ -5046,6 +5046,7 @@ if (!loan) {
                 confirmBtn.disabled = false;
                 mapContainer.style.opacity = '1';
                 
+                const map = L.map('pin-map-container').setView(centerCoords, 18);
                // Mapa con máximo detalle de calles, barrios y autopistas
                 L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
                     maxZoom: 20,
@@ -5550,12 +5551,21 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         <div class="form-group"><label data-lang-key="whatsapp"></label><input type="tel" id="client-whatsapp" required value="${client.whatsapp || ''}" ${isNewLoan ? 'readonly' : ''}></div>
                         
                         <div class="form-group" style="${isNewLoan ? 'display: none;' : ''}">
-                            <label data-lang-key="location"></label>
-                            <input type="text" id="client-location" readonly placeholder="Clique no botão para obter" value="${client.location || ''}">
-                            <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%; margin-top: 10px;">
-                                <i data-lucide="map-pin"></i> ${t_gpsBtn}
-                            </button>
-                        </div>
+    <label data-lang-key="location"></label>
+    
+    <!-- CAMPO DE TEXTO -->
+    <input type="text" id="client-location" placeholder="${currentLang === 'es' ? 'Pega el link o usa el GPS' : 'Cole o link ou use o GPS'}" value="${client.location || ''}" style="margin-bottom: 5px;">
+    
+    <!-- MENSAJE DE AYUDA -->
+    <p style="font-size: 0.8em; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.2;">
+        ${currentLang === 'es' ? 'Puedes pegar un link de Google Maps directamente arriba o usar el mapa para obtener la posición actual.' : 'Você pode colar um link do Google Maps diretamente acima ou usar o mapa para obter a posição atual.'}
+    </p>
+    
+    <!-- BOTÓN ÚNICO (INTELIGENTE) -->
+    <button type="button" class="btn-secondary" id="get-location-btn" style="width: 100%;">
+        <i data-lucide="map-pin"></i> <span>${t_gpsBtn}</span>
+    </button>
+</div>
                         
                         <div style="display: none;">
                             <h3 class="section-title">Acesso Oculto (Automático)</h3>
@@ -5942,8 +5952,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             }
             
             const gpsBtn = document.getElementById('get-location-btn');
-            if(gpsBtn) { gpsBtn.addEventListener('click', () => showMapPinModal()); }
-            
+if(gpsBtn) { 
+    gpsBtn.addEventListener('click', () => showMapPinModal()); 
+}
+
+
             document.getElementById('closeClientFormModal').addEventListener('click', () => window.history.back());
             
             const saveButton = document.getElementById('saveClientBtn');
