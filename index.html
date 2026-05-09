@@ -8655,12 +8655,19 @@ async function startRealtimeGeolocation() {
             try {
                 locationWatchId = navigator.geolocation.watchPosition(
                     (position) => {
+                        // --- FILTRO DE PRECISIÓN (Evita que la moto salte a 30 mins) ---
+                        // Si el margen de error es mayor a 60 metros (suele ser antena de celular y no satélite real), ignoramos la lectura.
+                        if (position.coords.accuracy > 60) {
+                            console.warn("Ignorando GPS ruim da moto. Precisão:", position.coords.accuracy);
+                            return; // Corta aquí y no mueve la moto
+                        }
+
                         // --- ÉXITO ---
                         collectorCurrentLocation = {
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
                         };
-                        console.log('GPS OK:', collectorCurrentLocation);
+                        console.log('GPS MOTO OK:', collectorCurrentLocation);
                         
                         const now = Date.now();
                         // Guardar en DB cada 30 segundos
@@ -9397,9 +9404,16 @@ function sendWhatsAppCollection(clientId, loanIndex) {
     
     if (phone.length <= 11 && phone.length > 0) phone = countryDDI + phone;
 
-    // 6. Abrir WhatsApp
+   // 6. Abrir WhatsApp (Con parche para pantalla blanca en iPhone)
     const wpUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(finalMessage)}`;
-    window.open(wpUrl, '_blank');
+    
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+        window.location.href = wpUrl; // Redirección segura para iPhone PWA
+    } else {
+        window.open(wpUrl, '_blank'); // Abre normal en Android y PC
+    }
+
 }
         init();
     </script>
