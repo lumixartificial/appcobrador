@@ -3056,17 +3056,16 @@ async function showRefinanceModal(clientId, notificationId) {
                      const paymentDays = loan.paymentDays || [];
 
                      if (frequency === 'daily') {
-                         // --- CORRECCIÓN: IGUAL QUE LA LISTA VISUAL ---
-                         // Si es diario, entra SIEMPRE en la ruta (no importa el día de la semana)
-                         isInRoute = true; 
+                         // Lógica idéntica a la lista de tarjetas
+                         isInRoute = paymentDays.includes(dayOfWeek); 
                      } else if (frequency === 'weekly') {
                          isInRoute = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
                      } else if (frequency === 'biweekly') {
                          if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
                              const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
                              startDate.setHours(0,0,0,0);
-                             const diffTime = Math.abs(today - startDate);
-                             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                             const diffTime = today.getTime() - startDate.getTime();
+                             const diffDays = Math.round(diffTime / 86400000); 
                              if (Math.floor(diffDays / 7) % 2 === 0) isInRoute = true;
                          }
                      } else if (frequency === 'monthly') {
@@ -4100,6 +4099,8 @@ const paymentDayLabelHtml = `
 
            allClients.forEach(client => {
                if (!client.loans || client.loans.length === 0) return;
+
+               if (client.isBlacklisted === true) return;
 
                client.loans.forEach((loan, index) => {
                    const details = calculateLoanDetails(loan);
