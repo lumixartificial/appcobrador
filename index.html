@@ -1577,6 +1577,7 @@ const BLACKLIST_DATA = {
     <button class="filter-btn" data-filter="paid" style="border-color: #06b6d4; color: #06b6d4;">PAGADOS</button>
     <button class="filter-btn" data-filter="late" style="border-color: #dc2626; color: #dc2626;">ATRASADOS</button>
     <button class="filter-btn" data-filter="finished" style="border-color: #64748b; color: #64748b;">FINALIZADOS</button>
+    <button class="filter-btn" data-filter="blacklisted" style="border-color: #111827; color: #111827; background-color: #f3f4f6; font-weight: 800;">LISTA NEGRA</button>
 </div>
 
                         <div class="client-list" id="all-clients-list"></div>
@@ -3034,6 +3035,7 @@ async function showRefinanceModal(clientId, notificationId) {
             allClients.forEach(client => {
     // Escudo: Si el cliente no tiene préstamos (es preventa), no cuenta para el progreso de la ruta
     if (!client.loans || client.loans.length === 0) return;
+    if (client.isBlacklisted === true) return;
                 
                 client.loans.forEach(loan => {
                      const details = calculateLoanDetails(loan);
@@ -4244,6 +4246,28 @@ todayStart.setHours(0, 0, 0, 0);
         allClients.forEach(client => {
             const hasNoLoans = !client.loans || client.loans.length === 0;
 
+            // --- INICIO NUEVO: LÓGICA DE LISTA NEGRA ---
+            // Si estamos en la pestaña "Lista Negra", solo mostramos los bloqueados
+            if (filter === 'blacklisted') {
+                if (client.isBlacklisted === true) {
+                    let matchesSearch = true;
+                    if (searchTerm) {
+                        matchesSearch = client.name.toLowerCase().includes(searchTerm) || 
+                                        (client.documentNumber && client.documentNumber.includes(searchTerm));
+                    }
+                    if (matchesSearch) {
+                        const lastLoanIdx = hasNoLoans ? 0 : client.loans.length - 1;
+                        const loanData = hasNoLoans ? null : client.loans[lastLoanIdx];
+                        clientsWithLoans.push({ client, loan: loanData, loanIndex: lastLoanIdx });
+                    }
+                }
+                return; // Evita que se evalúen los demás filtros para este cliente
+            }
+
+            // Si NO estamos en "Lista Negra", ocultamos a los bloqueados de todas las demás pestañas
+            if (client.isBlacklisted === true) return;
+            // --- FIN NUEVO: LÓGICA DE LISTA NEGRA ---
+
             // FILTRO PREVENTA: Solo pasan los que NO tienen préstamos
             if (filter === 'pre_sale') {
                 if (hasNoLoans) {
@@ -4665,7 +4689,25 @@ if (!loan) {
 
              const newLoanBtnFinished = canCreateLoan ? `<button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>` : '';
             const newLoanBtnActive = canCreateLoan ? `<button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> <span data-lang-key="createNewLoan"></span></button>` : '';
-
+            // Lógica Botón Lista Negra
+            const daysLate = loanDetails.lateDays || 0;
+            const isBlacklisted = client.isBlacklisted === true;
+            let blacklistBtnHtml = '';
+            
+            // Aparece si tiene 15 días o más de atraso y NO está finalizado
+            if (!isBlacklisted && daysLate >= 15 && currentStatus !== 'finished') {
+                blacklistBtnHtml = `
+                <button class="btn-secondary" id="sendToBlacklistBtn" style="border-color: #111827; color: #111827; background-color: #f8fafc;">
+                    <i data-lucide="skull"></i> 
+                    <span style="text-align: center;">${currentLang === 'es' ? 'Lista<br>Negra' : 'Lista<br>Negra'}</span>
+                </button>`;
+            } else if (isBlacklisted) {
+                blacklistBtnHtml = `
+                <button class="btn-secondary" id="removeFromBlacklistBtn" style="border-color: #10b981; color: #10b981; background-color: #ecfdf5;">
+                    <i data-lucide="shield-check"></i> 
+                    <span style="text-align: center;">${currentLang === 'es' ? 'Sacar de<br>Lista' : 'Tirar da<br>Lista'}</span>
+                </button>`;
+            }
             const actionButtonsHtml = currentStatus === 'finished' ? `
                 ${updateBtnHtml}
                 ${newLoanBtnFinished}
@@ -4678,6 +4720,7 @@ if (!loan) {
                 <i data-lucide="message-circle"></i> 
                 <span style="text-align: center;">${currentLang === 'es' ? 'Cobro<br>Rápido' : (currentLang === 'en' ? 'Quick<br>Collect' : 'Cobrança<br>Rápida')}</span>
                 </button>
+                ${blacklistBtnHtml}:
             `; 
 
             let messages = loan.chatHistory || [];
@@ -4955,6 +4998,36 @@ if (!loan) {
             });
            }
                 
+                // --- INICIO: LÓGICA BOTONES LISTA NEGRA ---
+                const btnBlacklist = document.getElementById('sendToBlacklistBtn');
+                if (btnBlacklist) {
+                    btnBlacklist.addEventListener('click', async () => {
+                        const confirmTxt = currentLang === 'es' ? '¿Enviar a Lista Negra?' : 'Mandar para Lista Negra?';
+                        const descTxt = currentLang === 'es' ? 'Este cliente desaparecerá de las rutas y filtros normales.' : 'Este cliente sumirá das rotas normais.';
+                        const confirmed = await showConfirmationModal(confirmTxt, descTxt, 'Confirmar', 'btn-danger');
+                        if (confirmed) {
+                            await updateDoc(doc(db, 'companies', currentCompanyId, "clients", clientId), { isBlacklisted: true });
+                            showToast(currentLang === 'es' ? 'Cliente movido a Lista Negra' : 'Movido para Lista Negra', 'success');
+                            window.history.back();
+                        }
+                    });
+                }
+
+                const btnRemoveBlacklist = document.getElementById('removeFromBlacklistBtn');
+                if (btnRemoveBlacklist) {
+                    btnRemoveBlacklist.addEventListener('click', async () => {
+                        const confirmTxt = currentLang === 'es' ? '¿Quitar de Lista Negra?' : 'Tirar da Lista Negra?';
+                        const descTxt = currentLang === 'es' ? 'El cliente volverá a la ruta normal de cobros.' : 'O cliente voltará para a rota normal.';
+                        const confirmed = await showConfirmationModal(confirmTxt, descTxt, 'Confirmar', 'btn-primary');
+                        if (confirmed) {
+                            await updateDoc(doc(db, 'companies', currentCompanyId, "clients", clientId), { isBlacklisted: false });
+                            showToast(currentLang === 'es' ? 'Cliente restaurado' : 'Cliente restaurado', 'success');
+                            window.history.back();
+                        }
+                    });
+                }
+                // --- FIN: LÓGICA BOTONES LISTA NEGRA ---
+
                 const startRouteBtn = document.getElementById('startRouteBtn');
                 let navigationUrl = client.location;
                 if (!navigationUrl || navigationUrl.trim() === '') {
@@ -5080,33 +5153,63 @@ if (!loan) {
             const matchCoords = currentUrl.match(regexCoords);
             
             if (matchCoords) {
-                // PRIORIDAD 1: Si ya hay coordenadas en el texto, abrir el mapa ahí
+                // PRIORIDAD 1: Si ya hay coordenadas en el texto (link de google maps), abrir el mapa ahí
                 initializeMap([parseFloat(matchCoords[1]), parseFloat(matchCoords[2])]);
             } else {
-                // PRIORIDAD 2: Buscar tu casa con el sensor GPS real
+                // --- INICIO NUEVO SISTEMA INTELIGENTE DE GPS (SATÉLITE) ---
                 if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
+                    loadingOverlay.style.display = 'block';
+                    loadingOverlay.innerHTML = '<i data-lucide="satellite" style="animation: pulse 1s infinite; width: 32px; height: 32px;"></i><p style="margin: 10px 0 0;">Conectando a satélites (Alta Precisión)...</p>';
+                    lucide.createIcons({nodes: [loadingOverlay.querySelector('i')]});
+
+                    let bestPos = null;
+                    
+                    // Usamos watchPosition para escanear múltiples veces hasta obtener la ubicación exacta
+                    let watchId = navigator.geolocation.watchPosition(
                         (pos) => {
-                            // ÉXITO: Encontró tu ubicación exacta del teléfono
-                            initializeMap([pos.coords.latitude, pos.coords.longitude]);
+                            // Si la nueva posición es más precisa que la anterior, la guardamos
+                            if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
+                                bestPos = pos;
+                            }
+                            
+                            // Si la precisión es EXCELENTE (menos de 25 metros), detenemos la búsqueda y usamos esta
+                            if (pos.coords.accuracy <= 25) {
+                                navigator.geolocation.clearWatch(watchId);
+                                initializeMap([pos.coords.latitude, pos.coords.longitude]);
+                            }
                         },
                         (err) => {
-                            // FALLO: Abrir el mapa en Goiânia para que no quede en blanco y sea útil
-                            console.warn("GPS tardó demasiado o fue denegado.");
-                            loadingOverlay.style.display = 'none';
-                            showToast('GPS não detectado. Usando centro de Goiânia como base.', true);
-                            initializeMap([-16.6868, -49.2647]); 
+                            console.warn("Intento de lectura GPS:", err);
                         },
-                        { 
-                            enableHighAccuracy: true, // FUERZA el uso del chip GPS real
-                            timeout: 10000,           // Espera 10 segundos
-                            maximumAge: 0             // No usa memoria caché
-                        }
+                        // maximumAge en 0 OBLIGA al celular a prender la antena GPS física
+                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                     );
+
+                    // TEMPORIZADOR DE RESCATE (10 segundos):
+                    // Si después de 10 segundos no logró una precisión perfecta, usamos la mejor que encontró en esos 10 segundos.
+                    setTimeout(() => {
+                        navigator.geolocation.clearWatch(watchId);
+                        if (bestPos) {
+                            // Usamos la mejor coordenada encontrada
+                            initializeMap([bestPos.coords.latitude, bestPos.coords.longitude]);
+                        } else {
+                            // Si falló por completo (ej. bajo techo sin señal), intentamos por red móvil
+                            navigator.geolocation.getCurrentPosition(
+                                (p) => initializeMap([p.coords.latitude, p.coords.longitude]),
+                                (e) => {
+                                    loadingOverlay.style.display = 'none';
+                                    showToast('GPS no detectado. Usando centro de Goiânia.', true);
+                                    initializeMap([-16.6868, -49.2647]); 
+                                },
+                                { enableHighAccuracy: false, timeout: 5000 }
+                            );
+                        }
+                    }, 10000); // 10 segundos de escaneo inteligente
+
                 } else {
-                    // Si el navegador no soporta GPS
                     initializeMap([-16.6868, -49.2647]);
                 }
+                // --- FIN NUEVO SISTEMA INTELIGENTE ---
             }
         }
         
