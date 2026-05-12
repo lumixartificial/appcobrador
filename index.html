@@ -1189,7 +1189,11 @@ const BLACKLIST_DATA = {
                     (loan.history || []).forEach(h => {
                         // 2. Filtramos pagos aprobados
                         if (h.status === 'approved' && h.method !== 'migration') {
-                            let pDate = h.date?.toDate ? h.date.toDate() : new Date(h.date);
+                            // --- PARCHE: Leer fechas normales y fechas dañadas por el error ---
+                                let pDate = null;
+                                if (h.date?.toDate) pDate = h.date.toDate();
+                                else if (h.date?.seconds) pDate = new Date(h.date.seconds * 1000);
+                                else pDate = new Date(h.date);
                             if (pDate && !isNaN(pDate.getTime())) {
                                 // 3. Aplicamos el escudo al pago individual
                                 let logicalPDate = new Date(pDate);
@@ -2253,7 +2257,12 @@ async function showRefinanceModal(clientId, notificationId) {
                                 const clientIdx = allClients.findIndex(c => c.id === clientId);
                                 if (clientIdx === -1) throw new Error("Cliente no encontrado en memoria");
                                 const currentClientData = allClients[clientIdx];
-                                const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
+                                // --- CORRECCIÓN: Copia segura de toda la matriz ---
+            const updatedLoans = currentClientData.loans.map(loan => ({
+                ...loan,
+                history: [...(loan.history || [])],
+                chatHistory: [...(loan.chatHistory || [])]
+            }));
                                 const currentLoan = updatedLoans[loanIndex];
 
                                 currentLoan.history.splice(historyIndex, 1);
@@ -4917,7 +4926,12 @@ if (!loan) {
                     try {
                         const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
                         const newMessage = { sender: 'collector', text: text, timestamp: new Date() };
-                        const updatedLoans = JSON.parse(JSON.stringify(allLoans));
+                        // --- CORRECCIÓN: Copia segura para el chat ---
+                        const updatedLoans = allLoans.map(loan => ({
+                            ...loan,
+                            history: [...(loan.history || [])],
+                            chatHistory: [...(loan.chatHistory || [])]
+                        }));
                         
                         if (!updatedLoans[currentLoanIndex].chatHistory) {
                             updatedLoans[currentLoanIndex].chatHistory = [];
@@ -4961,7 +4975,12 @@ if (!loan) {
 
                     try {
                         const clientRef = doc(db, 'companies', currentCompanyId, "clients", clientId);
-                        const updatedLoans = JSON.parse(JSON.stringify(allLoans));
+                        // --- CORRECCIÓN: Copia segura para el chat ---
+                        const updatedLoans = allLoans.map(loan => ({
+                            ...loan,
+                            history: [...(loan.history || [])],
+                            chatHistory: [...(loan.chatHistory || [])]
+                        }));
                         updatedLoans[currentLoanIndex].chatHistory = [];
                         updatedLoans[currentLoanIndex].notes = "";
                         await updateDoc(clientRef, { loans: updatedLoans });
@@ -5321,7 +5340,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             // Obtenemos una copia ACTUALIZADA del cliente por si acaso hubo cambios mientras el modal estaba abierto
             const currentClientData = allClients.find(c => c.id === clientId); 
             if (!currentClientData) throw new Error("Cliente no encontrado en datos locales actualizados.");
-            const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans)); // Copia profunda de los préstamos actuales
+            // --- CORRECCIÓN: Copia segura de toda la matriz ---
+            const updatedLoans = currentClientData.loans.map(loan => ({
+                ...loan,
+                history: [...(loan.history || [])],
+                chatHistory: [...(loan.chatHistory || [])]
+            }));// Copia profunda de los préstamos actuales
 
             if (updatedLoans[loanIndex]?.history?.[historyIndex]) {
                 updatedLoans[loanIndex].history[historyIndex].status = 'rejected';
@@ -5367,7 +5391,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             // Obtenemos una copia ACTUALIZADA del cliente por si acaso
             const currentClientData = allClients.find(c => c.id === clientId);
             if (!currentClientData) throw new Error("Cliente no encontrado en datos locales actualizados.");
-            const updatedLoans = JSON.parse(JSON.stringify(currentClientData.loans));
+            // --- CORRECCIÓN: Copia segura de toda la matriz ---
+            const updatedLoans = currentClientData.loans.map(loan => ({
+                ...loan,
+                history: [...(loan.history || [])],
+                chatHistory: [...(loan.chatHistory || [])]
+            }));
             const currentLoan = updatedLoans[loanIndex];
 
             if (!currentLoan?.history?.[historyIndex]) { throw new Error("Índice de préstamo o historial inválido al intentar aprobar."); }
@@ -7068,7 +7097,9 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
                     const clientRef = doc(db, 'companies', currentCompanyId, "clients", cId);
                     const currentClient = allClients.find(c => c.id === cId);
-                    const currentLoan = JSON.parse(JSON.stringify(currentClient.loans[lIndex]));
+                    // --- CORRECCIÓN: Copia segura que NO destruye las fechas ---
+                    const currentLoan = { ...currentClient.loans[lIndex] };
+                    currentLoan.history = [...(currentLoan.history || [])];
 
                     if (!currentLoan.history) currentLoan.history = [];
                     
