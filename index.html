@@ -1175,44 +1175,45 @@ const BLACKLIST_DATA = {
 
         
        function calculateDailyTotals() {
-            // 1. Definimos la jornada actual (Hoy) con el escudo de las 5 AM
-            let todayLogico = new Date();
-            if (todayLogico.getHours() < 5) todayLogico.setDate(todayLogico.getDate() - 1);
-            const todayStr = todayLogico.toLocaleDateString('pt-BR'); 
+    // 1. Definimos la jornada actual (Hoy) con el escudo de las 5 AM
+    let todayLogico = new Date();
+    if (todayLogico.getHours() < 5) todayLogico.setDate(todayLogico.getDate() - 1);
+    const todayStr = todayLogico.toLocaleDateString('pt-BR'); 
 
-            let dailyTotal = 0;
-            let dailyTotalCash = 0;
-            let dailyTotalDigital = 0;
+    let dailyTotal = 0;
+    let dailyTotalCash = 0;
+    let dailyTotalDigital = 0;
 
-            allClients.forEach(client => {
-                (client.loans || []).forEach(loan => {
-                    (loan.history || []).forEach(h => {
-                        // 2. Filtramos pagos aprobados
-                        if (h.status === 'approved' && h.method !== 'migration') {
-                            // --- PARCHE: Leer fechas normales y fechas dañadas por el error ---
-                                let pDate = null;
-                                if (h.date?.toDate) pDate = h.date.toDate();
-                                else if (h.date?.seconds) pDate = new Date(h.date.seconds * 1000);
-                                else pDate = new Date(h.date);
-                            if (pDate && !isNaN(pDate.getTime())) {
-                                // 3. Aplicamos el escudo al pago individual
-                                let logicalPDate = new Date(pDate);
-                                if (logicalPDate.getHours() < 5) logicalPDate.setDate(logicalPDate.getDate() - 1);
-                                
-                                // 4. Comparamos el TEXTO de la fecha (Ej: "05/05/2026")
-                                if (logicalPDate.toLocaleDateString('pt-BR') === todayStr) {
-                                    const amount = parseFloat(h.amount) || 0;
-                                    dailyTotal += amount; 
-                                    if (h.method === 'dinheiro') dailyTotalCash += amount;
-                                    else dailyTotalDigital += amount;
-                                }
-                            }
+    allClients.forEach(client => {
+        (client.loans || []).forEach(loan => {
+            (loan.history || []).forEach(h => {
+                // 2. Filtramos pagos aprobados
+                if (h.status === 'approved' && h.method !== 'migration') {
+                    // --- PARCHE: Leer fechas normales y fechas dañadas por el error ---
+                        let pDate = null;
+                        if (h.date?.toDate) pDate = h.date.toDate();
+                        else if (h.date?.seconds) pDate = new Date(h.date.seconds * 1000);
+                        else pDate = new Date(h.date);
+
+                    if (pDate && !isNaN(pDate.getTime())) {
+                        // 3. Aplicamos el escudo al pago individual
+                        let logicalPDate = new Date(pDate);
+                        if (logicalPDate.getHours() < 5) logicalPDate.setDate(logicalPDate.getDate() - 1);
+                        
+                        // 4. Comparamos el TEXTO de la fecha (Ej: "05/05/2026")
+                        if (logicalPDate.toLocaleDateString('pt-BR') === todayStr) {
+                            const amount = parseFloat(h.amount) || 0;
+                            dailyTotal += amount; 
+                            if (h.method === 'dinheiro') dailyTotalCash += amount;
+                            else dailyTotalDigital += amount;
                         }
-                    });
-                });
+                    }
+                }
             });
-            return { dailyTotal, dailyTotalCash, dailyTotalDigital };
-        }
+        });
+    });
+    return { dailyTotal, dailyTotalCash, dailyTotalDigital };
+}
 
         
         function showToast(message, type = 'normal') {
@@ -3113,99 +3114,99 @@ async function showRefinanceModal(clientId, notificationId) {
         
 
         function updateDashboard(clientsForDashboard) { 
-            const kpiGoal = document.getElementById('kpi-goal');
-            const kpiReceived = document.getElementById('kpi-received');
-            const kpiRemaining = document.getElementById('kpi-remaining');
-            
-            if (!kpiGoal) return;
+    const kpiGoal = document.getElementById('kpi-goal');
+    const kpiReceived = document.getElementById('kpi-received');
+    const kpiRemaining = document.getElementById('kpi-remaining');
+    
+    if (!kpiGoal) return;
 
-            let calculatedDailyGoal = 0;      
-            
-            // 1. Definimos la jornada de "Hoy" con el escudo de las 5 AM
-            const today = new Date();
-            if (today.getHours() < 5) today.setDate(today.getDate() - 1);
-            today.setHours(0, 0, 0, 0);
-            const todayStr = today.toLocaleDateString('pt-BR');
+    let calculatedDailyGoal = 0;      
+    
+    // 1. Definimos la jornada de "Hoy" con el escudo de las 5 AM
+    const today = new Date();
+    if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toLocaleDateString('pt-BR');
 
-            // 2. Función interna con escudo para los contadores
-            const checkIsToday = (timestamp) => {
-                if (!timestamp) return false;
-                let d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-                let logicalD = new Date(d);
-                if (logicalD.getHours() < 5) logicalD.setDate(logicalD.getDate() - 1);
-                return logicalD.toLocaleDateString('pt-BR') === todayStr;
-            };
+    // 2. Función interna con escudo para los contadores
+    const checkIsToday = (timestamp) => {
+        if (!timestamp) return false;
+        let d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        let logicalD = new Date(d);
+        if (logicalD.getHours() < 5) logicalD.setDate(logicalD.getDate() - 1);
+        return logicalD.toLocaleDateString('pt-BR') === todayStr;
+    };
 
-            // 3. Lógica de Meta Diaria (Tu código original preservado)
-            allClients.forEach(client => {
-                (client.loans || []).forEach(loan => {
-                    const isFinished = loan.status === 'finished';
-                    const todayMonthDay = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}`;
-                    if (nationalHolidays.includes(todayMonthDay)) return;
+    // 3. Lógica de Meta Diaria (Incluye Lista Negra por defecto al no filtrar)
+    allClients.forEach(client => {
+        (client.loans || []).forEach(loan => {
+            const isFinished = loan.status === 'finished';
+            const todayMonthDay = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}`;
+            if (nationalHolidays.includes(todayMonthDay)) return;
 
-                    const paidToday = (loan.history || []).reduce((sum, h) => {
-                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
-                            return sum + (parseFloat(h.amount) || 0);
-                        }
-                        return sum;
-                    }, 0);
+            const paidToday = (loan.history || []).reduce((sum, h) => {
+                if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
+                    return sum + (parseFloat(h.amount) || 0);
+                }
+                return sum;
+            }, 0);
 
-                    if (isFinished && paidToday === 0) return;
+            if (isFinished && paidToday === 0) return;
 
-                    let isPaymentDay = false;
-                    const frequency = loan.paymentFrequency || 'daily';
-                    const paymentDays = loan.paymentDays || [];
+            let isPaymentDay = false;
+            const frequency = loan.paymentFrequency || 'daily';
+            const paymentDays = loan.paymentDays || [];
 
-                    if (frequency === 'daily') {
-                        isPaymentDay = paymentDays.some(d => parseInt(d) === today.getDay());
-                    } else if (frequency === 'weekly') {
-                        isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDay();
-                    } else if (frequency === 'biweekly') {
-                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDay()) {
-                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                            startDate.setHours(0,0,0,0);
-                            const diffTime = Math.abs(today - startDate);
-                            const diffDays = Math.round(diffTime / 86400000);
-                            if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
-                        }
-                    } else if (frequency === 'monthly') {
-                        isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDate();
-                    }
-
-                    let installmentValue = parseFloat(loan.amount) || parseFloat(loan.originalInstallmentAmount) || 0;
-                    const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
-                        (h.status === 'approved' || h.method === 'migration') ? sum + (h.amount || 0) : sum, 0
-                    );
-                    const currentBalance = Math.max(0, (parseFloat(loan.totalLoan) || 0) - totalPaidAllTime);
-                    const debtAtStartOfDay = currentBalance + paidToday;
-                    
-                    let goalForThisClient = installmentValue;
-                    if (goalForThisClient > debtAtStartOfDay) goalForThisClient = debtAtStartOfDay;
-
-                    if (isPaymentDay) calculatedDailyGoal += goalForThisClient;
-                });
-            });
-
-            // 4. Actualizar visualmente los cuadros
-            kpiGoal.textContent = money(calculatedDailyGoal);
-            
-            const { dailyTotal } = calculateDailyTotals();
-            kpiReceived.textContent = money(dailyTotal);
-
-            if (kpiRemaining) {
-                const remainingItems = (clientsForDashboard || []).filter(item => {
-                    if (item.loan.status === 'finished') return false;
-                    const paidTodayVal = (item.loan.history || []).reduce((sum, h) => {
-                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
-                            return sum + (parseFloat(h.amount) || 0);
-                        }
-                        return sum;
-                    }, 0);
-                    return paidTodayVal === 0;
-                });
-                kpiRemaining.textContent = remainingItems.length;
+            if (frequency === 'daily') {
+                isPaymentDay = paymentDays.some(d => parseInt(d) === today.getDay());
+            } else if (frequency === 'weekly') {
+                isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDay();
+            } else if (frequency === 'biweekly') {
+                if (paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDay()) {
+                    const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                    startDate.setHours(0,0,0,0);
+                    const diffTime = Math.abs(today - startDate);
+                    const diffDays = Math.round(diffTime / 86400000);
+                    if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
+                }
+            } else if (frequency === 'monthly') {
+                isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDate();
             }
-        }
+
+            let installmentValue = parseFloat(loan.amount) || parseFloat(loan.originalInstallmentAmount) || 0;
+            const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
+                (h.status === 'approved' || h.method === 'migration') ? sum + (h.amount || 0) : sum, 0
+            );
+            const currentBalance = Math.max(0, (parseFloat(loan.totalLoan) || 0) - totalPaidAllTime);
+            const debtAtStartOfDay = currentBalance + paidToday;
+            
+            let goalForThisClient = installmentValue;
+            if (goalForThisClient > debtAtStartOfDay) goalForThisClient = debtAtStartOfDay;
+
+            if (isPaymentDay) calculatedDailyGoal += goalForThisClient;
+        });
+    });
+
+    // 4. Actualizar visualmente los cuadros
+    kpiGoal.textContent = money(calculatedDailyGoal);
+    
+    const { dailyTotal } = calculateDailyTotals();
+    kpiReceived.textContent = money(dailyTotal);
+
+    if (kpiRemaining) {
+        const remainingItems = (clientsForDashboard || []).filter(item => {
+            if (item.loan.status === 'finished') return false;
+            const paidTodayVal = (item.loan.history || []).reduce((sum, h) => {
+                if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
+                    return sum + (parseFloat(h.amount) || 0);
+                }
+                return sum;
+            }, 0);
+            return paidTodayVal === 0;
+        });
+        kpiRemaining.textContent = remainingItems.length;
+    }
+}
         
         
 
@@ -3331,208 +3332,107 @@ function updateProfileView(collectorData = null) {
         // Nueva función mejorada que calcula días de atraso Y mora
 
     
-        function calculateLoanDetails(loan) {
-           let details = {
-               lateDays: 0,
-               lateFeesAccumulated: 0,
-               fixedFineApplied: 0, 
-               hasFixedFine: false, 
-               status: 'pending', 
-               nextDueDate: null, 
-               amountDueToday: 0 
-           };
+        /* STREAMING_CHUNK: Función calculateLoanDetails Completa y Corregida */
+function calculateLoanDetails(loan) {
+    let details = {
+        lateDays: 0,
+        lateFeesAccumulated: 0,
+        fixedFineApplied: 0, 
+        hasFixedFine: false, 
+        status: 'pending', 
+        nextDueDate: null, 
+        amountDueToday: 0 
+    };
 
-           // 1. Filtrar pagos válidos y ordenarlos
-           let validPayments = (loan.history || []).filter(h => 
-               h.status !== 'pending_verification' && 
-               h.status !== 'rejected' && 
-               h.status !== 'postponed'
-           );
-           
-           validPayments.sort((a, b) => {
-               const dateA = a.date?.seconds ? new Date(a.date.seconds * 1000) : new Date(a.date);
-               const dateB = b.date?.seconds ? new Date(b.date.seconds * 1000) : new Date(b.date);
-               return dateA - dateB;
-           });
+    // 1. Cálculo de pagos totales (Suma historia + migración)
+    let validPayments = (loan.history || []).filter(h => 
+        h.status !== 'pending_verification' && h.status !== 'rejected' && h.status !== 'postponed' && h.status !== 'skipped'
+    );
+    
+    const initialPaid = parseFloat(loan.initialMigratedAmount) || 0;
+    const historyPaid = validPayments.reduce((sum, h) => {
+        if (h.method === 'migration') return sum; 
+        return sum + (parseFloat(h.amount) || 0);
+    }, 0);
+    
+    const currentTotalPaidGlobal = initialPaid + historyPaid;
+    const totalOriginalDebt = parseFloat(loan.totalLoan) || 0;
 
-           // 2. Totales Básicos (CORREGIDO PARA MIGRACIONES - TODAS LAS FRECUENCIAS)
-           const hasInitialMigratedField = loan.initialMigratedAmount !== undefined;
-           const initialPaid = parseFloat(loan.initialMigratedAmount) || 0;
-           
-           const currentTotalPaidGlobal = validPayments.reduce((sum, h) => {
-               if (hasInitialMigratedField && h.method === 'migration') return sum; // Evitar duplicar
-               return sum + (parseFloat(h.amount) || 0);
-           }, 0) + initialPaid;
+    // --- REGLA DE CIERRE MAESTRO ---
+    // Si el capital ya se pagó, el préstamo muere aquí y no se procesa nada más.
+    if (loan.status === 'finished' || currentTotalPaidGlobal >= totalOriginalDebt - 0.1) { 
+        details.status = 'finished'; 
+        return details; 
+    }
 
-           const totalOriginalDebt = parseFloat(loan.totalLoan) || 0;
+    const today = new Date();
+    if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+    today.setHours(0, 0, 0, 0);
+    
+    let startDateObj = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+    if (!startDateObj || isNaN(startDateObj.getTime())) return details;
+    startDateObj.setHours(0, 0, 0, 0);
 
-           // Estado forzado si ya estaba finalizado (Legacy)
-           if (loan.status === 'finished') {
-               details.status = 'finished';
-               return details;
-           }
+    let checkDate = new Date(startDateObj); 
+    checkDate.setDate(checkDate.getDate() + 1); 
+    
+    const installmentAmount = parseFloat(loan.originalInstallmentAmount) || parseFloat(loan.amount) || 0;
+    let installmentsDueCount = 0; 
+    
+    let stopDate = new Date(today);
+    stopDate.setDate(stopDate.getDate() + 90); 
 
-           // 3. Configurar Fechas (Normalización estricta a medianoche)
-           const today = new Date();
-if (today.getHours() < 5) today.setDate(today.getDate() - 1);
-today.setHours(0, 0, 0, 0);
-           
-           let startDateObj = null;
-           if (loan.startDate) {
-               if (loan.startDate.seconds) startDateObj = new Date(loan.startDate.seconds * 1000);
-               else if (loan.startDate instanceof Date) startDateObj = loan.startDate;
-               else if (typeof loan.startDate === 'string') startDateObj = new Date(loan.startDate);
-           }
+    while (checkDate <= stopDate) {
+        const dayOfWeek = checkDate.getDay();
+        const dayOfMonth = checkDate.getDate();
+        const fDate = `${String(dayOfMonth).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
+        const isHoliday = nationalHolidays.includes(fDate);
+        const frequency = loan.paymentFrequency || 'daily';
+        let isPaymentDay = false;
+        const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
+        
+        if (frequency === 'daily') isPaymentDay = pDays.some(d => String(d) === String(dayOfWeek));
+        else if (frequency === 'weekly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfWeek);
+        else if (frequency === 'monthly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfMonth);
+        else if (frequency === 'biweekly') {
+            if (pDays.length > 0 && String(pDays[0]) === String(dayOfWeek)) {
+                const diffTime = checkDate.getTime() - startDateObj.getTime();
+                const diffDays = Math.round(diffTime / 86400000);
+                // Mantenemos flexibilidad: Semana 0, 2, 4... son semanas de cobro.
+                if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
+            }
+        }
 
-           if (!startDateObj || isNaN(startDateObj.getTime())) return details;
-           
-           // Inicio del bucle: Día siguiente al inicio
-           startDateObj.setHours(0, 0, 0, 0);
-           let checkDate = new Date(startDateObj); 
-           checkDate.setDate(checkDate.getDate() + 1); 
-           
-           let accumulatedLateDays = 0;
-           let accumulatedLateFees = 0; 
-           const dailyLateRate = (loan.lateFeeRate || 0) / 100;
-           const installmentAmount = parseFloat(loan.originalInstallmentAmount) || parseFloat(loan.amount) || 0;
-           let installmentsDueCount = 0; 
-           
-           // Límite de seguridad para el bucle
-           let stopDate = new Date(today);
-           stopDate.setDate(stopDate.getDate() + 60); 
+        if (isPaymentDay && !isHoliday) {
+            if (checkDate < today) {
+                installmentsDueCount++; 
+            } else if (checkDate.getTime() === today.getTime()) {
+                const expectedTotal = (installmentsDueCount + 1) * installmentAmount;
+                if (currentTotalPaidGlobal < expectedTotal - 0.1) {
+                    details.amountDueToday = Math.min(installmentAmount, totalOriginalDebt - currentTotalPaidGlobal);
+                }
+                if (!details.nextDueDate) details.nextDueDate = new Date(checkDate);
+            } else if (checkDate > today && !details.nextDueDate) {
+                details.nextDueDate = new Date(checkDate);
+            }
+        }
+        if (details.nextDueDate && checkDate > today) break;
+        checkDate.setDate(checkDate.getDate() + 1);
+    }
+    
+    const totalExpectedUpToYesterday = installmentsDueCount * installmentAmount;
+    const currentGap = totalExpectedUpToYesterday - currentTotalPaidGlobal;
+    details.lateDays = (currentGap > 0.5 && installmentAmount > 0) ? Math.ceil(currentGap / installmentAmount) : 0;
+    
+    const fixedFineAmount = parseFloat(loan.lateFeeAmount) || 0;
+    if (details.lateDays >= 5 && fixedFineAmount > 0) {
+        details.fixedFineApplied = fixedFineAmount; 
+        details.hasFixedFine = true; 
+    }
 
-           if (checkDate > stopDate) return details;
-
-           // 4. Bucle Histórico (Calcula qué debió pagarse día a día)
-           while (checkDate <= stopDate) {
-               const dayOfWeek = checkDate.getDay();
-               const dayOfMonth = checkDate.getDate();
-               // --- DETECCIÓN REAL DE FESTIVOS ---
-               const fDate = `${String(dayOfMonth).padStart(2, '0')}/${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
-               const isHoliday = nationalHolidays.includes(fDate);
-               const frequency = loan.paymentFrequency || 'daily';
-               let isPaymentDay = false;
-               
-               const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1, 2, 3, 4, 5, 6];
-               
-               if (frequency === 'daily') isPaymentDay = pDays.some(d => String(d) === String(dayOfWeek));
-               else if (frequency === 'weekly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfWeek);
-               else if (frequency === 'monthly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfMonth);
-               else if (frequency === 'biweekly') {
-                   // LÓGICA QUINCENAL CORREGIDA (Usa Math.floor siempre para consistencia)
-                   if (pDays.length > 0 && String(pDays[0]) === String(dayOfWeek)) {
-                        const diffTime = checkDate.getTime() - startDateObj.getTime();
-                        // 1 día = 86400000 ms. Usamos Math.round para evitar errores de horario de verano
-                        const diffDays = Math.round(diffTime / 86400000);
-                        const weekNumber = Math.floor(diffDays / 7);
-                        // Paga en semanas pares (0, 2, 4...) después del inicio
-                        if (weekNumber % 2 === 0) isPaymentDay = true;
-                   }
-               }
-
-               if (isPaymentDay && !isHoliday) {
-                   const endOfCheckDate = new Date(checkDate);
-                   endOfCheckDate.setHours(23, 59, 59, 999);
-
-                   const paidByThisDate = validPayments.reduce((sum, h) => {
-                       if (hasInitialMigratedField && h.method === 'migration') return sum; 
-                       if (!hasInitialMigratedField && h.method === 'migration') return sum + (parseFloat(h.amount) || 0);
-                       
-                       let pDate = h.date?.seconds ? new Date(h.date.seconds * 1000) : new Date(h.date);
-                       if (pDate <= endOfCheckDate) {
-                           return sum + (parseFloat(h.amount) || 0);
-                       }
-                       return sum;
-                   }, 0) + initialPaid;
-
-                   // A) Días Pasados (Atraso)
-                   if (checkDate.getTime() < today.getTime()) {
-                       installmentsDueCount++; 
-                       const expectedPaidByThisDate = installmentsDueCount * installmentAmount;
-                       const outstandingDueAmount = Math.max(0, expectedPaidByThisDate - paidByThisDate);
-
-                       // Tolerancia de 0.9 para centavos
-                       if (outstandingDueAmount > 0.9) { 
-                           accumulatedLateDays++; 
-                           if (dailyLateRate > 0) accumulatedLateFees += (outstandingDueAmount * dailyLateRate);
-                       }
-                   } 
-                   // B) El Día de HOY (Cobro actual)
-                   else if (checkDate.getTime() === today.getTime()) {
-                       const expectedTotalIncludingToday = (installmentsDueCount + 1) * installmentAmount;
-                       
-                       // [CORRECCIÓN CRÍTICA] Cálculo de saldo restante real
-                       // Si ya pagó una parte, solo mostramos la diferencia.
-                       if (currentTotalPaidGlobal < expectedTotalIncludingToday - 0.1) {
-                           const gap = expectedTotalIncludingToday - currentTotalPaidGlobal;
-                           // El cobro de hoy es el gap, pero nunca más que una cuota completa (salvo que sea la última)
-                           details.amountDueToday = gap; 
-                       }
-                       
-                       if (!details.nextDueDate) details.nextDueDate = new Date(checkDate);
-                   } 
-                   // C) Futuro
-                   else if (checkDate > today && !details.nextDueDate) {
-                       details.nextDueDate = new Date(checkDate);
-                   }
-               }
-               
-               if (details.nextDueDate && checkDate > today) break;
-               checkDate.setDate(checkDate.getDate() + 1);
-           }
-           
-           // Cálculo de Días de Atraso Totales
-           const totalExpectedUpToYesterday = installmentsDueCount * installmentAmount;
-           const currentGap = totalExpectedUpToYesterday - currentTotalPaidGlobal;
-
-           if (currentGap > 0.5 && installmentAmount > 0) {
-               details.lateDays = Math.ceil(currentGap / installmentAmount);
-           } else {
-               details.lateDays = 0;
-           }
-           
-           // Cálculo de Multa Fija
-           const fixedFineAmount = parseFloat(loan.lateFeeAmount) || 0;
-           let appliedFixedFine = 0;
-           
-           if (accumulatedLateDays >= 5 && fixedFineAmount > 0) {
-               appliedFixedFine = fixedFineAmount;
-               details.fixedFineApplied = fixedFineAmount; 
-               details.hasFixedFine = true; 
-           }
-
-           // --- LÓGICA DE FINALIZACIÓN Y ESTADO ---
-           
-           // 1. ¿Pagó el Capital Original?
-           const isCapitalPaid = currentTotalPaidGlobal >= totalOriginalDebt - 0.5; // Tolerancia 50 centavos
-
-           if (isCapitalPaid) {
-               // Si pagó el capital, la mora diaria deja de correr. Solo queda la multa fija si aplica.
-               details.lateFeesAccumulated = appliedFixedFine;
-               
-               const totalDebtWithFixedFine = totalOriginalDebt + appliedFixedFine;
-
-               if (currentTotalPaidGlobal >= totalDebtWithFixedFine - 0.5) {
-                   // Pagó Capital + Multa Fija -> FINALIZADO
-                   details.status = 'finished';
-               } else {
-                   // Pagó Capital pero debe la Multa Fija -> ATRASADO
-                   details.status = 'late';
-               }
-           } else {
-               // Aún debe capital -> Sumamos intereses diarios + Multa Fija
-               details.lateFeesAccumulated = accumulatedLateFees + appliedFixedFine;
-               details.status = (details.lateDays > 0) ? 'late' : 'pending';
-               
-               // Verificación de seguridad por si la deuda total era menor a lo esperado
-               const totalDebtFull = totalOriginalDebt + details.lateFeesAccumulated;
-               if (currentTotalPaidGlobal >= totalDebtFull - 0.5) {
-                   details.status = 'finished';
-               }
-           }
-           
-           return details;
-       }
+    details.status = (details.lateDays > 0) ? 'late' : 'pending';
+    return details;
+}
            
 
 
@@ -4112,144 +4012,99 @@ const paymentDayLabelHtml = `
             return result;
         }
 
-        function updateTodaysRouteList() {
-   const today = new Date(); // <--- Aquí añadimos 'const'
-   if (today.getHours() < 5) {
-       today.setDate(today.getDate() - 1);
-   }
-   today.setHours(0, 0, 0, 0);
-           const dayOfWeek = today.getDay();
-           const dayOfMonth = today.getDate();
+        /* STREAMING_CHUNK: Función updateTodaysRouteList Completa y Segura */
+function updateTodaysRouteList() {
+    const today = new Date();
+    if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+    today.setHours(0, 0, 0, 0);
+    const dayOfWeek = today.getDay();
+    const dayOfMonth = today.getDate();
+    const todayStr = today.toLocaleDateString('pt-BR');
 
-           const getPaymentDate = (dateObj) => {
-    if (!dateObj) return null;
-    let d;
-    if (typeof dateObj.toDate === 'function') d = dateObj.toDate();
-    else if (dateObj instanceof Date) d = dateObj;
-    else if (typeof dateObj === 'string') d = new Date(dateObj);
-    
-    if (d && !isNaN(d.getTime())) {
-        // ESCUDO: Si el pago se registró antes de las 5 AM, 
-        // lo tratamos como si fuera de la jornada de ayer para que coincida con la ruta.
-        let logicalDate = new Date(d);
-        if (logicalDate.getHours() < 5) {
-            logicalDate.setDate(logicalDate.getDate() - 1);
+    const getPaymentDate = (dateObj) => {
+        if (!dateObj) return null;
+        let d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj);
+        if (d && !isNaN(d.getTime())) {
+            let logicalDate = new Date(d);
+            if (logicalDate.getHours() < 5) logicalDate.setDate(logicalDate.getDate() - 1);
+            logicalDate.setHours(0, 0, 0, 0);
+            return logicalDate;
         }
-        logicalDate.setHours(0, 0, 0, 0);
-        return logicalDate;
-    }
-    return null;
-};
+        return null;
+    };
 
-           let clientsForRoute = [];
+    let clientsForRoute = [];
 
-           allClients.forEach(client => {
-               if (!client.loans || client.loans.length === 0) return;
+    allClients.forEach(client => {
+        if (!client.loans || client.loans.length === 0) return;
+        if (client.isBlacklisted === true) return;
 
-               if (client.isBlacklisted === true) return;
+        client.loans.forEach((loan, index) => {
+            const details = calculateLoanDetails(loan);
+            const isFinished = (details.status === 'finished');
+            
+            // Si el préstamo ya está finalizado, no tiene sentido que esté en la ruta
+            if (isFinished) return;
 
-               client.loans.forEach((loan, index) => {
-                   const details = calculateLoanDetails(loan);
-                   const currentStatus = details.status;
+            let isScheduledForToday = false;
+            const frequency = loan.paymentFrequency || 'daily';
+            const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
 
-                   // 1. REGLA DE CALENDARIO
-                   let isScheduledForToday = false;
-                   const frequency = loan.paymentFrequency || 'daily';
-                   const paymentDays = loan.paymentDays || [];
+            if (frequency === 'daily') {
+                isScheduledForToday = paymentDays.includes(dayOfWeek); 
+            } else if (frequency === 'weekly') {
+                isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+            } else if (frequency === 'biweekly') {
+                if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
+                    const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                    startDate.setHours(0,0,0,0);
+                    const diffTime = today.getTime() - startDate.getTime();
+                    const diffDays = Math.round(diffTime / 86400000); 
+                    if (Math.floor(diffDays / 7) % 2 === 0) isScheduledForToday = true;
+                }
+            } else if (frequency === 'monthly') {
+                isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+            }
 
-                   if (frequency === 'daily') {
-                       isScheduledForToday = paymentDays.includes(dayOfWeek); 
-                   } else if (frequency === 'weekly') {
-                       isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
-                   } else if (frequency === 'biweekly') {
-                       if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
-                           const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                           startDate.setHours(0,0,0,0);
-                           
-                           // LÓGICA QUINCENAL CORREGIDA (Idéntica a calculateLoanDetails)
-                           const diffTime = today.getTime() - startDate.getTime();
-                           const diffDays = Math.round(diffTime / 86400000); 
-                           // Semanas pares desde el inicio
-                           if (Math.floor(diffDays / 7) % 2 === 0) {
-                               isScheduledForToday = true;
-                           }
-                       }
-                   } else if (frequency === 'monthly') {
-                       isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
-                   }
-                   if (!isScheduledForToday) return;
-                    // 2. REGLA DE LIMPIEZA (Blindaje: Sale de ruta si hubo gestión hoy)
-let hasPaidToday = false;
-const todayStr = today.toLocaleDateString('pt-BR'); // Ejemplo: "18/04/2026"
+            // Verificar si ya se gestionó hoy (pago o visita fallida)
+            let hasActionToday = (loan.history || []).some(h => {
+                if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
+                const pDate = getPaymentDate(h.date);
+                return pDate && pDate.toLocaleDateString('pt-BR') === todayStr && 
+                       (h.status === 'approved' || h.status === 'skipped' || h.status === 'pending_verification');
+            });
 
-if (loan.history && loan.history.length > 0) {
-    hasPaidToday = loan.history.some(h => {
-        // No sacamos de ruta si el pago fue rechazado, aplazado o es una migración antigua
-        if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
-
-        const pDate = getPaymentDate(h.date);
-        if (!pDate) return false;
-
-        // Comparamos solo DIA/MES/AÑO como texto para evitar errores de milisegundos
-        const isSameDay = pDate.toLocaleDateString('pt-BR') === todayStr;
-
-        // CONSIDERAMOS GESTIÓN TERMINADA SI:
-        // - El pago es aprobado ('approved')
-        // - Se marcó como "No Pagó Hoy" ('skipped')
-        // - Está pendiente de que tú lo verifiques ('pending_verification')
-        const isFinishedTask = (h.status === 'approved' || h.status === 'skipped' || h.status === 'pending_verification');
-
-        return isSameDay && isFinishedTask;
+            const isLate = (details.status === 'late');
+            
+            // Mostrar si (Toca hoy O está atrasado) Y (No se ha gestionado hoy)
+            if ((isScheduledForToday || isLate) && !hasActionToday) {
+                clientsForRoute.push({ 
+                    client, 
+                    loan: { ...loan, status: details.status, lateDays: details.lateDays, amountDueToday: details.amountDueToday }, 
+                    loanIndex: index 
+                });
+            }
+        });
     });
-} 
 
-                   // 3. FILTRO FINAL
-                   const isLate = (currentStatus === 'late');
-                   const isFinished = (currentStatus === 'finished');
-                   
-                   // Mostrar si (Toca Hoy O Está Atrasado) Y (No ha pagado hoy) Y (No está finalizado)
-                   if ((isScheduledForToday || isLate) && !hasPaidToday && !isFinished) {
-                       const loanToRender = { 
-                           ...loan, 
-                           status: currentStatus, 
-                           lateDays: details.lateDays, 
-                           amountDueToday: details.amountDueToday 
-                       };
-                       clientsForRoute.push({ client, loan: loanToRender, loanIndex: index });
-                   }
-               });
-           });
- 
-           // --- ORDENAMIENTO (PRIORIDAD MANUAL) ---
-           
-           const manualOrderClients = clientsForRoute.filter(c => c.loan.routeOrder && c.loan.routeOrder > 0);
-           const autoOrderClients = clientsForRoute.filter(c => !c.loan.routeOrder || c.loan.routeOrder <= 0);
+    // Ordenamiento manual y optimización GPS
+    const manualOrderClients = clientsForRoute.filter(c => c.loan.routeOrder && c.loan.routeOrder > 0);
+    const autoOrderClients = clientsForRoute.filter(c => !c.loan.routeOrder || c.loan.routeOrder <= 0);
+    manualOrderClients.sort((a, b) => a.loan.routeOrder - b.loan.routeOrder);
+    
+    autoOrderClients.sort((a, b) => {
+        if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
+        if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
+        return a.client.name.localeCompare(b.client.name);
+    });
 
-           // 1. Manuales
-           manualOrderClients.sort((a, b) => a.loan.routeOrder - b.loan.routeOrder);
+    const optimizedAutoClients = optimizeRoute(autoOrderClients, collectorCurrentLocation);
+    const finalRoute = [...manualOrderClients, ...optimizedAutoClients];
 
-           // 2. Automáticos (Atrasados > Alfabético)
-           autoOrderClients.sort((a, b) => {
-               if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
-               if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
-               const daysA = a.loan.lateDays || 0;
-               const daysB = b.loan.lateDays || 0;
-               if (daysA > daysB) return -1;
-               if (daysA < daysB) return 1;
-               return a.client.name.localeCompare(b.client.name);
-           });
-
-           // 3. Optimización GPS para automáticos
-           const optimizedAutoClients = optimizeRoute(autoOrderClients, collectorCurrentLocation);
-
-           // 4. COMBINAR
-           const finalRoute = [...manualOrderClients, ...optimizedAutoClients];
-
-           updateDashboard(finalRoute); 
-           
-           if (document.querySelector('#map-view.active')) plotClientsOnMap();
-           renderClientCards(document.getElementById('todays-route-list'), finalRoute);
-       }
+    updateDashboard(finalRoute); 
+    if (document.querySelector('#map-view.active')) plotClientsOnMap();
+    renderClientCards(document.getElementById('todays-route-list'), finalRoute);
+}
         
 
 
