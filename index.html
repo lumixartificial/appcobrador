@@ -3209,82 +3209,119 @@ async function showRefinanceModal(clientId, notificationId) {
         
         
 
-    function updateProfileView(collectorData = null) {
-        const dailyTotalEl = document.getElementById('kpi-daily-total');
-        const capitalTotalEl = document.getElementById('kpi-capital-total'); 
-        const distributedCapitalEl = document.getElementById('kpi-distributed-capital'); 
-        const dailyCashEl = document.getElementById('kpi-daily-cash');
-        const dailyDigitalEl = document.getElementById('kpi-daily-digital');
-        const totalPatrimonioEl = document.getElementById('kpi-total-patrimonio'); 
-        
-        if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return; 
+    /* STREAMING_CHUNK: Refinando el cálculo del Capital en Mano (Cerebro Financiero) */
+function updateProfileView(collectorData = null) {
+    const dailyTotalEl = document.getElementById('kpi-daily-total');
+    const capitalTotalEl = document.getElementById('kpi-capital-total'); 
+    const distributedCapitalEl = document.getElementById('kpi-distributed-capital'); 
+    const dailyCashEl = document.getElementById('kpi-daily-cash');
+    const dailyDigitalEl = document.getElementById('kpi-daily-digital');
+    const totalPatrimonioEl = document.getElementById('kpi-total-patrimonio'); 
+    
+    if (!dailyTotalEl || !capitalTotalEl || !distributedCapitalEl || !totalPatrimonioEl) return; 
 
-        // --- CÁLCULO UNIFICADO (IGUAL AL PDF) ---
-        let totalLoansMade = 0; 
-        let totalPaymentsReceived = 0; 
-        let totalDistributedCapital_Outstanding = 0; 
-        
-        const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
-        
-        allClients.forEach(client => {
-            (client.loans || []).forEach(loan => {
-                // 1. Préstamos realizados (Salida de caja)
-                if (!loan.migrationDate) {
-                    let principal = parseFloat(loan.principalAmount);
-                    if (!principal && loan.totalLoan) {
-                        const rate = client.interestRate || 20;
-                        principal = loan.totalLoan / (1 + (rate / 100));
-                    }
-                    totalLoansMade += (principal || 0);
+    // --- INICIALIZACIÓN DE CONTADORES ---
+    let totalLoansMade = 0; 
+    let totalPaymentsReceived = 0; 
+    let totalDistributedCapital_Outstanding = 0; 
+    
+    // Obtener totales del día (respetando la regla de las 5 AM)
+    const { dailyTotal, dailyTotalCash, dailyTotalDigital } = calculateDailyTotals();
+    
+    allClients.forEach(client => {
+        (client.loans || []).forEach(loan => {
+            // 1. Préstamos realizados (Salida física de caja)
+            // Solo restamos si NO es una migración y el préstamo es real
+            if (!loan.migrationDate) {
+                let principal = Number(loan.principalAmount) || 0;
+                // Si por alguna razón el principal es 0 pero hay deuda total, lo calculamos
+                if (principal === 0 && loan.totalLoan) {
+                    const rate = Number(client.interestRate) || 20;
+                    principal = Number(loan.totalLoan) / (1 + (rate / 100));
                 }
+                totalLoansMade += principal;
+            }
 
-                // 2. Pagos recibidos (Entrada a caja)
-                (loan.history || []).forEach(h => {
-                    if (h.status === 'approved' && h.method !== 'migration') {
-                        totalPaymentsReceived += (parseFloat(h.amount) || 0);
-                    }
-                });
-                
-                // 3. Capital en la calle
-                const loanDetails = calculateLoanDetails(loan);
-                if (loanDetails.status !== 'finished') {
-                    const totalPaidForThisLoan = (loan.history || [])
-                        .filter(h => h.status === 'approved')
-                        .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
-                    const outstandingBalance = (parseFloat(loan.totalLoan) || 0) - totalPaidForThisLoan;
-                    totalDistributedCapital_Outstanding += outstandingBalance;
+            // 2. Pagos recibidos (Entrada física a caja)
+            (loan.history || []).forEach(h => {
+                // Solo sumamos pagos que realmente entraron y fueron aprobados
+                if (h.status === 'approved' && h.method !== 'migration') {
+                    totalPaymentsReceived += (Number(h.amount) || 0);
                 }
             });
+            
+            // 3. Capital distribuido (Lo que está en la calle actualmente)
+            const loanDetails = calculateLoanDetails(loan);
+            if (loanDetails.status !== 'finished') {
+                const totalPaidForThisLoan = (loan.history || [])
+                    .filter(h => h.status === 'approved' || h.method === 'migration')
+                    .reduce((sum, h) => sum + (Number(h.amount) || 0), 0);
+                
+                const outstandingBalance = (Number(loan.totalLoan) || 0) - totalPaidForThisLoan;
+                totalDistributedCapital_Outstanding += Math.max(0, outstandingBalance);
+            }
         });
+    });
 
-        const totalExpenses = allExpenses.reduce((sum, e) => sum + (parseFloat(e.value) || 0), 0);
-        const totalSettled = allSettlements
-            .filter(s => s.status === 'approved' && s.type !== 'insurance')
-            .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
-        const totalInjected = allCapitalInjections
-            .filter(i => i.status === 'approved')
-            .reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+    // 4. Egresos y Aportes externos
+    const totalExpenses = allExpenses.reduce((sum, e) => sum + (Number(e.value) || 0), 0);
+    
+    // Retiradas entregadas al Admin (Solo las aprobadas descuentan caja)
+    const totalSettled = allSettlements
+        .filter(s => s.status === 'approved' && s.type !== 'insurance')
+        .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
-        const currentStartingCapital = (collectorData?.startingCapitalOnHand !== undefined) 
-            ? parseFloat(collectorData.startingCapitalOnHand) 
-            : (parseFloat(collectorData?.startingCapital) || 0);
+    // Inyecciones de capital del Admin (Solo aprobadas suman a caja)
+    const totalInjected = allCapitalInjections
+        .filter(i => i.status === 'approved')
+        .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
 
-        const historicalBalance = parseFloat(collectorData?.historicalBalance || 0);
+    // 5. SALDOS BASE
+    // Capital Inicial definido por el Admin
+    const currentStartingCapital = (collectorData?.startingCapitalOnHand !== undefined) 
+        ? Number(collectorData.startingCapitalOnHand) 
+        : (Number(collectorData?.startingCapital) || 0);
 
-        // LA FÓRMULA FINAL
-        const capitalTotal = currentStartingCapital + totalInjected + totalPaymentsReceived + historicalBalance - totalLoansMade - totalExpenses - totalSettled;
-        
-        currentCapitalOnHand = capitalTotal;
+    // Saldo histórico (Este es el "ajuste" por clientes borrados o migraciones antiguas)
+    const historicalBalance = Number(collectorData?.historicalBalance || 0);
 
-        // Renderizado en pantalla
-        dailyTotalEl.textContent = money(dailyTotal);
-        capitalTotalEl.textContent = money(capitalTotal); 
-        distributedCapitalEl.textContent = money(totalDistributedCapital_Outstanding); 
-        totalPatrimonioEl.textContent = money(capitalTotal + totalDistributedCapital_Outstanding); 
-        
-        if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
-        if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
+    /* STREAMING_CHUNK: Calculando Multas para Arrastre de Caja */
+    // --- NUEVA LÓGICA DE MULTAS PARA CUADRE DE CAJA ---
+    let totalFinesEffect = 0;
+    allClients.forEach(c => {
+        (c.loans || []).forEach(l => {
+            const d = calculateLoanDetails(l);
+            if (d.hasFixedFine && d.fixedFineApplied > 0) {
+                totalFinesEffect += Number(d.fixedFineApplied);
+            }
+        });
+    });
+
+    // --- REEMPLAZO DE LA FÓRMULA MAESTRA ---
+    // Incluimos totalFinesEffect para que el negativo sea persistente y real
+    const capitalTotal = (Number(currentStartingCapital) + Number(totalInjected) + Number(totalPaymentsReceived) + Number(historicalBalance) + Number(totalFinesEffect)) - 
+                         (Number(totalLoansMade) + Number(totalExpenses) + Number(totalSettled));
+    
+    currentCapitalOnHand = capitalTotal;
+
+    // --- ACTUALIZACIÓN VISUAL ---
+
+    // --- ACTUALIZACIÓN VISUAL ---
+    dailyTotalEl.textContent = money(dailyTotal);
+    capitalTotalEl.textContent = money(capitalTotal); 
+    distributedCapitalEl.textContent = money(totalDistributedCapital_Outstanding); 
+    totalPatrimonioEl.textContent = money(capitalTotal + totalDistributedCapital_Outstanding); 
+    
+    // Aplicar color rojo si está en negativo para alertar al cobrador
+    if (capitalTotal < 0) {
+        capitalTotalEl.style.color = 'var(--danger-color)';
+    } else {
+        capitalTotalEl.style.color = 'var(--accent-green)';
     }
+
+    if(dailyCashEl) dailyCashEl.textContent = money(dailyTotalCash);
+    if(dailyDigitalEl) dailyDigitalEl.textContent = money(dailyTotalDigital);
+}
 
 
         
@@ -7670,14 +7707,18 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             });
             lateClientsList.sort((a, b) => b.lateDays - a.lateDays);
             
-            // --- CÁLCULOS FINALES (SINCRONIZADOS) ---
-            const operationalResult = dailyTotal - totalExpenses;
-            const netCashFlow = (operationalResult + totalInjections) - (totalSettlements + totalLoansOutflow);
+            /* STREAMING_CHUNK: Sincronizando el flujo neto con el cierre real */
+            // --- CÁLCULOS DE FLUJO NETO (INCLUYENDO MULTAS GENERADAS HOY) ---
+            const totalFinesToday = finedClientsList.reduce((sum, f) => sum + Number(f.fineAmount), 0);
             
-            // Forzamos que el cierre del PDF sea igual al saldo actual de la App
-            const closingCapitalThisDay = currentBalanceRealTime; 
+            // Variación de hoy: (Cobros + Aportes + Multas) - (Gastos + Retiros + Préstamos nuevos)
+            const netCashFlow = (Number(dailyTotal) + Number(totalInjected) + Number(totalFinesToday)) - 
+                                (Number(totalExpenses) + Number(totalSettlements) + Number(totalLoansOutflow));
             
-            // Calculamos la "Caja Anterior" de forma inversa para que el resumen cuadre visualmente
+            // Sincronizamos con el valor real de la App
+            const closingCapitalThisDay = Number(currentBalanceRealTime); 
+            
+            // EL AMANECER: Ahora si el cierre es -900 y el flujo fue +2000, el amanecer dirá -2900 (Correcto)
             const previousCapital = closingCapitalThisDay - netCashFlow;
 
 
