@@ -7711,15 +7711,22 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             // --- CÁLCULOS DE FLUJO NETO (INCLUYENDO MULTAS GENERADAS HOY) ---
             const totalFinesToday = finedClientsList.reduce((sum, f) => sum + Number(f.fineAmount), 0);
             
-            // Variación de hoy: (Cobros + Aportes + Multas) - (Gastos + Retiros + Préstamos nuevos)
-            const netCashFlow = (Number(dailyTotal) + Number(totalInjected) + Number(totalFinesToday)) - 
+            // Resultado Operativo: Cobros - Gastos
+            const operationalResult = Number(dailyTotal) - Number(totalExpenses);
+            
+            // Variación de hoy: (Cobros + Aportes + Multas de hoy) - (Gastos + Retiros + Préstamos nuevos)
+            const netCashFlow = (Number(dailyTotal) + Number(totalInjections) + Number(totalFinesToday)) - 
                                 (Number(totalExpenses) + Number(totalSettlements) + Number(totalLoansOutflow));
             
             // Sincronizamos con el valor real de la App
+            // IMPORTANTE: currentBalanceRealTime debe estar definido arriba en la sección 1 del reporte
             const closingCapitalThisDay = Number(currentBalanceRealTime); 
             
             // EL AMANECER: Ahora si el cierre es -900 y el flujo fue +2000, el amanecer dirá -2900 (Correcto)
             const previousCapital = closingCapitalThisDay - netCashFlow;
+
+
+            // ==========================================================================================
 
 
             // ==========================================================================================
