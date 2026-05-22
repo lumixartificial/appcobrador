@@ -1143,7 +1143,7 @@ const BLACKLIST_DATA = {
 ];
         
 
-        const money = val => {
+       const money = val => {
             const safeVal = (typeof val !== 'number' || isNaN(val)) ? 0 : val;
             
             // 1. Intentamos usar la moneda específica del cobrador
@@ -1159,7 +1159,7 @@ const BLACKLIST_DATA = {
 
             // Mapas de formato para que los puntos y comas se vean bien según el país
             const localeMap = {
-                'USD': 'en-US', 'MXN': 'es-MX', 'COP': 'es-CO', // Colombia usa $ 1.000,00 o $ 1,000.00 según preferencia, es-CO suele ser punto miles coma decimales estándar.
+                'USD': 'en-US', 'MXN': 'es-MX', 'COP': 'es-CO',
                 'ARS': 'es-AR', 'CLP': 'es-CL', 'EUR': 'es-ES',
                 'BRL': 'pt-BR', 'PYG': 'es-PY', 'PEN': 'es-PE',
                 'UYU': 'es-UY', 'VES': 'es-VE', 'CRC': 'es-CR',
@@ -1169,7 +1169,19 @@ const BLACKLIST_DATA = {
             };
             const locale = localeMap[currencyCode] || 'pt-BR'; 
 
-            return safeVal.toLocaleString(locale, { style: 'currency', currency: currencyCode });
+            try {
+                // Intento nativo (Falla en celulares antiguos con moneda VES)
+                return safeVal.toLocaleString(locale, { style: 'currency', currency: currencyCode });
+            } catch (error) {
+                // SALVAVIDAS: Si el celular antiguo no reconoce la moneda, lo formateamos manualmente sin colapsar la app.
+                let symbol = '$';
+                if (currencyCode === 'VES') symbol = 'Bs.';
+                else if (currencyCode === 'BRL') symbol = 'R$';
+                else if (currencyCode === 'EUR') symbol = '€';
+                
+                // Retorna un formato limpio (Ej: Bs. 1,500.50)
+                return `${symbol} ${safeVal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+            }
         };
 
 
