@@ -1187,45 +1187,43 @@ const BLACKLIST_DATA = {
 
         
        function calculateDailyTotals() {
-    // 1. Definimos la jornada actual (Hoy) con el escudo de las 5 AM
-    let todayLogico = new Date();
-    if (todayLogico.getHours() < 5) todayLogico.setDate(todayLogico.getDate() - 1);
-    const todayStr = todayLogico.toLocaleDateString('pt-BR'); 
+            let todayLogico = new Date();
+            if (todayLogico.getHours() < 5) todayLogico.setDate(todayLogico.getDate() - 1);
 
-    let dailyTotal = 0;
-    let dailyTotalCash = 0;
-    let dailyTotalDigital = 0;
+            let dailyTotal = 0;
+            let dailyTotalCash = 0;
+            let dailyTotalDigital = 0;
 
-    allClients.forEach(client => {
-        (client.loans || []).forEach(loan => {
-            (loan.history || []).forEach(h => {
-                // 2. Filtramos pagos aprobados
-                if (h.status === 'approved' && h.method !== 'migration') {
-                    // --- PARCHE: Leer fechas normales y fechas dañadas por el error ---
-                        let pDate = null;
-                        if (h.date?.toDate) pDate = h.date.toDate();
-                        else if (h.date?.seconds) pDate = new Date(h.date.seconds * 1000);
-                        else pDate = new Date(h.date);
+            allClients.forEach(client => {
+                (client.loans || []).forEach(loan => {
+                    (loan.history || []).forEach(h => {
+                        if (h.status === 'approved' && h.method !== 'migration') {
+                            let pDate = null;
+                            if (h.date?.toDate) pDate = h.date.toDate();
+                            else if (h.date?.seconds) pDate = new Date(h.date.seconds * 1000);
+                            else pDate = new Date(h.date);
 
-                    if (pDate && !isNaN(pDate.getTime())) {
-                        // 3. Aplicamos el escudo al pago individual
-                        let logicalPDate = new Date(pDate);
-                        if (logicalPDate.getHours() < 5) logicalPDate.setDate(logicalPDate.getDate() - 1);
-                        
-                        // 4. Comparamos el TEXTO de la fecha (Ej: "05/05/2026")
-                        if (logicalPDate.toLocaleDateString('pt-BR') === todayStr) {
-                            const amount = parseFloat(h.amount) || 0;
-                            dailyTotal += amount; 
-                            if (h.method === 'dinheiro') dailyTotalCash += amount;
-                            else dailyTotalDigital += amount;
+                            if (pDate && !isNaN(pDate.getTime())) {
+                                let logicalPDate = new Date(pDate);
+                                if (logicalPDate.getHours() < 5) logicalPDate.setDate(logicalPDate.getDate() - 1);
+                                
+                                // BÚSQUEDA EXACTA POR FECHA (Irrompible, ignora los ceros faltantes)
+                                if (logicalPDate.getFullYear() === todayLogico.getFullYear() &&
+                                    logicalPDate.getMonth() === todayLogico.getMonth() &&
+                                    logicalPDate.getDate() === todayLogico.getDate()) {
+                                    
+                                    const amount = parseFloat(h.amount) || 0;
+                                    dailyTotal += amount; 
+                                    if (h.method === 'dinheiro') dailyTotalCash += amount;
+                                    else dailyTotalDigital += amount;
+                                }
+                            }
                         }
-                    }
-                }
+                    });
+                });
             });
-        });
-    });
-    return { dailyTotal, dailyTotalCash, dailyTotalDigital };
-}
+            return { dailyTotal, dailyTotalCash, dailyTotalDigital };
+        }
 
         
         function showToast(message, type = 'normal') {
@@ -3125,101 +3123,106 @@ async function showRefinanceModal(clientId, notificationId) {
 
         
 
+       
         function updateDashboard(clientsForDashboard) { 
-    const kpiGoal = document.getElementById('kpi-goal');
-    const kpiReceived = document.getElementById('kpi-received');
-    const kpiRemaining = document.getElementById('kpi-remaining');
-    
-    if (!kpiGoal) return;
-
-    let calculatedDailyGoal = 0;      
-    
-    // 1. Definimos la jornada de "Hoy" con el escudo de las 5 AM
-    const today = new Date();
-    if (today.getHours() < 5) today.setDate(today.getDate() - 1);
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toLocaleDateString('pt-BR');
-
-    // 2. Función interna con escudo para los contadores
-    const checkIsToday = (timestamp) => {
-        if (!timestamp) return false;
-        let d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        let logicalD = new Date(d);
-        if (logicalD.getHours() < 5) logicalD.setDate(logicalD.getDate() - 1);
-        return logicalD.toLocaleDateString('pt-BR') === todayStr;
-    };
-
-    // 3. Lógica de Meta Diaria (Incluye Lista Negra por defecto al no filtrar)
-    allClients.forEach(client => {
-        (client.loans || []).forEach(loan => {
-            const isFinished = loan.status === 'finished';
-            const todayMonthDay = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}`;
-            if (nationalHolidays.includes(todayMonthDay)) return;
-
-            const paidToday = (loan.history || []).reduce((sum, h) => {
-                if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
-                    return sum + (parseFloat(h.amount) || 0);
-                }
-                return sum;
-            }, 0);
-
-            if (isFinished && paidToday === 0) return;
-
-            let isPaymentDay = false;
-            const frequency = loan.paymentFrequency || 'daily';
-            const paymentDays = loan.paymentDays || [];
-
-            if (frequency === 'daily') {
-                isPaymentDay = paymentDays.some(d => parseInt(d) === today.getDay());
-            } else if (frequency === 'weekly') {
-                isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDay();
-            } else if (frequency === 'biweekly') {
-                if (paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDay()) {
-                    const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                    startDate.setHours(0,0,0,0);
-                    const diffTime = Math.abs(today - startDate);
-                    const diffDays = Math.round(diffTime / 86400000);
-                    if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
-                }
-            } else if (frequency === 'monthly') {
-                isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === today.getDate();
-            }
-
-            let installmentValue = parseFloat(loan.amount) || parseFloat(loan.originalInstallmentAmount) || 0;
-            const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
-                (h.status === 'approved' || h.method === 'migration') ? sum + (h.amount || 0) : sum, 0
-            );
-            const currentBalance = Math.max(0, (parseFloat(loan.totalLoan) || 0) - totalPaidAllTime);
-            const debtAtStartOfDay = currentBalance + paidToday;
+            const kpiGoal = document.getElementById('kpi-goal');
+            const kpiReceived = document.getElementById('kpi-received');
+            const kpiRemaining = document.getElementById('kpi-remaining');
             
-            let goalForThisClient = installmentValue;
-            if (goalForThisClient > debtAtStartOfDay) goalForThisClient = debtAtStartOfDay;
+            if (!kpiGoal) return;
 
-            if (isPaymentDay) calculatedDailyGoal += goalForThisClient;
-        });
-    });
+            let calculatedDailyGoal = 0;      
+            
+            const today = new Date();
+            if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+            today.setHours(0, 0, 0, 0);
 
-    // 4. Actualizar visualmente los cuadros
-    kpiGoal.textContent = money(calculatedDailyGoal);
-    
-    const { dailyTotal } = calculateDailyTotals();
-    kpiReceived.textContent = money(dailyTotal);
+            const checkIsToday = (timestamp) => {
+                if (!timestamp) return false;
+                let d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                let logicalD = new Date(d);
+                if (logicalD.getHours() < 5) logicalD.setDate(logicalD.getDate() - 1);
+                return logicalD.getFullYear() === today.getFullYear() && 
+                       logicalD.getMonth() === today.getMonth() && 
+                       logicalD.getDate() === today.getDate();
+            };
 
-    if (kpiRemaining) {
-        const remainingItems = (clientsForDashboard || []).filter(item => {
-            if (item.loan.status === 'finished') return false;
-            const paidTodayVal = (item.loan.history || []).reduce((sum, h) => {
-                if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
-                    return sum + (parseFloat(h.amount) || 0);
-                }
-                return sum;
-            }, 0);
-            return paidTodayVal === 0;
-        });
-        kpiRemaining.textContent = remainingItems.length;
-    }
-}
-        
+            const dayOfWeek = today.getDay();
+            const dayOfMonth = today.getDate();
+
+            allClients.forEach(client => {
+                (client.loans || []).forEach(loan => {
+                    const details = calculateLoanDetails(loan);
+                    const isFinished = details.status === 'finished';
+                    
+                    const todayMonthDay = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}`;
+                    if (typeof nationalHolidays !== 'undefined' && nationalHolidays.includes(todayMonthDay)) return;
+
+                    // Para la meta diaria (lo que debió cobrarse hoy sí o sí), verificamos si hoy le toca pagar
+                    let isPaymentDay = false;
+                    const frequency = loan.paymentFrequency || 'daily';
+                    const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
+
+                    if (frequency === 'daily') isPaymentDay = paymentDays.includes(dayOfWeek); 
+                    else if (frequency === 'weekly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+                    else if (frequency === 'biweekly') {
+                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
+                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                            startDate.setHours(0,0,0,0);
+                            const diffDays = Math.round(Math.abs(today.getTime() - startDate.getTime()) / 86400000); 
+                            if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
+                        }
+                    } else if (frequency === 'monthly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+
+                    // Solo sumamos a la meta si NO está finalizado y HOY le toca pagar
+                    if (isPaymentDay && !isFinished) {
+                        let installmentValue = parseFloat(loan.originalInstallmentAmount) || parseFloat(loan.amount) || 0;
+                        
+                        // Blindaje: No sumar a la meta si la deuda pendiente es menor que la cuota (solo sumar lo que falta)
+                        const totalPaidAllTime = (loan.history || []).reduce((sum, h) => 
+                            (h.status === 'approved' || h.method === 'migration') ? sum + (parseFloat(h.amount) || 0) : sum, 0
+                        );
+                        const totalDebt = (parseFloat(loan.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+                        const currentBalance = Math.max(0, totalDebt - totalPaidAllTime);
+
+                        // Aquí está el truco: le sumamos lo que haya pagado hoy para saber su saldo "a primera hora del día"
+                        const paidToday = (loan.history || []).reduce((sum, h) => {
+                            if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
+                                return sum + (parseFloat(h.amount) || 0);
+                            }
+                            return sum;
+                        }, 0);
+
+                        const balanceAtDawn = currentBalance + paidToday;
+                        
+                        // Si la deuda al amanecer era menor que la cuota, la meta es solo la deuda
+                        if (installmentValue > balanceAtDawn) {
+                            installmentValue = balanceAtDawn;
+                        }
+
+                        calculatedDailyGoal += installmentValue;
+                    }
+                });
+            });
+
+            kpiGoal.textContent = money(calculatedDailyGoal);
+            const { dailyTotal } = calculateDailyTotals();
+            kpiReceived.textContent = money(dailyTotal);
+
+            if (kpiRemaining) {
+                const remainingItems = (clientsForDashboard || []).filter(item => {
+                    if (item.loan.status === 'finished') return false;
+                    const paidTodayVal = (item.loan.history || []).reduce((sum, h) => {
+                        if (h.status !== 'rejected' && h.status !== 'pending_verification' && h.method !== 'migration' && checkIsToday(h.date)) {
+                            return sum + (parseFloat(h.amount) || 0);
+                        }
+                        return sum;
+                    }, 0);
+                    return paidTodayVal === 0;
+                });
+                kpiRemaining.textContent = remainingItems.length;
+            }
+        }
         
 
     /* STREAMING_CHUNK: Refinando el cálculo del Capital en Mano (Cerebro Financiero) */
@@ -4021,279 +4024,224 @@ const paymentDayLabelHtml = `
         }
 
         /* STREAMING_CHUNK: Función updateTodaysRouteList Completa y Segura */
-function updateTodaysRouteList() {
-    const today = new Date();
-    if (today.getHours() < 5) today.setDate(today.getDate() - 1);
-    today.setHours(0, 0, 0, 0);
-    const dayOfWeek = today.getDay();
-    const dayOfMonth = today.getDate();
-    const todayStr = today.toLocaleDateString('pt-BR');
 
-    const getPaymentDate = (dateObj) => {
-        if (!dateObj) return null;
-        let d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj);
-        if (d && !isNaN(d.getTime())) {
-            let logicalDate = new Date(d);
-            if (logicalDate.getHours() < 5) logicalDate.setDate(logicalDate.getDate() - 1);
-            logicalDate.setHours(0, 0, 0, 0);
-            return logicalDate;
-        }
-        return null;
-    };
+        function updateTodaysRouteList() {
+            const today = new Date();
+            if (today.getHours() < 5) today.setDate(today.getDate() - 1);
+            today.setHours(0, 0, 0, 0);
+            const dayOfWeek = today.getDay();
+            const dayOfMonth = today.getDate();
 
-    let clientsForRoute = [];
-
-    allClients.forEach(client => {
-        if (!client.loans || client.loans.length === 0) return;
-        if (client.isBlacklisted === true) return;
-
-        client.loans.forEach((loan, index) => {
-            const details = calculateLoanDetails(loan);
-            const isFinished = (details.status === 'finished');
-            
-            // Si el préstamo ya está finalizado, no tiene sentido que esté en la ruta
-            if (isFinished) return;
-
-            let isScheduledForToday = false;
-            const frequency = loan.paymentFrequency || 'daily';
-            const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
-
-            if (frequency === 'daily') {
-                isScheduledForToday = paymentDays.includes(dayOfWeek); 
-            } else if (frequency === 'weekly') {
-                isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
-            } else if (frequency === 'biweekly') {
-                if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
-                    const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                    startDate.setHours(0,0,0,0);
-                    const diffTime = today.getTime() - startDate.getTime();
-                    const diffDays = Math.round(diffTime / 86400000); 
-                    if (Math.floor(diffDays / 7) % 2 === 0) isScheduledForToday = true;
+            const getPaymentDate = (dateObj) => {
+                if (!dateObj) return null;
+                let d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj);
+                if (d && !isNaN(d.getTime())) {
+                    let logicalDate = new Date(d);
+                    if (logicalDate.getHours() < 5) logicalDate.setDate(logicalDate.getDate() - 1);
+                    logicalDate.setHours(0, 0, 0, 0);
+                    return logicalDate;
                 }
-            } else if (frequency === 'monthly') {
-                isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
-            }
+                return null;
+            };
 
-            // Verificar si ya se gestionó hoy (pago o visita fallida)
-            let hasActionToday = (loan.history || []).some(h => {
-                if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
-                const pDate = getPaymentDate(h.date);
-                return pDate && pDate.toLocaleDateString('pt-BR') === todayStr && 
-                       (h.status === 'approved' || h.status === 'skipped' || h.status === 'pending_verification');
+            let clientsForRoute = [];
+
+            allClients.forEach(client => {
+                if (!client.loans || client.loans.length === 0) return;
+                if (client.isBlacklisted === true) return;
+
+                client.loans.forEach((loan, index) => {
+                    const details = calculateLoanDetails(loan);
+                    if (details.status === 'finished') return;
+
+                    let isScheduledForToday = false;
+                    const frequency = loan.paymentFrequency || 'daily';
+                    const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
+
+                    if (frequency === 'daily') isScheduledForToday = paymentDays.includes(dayOfWeek); 
+                    else if (frequency === 'weekly') isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+                    else if (frequency === 'biweekly') {
+                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
+                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                            startDate.setHours(0,0,0,0);
+                            const diffDays = Math.round(Math.abs(today.getTime() - startDate.getTime()) / 86400000); 
+                            if (Math.floor(diffDays / 7) % 2 === 0) isScheduledForToday = true;
+                        }
+                    } else if (frequency === 'monthly') isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+
+                    let hasActionToday = (loan.history || []).some(h => {
+                        if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
+                        const pDate = getPaymentDate(h.date);
+                        // CORRECCIÓN MÁXIMA DE FECHAS
+                        return pDate && 
+                               pDate.getFullYear() === today.getFullYear() &&
+                               pDate.getMonth() === today.getMonth() &&
+                               pDate.getDate() === today.getDate() && 
+                               (h.status === 'approved' || h.status === 'skipped' || h.status === 'pending_verification');
+                    });
+
+                    if ((isScheduledForToday || details.status === 'late') && !hasActionToday) {
+                        clientsForRoute.push({ 
+                            client, 
+                            loan: { ...loan, status: details.status, lateDays: details.lateDays, amountDueToday: details.amountDueToday }, 
+                            loanIndex: index 
+                        });
+                    }
+                });
             });
 
-            const isLate = (details.status === 'late');
+            const manualOrderClients = clientsForRoute.filter(c => c.loan.routeOrder && c.loan.routeOrder > 0);
+            const autoOrderClients = clientsForRoute.filter(c => !c.loan.routeOrder || c.loan.routeOrder <= 0);
+            manualOrderClients.sort((a, b) => a.loan.routeOrder - b.loan.routeOrder);
             
-            // Mostrar si (Toca hoy O está atrasado) Y (No se ha gestionado hoy)
-            if ((isScheduledForToday || isLate) && !hasActionToday) {
-                clientsForRoute.push({ 
-                    client, 
-                    loan: { ...loan, status: details.status, lateDays: details.lateDays, amountDueToday: details.amountDueToday }, 
-                    loanIndex: index 
-                });
-            }
-        });
-    });
+            autoOrderClients.sort((a, b) => {
+                if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
+                if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
+                return a.client.name.localeCompare(b.client.name);
+            });
 
-    // Ordenamiento manual y optimización GPS
-    const manualOrderClients = clientsForRoute.filter(c => c.loan.routeOrder && c.loan.routeOrder > 0);
-    const autoOrderClients = clientsForRoute.filter(c => !c.loan.routeOrder || c.loan.routeOrder <= 0);
-    manualOrderClients.sort((a, b) => a.loan.routeOrder - b.loan.routeOrder);
-    
-    autoOrderClients.sort((a, b) => {
-        if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
-        if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
-        return a.client.name.localeCompare(b.client.name);
-    });
+            const optimizedAutoClients = optimizeRoute(autoOrderClients, collectorCurrentLocation);
+            const finalRoute = [...manualOrderClients, ...optimizedAutoClients];
 
-    const optimizedAutoClients = optimizeRoute(autoOrderClients, collectorCurrentLocation);
-    const finalRoute = [...manualOrderClients, ...optimizedAutoClients];
-
-    updateDashboard(finalRoute); 
-    if (document.querySelector('#map-view.active')) plotClientsOnMap();
-    renderClientCards(document.getElementById('todays-route-list'), finalRoute);
-}
-        
+            updateDashboard(finalRoute); 
+            if (document.querySelector('#map-view.active')) plotClientsOnMap();
+            renderClientCards(document.getElementById('todays-route-list'), finalRoute);
+        }
 
 
 
 
     function updateAllClientsList() {
-        const container = document.getElementById('all-clients-list');
-        const searchInput = document.getElementById('client-search-input');
-        let activeFilter = document.querySelector('.filter-buttons .filter-btn.active');
-        let filter = activeFilter ? activeFilter.dataset.filter : 'all';
+            const container = document.getElementById('all-clients-list');
+            const searchInput = document.getElementById('client-search-input');
+            let activeFilter = document.querySelector('.filter-buttons .filter-btn.active');
+            let filter = activeFilter ? activeFilter.dataset.filter : 'all';
 
-        if (!container || !searchInput) return;
+            if (!container || !searchInput) return;
 
-        const searchTerm = searchInput.value.toLowerCase().trim();
-        const todayStart = new Date();
-if (todayStart.getHours() < 5) todayStart.setDate(todayStart.getDate() - 1);
-todayStart.setHours(0, 0, 0, 0);
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const todayStart = new Date();
+            if (todayStart.getHours() < 5) todayStart.setDate(todayStart.getDate() - 1);
+            todayStart.setHours(0, 0, 0, 0);
 
-        const getPaymentDate = (dateObj) => {
-    if (!dateObj) return null;
-    let d;
-    if (typeof dateObj.toDate === 'function') d = dateObj.toDate();
-    else if (dateObj instanceof Date) d = dateObj;
-    else if (typeof dateObj === 'string') d = new Date(dateObj);
-    
-    if (d && !isNaN(d.getTime())) {
-        // ESCUDO: Si el pago se registró antes de las 5 AM, 
-        // lo tratamos como si fuera de la jornada de ayer para que coincida con la ruta.
-        let logicalDate = new Date(d);
-        if (logicalDate.getHours() < 5) {
-            logicalDate.setDate(logicalDate.getDate() - 1);
-        }
-        logicalDate.setHours(0, 0, 0, 0);
-        return logicalDate;
-    }
-    return null;
-};
+            const dayOfWeek = todayStart.getDay();
+            const dayOfMonth = todayStart.getDate();
 
-        let clientsWithLoans = [];
-
-        allClients.forEach(client => {
-            const hasNoLoans = !client.loans || client.loans.length === 0;
-
-            // --- INICIO NUEVO: LÓGICA DE LISTA NEGRA ---
-            // Si estamos en la pestaña "Lista Negra", solo mostramos los bloqueados
-            if (filter === 'blacklisted') {
-                if (client.isBlacklisted === true) {
-                    let matchesSearch = true;
-                    if (searchTerm) {
-                        matchesSearch = client.name.toLowerCase().includes(searchTerm) || 
-                                        (client.documentNumber && client.documentNumber.includes(searchTerm));
-                    }
-                    if (matchesSearch) {
-                        const lastLoanIdx = hasNoLoans ? 0 : client.loans.length - 1;
-                        const loanData = hasNoLoans ? null : client.loans[lastLoanIdx];
-                        clientsWithLoans.push({ client, loan: loanData, loanIndex: lastLoanIdx });
-                    }
+            const getPaymentDate = (dateObj) => {
+                if (!dateObj) return null;
+                let d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj);
+                if (d && !isNaN(d.getTime())) {
+                    let logicalDate = new Date(d);
+                    if (logicalDate.getHours() < 5) logicalDate.setDate(logicalDate.getDate() - 1);
+                    logicalDate.setHours(0, 0, 0, 0);
+                    return logicalDate;
                 }
-                return; // Evita que se evalúen los demás filtros para este cliente
-            }
+                return null;
+            };
 
-            // Si NO estamos en "Lista Negra", ocultamos a los bloqueados de todas las demás pestañas
-            if (client.isBlacklisted === true) return;
-            // --- FIN NUEVO: LÓGICA DE LISTA NEGRA ---
+            let clientsWithLoans = [];
 
-            // FILTRO PREVENTA: Solo pasan los que NO tienen préstamos
-            if (filter === 'pre_sale') {
-                if (hasNoLoans) {
-                    let matchesSearch = true;
-                    if (searchTerm) {
-                        matchesSearch = client.name.toLowerCase().includes(searchTerm);
+            allClients.forEach(client => {
+                const hasNoLoans = !client.loans || client.loans.length === 0;
+
+                if (filter === 'blacklisted') {
+                    if (client.isBlacklisted === true) {
+                        let matchesSearch = true;
+                        if (searchTerm) matchesSearch = client.name.toLowerCase().includes(searchTerm) || (client.documentNumber && client.documentNumber.includes(searchTerm));
+                        if (matchesSearch) {
+                            const lastLoanIdx = hasNoLoans ? 0 : client.loans.length - 1;
+                            const loanData = hasNoLoans ? null : client.loans[lastLoanIdx];
+                            clientsWithLoans.push({ client, loan: loanData, loanIndex: lastLoanIdx });
+                        }
                     }
-                    if (matchesSearch) {
-                        clientsWithLoans.push({ client, loan: null, loanIndex: 0 });
-                    }
+                    return; 
                 }
-                return; // IMPORTANTE: Si estamos en filtro preventa, ignoramos el resto de la lógica para este cliente
-            }
 
-            // OTROS FILTROS: Si el cliente no tiene préstamos, lo ignoramos por completo
-            if (hasNoLoans) return;
-            client.loans.forEach((loan, loanIndex) => {
-                // --- INICIO: DEFINICIÓN DE VARIABLES DE APOYO ---
-const hasMigrationHistory = (loan.history || []).some(x => x.method === 'migration');
-const instVal = parseFloat(loan.originalInstallmentAmount || loan.amount || 1);
-const totalInstCount = (loan.installments || "0/0").split('/')[1];
-// --- FIN ---
-                const details = calculateLoanDetails(loan);
-                const currentStatus = details.status; 
+                if (client.isBlacklisted === true) return;
+
+                if (filter === 'pre_sale') {
+                    if (hasNoLoans) {
+                        let matchesSearch = true;
+                        if (searchTerm) matchesSearch = client.name.toLowerCase().includes(searchTerm);
+                        if (matchesSearch) clientsWithLoans.push({ client, loan: null, loanIndex: 0 });
+                    }
+                    return; 
+                }
+
+                if (hasNoLoans) return;
                 
-                // 1. Verificar si tiene CUALQUIER actividad hoy (Pagado O No Pagó Hoy)
-                const hasActivityToday = (loan.history || []).some(h => {
-                    if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return false; 
-                    const pDate = getPaymentDate(h.date);
-                    return pDate && pDate >= todayStart;
-                });
-
-                // 2. Verificar si PAGÓ DINERO REAL hoy (Solo Aprobados)
-                // Esto excluye a los que marcaste como "No Pagó Hoy" (skipped)
-                const hasPaidMoneyToday = (loan.history || []).some(h => {
-                    if (h.status !== 'approved') return false; 
-                    const pDate = getPaymentDate(h.date);
-                    return pDate && pDate >= todayStart;
-                });
-
-                let passesCategory = true;
-
-                if (searchTerm) {
-                    const nameMatch = client.name.toLowerCase().includes(searchTerm);
-                    const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
-                    if (!nameMatch && !addressMatch) passesCategory = false;
-                
-                } else {
-                    if (filter === 'all') {
-                        // "TODOS": Muestra cualquier actividad (Pago o Visita fallida)
-                        if (!hasActivityToday) passesCategory = false;
-                    }
-                     else if (filter === 'weekly') {
-                        if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
-                    }
-                    else if (filter === 'biweekly') {
-                        if (loan.paymentFrequency !== 'biweekly' || currentStatus === 'finished') passesCategory = false;
-                    }
+                client.loans.forEach((loan, loanIndex) => {
+                    const details = calculateLoanDetails(loan);
+                    const currentStatus = details.status; 
                     
-                    // --- COPIA Y PEGA ESTO AQUÍ ---
-                    else if (filter === 'monthly') {
-                        // Muestra solo si es Mensual Y no está finalizado
-                        if (loan.paymentFrequency !== 'monthly' || currentStatus === 'finished') passesCategory = false;
-                    }
-                    // --- FIN DE LO NUEVO ---
-                    else if (filter === 'no_pay_today') {
-                // 1. Solo préstamos activos
-                if (currentStatus === 'finished') passesCategory = false;
-                
-                // 2. Solo el último préstamo
-                if (loanIndex !== client.loans.length - 1) passesCategory = false;
+                    let hasActivityToday = false;
+                    let hasPaidMoneyToday = false;
 
-                // 3. Lógica: Si el cliente SÍ está programado para hoy, lo ocultamos de aquí
-                let isScheduled = false;
-                const freq = loan.paymentFrequency || 'daily';
-                const pDays = loan.paymentDays || [];
-                const dWeek = todayStart.getDay();
-                const dMonth = todayStart.getDate();
+                    (loan.history || []).forEach(h => {
+                        if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return; 
+                        const pDate = getPaymentDate(h.date);
+                        if (pDate && pDate.getFullYear() === todayStart.getFullYear() && pDate.getMonth() === todayStart.getMonth() && pDate.getDate() === todayStart.getDate()) {
+                            hasActivityToday = true;
+                            if (h.status === 'approved') hasPaidMoneyToday = true;
+                        }
+                    });
 
-                if (freq === 'daily') isScheduled = pDays.includes(dWeek);
-                else if (freq === 'weekly' || freq === 'biweekly') isScheduled = pDays.length > 0 && parseInt(pDays[0]) === dWeek;
-                else if (freq === 'monthly') isScheduled = pDays.length > 0 && parseInt(pDays[0]) === dMonth;
+                    // LÓGICA DE DÍA DE DESCANSO (No le toca pagar hoy)
+                    let isPaymentDay = false;
+                    const frequency = loan.paymentFrequency || 'daily';
+                    const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
 
-                if (isScheduled) passesCategory = false;
-            }
-                    else if (filter === 'todo_today') {
-                        // "Falta por Pagar":
-                        // Muestra si NO está finalizado Y NO ha pagado dinero hoy.
-                        // (Si marcaste "No Pagó Hoy", hasPaidMoneyToday es false, así que SÍ APARECE AQUÍ)
-                        if (currentStatus === 'finished' || hasPaidMoneyToday) passesCategory = false;
-                    }
-                    else if (filter === 'paid') {
-                        // "PAGADOS": Solo muestra si pagó dinero real
-                        if (!hasPaidMoneyToday) passesCategory = false;
-                    }
-                    else if (filter === 'late') {
-                        if (currentStatus !== 'late') passesCategory = false;
-                    }
-                    else if (filter === 'finished') {
-    if (currentStatus !== 'finished') passesCategory = false;
-    // NUEVO: Ocultar los préstamos anteriores, solo mostrar si es el último préstamo que tuvo
-    if (loanIndex !== client.loans.length - 1) passesCategory = false;
-} 
-                    
-                }
+                    if (frequency === 'daily') isPaymentDay = paymentDays.includes(dayOfWeek); 
+                    else if (frequency === 'weekly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+                    else if (frequency === 'biweekly') {
+                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
+                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
+                            startDate.setHours(0,0,0,0);
+                            const diffDays = Math.round(Math.abs(todayStart.getTime() - startDate.getTime()) / 86400000); 
+                            if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
+                        }
+                    } else if (frequency === 'monthly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
 
-                if (passesCategory) {
-                    clientsWithLoans.push({ client, loan, loanIndex }); 
-                }
+
+                    let passesCategory = true;
+
+                    if (searchTerm) {
+                        const nameMatch = client.name.toLowerCase().includes(searchTerm);
+                        const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
+                        if (!nameMatch && !addressMatch) passesCategory = false;
+                    } else {
+                        if (filter === 'all') {
+                            if (!hasActivityToday) passesCategory = false;
+                        } else if (filter === 'weekly') {
+                            if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
+                        } else if (filter === 'biweekly') {
+                            if (loan.paymentFrequency !== 'biweekly' || currentStatus === 'finished') passesCategory = false;
+                        } else if (filter === 'monthly') {
+                            if (loan.paymentFrequency !== 'monthly' || currentStatus === 'finished') passesCategory = false;
+                        } else if (filter === 'no_pay_today') {
+                            // CORRECCIÓN EXACTA: Mostrar los activos cuyo día de hoy NO está en su contrato
+                            if (currentStatus === 'finished' || isPaymentDay === true) passesCategory = false;
+                        } else if (filter === 'todo_today') {
+                            if (currentStatus === 'finished' || hasPaidMoneyToday) passesCategory = false;
+                        } else if (filter === 'paid') {
+                            if (!hasPaidMoneyToday) passesCategory = false;
+                        } else if (filter === 'late') {
+                            if (currentStatus !== 'late') passesCategory = false;
+                        } else if (filter === 'finished') {
+                            if (currentStatus !== 'finished') passesCategory = false;
+                            if (loanIndex !== client.loans.length - 1) passesCategory = false;
+                        } 
+                    }
+
+                    if (passesCategory) {
+                        clientsWithLoans.push({ client, loan, loanIndex }); 
+                    }
+                });
             });
-        });
-        
-        // Ordenar alfabéticamente
-        clientsWithLoans.sort((a, b) => a.client.name.localeCompare(b.client.name));
-        renderClientCards(container, clientsWithLoans);
-    }
+            
+            clientsWithLoans.sort((a, b) => a.client.name.localeCompare(b.client.name));
+            renderClientCards(container, clientsWithLoans);
+        }
         
         // --- PEGAR ESTO ANTES DE function showClientDetails ---
 
@@ -9368,6 +9316,3 @@ function sendWhatsAppCollection(clientId, loanIndex) {
     </script>
 </body>
     </html>
-
-
-
