@@ -966,6 +966,7 @@ try {
         let currentDetailLoanIndex = null; // Guarda el índice del préstamo en vista detallada
         let currentPaymentDetailState = null;
         let allExpenses = [];
+        let allAdminExpenses = [];
         let allSettlements = [];
         let allCapitalInjections = []; // <-- AÑADE ESTA LÍNEA
         let currentCapitalOnHand = 0;    // <-- AÑADE ESTA LÍNEA
@@ -3280,11 +3281,15 @@ function updateProfileView(collectorData = null) {
     });
 
     // 4. Egresos y Aportes externos
-    const totalExpenses = allExpenses.reduce((sum, e) => sum + (Number(e.value) || 0), 0);
+    // Modificado para atrapar si el gasto se guardó como 'value' o como 'amount'
+    const totalExpenses = allExpenses.reduce((sum, e) => sum + (Number(e.value) || Number(e.amount) || 0), 0);
     
-    // Retiradas entregadas al Admin (Solo las aprobadas descuentan caja)
+    // Gastos Administrativos (Los que el Admin le descuenta al cobrador)
+    const totalAdminExpenses = allAdminExpenses.reduce((sum, e) => sum + (Number(e.amount) || Number(e.value) || 0), 0);
+
+    // Retiradas entregadas al Admin (SE ELIMINÓ la restricción del micro seguro para que descuente el efectivo entregado)
     const totalSettled = allSettlements
-        .filter(s => s.status === 'approved' && s.type !== 'insurance')
+        .filter(s => s.status === 'approved')
         .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
     // Inyecciones de capital del Admin (Solo aprobadas suman a caja)
@@ -3293,26 +3298,20 @@ function updateProfileView(collectorData = null) {
         .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
 
     // 5. SALDOS BASE
-    // Capital Inicial definido por el Admin
     const currentStartingCapital = (collectorData?.startingCapitalOnHand !== undefined) 
         ? Number(collectorData.startingCapitalOnHand) 
         : (Number(collectorData?.startingCapital) || 0);
 
-    // Saldo histórico (Este es el "ajuste" por clientes borrados o migraciones antiguas)
     const historicalBalance = Number(collectorData?.historicalBalance || 0);
 
-    /* STREAMING_CHUNK: Calculando Multas para Arrastre de Caja */
-    // --- NUEVA LÓGICA DE MULTAS PARA CUADRE DE CAJA ---
-    /* STREAMING_CHUNK: Calculando Multas para Arrastre de Caja */
-    // --- NUEVA LÓGICA DE MULTAS PARA CUADRE DE CAJA ---
-    // CORRECCIÓN: No sumar multas al capital en mano hasta que el cliente las pague.
-    // El dinero pagado ya está incluido en "totalPaymentsReceived".
     let totalFinesEffect = 0; 
 
     // --- REEMPLAZO DE LA FÓRMULA MAESTRA ---
-    // Eliminamos totalFinesEffect de la suma para evitar dinero fantasma en la caja.
+    // Ahora restamos totalAdminExpenses y el totalSettled ya incluye todo el efectivo que salió.
     const capitalTotal = (Number(currentStartingCapital) + Number(totalInjected) + Number(totalPaymentsReceived) + Number(historicalBalance)) - 
-                         (Number(totalLoansMade) + Number(totalExpenses) + Number(totalSettled));
+                         (Number(totalLoansMade) + Number(totalExpenses) + Number(totalSettled) + Number(totalAdminExpenses));
+    
+    currentCapitalOnHand = capitalTotal;
     
     currentCapitalOnHand = capitalTotal;
 
@@ -8978,6 +8977,14 @@ function renderVerificationResults(container, warnings, systemLoans) {
         }, (error) => {
             console.error("Error al obtener clientes: ", error);
             showToast('Falha ao carregar clientes.', true);
+        });
+        // Listener de Gastos Administrativos
+        const adminExpensesQuery = query(collection(db, 'companies', currentCompanyId, 'adminExpenses'), where("collectorId", "==", currentCollectorUsername));
+        onSnapshot(adminExpensesQuery, (snapshot) => {
+            allAdminExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            updateProfileView(currentCollectorData); 
+        }, (error) => {
+            console.error("Error al obtener gastos del admin: ", error);
         });
 
         // Listener de Gastos
