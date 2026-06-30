@@ -4298,7 +4298,8 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
             // --- VERIFICAR PERMISO EDITAR ---
             const canEdit = !currentCollectorData?.blockClientEdit;
             // --- VERIFICAR PERMISO NUEVOS PRÉSTAMOS ---
-            const canCreateLoan = !currentCollectorData?.blockNewLoans;
+          
+            const canCreateLoan = true;
             const editButtonHtml = canEdit 
                 ? `<button id="editClientBtn" class="header-btn" title="Editar"><i data-lucide="edit"></i></button>` 
                 : '';
@@ -4565,20 +4566,23 @@ if (!loan) {
                     <span style="text-align: center;">${currentLang === 'es' ? 'Sacar de<br>Lista' : 'Tirar da<br>Lista'}</span>
                 </button>`;
             }
-            const actionButtonsHtml = currentStatus === 'finished' ? `
-                ${updateBtnHtml}
-                ${newLoanBtnFinished}
-            ` : `
-                <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> <span data-lang-key="startRoute"></span></button>
-                <button class="btn-secondary" id="sendReceiptBtn"><i data-lucide="file-text"></i> Enviar comprobante</button>
-                ${newLoanBtnActive}
-                <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> Hacer Pagamento</button>
-                <button class="btn-secondary" id="fastCollectionBtn" style="border-color: #25D366; color: #25D366;">
-                <i data-lucide="message-circle"></i> 
-                <span style="text-align: center;">${currentLang === 'es' ? 'Cobro<br>Rápido' : (currentLang === 'en' ? 'Quick<br>Collect' : 'Cobrança<br>Rápida')}</span>
-                </button>
-                ${blacklistBtnHtml}:
-            `; 
+             // Estructura robusta: Garantizamos los botones para clientes finalizados
+    let actionButtonsHtml = '';
+
+    if (currentStatus === 'finished') {
+        actionButtonsHtml = `
+            ${updateBtnHtml}
+            <button class="btn-primary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> Nuevo Préstamo</button>
+        `;
+    } else {
+        actionButtonsHtml = `
+    <button class="btn-secondary" id="startRouteBtn"><i data-lucide="navigation"></i> Iniciar Ruta</button>
+    <button class="btn-secondary" id="sendReceiptBtn"><i data-lucide="file-text"></i> Enviar comprobante</button>
+    ${canCreateLoan ? '<button class="btn-secondary" id="createNewLoanBtn"><i data-lucide="plus-circle"></i> Nuevo Préstamo</button>' : ''}
+    <button class="btn-primary" id="registerPaymentBtn" data-loan-index="${currentLoanIndex}"><i data-lucide="dollar-sign"></i> Hacer Pagamento</button>
+    ${blacklistBtnHtml}
+`;
+    }
 
             let messages = loan.chatHistory || [];
             if (messages.length === 0 && loan.notes && loan.notes.trim() !== '') {
