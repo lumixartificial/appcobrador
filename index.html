@@ -8039,9 +8039,9 @@ function showReportDateModal() {
 
             const viewEl = document.getElementById(`${viewName}-view`);
             if (viewEl) viewEl.classList.add('active');
-
-            const canCreateLoanGlobal = !currentCollectorData?.blockNewLoans;
-            document.getElementById('addClientBtn').classList.toggle('hidden', !['home', 'clients'].includes(viewName) || !canCreateLoanGlobal);
+            const estaEnRutaValida = ['home', 'clients'].includes(viewName);
+            document.getElementById('addClientBtn').classList.toggle('hidden', !estaEnRutaValida);
+           
             document.getElementById('addExpenseBtn').classList.toggle('hidden', viewName !== 'expenses');
             
             if (viewName === 'map') {
