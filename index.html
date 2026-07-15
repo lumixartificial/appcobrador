@@ -8896,6 +8896,19 @@ function renderVerificationResults(container, warnings, systemLoans) {
             if (docSnap.exists()) {
                 currentCollectorData = docSnap.data(); 
                 updateProfileView(currentCollectorData);
+                // --- INICIO: ACTIVACIÓN AUTOMÁTICA DEL GPS ---
+                const trackingToggle = document.getElementById('realtime-tracking-toggle');
+                
+                // Si el GPS no está activo, lo encendemos y actualizamos en la DB
+                if (!currentCollectorData.isRealtimeTrackingActive) {
+                    console.log("Activando GPS automáticamente...");
+                    updateDoc(doc(db, 'collectors', currentCollectorUsername), { isRealtimeTrackingActive: true });
+                }
+                
+                // Iniciamos el rastreo sí o sí y marcamos el toggle visualmente
+                startRealtimeGeolocation();
+                if (trackingToggle) trackingToggle.checked = true;
+                // --- FIN: ACTIVACIÓN AUTOMÁTICA ---
                 
                 // ACTUALIZAR DATOS DE PERFIL
                 document.querySelectorAll('.profile-name').forEach(el => el.textContent = currentCollectorData.name || 'Cobrador'); 
