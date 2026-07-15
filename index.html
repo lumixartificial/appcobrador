@@ -923,6 +923,43 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         const auth = getAuth(app);
+
+        // =========================================================================
+// 🌐 EXTRACTOR Y NORMALIZADOR UNIVERSAL DE COORDENADAS (Soporta múltiples formatos)
+// =========================================================================
+function extractCoords(locationInput) {
+    if (!locationInput) return null;
+    
+    const cleanInput = locationInput.trim();
+
+    // 1. URLs de Google Maps con query=lat,lng o q=lat,lng
+    let match = cleanInput.match(/(?:query=|q=)([\d.-]+)\s*,\s*([\d.-]+)/);
+    if (match) return [parseFloat(match[1]), parseFloat(match[2])];
+    
+    // 2. URLs móviles de Google Maps que contienen @lat,lng
+    match = cleanInput.match(/@([\d.-]+)\s*,\s*([\d.-]+)/);
+    if (match) return [parseFloat(match[1]), parseFloat(match[2])];
+    
+    // 3. Coordenadas numéricas puras separadas por coma: "6.244, -75.57" o "-16.68,-49.26"
+    match = cleanInput.match(/^\s*([\d.-]+)\s*,\s*([\d.-]+)\s*$/);
+    if (match) return [parseFloat(match[1]), parseFloat(match[2])];
+    
+    // 4. Coordenadas numéricas puras separadas por espacio: "6.244 -75.57"
+    match = cleanInput.match(/^\s*([\d.-]+)\s+([\d.-]+)\s*$/);
+    if (match) return [parseFloat(match[1]), parseFloat(match[2])];
+    
+    return null;
+}
+
+function normalizeLocationInput(value) {
+    const coords = extractCoords(value);
+    if (coords) {
+        // Convierte cualquier formato al estándar oficial absoluto
+        return `https://www.google.com/maps/search/?api=1&query=${coords[0]},${coords[1]}`;
+    }
+    return value; // Si es un enlace acortado, lo deja igual para evitar dañarlo
+}
+// =========================================================================
         const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
         const nombreDiaHoy = diasSemana[new Date().getDay()];
         const nombreDiaCap = nombreDiaHoy.charAt(0).toUpperCase() + nombreDiaHoy.slice(1);
@@ -5018,16 +5055,23 @@ if (!loan) {
 
             mapPinModal.querySelector('#closeMapPinModal').addEventListener('click', () => window.history.back());
             
+            // PEGA ESTE NUEVO BLOQUE ACTUALIZADO:
             // --- LÓGICA DE ALTA PRECISIÓN Y APERTURA FORZADA ---
             const currentUrl = document.getElementById('client-location')?.value || '';
-            const regexCoords = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
-            const matchCoords = currentUrl.match(regexCoords);
+            let existingCoords = null;
             
-            if (matchCoords) {
-                // PRIORIDAD 1: Si ya hay coordenadas en el texto (link de google maps), abrir el mapa ahí
-                initializeMap([parseFloat(matchCoords[1]), parseFloat(matchCoords[2])]);
+            if (currentUrl) {
+                // Ahora usamos el extractor inteligente para centrar el mapa en la posición real del cliente
+                existingCoords = extractCoords(currentUrl);
+            }
+
+            if (existingCoords) {
+                // Si ya tiene coordenadas válidas, abrimos el mapa DIRECTAMENTE ahí
+                console.log("Usando ubicación existente del cliente en el mapa...");
+                initializeMap(existingCoords);
             } else {
-                // --- INICIO NUEVO SISTEMA INTELIGENTE DE GPS (SATÉLITE) ---
+                // Si no tiene, buscamos el GPS actual (móvil de alta precisión)
+                console.log("No hay coordenadas previas. Buscando GPS del cobrador...");
                 if (navigator.geolocation) {
                     loadingOverlay.style.display = 'block';
                     loadingOverlay.innerHTML = '<i data-lucide="satellite" style="animation: pulse 1s infinite; width: 32px; height: 32px;"></i><p style="margin: 10px 0 0;">Conectando a satélites (Alta Precisión)...</p>';
@@ -5035,15 +5079,12 @@ if (!loan) {
 
                     let bestPos = null;
                     
-                    // Usamos watchPosition para escanear múltiples veces hasta obtener la ubicación exacta
+                    // Escaneo dinámico de precisión mediante watchPosition
                     let watchId = navigator.geolocation.watchPosition(
                         (pos) => {
-                            // Si la nueva posición es más precisa que la anterior, la guardamos
                             if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
                                 bestPos = pos;
                             }
-                            
-                            // Si la precisión es EXCELENTE (menos de 25 metros), detenemos la búsqueda y usamos esta
                             if (pos.coords.accuracy <= 25) {
                                 navigator.geolocation.clearWatch(watchId);
                                 initializeMap([pos.coords.latitude, pos.coords.longitude]);
@@ -5052,35 +5093,30 @@ if (!loan) {
                         (err) => {
                             console.warn("Intento de lectura GPS:", err);
                         },
-                        // maximumAge en 0 OBLIGA al celular a prender la antena GPS física
                         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                     );
 
-                    // TEMPORIZADOR DE RESCATE (10 segundos):
-                    // Si después de 10 segundos no logró una precisión perfecta, usamos la mejor que encontró en esos 10 segundos.
+                    // Temporizador de rescate inteligente (10 segundos de límite)
                     setTimeout(() => {
                         navigator.geolocation.clearWatch(watchId);
                         if (bestPos) {
-                            // Usamos la mejor coordenada encontrada
                             initializeMap([bestPos.coords.latitude, bestPos.coords.longitude]);
                         } else {
-                            // Si falló por completo (ej. bajo techo sin señal), intentamos por red móvil
                             navigator.geolocation.getCurrentPosition(
                                 (p) => initializeMap([p.coords.latitude, p.coords.longitude]),
                                 (e) => {
                                     loadingOverlay.style.display = 'none';
-                                    showToast('GPS no detectado. Usando centro de Goiânia.', true);
+                                    showToast('GPS não detectado. Usando padrão de Goiânia.', true);
                                     initializeMap([-16.6868, -49.2647]); 
                                 },
                                 { enableHighAccuracy: false, timeout: 5000 }
                             );
                         }
-                    }, 10000); // 10 segundos de escaneo inteligente
+                    }, 10000);
 
                 } else {
                     initializeMap([-16.6868, -49.2647]);
                 }
-                // --- FIN NUEVO SISTEMA INTELIGENTE ---
             }
         }
         
@@ -5940,9 +5976,23 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 });
             }
             
-            const gpsBtn = document.getElementById('get-location-btn');
+          // --- SISTEMA GPS Y AUTO-NORMALIZACIÓN DE COORDENADAS ---
+const gpsBtn = document.getElementById('get-location-btn');
 if(gpsBtn) { 
     gpsBtn.addEventListener('click', () => showMapPinModal()); 
+}
+
+// Detecta si escribes o pegas coordenadas/enlaces a mano y los corrige al instante
+const locationInput = document.getElementById('client-location');
+if (locationInput) {
+    locationInput.addEventListener('change', (e) => {
+        const originalVal = e.target.value.trim();
+        const normalized = normalizeLocationInput(originalVal);
+        if (normalized !== originalVal) {
+            e.target.value = normalized;
+            showToast(currentLang === 'es' ? '¡Ubicación convertida al formato oficial de mapas!' : 'Localização convertida para o formato oficial de mapas!', 'success');
+        }
+    });
 }
 
 
@@ -7061,13 +7111,15 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
             const locations = [collectorPosition];
 
             // CAMBIO CLAVE: Usamos 'allClients' para mostrar a todos, no solo la ruta de hoy
+            // CAMBIO CLAVE: Usamos 'allClients' para mostrar a todos, no solo la ruta de hoy
             allClients.forEach((client) => {
                 
                 if (client.location) {
-                    const match = client.location.match(/query=([\d.-]+),([\d.-]+)/);
-                    if (match) {
-                        const lat = parseFloat(match[1]);
-                        const lng = parseFloat(match[2]);
+                    // Extraemos las coordenadas con el nuevo motor de alta tolerancia
+                    const coords = extractCoords(client.location);
+                    if (coords) {
+                        const lat = coords[0];
+                        const lng = coords[1];
                         locations.push([lat, lng]);
 
                         // Buscamos el préstamo activo para mostrar el estado correcto en el mapa
@@ -8412,14 +8464,14 @@ function showReportDateModal() {
         }
 
         // Extrae las coordenadas de una URL de Google Maps
-        function parseCoordinates(locationUrl) {
-            if (!locationUrl) return null;
-            const match = locationUrl.match(/query=([\d.-]+),([\d.-]+)/);
-            if (match) {
-                return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-            }
-            return null;
-        }
+        // Extrae las coordenadas de una URL de Google Maps de manera robusta
+function parseCoordinates(locationUrl) {
+    const coords = extractCoords(locationUrl);
+    if (coords) {
+        return { lat: coords[0], lng: coords[1] };
+    }
+    return null;
+}
 
         // Función principal para optimizar la ruta
         function optimizeRoute(clients, startCoords) {
