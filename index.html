@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- ETIQUETAS ANTI-CACHÉ PARA QUE LOS CELULARES ACTUALICEN EL CÓDIGO -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -9127,6 +9131,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
 
 
         
+         // ... existing code ...
          function init() {
             applyLanguage(currentLang); // Traducir Login inmediatamente
             // --- VARIABLE DE CONTROL DE DÍA ---
@@ -9134,14 +9139,20 @@ function renderVerificationResults(container, warnings, systemLoans) {
 
             document.body.classList.add('dark-mode');
             
+            // --- NUEVO: DESTRUCTOR DE CACHÉ SILENCIOSO ---
+            // Obliga al celular a vaciar su memoria interna PWA al arrancar
+            if ('caches' in window) {
+                caches.keys().then(function(cacheNames) {
+                    cacheNames.forEach(function(cacheName) {
+                        caches.delete(cacheName);
+                    });
+                });
+            }
+            // ---------------------------------------------
             
-            // ----------------------------------------
-
-            // --- PWA Banner ---
-            // ... (resto de la función sigue igual)
-
             // --- PWA Banner ---
             window.addEventListener('beforeinstallprompt', (e) => {
+// ... existing code ...
                 e.preventDefault();
                 deferredPrompt = e;
                 const installBanner = document.getElementById('install-banner');
@@ -9246,6 +9257,7 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 }
             }, 1000);
 
+            // ... existing code ...
             // --- Service Worker ---
             if ('serviceWorker' in navigator) {
                 if (window.location.protocol === 'blob:') {
@@ -9254,6 +9266,10 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     navigator.serviceWorker.register('firebase-messaging-sw.js')
                     .then(reg => {
                         console.log('Service Worker registrado.');
+                        
+                        // NUEVO: Obligar a buscar la versión más reciente del servidor
+                        reg.update();
+
                         if (typeof currentCollectorUsername !== 'undefined' && currentCollectorUsername) {
                              setupFCM(currentCollectorUsername, reg);
                         }
@@ -9261,6 +9277,9 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     .catch(console.error);
                 }
             }
+
+            // --- Auth State ---
+// ... existing code ...
 
             // --- Auth State ---
             const splash = document.getElementById('splash-screen');
