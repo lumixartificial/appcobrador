@@ -3494,13 +3494,19 @@ function calculateLoanDetails(loan) {
             // --- ORDENAMIENTO FORZADO AQUI ---
             // Esto asegura que cada vez que alguien llame a esta función, 
             // la lista se pinte ordenada, sin importar la fuente.
-            if (clientsData && clientsData.length > 0) {
-                clientsData.sort((a, b) => {
-                    const nameA = (a.client.name || "").toLowerCase();
-                    const nameB = (b.client.name || "").toLowerCase();
-                    return nameA.localeCompare(nameB);
-                });
-            }
+           // --- ORDENAMIENTO INTELIGENTE ---
+// Solo ordenamos si la lista NO tiene un "routeOrder" (que es el orden manual)
+if (clientsData && clientsData.length > 0) {
+    const tieneOrdenManual = clientsData.some(item => item.loan && item.loan.routeOrder > 0);
+    
+    if (!tieneOrdenManual) {
+        clientsData.sort((a, b) => {
+            const nameA = (a.client.name || "").toLowerCase();
+            const nameB = (b.client.name || "").toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+    }
+}
             // --- FIN DEL ORDENAMIENTO ---
 
             if (!clientsData || clientsData.length === 0) {
