@@ -4283,12 +4283,16 @@ const paymentDayLabelHtml = `
                 });
             });
             
-            // BLOQUE DE REEMPLAZO 1
-            clientsWithLoans.sort((a, b) => {
-                return a.client.name.localeCompare(b.client.name);
-            });
-            renderClientCards(container, clientsWithLoans);
-        }
+           // --- ORDENAMIENTO ALFABÉTICO (DE LA A A LA Z) ---
+    clientsWithLoans.sort((a, b) => {
+        const nombreA = a.client.name ? a.client.name.toLowerCase() : "";
+        const nombreB = b.client.name ? b.client.name.toLowerCase() : "";
+        return nombreA.localeCompare(nombreB);
+    });
+
+    // --- RENDERIZADO FINAL ---
+    renderClientCards(container, clientsWithLoans);
+}
         
         // --- PEGAR ESTO ANTES DE function showClientDetails ---
 
