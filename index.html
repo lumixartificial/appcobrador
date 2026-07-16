@@ -4125,21 +4125,24 @@ const paymentDayLabelHtml = `
                     }
                 });
             });
-
+            // BLOQUE DE REEMPLAZO 2
             const manualOrderClients = clientsForRoute.filter(c => c.loan.routeOrder && c.loan.routeOrder > 0);
             const autoOrderClients = clientsForRoute.filter(c => !c.loan.routeOrder || c.loan.routeOrder <= 0);
+            
+            // Orden manual
             manualOrderClients.sort((a, b) => a.loan.routeOrder - b.loan.routeOrder);
             
-            autoOrderClients.sort((a, b) => {
-                if (a.loan.status === 'late' && b.loan.status !== 'late') return -1;
-                if (a.loan.status !== 'late' && b.loan.status === 'late') return 1;
-                return a.client.name.localeCompare(b.client.name);
-            });
+            // Lógica inteligente: Si hay GPS usa distancia, si no, usa orden alfabético
+            let finalAutoSorted = [];
+            if (collectorCurrentLocation) {
+                finalAutoSorted = optimizeRoute(autoOrderClients, collectorCurrentLocation);
+            } else {
+                finalAutoSorted = autoOrderClients.sort((a, b) => a.client.name.localeCompare(b.client.name));
+            }
 
-            const optimizedAutoClients = optimizeRoute(autoOrderClients, collectorCurrentLocation);
-            const finalRoute = [...manualOrderClients, ...optimizedAutoClients];
-
-            updateDashboard(finalRoute); 
+            const finalRoute = [...manualOrderClients, ...finalAutoSorted];
+            updateDashboard(finalRoute);
+             
             if (document.querySelector('#map-view.active')) plotClientsOnMap();
             renderClientCards(document.getElementById('todays-route-list'), finalRoute);
         }
@@ -4275,7 +4278,10 @@ const paymentDayLabelHtml = `
                 });
             });
             
-            clientsWithLoans.sort((a, b) => a.client.name.localeCompare(b.client.name));
+            // BLOQUE DE REEMPLAZO 1
+            clientsWithLoans.sort((a, b) => {
+                return a.client.name.localeCompare(b.client.name);
+            });
             renderClientCards(container, clientsWithLoans);
         }
         
