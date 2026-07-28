@@ -3340,10 +3340,11 @@ function updateProfileView(collectorData = null) {
     // Gastos Administrativos (Los que el Admin le descuenta al cobrador)
     const totalAdminExpenses = allAdminExpenses.reduce((sum, e) => sum + (Number(e.amount) || Number(e.value) || 0), 0);
 
-    // Retiradas entregadas al Admin (SE ELIMINÓ la restricción del micro seguro para que descuente el efectivo entregado)
-    const totalSettled = allSettlements
-        .filter(s => s.status === 'approved')
-        .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+    
+     // Retiradas de Capital entregadas al Admin (Excluye retiros de Microseguro)
+     const totalSettled = allSettlements
+    .filter(s => s.status === 'approved' && s.type !== 'insurance')
+    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
     // Inyecciones de capital del Admin (Solo aprobadas suman a caja)
     const totalInjected = allCapitalInjections
