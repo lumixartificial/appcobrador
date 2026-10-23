@@ -4305,7 +4305,9 @@ const paymentDayLabelHtml = `
                     }
 
                     if (passesCategory) {
-                        if (filter === 'weekly') {
+                        if (filter === 'all') {
+                            if (!hasActivityToday) passesCategory = false;
+                        } else if (filter === 'weekly') {
                             if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                         } else if (filter === 'biweekly') {
                             if (loan.paymentFrequency !== 'biweekly' || currentStatus === 'finished') passesCategory = false;
