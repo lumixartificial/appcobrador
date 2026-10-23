@@ -854,6 +854,7 @@
                     <input type="password" id="password" required>
                 </div>
                 <button type="submit" class="btn-primary" data-lang-key="enterBtn">Entrar</button>
+                <button type="button" id="forgot-collector-password-btn" data-lang-key="forgotPassword" style="margin-top: 12px; width: 100%; border: 0; background: transparent; color: var(--primary-color); cursor: pointer; font-weight: 600;">Esqueci minha senha</button>
             </form>
         </div>
     </div>
@@ -910,11 +911,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
 
     <script type="module">
+        import { calculateLoanDetails } from "./loan-calculations.js?v=20261023-0100";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc, collectionGroup } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
         
         const firebaseConfig = {
             apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
@@ -925,10 +928,11 @@
             // [CORRECCIÓN CRÍTICA] Se ha corregido el appId para que coincida con el del Service Worker y el de la app del cliente.
             appId: "1:463777495321:web:106118f53f56abd206ed88"
         };
-        const app = initializeApp(firebaseConfig);
+        const app = initializeApp(firebaseConfig, 'lumix-cobrador');
         const db = getFirestore(app);
         const storage = getStorage(app);
         const auth = getAuth(app);
+        const functions = getFunctions(app, 'us-central1');
 
         // =========================================================================
 // 🌐 EXTRACTOR Y NORMALIZADOR UNIVERSAL DE COORDENADAS (Soporta múltiples formatos)
@@ -1068,6 +1072,8 @@ const BLACKLIST_DATA = {
                 usernameLabel: 'Usuário',
                 passwordLabel: 'Senha',
                 enterBtn: 'Entrar',
+                forgotPassword: 'Esqueci minha senha',
+                passwordResetSent: 'Enviamos as instruções de redefinição para o e-mail vinculado a este usuário.',
                 languageChanged: 'Idioma alterado para',
                 expenseSaved: 'Gasto salvo com sucesso!',
                 valToWithdraw: 'Valor a Retirar',
@@ -1115,6 +1121,8 @@ const BLACKLIST_DATA = {
                 usernameLabel: 'Usuario',
                 passwordLabel: 'Contraseña',
                 enterBtn: 'Entrar',
+                forgotPassword: 'Olvidé mi contraseña',
+                passwordResetSent: 'Enviamos las instrucciones para restablecerla al correo vinculado a este usuario.',
                 languageChanged: 'Idioma cambiado a',
                 expenseSaved: '¡Gasto guardado con éxito!',
                 valToWithdraw: 'Valor a Retirar',
@@ -1160,6 +1168,8 @@ const BLACKLIST_DATA = {
                 usernameLabel: 'Username',
                 passwordLabel: 'Password',
                 enterBtn: 'Login',
+                forgotPassword: 'Forgot my password',
+                passwordResetSent: 'Reset instructions were sent to the email linked to this username.',
                 languageChanged: 'Language changed to',
                 expenseSaved: 'Expense saved successfully!',
                 valToWithdraw: 'Amount to Withdraw',
@@ -1936,10 +1946,14 @@ async function showRefinanceModal(clientId, notificationId) {
             // Heredar la tasa de mora y la frecuencia del último préstamo (o usar defaults)
             const lastLoan = client.loans && client.loans.length > 0 ? client.loans[client.loans.length - 1] : {};
             const lateFeeRate = lastLoan.lateFeeRate !== undefined ? lastLoan.lateFeeRate : (currentCompanyData?.defaultInterest || 0);
+            const inheritedLateFeeDelay = Number.parseInt(lastLoan.lateFeeDelay, 10);
 
             const loanSpecificData = {
                 principalAmount: loanAmount,
                 lateFeeRate: lateFeeRate,
+                lateFeeAmount: Number(lastLoan.lateFeeAmount) || 0,
+                lateFeeDelay: Number.isInteger(inheritedLateFeeDelay) && inheritedLateFeeDelay >= 1 && inheritedLateFeeDelay <= 5 ? inheritedLateFeeDelay : 5,
+                microInsurance: Number(lastLoan.microInsurance) || 0,
                 totalLoan: totalToPay,
                 amount: installmentValue,
                 originalInstallmentAmount: installmentValue,
@@ -3397,7 +3411,7 @@ function updateProfileView(collectorData = null) {
 
     
         /* STREAMING_CHUNK: Función calculateLoanDetails Completa y Corregida */
-function calculateLoanDetails(loan) {
+function legacyCalculateLoanDetails(loan) {
     let details = {
         lateDays: 0,
         lateFeesAccumulated: 0,
@@ -3489,7 +3503,9 @@ function calculateLoanDetails(loan) {
     details.lateDays = (currentGap > 0.5 && installmentAmount > 0) ? Math.ceil(currentGap / installmentAmount) : 0;
     
     const fixedFineAmount = parseFloat(loan.lateFeeAmount) || 0;
-    if (details.lateDays >= 5 && fixedFineAmount > 0) {
+    const configuredFineDelay = Number.parseInt(loan.lateFeeDelay, 10);
+    const fixedFineDelay = Number.isInteger(configuredFineDelay) && configuredFineDelay >= 1 && configuredFineDelay <= 5 ? configuredFineDelay : 5;
+    if (details.lateDays >= fixedFineDelay && fixedFineAmount > 0) {
         details.fixedFineApplied = fixedFineAmount; 
         details.hasFixedFine = true; 
     }
@@ -3590,6 +3606,7 @@ const paymentDayLabelHtml = `
                     ...loan, 
                     status: details.status,
                     lateDays: details.lateDays,
+                    overdueInstallments: details.overdueInstallments,
                     amountDueToday: details.amountDueToday || 0
                 };
 
@@ -3755,7 +3772,8 @@ const paymentDayLabelHtml = `
 
                 let statusLabelUnderName = '';
                 if (displayLoan.status === 'late') {
-                    statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} dias)</span>`;
+                    const installmentWord = displayLoan.overdueInstallments === 1 ? 'parcela' : 'parcelas';
+                    statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: var(--danger-color); font-weight: 700; margin-top: 2px;">⚠️ ATRASADO (${displayLoan.lateDays} dias • ${displayLoan.overdueInstallments || 0} ${installmentWord})</span>`;
                 } else if (displayLoan.status === 'finished') {
                     statusLabelUnderName = `<span style="display: block; font-size: 0.75em; color: #4338ca; font-weight: 700; margin-top: 2px;">🏁 FINALIZADO</span>`;
                 }
@@ -4155,7 +4173,7 @@ const paymentDayLabelHtml = `
                     if ((isScheduledForToday || details.status === 'late') && !hasActionToday) {
                         clientsForRoute.push({ 
                             client, 
-                            loan: { ...loan, status: details.status, lateDays: details.lateDays, amountDueToday: details.amountDueToday }, 
+                            loan: { ...loan, status: details.status, lateDays: details.lateDays, overdueInstallments: details.overdueInstallments, amountDueToday: details.amountDueToday },
                             loanIndex: index 
                         });
                     }
@@ -4189,7 +4207,7 @@ const paymentDayLabelHtml = `
     function updateAllClientsList() {
             const container = document.getElementById('all-clients-list');
             const searchInput = document.getElementById('client-search-input');
-            let activeFilter = document.querySelector('.filter-buttons .filter-btn.active');
+            let activeFilter = document.querySelector('.filter-buttons .filter-btn[data-filter].active');
             let filter = activeFilter ? activeFilter.dataset.filter : 'all';
 
             if (!container || !searchInput) return;
@@ -4284,10 +4302,10 @@ const paymentDayLabelHtml = `
                         const nameMatch = client.name.toLowerCase().includes(searchTerm);
                         const addressMatch = client.address && client.address.toLowerCase().includes(searchTerm);
                         if (!nameMatch && !addressMatch) passesCategory = false;
-                    } else {
-                        if (filter === 'all') {
-                            if (!hasActivityToday) passesCategory = false;
-                        } else if (filter === 'weekly') {
+                    }
+
+                    if (passesCategory) {
+                        if (filter === 'weekly') {
                             if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                         } else if (filter === 'biweekly') {
                             if (loan.paymentFrequency !== 'biweekly' || currentStatus === 'finished') passesCategory = false;
@@ -4551,7 +4569,13 @@ if (!loan) {
             if (currentStatus === 'pending') { statusText = { pt: 'EM DIA', es: 'AL DÍA', en: 'UP TO DATE' }[currentLang] || 'EM DIA'; statusClass = 'status-paid'; } 
             else if (currentStatus === 'late') {
                 let baseText = (translations[currentLang] && translations[currentLang][currentStatus]) || currentStatus;
-                if (loanDetails.lateDays > 0) { const daysLabel = { pt: 'dias', es: 'días', en: 'days' }[currentLang] || 'dias'; baseText += ` (${loanDetails.lateDays} ${daysLabel})`; }
+                if (loanDetails.lateDays > 0) {
+                    const daysLabel = { pt: 'dias', es: 'días', en: 'days' }[currentLang] || 'dias';
+                    const installmentLabel = loanDetails.overdueInstallments === 1
+                        ? ({ pt: 'parcela', es: 'cuota', en: 'installment' }[currentLang] || 'parcela')
+                        : ({ pt: 'parcelas', es: 'cuotas', en: 'installments' }[currentLang] || 'parcelas');
+                    baseText += ` (${loanDetails.lateDays} ${daysLabel} • ${loanDetails.overdueInstallments} ${installmentLabel})`;
+                }
                 statusText = baseText;
             } else { statusText = (translations[currentLang] && translations[currentLang][currentStatus]) || currentStatus; }
 
@@ -5581,6 +5605,13 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 es: ['D','L','M','X','J','V','S'], // Dom, Lun, Mar, Mié(X), Jue, Vie, Sáb
                 en: ['S','M','T','W','T','F','S']  // Sun, Mon, Tue, Wed, Thu, Fri, Sat
             }[currentLang] || ['D','S','T','Q','Q','S','S'];
+            const t_lateFeeAmount = { pt: 'Valor da Multa', es: 'Valor de la Multa', en: 'Fine Amount' }[currentLang] || 'Valor da Multa';
+            const t_lateFeeDelay = { pt: 'Aplicar multa após', es: 'Aplicar multa después de', en: 'Apply fine after' }[currentLang] || 'Aplicar multa após';
+            const t_days = { pt: 'dias de atraso', es: 'días de retraso', en: 'late days' }[currentLang] || 'dias de atraso';
+            const configuredLateFeeDelay = Number.parseInt(loan.lateFeeDelay, 10);
+            const selectedLateFeeDelay = Number.isInteger(configuredLateFeeDelay) && configuredLateFeeDelay >= 1 && configuredLateFeeDelay <= 5
+                ? configuredLateFeeDelay
+                : 5;
             // ---------------------------------------------------------------------
 
             clientFormModal.innerHTML = `
@@ -5726,15 +5757,23 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="client-late-fee" style="color: #ef4444; font-weight: 700;">
-                                <i data-lucide="alert-triangle" style="width: 14px; height: 14px; vertical-align: middle;"></i> 
-                                Multa (5 Dias de Atraso)
-                            </label>
-                            <input type="number" id="client-late-fee" step="0.01" 
-                                   value="${loan.lateFeeAmount || '0'}" 
-                                   placeholder="Ex: 50.00"
-                                   style="border-color: #ef4444;">
+                        <div class="form-group grid-2" style="background-color: color-mix(in srgb, #ef4444 5%, var(--surface)); padding: 15px; border-radius: 8px; border: 1px solid color-mix(in srgb, #ef4444 45%, transparent);">
+                            <div>
+                                <label for="client-late-fee" style="color: #ef4444; font-weight: 700;">
+                                    <i data-lucide="alert-triangle" style="width: 14px; height: 14px; vertical-align: middle;"></i>
+                                    ${t_lateFeeAmount}
+                                </label>
+                                <input type="number" id="client-late-fee" step="0.01" min="0"
+                                       value="${loan.lateFeeAmount || '0'}"
+                                       placeholder="Ex: 50.00"
+                                       style="border-color: #ef4444;">
+                            </div>
+                            <div>
+                                <label for="client-late-fee-delay" style="color: #ef4444; font-weight: 700;">${t_lateFeeDelay}</label>
+                                <select id="client-late-fee-delay" style="border-color: #ef4444;">
+                                    ${[1, 2, 3, 4, 5].map(day => `<option value="${day}" ${day === selectedLateFeeDelay ? 'selected' : ''}>${day} ${t_days}</option>`).join('')}
+                                </select>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -6107,6 +6146,10 @@ if (preSaleBtn) {
                     // --- CAMBIO: GUARDAR MICRO SEGURO, MULTA Y ORDEN DE RUTA ---
                     const microInsurance = parseFloat(document.getElementById('client-micro-insurance').value) || 0;
                     const lateFeeAmount = parseFloat(document.getElementById('client-late-fee').value) || 0;
+                    const lateFeeDelay = parseInt(document.getElementById('client-late-fee-delay').value, 10);
+                    if (!Number.isInteger(lateFeeDelay) || lateFeeDelay < 1 || lateFeeDelay > 5) {
+                        throw new Error('O prazo para aplicação da multa deve estar entre 1 e 5 dias.');
+                    }
                     const routeOrder = parseInt(document.getElementById('client-route-order').value) || 0; // NUEVO
                     const lateFeeRate = 0; 
                     // ---------------------------------------------------------
@@ -6144,6 +6187,7 @@ if (preSaleBtn) {
                         lateFeeRate: lateFeeRate, 
                         microInsurance: microInsurance, 
                         lateFeeAmount: lateFeeAmount,
+                        lateFeeDelay: lateFeeDelay,
                         routeOrder: routeOrder, // NUEVO CAMPO GUARDADO
                         totalLoan: totalToPay,
                         amount: installmentValue,
@@ -6195,14 +6239,9 @@ if (preSaleBtn) {
                         if (password && password !== client.password) {
                             showToast("Atualizando senha...", false);
                             if (!auth.currentUser) throw new Error("Cobrador não está autenticado.");
-                            const idToken = await auth.currentUser.getIdToken(true);
-                            const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/updateClientAuth";
-                            const response = await fetch(functionUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                                body: JSON.stringify({ data: { clientUsername: clientIdToSave, newPassword: password } })
-                            });
-                            if (!response.ok) throw new Error("Erro ao alterar senha.");
+                            const updateClientAuth = httpsCallable(functions, 'updateClientAuth');
+                            const updateResult = await updateClientAuth({ clientUsername: clientIdToSave, newPassword: password });
+                            if (!updateResult.data?.success) throw new Error(updateResult.data?.message || "Erro ao alterar senha.");
                         }
 
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
@@ -6212,6 +6251,7 @@ if (preSaleBtn) {
                              lateFeeRate: lateFeeRate, 
                              microInsurance: microInsurance, 
                              lateFeeAmount: lateFeeAmount, 
+                             lateFeeDelay: lateFeeDelay,
                              routeOrder: routeOrder, // ACTUALIZAR
                              totalLoan: totalToPay,
                              amount: installmentValue,
@@ -6229,19 +6269,16 @@ if (preSaleBtn) {
                         let newClientAuthUid = null;
                         try {
                             if (!auth.currentUser) throw new Error("Cobrador não autenticado.");
-                            const idToken = await auth.currentUser.getIdToken(true);
-                            const functionUrl = "https://us-central1-lumix-financas-app.cloudfunctions.net/createClientAuthAndLink";
-                            const response = await fetch(functionUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                                body: JSON.stringify({ data: { clientEmail: email, clientPassword: password } }) 
-                            });
-                            const result = await response.json();
-                            if (!response.ok || !result.result?.success) throw new Error(result.error?.message || "Erro na criação");
-                            newClientAuthUid = result.result.clientUid;
+                            const createClientAuthAndLink = httpsCallable(functions, 'createClientAuthAndLink');
+                            const createResult = await createClientAuthAndLink({ clientEmail: email, clientPassword: password });
+                            if (!createResult.data?.success || !createResult.data?.clientUid) {
+                                throw new Error(createResult.data?.message || "Erro na criação do acesso do cliente.");
+                            }
+                            newClientAuthUid = createResult.data.clientUid;
                         } catch (authCreationError) {
                              console.error("Erro auth:", authCreationError);
-                             throw authCreationError;
+                             const friendlyMessage = authCreationError?.message || "Não foi possível criar o acesso do cliente.";
+                             throw new Error(friendlyMessage);
                         }
                         
                         const newClientId = username; 
@@ -8460,6 +8497,31 @@ function showReportDateModal() {
         }
 
 
+        async function handleCollectorPasswordReset() {
+            const usernameInput = document.getElementById('username');
+            const username = usernameInput.value.trim();
+            const t = translations[currentLang];
+
+            if (!username) {
+                showToast(t.usernameRequired || 'Informe o usuário.', true);
+                usernameInput.focus();
+                return;
+            }
+
+            const resetButton = document.getElementById('forgot-collector-password-btn');
+            resetButton.disabled = true;
+
+            try {
+                await sendPasswordResetEmail(auth, `${username}@gmail.com`);
+                showToast(t.passwordResetSent || 'Instruções de redefinição enviadas.');
+            } catch (error) {
+                console.error('Erro ao solicitar redefinição de senha:', error.code);
+                showToast('Não foi possível solicitar a redefinição. Verifique o usuário e tente novamente.', true);
+            } finally {
+                resetButton.disabled = false;
+            }
+        }
+
         async function handleClearCollectorNotifications() {
             console.log("[COBRADOR-APP] Solicitado para limpar notificações...");
             
@@ -9387,6 +9449,10 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     if (loginForm) {
                         loginForm.removeEventListener('submit', handleLogin); 
                         loginForm.addEventListener('submit', handleLogin); 
+                    }
+                    const forgotPasswordBtn = document.getElementById('forgot-collector-password-btn');
+                    if (forgotPasswordBtn) {
+                        forgotPasswordBtn.onclick = handleCollectorPasswordReset;
                     }
                 }
             });
