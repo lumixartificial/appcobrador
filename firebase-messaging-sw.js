@@ -1,4 +1,4 @@
-const SW_VERSION = "v6.1-production-offline-shell";
+const SW_VERSION = "v6.2-production-moto-icon";
 const CACHE_PREFIX = 'lumix-cobrador-';
 const SHELL_CACHE = `${CACHE_PREFIX}shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-${SW_VERSION}`;
@@ -6,6 +6,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
+  './MotoIcono.png',
   './loan-calculations.js?v=20261023-0100',
   './payment-timing.mjs?v=20261103-1600'
 ];

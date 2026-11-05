@@ -1312,7 +1312,7 @@ const BLACKLIST_DATA = {
             pt: {
                 newClientStatus: 'NOVO CLIENTE',
                 renewalStatus: 'RENOVAÇÃO',
-                pre_sale: 'PREVENDA',
+                pre_sale: 'PREVENTA',
                 portalTitle: 'Portal do Cobrador', 
                 noClientsFound: 'Nenhum cliente encontrado.', 
                 biweekly: 'QUINZENAL', registerOutflow: 'Registrar Nova Saída', addExpenseOption: 'Adicionar Gasto', expenseOptionDesc: 'Registrar combustível, alimentação, etc.', cashWithdrawal: 'Retirada de Caixa', withdrawalOptionDesc: 'Enviar dinheiro entregue ao admin.', amountDeliveredAdmin: 'Valor entregue ao Admin:', sendForApproval: 'Enviar para Aprovação',
@@ -1403,7 +1403,7 @@ const BLACKLIST_DATA = {
             en: { 
                 newClientStatus: 'NEW CUSTOMER',
                 renewalStatus: 'RENEWAL',
-                pre_sale: 'PRE-SALE',
+                pre_sale: 'PREVENTA',
                 didNotPayToday: 'Did Not Pay Today',
                 portalTitle: 'Collector Portal',
                 noClientsFound: 'No clients found.',
@@ -4911,6 +4911,68 @@ async function sendNotificationToClient(clientId, title, body, type, icon) {
 // ---------------------------------------------------------
 
 
+        async function requestPreSaleDeletion(clientId) {
+            const copy = {
+                pt: {
+                    title: 'Excluir preventa?',
+                    message: 'Esta ação removerá o cadastro, o acesso e os arquivos deste prospecto. Depois que a preventa virar empréstimo, ela não poderá mais ser excluída.',
+                    confirm: 'Excluir preventa',
+                    success: 'Preventa excluída com sucesso.',
+                    offline: 'Conecte-se à internet para excluir a preventa.',
+                    converted: 'Esta preventa já virou empréstimo e não pode ser excluída.',
+                    error: 'Não foi possível excluir a preventa.',
+                },
+                es: {
+                    title: '¿Eliminar preventa?',
+                    message: 'Esta acción eliminará el registro, el acceso y los archivos de este prospecto. Después de convertirse en préstamo, la preventa ya no podrá eliminarse.',
+                    confirm: 'Eliminar preventa',
+                    success: 'Preventa eliminada correctamente.',
+                    offline: 'Conéctese a internet para eliminar la preventa.',
+                    converted: 'Esta preventa ya se convirtió en préstamo y no se puede eliminar.',
+                    error: 'No se pudo eliminar la preventa.',
+                },
+                en: {
+                    title: 'Delete Preventa?',
+                    message: 'This removes the prospect record, access account and files. Once converted into a loan, the Preventa can no longer be deleted.',
+                    confirm: 'Delete Preventa',
+                    success: 'Preventa deleted successfully.',
+                    offline: 'Connect to the internet to delete the Preventa.',
+                    converted: 'This Preventa has already become a loan and cannot be deleted.',
+                    error: 'The Preventa could not be deleted.',
+                },
+            }[currentLang];
+
+            if (!navigator.onLine) {
+                showToast(copy.offline, true);
+                return;
+            }
+
+            const confirmed = await showConfirmationModal(copy.title, copy.message, copy.confirm, 'btn-danger');
+            if (!confirmed) return;
+
+            const deleteButton = document.getElementById('delete-pre-sale-btn');
+            if (deleteButton) deleteButton.disabled = true;
+            try {
+                const deletePreSaleClient = httpsCallable(functions, 'deletePreSaleClient');
+                const result = await deletePreSaleClient({
+                    clientId,
+                    collectorId: currentCollectorUsername,
+                });
+                if (!result.data?.success) throw new Error(copy.error);
+                if (result.data.cleanupComplete === false) {
+                    console.warn('Preventa removida com pendências de limpeza:', result.data.cleanupWarnings);
+                }
+                console.info('Tempo de exclusão da Preventa:', result.data.timings || {});
+                window.history.back();
+                showToast(copy.success);
+            } catch (error) {
+                console.error('Erro ao excluir preventa:', error);
+                const wasConverted = String(error?.code || '').includes('failed-precondition');
+                showToast(wasConverted ? copy.converted : (error?.message || copy.error), true);
+                if (deleteButton) deleteButton.disabled = false;
+            }
+        }
+
          function showClientDetails(clientId, loanIndex = 0, isUpdate = false) {
             currentDetailClientId = clientId;
             currentDetailLoanIndex = loanIndex;
@@ -4960,6 +5022,11 @@ const loan = allLoans.length > 0 ? allLoans[currentLoanIndex] : null;
 
 // PANTALLA ESPECIAL PARA CLIENTE SIN PRÉSTAMO
 if (!loan) {
+    const deletePreSaleLabel = ({
+        pt: 'EXCLUIR PREVENTA',
+        es: 'ELIMINAR PREVENTA',
+        en: 'DELETE PREVENTA',
+    })[currentLang] || 'EXCLUIR PREVENTA';
     clientDetailView.innerHTML = `
         <header class="modal-header">
             <button id="closeDetailView"><i data-lucide="arrow-left"></i></button>
@@ -4977,6 +5044,10 @@ if (!loan) {
                     <button class="btn-primary" id="activate-loan-btn" style="margin-top: 30px; width: 100%; padding: 18px;">
                         <i data-lucide="zap"></i> ACTIVAR PRÉSTAMO
                     </button>
+                    ${canEdit ? `
+                    <button class="btn-danger" id="delete-pre-sale-btn" style="margin-top: 12px; width: 100%; padding: 16px;">
+                        <i data-lucide="trash-2"></i> ${deletePreSaleLabel}
+                    </button>` : ''}
                 </div>
             </div>
         </div>`;
@@ -4988,6 +5059,10 @@ if (!loan) {
             const activateBtn = clientDetailView.querySelector('#activate-loan-btn');
             if (activateBtn) {
                 activateBtn.onclick = () => showClientFormModal(client.id, true);
+            }
+            const deletePreSaleBtn = clientDetailView.querySelector('#delete-pre-sale-btn');
+            if (deletePreSaleBtn) {
+                deletePreSaleBtn.onclick = () => requestPreSaleDeletion(client.id);
             }
     clientDetailView.querySelector('#closeDetailView').onclick = () => window.history.back();
     lucide.createIcons({ nodes: clientDetailView.querySelectorAll('[data-lucide]') });
@@ -7919,7 +7994,7 @@ function showSettlementFormModal() {
 
             // --- 1. COBRADOR (Icono de Moto) ---
             const collectorIcon = L.icon({
-                iconUrl: 'https://firebasestorage.googleapis.com/v0/b/lumix-financas-app.firebasestorage.app/o/MotoIcono.png?alt=media&token=e8add7cd-e8d3-424d-8f05-5d04e0d10ec1',
+                iconUrl: './MotoIcono.png',
                 iconSize: [36, 36],
                 iconAnchor: [18, 36],
                 popupAnchor: [0, -36]
