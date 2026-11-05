@@ -4,7 +4,11 @@
 
   "short_name": "Portal Cobrador",
 
+  "id": "/",
+
   "start_url": "/",
+
+  "scope": "/",
 
   "display": "standalone",
 

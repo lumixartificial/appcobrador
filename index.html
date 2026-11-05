@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <!-- ETIQUETAS ANTI-CACHÉ PARA QUE LOS CELULARES ACTUALICEN EL CÓDIGO -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <!-- A versão é revalidada online; o service worker mantém uma cópia segura para uso offline. -->
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <link rel="manifest" href="manifest.json">
@@ -285,6 +285,25 @@
         body.dark-mode .rep-regular { color: var(--accent-yellow); }
         .rep-bad { background-color: rgba(220, 53, 69, 0.15); color: var(--danger-color); }
         .client-card .payment-info { flex-shrink: 0; }
+        .client-card-header { width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .client-card-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 15px; align-items: center; width: 100%; }
+        .client-card-avatar-column { display: flex; flex-direction: column; align-items: center; min-width: 55px; }
+        .client-card-financial-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; min-width: 0; }
+        .client-card-balance { min-width: 0; }
+        .client-card-balance-label { overflow-wrap: anywhere; }
+        @media (max-width: 480px) {
+            .client-card { padding: 12px; }
+            .client-card-header { flex-wrap: nowrap; align-items: center; gap: 6px; }
+            .client-card-header .client-name { flex: 1 1 auto; min-width: 0; font-size: 1em !important; }
+            .client-card-payment-day { flex: 0 1 105px; line-height: 1.15; }
+            .client-card .collection-wp-btn { flex: 0 0 auto; padding: 4px 6px !important; }
+            .client-card-body { grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: start; }
+            .client-card-financial-grid { grid-template-columns: minmax(0, 1fr) minmax(88px, auto); gap: 5px; align-items: center; }
+            .client-card-balance-label { font-size: 0.84em !important; line-height: 1.15; overflow-wrap: normal; }
+            .client-card .payment-info { align-items: flex-end !important; text-align: right; width: auto; padding-top: 0; border-top: 0; }
+            .client-card .payment-status { text-align: right !important; }
+            .client-card .payment-amount { font-size: 1.25em !important; white-space: nowrap; }
+        }
         .reputation-bar-container { width: 100%; background-color: var(--border-color); border-radius: 8px; height: 16px; overflow: hidden; margin-bottom: 10px; }
         .reputation-bar { height: 100%; border-radius: 8px; width: 0%; transition: width 1s ease-out, background-color 0.5s; }
         .reputation-bar.status-perfect { background-color: var(--accent-green); }
@@ -812,10 +831,32 @@
 }
 /* --- FIN DEL AJUSTE --- */
 
+    #connectivity-status {
+        position: fixed;
+        top: max(8px, env(safe-area-inset-top));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 120000;
+        display: none;
+        align-items: center;
+        gap: 7px;
+        max-width: calc(100% - 24px);
+        padding: 8px 12px;
+        border-radius: 999px;
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 800;
+        box-shadow: 0 6px 20px rgba(0,0,0,.24);
+    }
+    #connectivity-status.offline { display: flex; background: #b45309; }
+    #connectivity-status.syncing { display: flex; background: #2563eb; }
+    #connectivity-status.synced { display: flex; background: #15803d; }
+
     </style>
     
 </head>
 <body>
+    <div id="connectivity-status" role="status" aria-live="polite"></div>
     
     <div id="install-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 380px; background-color: var(--surface); color: var(--text-primary); padding: 25px; border-radius: 16px; z-index: 5000; box-shadow: 0 10px 40px rgba(0,0,0,0.2); border: 1px solid var(--border-color); text-align: center;">
 
@@ -854,7 +895,6 @@
                     <input type="password" id="password" required>
                 </div>
                 <button type="submit" class="btn-primary" data-lang-key="enterBtn">Entrar</button>
-                <button type="button" id="forgot-collector-password-btn" data-lang-key="forgotPassword" style="margin-top: 12px; width: 100%; border: 0; background: transparent; color: var(--primary-color); cursor: pointer; font-weight: 600;">Esqueci minha senha</button>
             </form>
         </div>
     </div>
@@ -900,6 +940,7 @@
     <div id="paymentSettingsModal" class="modal-view"></div>
     <div id="refinanceModal" class="modal-view"></div>
     <div id="paymentDetailModal" class="modal-view"></div>
+    <div id="generatedReceiptModal" class="modal-view"></div>
     <div id="confirmationModal" class="modal-view"></div>
     <div id="mapPinModal" class="modal-view"></div>
     <div id="settlementFormModal" class="modal-view"></div>
@@ -912,11 +953,12 @@
 
     <script type="module">
         import { calculateLoanDetails } from "./loan-calculations.js?v=20261023-0100";
+        import { createPaymentTimingSnapshot, readPaymentTiming } from "./payment-timing.mjs?v=20261103-1600";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc, collectionGroup } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, arrayUnion, addDoc, setDoc, query, where, serverTimestamp, getDocs, enableIndexedDbPersistence, deleteDoc, collectionGroup, runTransaction } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
         
         const firebaseConfig = {
@@ -933,6 +975,8 @@
         const storage = getStorage(app);
         const auth = getAuth(app);
         const functions = getFunctions(app, 'us-central1');
+        const authPersistenceReady = setPersistence(auth, browserLocalPersistence)
+            .catch(error => console.error('Não foi possível confirmar a persistência local da sessão:', error));
 
         // =========================================================================
 // 🌐 EXTRACTOR Y NORMALIZADOR UNIVERSAL DE COORDENADAS (Soporta múltiples formatos)
@@ -996,6 +1040,228 @@ try {
 }
 // --- FIN CÓDIGO PARA HABILITAR MODO OFFLINE ---
 
+        const OFFLINE_DB_NAME = 'lumix-cobrador-offline-v1';
+        const OFFLINE_UPLOAD_STORE = 'pendingUploads';
+        let pendingFirestoreWrites = 0;
+        let firestoreMetadataPending = false;
+        let pendingUploadCount = 0;
+        let processingOfflineUploads = false;
+        let offlineUploadRetryTimer = null;
+        let connectivityResetTimer = null;
+
+        function openOfflineDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(OFFLINE_DB_NAME, 1);
+                request.onupgradeneeded = () => {
+                    const database = request.result;
+                    if (!database.objectStoreNames.contains(OFFLINE_UPLOAD_STORE)) {
+                        database.createObjectStore(OFFLINE_UPLOAD_STORE, { keyPath: 'id' });
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function withOfflineUploadStore(mode, action) {
+            const database = await openOfflineDatabase();
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(OFFLINE_UPLOAD_STORE, mode);
+                const store = transaction.objectStore(OFFLINE_UPLOAD_STORE);
+                let result;
+                try {
+                    result = action(store);
+                } catch (error) {
+                    database.close();
+                    reject(error);
+                    return;
+                }
+                transaction.oncomplete = () => { database.close(); resolve(result?.result); };
+                transaction.onerror = () => { database.close(); reject(transaction.error); };
+                transaction.onabort = () => { database.close(); reject(transaction.error); };
+            });
+        }
+
+        async function getPendingUploads() {
+            const database = await openOfflineDatabase();
+            return new Promise((resolve, reject) => {
+                const transaction = database.transaction(OFFLINE_UPLOAD_STORE, 'readonly');
+                const request = transaction.objectStore(OFFLINE_UPLOAD_STORE).getAll();
+                request.onsuccess = () => resolve(request.result || []);
+                request.onerror = () => reject(request.error);
+                transaction.oncomplete = () => database.close();
+                transaction.onerror = () => database.close();
+            });
+        }
+
+        async function queueOfflineUpload(record) {
+            await withOfflineUploadStore('readwrite', store => store.put(record));
+            await refreshPendingUploadCount();
+        }
+
+        async function uploadNowOrQueue(record) {
+            if (!record?.blob) return { downloadUrl: '', queued: false };
+            if (!navigator.onLine) {
+                await queueOfflineUpload(record);
+                return { downloadUrl: '', queued: true };
+            }
+            const uploadPromise = uploadBytes(
+                ref(storage, record.storagePath),
+                record.blob,
+                { contentType: record.contentType || 'application/octet-stream' }
+            ).then(snapshot => getDownloadURL(snapshot.ref));
+            const result = await Promise.race([
+                uploadPromise.then(downloadUrl => ({ status: 'done', downloadUrl }), error => ({ status: 'error', error })),
+                new Promise(resolve => setTimeout(() => resolve({ status: 'timeout' }), 8000))
+            ]);
+            if (result.status === 'done') return { downloadUrl: result.downloadUrl, queued: false };
+            if (result.status === 'error' && !isTransientConnectionError(result.error)) throw result.error;
+            await queueOfflineUpload(record);
+            return { downloadUrl: '', queued: true };
+        }
+
+        async function removeOfflineUpload(id) {
+            await withOfflineUploadStore('readwrite', store => store.delete(id));
+            await refreshPendingUploadCount();
+        }
+
+        function updateConnectivityStatus(mode = null) {
+            const banner = document.getElementById('connectivity-status');
+            if (!banner) return;
+            if (connectivityResetTimer) {
+                clearTimeout(connectivityResetTimer);
+                connectivityResetTimer = null;
+            }
+            const totalPending = Math.max(pendingFirestoreWrites, firestoreMetadataPending ? 1 : 0) + pendingUploadCount;
+            banner.className = '';
+            if (!navigator.onLine) {
+                banner.classList.add('offline');
+                banner.textContent = totalPending > 0
+                    ? `Offline · ${totalPending} operação(ões) aguardando sincronização`
+                    : 'Offline · trabalhando com os dados salvos no aparelho';
+                return;
+            }
+            if (totalPending > 0 || mode === 'syncing') {
+                banner.classList.add('syncing');
+                banner.textContent = `Sincronizando ${Math.max(1, totalPending)} operação(ões)…`;
+                return;
+            }
+            if (mode === 'synced') {
+                banner.classList.add('synced');
+                banner.textContent = 'Tudo sincronizado';
+                connectivityResetTimer = setTimeout(() => { banner.className = ''; banner.textContent = ''; }, 2500);
+                return;
+            }
+            banner.textContent = '';
+        }
+
+        function isTransientConnectionError(error) {
+            return !navigator.onLine || [
+                'unavailable',
+                'firestore/unavailable',
+                'auth/network-request-failed',
+                'storage/retry-limit-exceeded',
+                'storage/unknown'
+            ].includes(error?.code);
+        }
+
+        async function refreshPendingUploadCount() {
+            try {
+                pendingUploadCount = (await getPendingUploads()).length;
+            } catch (error) {
+                console.error('Não foi possível consultar a fila offline de arquivos:', error);
+            }
+            updateConnectivityStatus();
+        }
+
+        function trackPendingFirestoreWrite(writePromise, label) {
+            pendingFirestoreWrites += 1;
+            updateConnectivityStatus();
+            writePromise.then(() => {
+                pendingFirestoreWrites = Math.max(0, pendingFirestoreWrites - 1);
+                updateConnectivityStatus('synced');
+            }).catch(error => {
+                pendingFirestoreWrites = Math.max(0, pendingFirestoreWrites - 1);
+                console.error(`Falha ao sincronizar ${label}:`, error);
+                updateConnectivityStatus();
+                showToast(`Falha ao sincronizar ${label}. Tente novamente com internet.`, true);
+            });
+        }
+
+        async function persistWithOfflineFeedback(writePromise, label) {
+            if (!navigator.onLine) {
+                trackPendingFirestoreWrite(writePromise, label);
+                return { queued: true };
+            }
+            const result = await Promise.race([
+                writePromise.then(value => ({ status: 'done', value }), error => ({ status: 'error', error })),
+                new Promise(resolve => setTimeout(() => resolve({ status: 'timeout' }), 4000))
+            ]);
+            if (result.status === 'done') return result.value;
+            if (result.status === 'error') throw result.error;
+            trackPendingFirestoreWrite(writePromise, label);
+            return { queued: true };
+        }
+
+        async function processPendingUploads() {
+            if (!navigator.onLine || processingOfflineUploads) return;
+            processingOfflineUploads = true;
+            updateConnectivityStatus('syncing');
+            try {
+                const records = await getPendingUploads();
+                for (const record of records) {
+                    try {
+                        const uploadRef = ref(storage, record.storagePath);
+                        await uploadBytes(uploadRef, record.blob, { contentType: record.contentType || 'application/octet-stream' });
+                        const downloadUrl = await getDownloadURL(uploadRef);
+                        if (record.kind === 'payment-receipt') {
+                            const clientRef = doc(db, 'companies', record.companyId, 'clients', record.clientId);
+                            await runTransaction(db, async transaction => {
+                                const snapshot = await transaction.get(clientRef);
+                                if (!snapshot.exists()) throw new Error('Cliente do comprovante não encontrado.');
+                                const loans = [...(snapshot.data().loans || [])];
+                                let found = false;
+                                loans.forEach(loan => {
+                                    loan.history = (loan.history || []).map(payment => {
+                                        if (payment.paymentId !== record.paymentId) return payment;
+                                        found = true;
+                                        return { ...payment, receiptUrl: downloadUrl, receiptUploadPending: false };
+                                    });
+                                });
+                                if (!found) throw new Error('Pagamento pendente não encontrado no histórico.');
+                                transaction.update(clientRef, { loans });
+                            });
+                        } else if (record.kind === 'document-attachment') {
+                            const targetRef = doc(db, ...record.documentPath);
+                            await updateDoc(targetRef, {
+                                [record.field || 'receiptUrl']: downloadUrl,
+                                receiptUploadPending: false
+                            });
+                        }
+                        await removeOfflineUpload(record.id);
+                    } catch (error) {
+                        console.error('Arquivo permaneceu na fila offline:', record.id, error);
+                    }
+                }
+            } finally {
+                processingOfflineUploads = false;
+                await refreshPendingUploadCount();
+                updateConnectivityStatus(pendingUploadCount === 0 ? 'synced' : null);
+                if (navigator.onLine && pendingUploadCount > 0 && !offlineUploadRetryTimer) {
+                    offlineUploadRetryTimer = setTimeout(() => {
+                        offlineUploadRetryTimer = null;
+                        processPendingUploads();
+                    }, 10000);
+                }
+            }
+        }
+
+        window.addEventListener('offline', () => updateConnectivityStatus());
+        window.addEventListener('online', () => {
+            updateConnectivityStatus('syncing');
+            processPendingUploads();
+        });
+
         // Función simplificada para desactivar notificaciones y evitar errores
         async function setupFCM(collectorId, swRegistration) {
             // Lógica de notificaciones desactivada intencionalmente.
@@ -1012,6 +1278,7 @@ try {
         let currentDetailClientId = null; // Guarda el ID del cliente en vista detallada
         let currentDetailLoanIndex = null; // Guarda el índice del préstamo en vista detallada
         let currentPaymentDetailState = null;
+        let currentGeneratedReceiptUrl = null;
         let allExpenses = [];
         let allAdminExpenses = [];
         let allSettlements = [];
@@ -1072,8 +1339,6 @@ const BLACKLIST_DATA = {
                 usernameLabel: 'Usuário',
                 passwordLabel: 'Senha',
                 enterBtn: 'Entrar',
-                forgotPassword: 'Esqueci minha senha',
-                passwordResetSent: 'Enviamos as instruções de redefinição para o e-mail vinculado a este usuário.',
                 languageChanged: 'Idioma alterado para',
                 expenseSaved: 'Gasto salvo com sucesso!',
                 valToWithdraw: 'Valor a Retirar',
@@ -1121,8 +1386,6 @@ const BLACKLIST_DATA = {
                 usernameLabel: 'Usuario',
                 passwordLabel: 'Contraseña',
                 enterBtn: 'Entrar',
-                forgotPassword: 'Olvidé mi contraseña',
-                passwordResetSent: 'Enviamos las instrucciones para restablecerla al correo vinculado a este usuario.',
                 languageChanged: 'Idioma cambiado a',
                 expenseSaved: '¡Gasto guardado con éxito!',
                 valToWithdraw: 'Valor a Retirar',
@@ -1168,8 +1431,6 @@ const BLACKLIST_DATA = {
                 usernameLabel: 'Username',
                 passwordLabel: 'Password',
                 enterBtn: 'Login',
-                forgotPassword: 'Forgot my password',
-                passwordResetSent: 'Reset instructions were sent to the email linked to this username.',
                 languageChanged: 'Language changed to',
                 expenseSaved: 'Expense saved successfully!',
                 valToWithdraw: 'Amount to Withdraw',
@@ -2315,7 +2576,7 @@ async function showRefinanceModal(clientId, notificationId) {
             
             const genInvoiceBtn = modal.querySelector('#generate-invoice-btn');
             if(genInvoiceBtn) {
-                genInvoiceBtn.addEventListener('click', () => generateInvoicePDF(client, payment));
+                genInvoiceBtn.addEventListener('click', () => showGeneratedPaymentReceipt(client, payment));
             }
             
             const deleteBtn = modal.querySelector('#delete-payment-btn');
@@ -2792,6 +3053,283 @@ async function showRefinanceModal(clientId, notificationId) {
 
     
     
+
+        function getPaymentDate(payment) {
+            if (!payment?.date) return new Date();
+            if (typeof payment.date.toDate === 'function') return payment.date.toDate();
+            if (payment.date.seconds) return new Date(payment.date.seconds * 1000);
+            if (payment.date instanceof Date) return payment.date;
+            const parsedDate = new Date(payment.date);
+            return isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+        }
+
+        function getPaymentMethodLabel(method) {
+            const labels = {
+                pt: { dinheiro: 'Dinheiro', pix: 'PIX', cartao: 'Cartão', migration: 'Migração' },
+                es: { dinheiro: 'Efectivo', pix: 'Pago electrónico', cartao: 'Tarjeta', migration: 'Migración' },
+                en: { dinheiro: 'Cash', pix: 'Electronic payment', cartao: 'Card', migration: 'Migration' }
+            };
+            return (labels[currentLang] || labels.pt)[method] || method || '---';
+        }
+
+        function buildReceiptSnapshotFallback(clientData, payment) {
+            let loan = null;
+            if (clientData?.loans) {
+                loan = clientData.loans.find(item => (item.history || []).some(historyItem =>
+                    historyItem === payment ||
+                    (historyItem.paymentId && historyItem.paymentId === payment.paymentId)
+                ));
+            }
+
+            if (!loan && clientData?.loans?.length) loan = clientData.loans[clientData.loans.length - 1];
+
+            const totalInstallments = parseInt((loan?.installments || '0/0').split('/')[1], 10) || 0;
+            const installmentValue = parseFloat(loan?.originalInstallmentAmount || loan?.amount || 0);
+            const totalPaid = (loan?.initialMigratedAmount || 0) + (loan?.history || [])
+                .filter(item => item.status === 'approved' && item.method !== 'migration')
+                .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const details = loan ? calculateLoanDetails(loan) : { lateFeesAccumulated: 0 };
+            const totalDebt = (parseFloat(loan?.totalLoan) || 0) + (details.lateFeesAccumulated || 0);
+            const paidInstallments = installmentValue > 0
+                ? Math.min(totalInstallments, Math.floor((totalPaid / installmentValue) + 0.01))
+                : 0;
+
+            return {
+                companyName: currentCompanyData?.name || 'LUMIX Finanças',
+                collectorName: currentCollectorData?.name || currentCollectorUsername || 'Cobrador',
+                clientName: clientData?.name || 'Cliente',
+                currencyCode: currentCollectorData?.paymentSettings?.currency || currentCompanyData?.settings?.currency || 'BRL',
+                totalDebt,
+                totalPaid,
+                remainingBalance: Math.max(0, totalDebt - totalPaid),
+                paidInstallments,
+                totalInstallments,
+                installmentValue,
+                paymentTimingStatus: payment.paymentTimingStatus || null,
+                paymentDelayDays: Number(payment.paymentDelayDays) || 0
+            };
+        }
+
+        function canvasToPngBlob(canvas) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob(blob => {
+                    if (blob) resolve(blob);
+                    else reject(new Error('Não foi possível criar a imagem do comprovante.'));
+                }, 'image/png', 0.95);
+            });
+        }
+
+        async function generatePaymentReceiptImage(clientData, payment) {
+            const snapshot = payment.receiptSnapshot || buildReceiptSnapshotFallback(clientData, payment);
+            const paymentTiming = readPaymentTiming(payment, snapshot);
+            const canvas = document.createElement('canvas');
+            canvas.width = 1080;
+            canvas.height = 1660;
+            const ctx = canvas.getContext('2d');
+            const locale = currentLang === 'es' ? 'es-ES' : (currentLang === 'en' ? 'en-US' : 'pt-BR');
+            const paymentDate = getPaymentDate(payment);
+            const paymentCode = payment.paymentId || `LEG-${paymentDate.getTime()}`;
+            const shortCode = paymentCode.length > 18 ? paymentCode.slice(0, 18).toUpperCase() : paymentCode.toUpperCase();
+            const receiptCurrency = snapshot.currencyCode || currentCollectorData?.paymentSettings?.currency || currentCompanyData?.settings?.currency || 'BRL';
+            const formatMoney = value => {
+                try {
+                    return new Intl.NumberFormat(locale, { style: 'currency', currency: receiptCurrency }).format(Number(value) || 0);
+                } catch (error) {
+                    return money(Number(value) || 0);
+                }
+            };
+            const texts = {
+                pt: { title: 'COMPROVANTE DE PAGAMENTO', client: 'CLIENTE', paid: 'VALOR RECEBIDO', date: 'DATA E HORA', method: 'MÉTODO', timing: 'SITUAÇÃO DO PAGAMENTO', onTime: 'EM DIA', lateDays: days => `ATRASADO ${days} ${days === 1 ? 'DIA' : 'DIAS'}`, unavailable: 'NÃO REGISTRADO', progress: 'PARCELAS PAGAS', totalPaid: 'TOTAL PAGO', remaining: 'SALDO RESTANTE', collector: 'RECEBIDO POR', code: 'IDENTIFICADOR', footer: 'Comprovante gerado por LUMIX Finanças' },
+                es: { title: 'COMPROBANTE DE PAGO', client: 'CLIENTE', paid: 'VALOR RECIBIDO', date: 'FECHA Y HORA', method: 'MÉTODO', timing: 'SITUACIÓN DEL PAGO', onTime: 'AL DÍA', lateDays: days => `ATRASADO ${days} ${days === 1 ? 'DÍA' : 'DÍAS'}`, unavailable: 'NO REGISTRADO', progress: 'CUOTAS PAGADAS', totalPaid: 'TOTAL PAGADO', remaining: 'SALDO RESTANTE', collector: 'RECIBIDO POR', code: 'IDENTIFICADOR', footer: 'Comprobante generado por LUMIX Finanzas' },
+                en: { title: 'PAYMENT RECEIPT', client: 'CLIENT', paid: 'AMOUNT RECEIVED', date: 'DATE AND TIME', method: 'METHOD', timing: 'PAYMENT STATUS', onTime: 'ON TIME', lateDays: days => `${days} ${days === 1 ? 'DAY' : 'DAYS'} LATE`, unavailable: 'NOT RECORDED', progress: 'PAID INSTALLMENTS', totalPaid: 'TOTAL PAID', remaining: 'REMAINING BALANCE', collector: 'RECEIVED BY', code: 'IDENTIFIER', footer: 'Receipt generated by LUMIX Finance' }
+            }[currentLang] || null;
+            const t = texts || {
+                title: 'COMPROVANTE DE PAGAMENTO', client: 'CLIENTE', paid: 'VALOR RECEBIDO', date: 'DATA E HORA', method: 'MÉTODO', timing: 'SITUAÇÃO DO PAGAMENTO', onTime: 'EM DIA', lateDays: days => `ATRASADO ${days} ${days === 1 ? 'DIA' : 'DIAS'}`, unavailable: 'NÃO REGISTRADO', progress: 'PARCELAS PAGAS', totalPaid: 'TOTAL PAGO', remaining: 'SALDO RESTANTE', collector: 'RECEBIDO POR', code: 'IDENTIFICADOR', footer: 'Comprovante gerado por LUMIX Finanças'
+            };
+
+            const roundedRect = (x, y, width, height, radius, fill, stroke = null) => {
+                const right = x + width;
+                const bottom = y + height;
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(right - radius, y);
+                ctx.quadraticCurveTo(right, y, right, y + radius);
+                ctx.lineTo(right, bottom - radius);
+                ctx.quadraticCurveTo(right, bottom, right - radius, bottom);
+                ctx.lineTo(x + radius, bottom);
+                ctx.quadraticCurveTo(x, bottom, x, bottom - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+            };
+            const centerText = (text, y, font, color) => {
+                ctx.font = font;
+                ctx.fillStyle = color;
+                ctx.textAlign = 'center';
+                ctx.fillText(text, canvas.width / 2, y);
+            };
+            const fitText = (text, maxWidth, initialSize, weight = 700) => {
+                let size = initialSize;
+                do {
+                    ctx.font = `${weight} ${size}px Inter, Arial, sans-serif`;
+                    if (ctx.measureText(text).width <= maxWidth) break;
+                    size -= 2;
+                } while (size > 30);
+                return `${weight} ${size}px Inter, Arial, sans-serif`;
+            };
+            const drawInfoCell = (x, y, width, label, value, valueColor = '#111827') => {
+                ctx.textAlign = 'left';
+                ctx.font = '600 24px Inter, Arial, sans-serif';
+                ctx.fillStyle = '#6b7280';
+                ctx.fillText(label, x, y);
+                ctx.font = fitText(String(value), width, 34, 700);
+                ctx.fillStyle = valueColor;
+                ctx.fillText(String(value), x, y + 48);
+            };
+
+            ctx.fillStyle = '#f3f4f6';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            roundedRect(45, 40, 990, 1580, 32, '#ffffff');
+            roundedRect(45, 40, 990, 240, 32, '#f3e8ff');
+            ctx.fillStyle = '#f3e8ff';
+            ctx.fillRect(45, 200, 990, 80);
+
+            centerText(t.title, 170, '800 40px Inter, Arial, sans-serif', '#6f42c1');
+
+            centerText(t.client, 350, '600 24px Inter, Arial, sans-serif', '#6b7280');
+            centerText(snapshot.clientName || clientData?.name || 'Cliente', 415, fitText(snapshot.clientName || clientData?.name || 'Cliente', 880, 50, 800), '#111827');
+
+            roundedRect(105, 475, 870, 190, 24, '#ecfdf5', '#86efac');
+            centerText(t.paid, 535, '700 25px Inter, Arial, sans-serif', '#15803d');
+            centerText(formatMoney(payment.amount), 625, '800 68px Inter, Arial, sans-serif', '#16a34a');
+
+            drawInfoCell(115, 755, 380, t.date, paymentDate.toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }));
+            drawInfoCell(585, 755, 360, t.method, getPaymentMethodLabel(payment.method));
+            ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(540, 710); ctx.lineTo(540, 845); ctx.stroke();
+
+            const timingIsLate = paymentTiming.status === 'late';
+            const timingIsKnown = paymentTiming.status !== null;
+            const timingText = timingIsLate ? t.lateDays(paymentTiming.paymentDelayDays) : (timingIsKnown ? t.onTime : t.unavailable);
+            const timingColors = timingIsLate
+                ? { fill: '#fef2f2', stroke: '#fca5a5', label: '#991b1b', value: '#b91c1c' }
+                : (timingIsKnown
+                    ? { fill: '#ecfdf5', stroke: '#86efac', label: '#166534', value: '#15803d' }
+                    : { fill: '#f9fafb', stroke: '#d1d5db', label: '#6b7280', value: '#4b5563' });
+            roundedRect(105, 875, 870, 110, 20, timingColors.fill, timingColors.stroke);
+            ctx.textAlign = 'left'; ctx.font = '700 23px Inter, Arial, sans-serif'; ctx.fillStyle = timingColors.label; ctx.fillText(t.timing, 145, 920);
+            ctx.textAlign = 'right'; ctx.font = fitText(timingText, 390, 36, 800); ctx.fillStyle = timingColors.value; ctx.fillText(timingText, 935, 946);
+
+            roundedRect(105, 1020, 870, 220, 22, '#f9fafb', '#e5e7eb');
+            drawInfoCell(145, 1090, 350, t.progress, `${snapshot.paidInstallments || 0} / ${snapshot.totalInstallments || 0}`);
+            drawInfoCell(585, 1090, 320, t.totalPaid, formatMoney(snapshot.totalPaid), '#16a34a');
+            ctx.strokeStyle = '#e5e7eb'; ctx.beginPath(); ctx.moveTo(540, 1050); ctx.lineTo(540, 1200); ctx.stroke();
+
+            roundedRect(105, 1280, 870, 115, 20, '#fff7ed', '#fdba74');
+            ctx.textAlign = 'left'; ctx.font = '700 25px Inter, Arial, sans-serif'; ctx.fillStyle = '#9a3412'; ctx.fillText(t.remaining, 145, 1327);
+            ctx.textAlign = 'right'; ctx.font = '800 40px Inter, Arial, sans-serif'; ctx.fillStyle = '#ea580c'; ctx.fillText(formatMoney(snapshot.remainingBalance), 935, 1350);
+
+            drawInfoCell(115, 1470, 480, t.collector, snapshot.collectorName || currentCollectorData?.name || 'Cobrador');
+            drawInfoCell(650, 1470, 300, t.code, shortCode);
+            centerText(t.footer, 1585, '500 22px Inter, Arial, sans-serif', '#9ca3af');
+
+            const blob = await canvasToPngBlob(canvas);
+            const safeClientName = (snapshot.clientName || clientData?.name || 'cliente')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_');
+            const fileName = `comprovante_${safeClientName}_${paymentDate.toISOString().slice(0, 10)}.png`;
+            return { blob, file: new File([blob], fileName, { type: 'image/png' }), fileName };
+        }
+
+        function downloadReceiptImage(blob, fileName) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        async function showGeneratedPaymentReceipt(clientData, payment, replaceCurrentHistory = false) {
+            const modal = document.getElementById('generatedReceiptModal');
+            if (!modal) return;
+
+            modal.innerHTML = `
+                <header class="modal-header">
+                    <button id="closeGeneratedReceiptModal"><i data-lucide="arrow-left"></i></button>
+                    <span class="modal-title">${currentLang === 'es' ? 'Comprobante' : (currentLang === 'en' ? 'Receipt' : 'Comprovante')}</span>
+                </header>
+                <div class="modal-content-wrapper container" style="display:flex; align-items:center; justify-content:center; padding-top:24px; padding-bottom:24px;">
+                    <div style="width:100%; max-width:460px; text-align:center;">
+                        <div id="generated-receipt-loading" style="padding:50px 20px; color:var(--text-secondary);">
+                            <i data-lucide="loader-circle" style="width:42px; height:42px; animation:spin 1s linear infinite;"></i>
+                            <p>${currentLang === 'es' ? 'Generando comprobante...' : (currentLang === 'en' ? 'Generating receipt...' : 'Gerando comprovante...')}</p>
+                        </div>
+                        <img id="generated-receipt-image" alt="Comprovante gerado" style="display:none; width:100%; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.18);">
+                    </div>
+                </div>
+                <div class="action-buttons" style="gap:10px;">
+                    <button class="btn-secondary" id="download-generated-receipt-btn" disabled style="flex:1; justify-content:center;">
+                        <i data-lucide="download"></i> ${currentLang === 'es' ? 'Descargar' : (currentLang === 'en' ? 'Download' : 'Baixar')}
+                    </button>
+                    <button class="btn-primary" id="share-generated-receipt-btn" disabled style="flex:1; justify-content:center;">
+                        <i data-lucide="share-2"></i> ${currentLang === 'es' ? 'Compartir' : (currentLang === 'en' ? 'Share' : 'Compartilhar')}
+                    </button>
+                </div>`;
+
+            if (replaceCurrentHistory) {
+                history.replaceState({ modal: 'generatedReceiptModal' }, 'Receipt', '#payment-receipt');
+                document.querySelectorAll('.modal-view.active, .modal-overlay.active').forEach(activeModal => activeModal.classList.remove('active'));
+            } else {
+                history.pushState({ modal: 'generatedReceiptModal' }, 'Receipt', '#payment-receipt');
+            }
+            modal.classList.add('active');
+            lucide.createIcons({ nodes: modal.querySelectorAll('[data-lucide]') });
+
+            modal.querySelector('#closeGeneratedReceiptModal').addEventListener('click', () => window.history.back());
+
+            try {
+                const generated = await generatePaymentReceiptImage(clientData, payment);
+                if (currentGeneratedReceiptUrl) URL.revokeObjectURL(currentGeneratedReceiptUrl);
+                currentGeneratedReceiptUrl = URL.createObjectURL(generated.blob);
+                const image = modal.querySelector('#generated-receipt-image');
+                image.src = currentGeneratedReceiptUrl;
+                image.style.display = 'block';
+                modal.querySelector('#generated-receipt-loading').style.display = 'none';
+
+                const downloadBtn = modal.querySelector('#download-generated-receipt-btn');
+                const shareBtn = modal.querySelector('#share-generated-receipt-btn');
+                downloadBtn.disabled = false;
+                shareBtn.disabled = false;
+                downloadBtn.addEventListener('click', () => downloadReceiptImage(generated.blob, generated.fileName));
+                shareBtn.addEventListener('click', async () => {
+                    try {
+                        if (navigator.share && navigator.canShare && navigator.canShare({ files: [generated.file] })) {
+                            await navigator.share({
+                                files: [generated.file],
+                                title: `Comprovante - ${clientData.name}`,
+                                text: `${currentLang === 'es' ? 'Comprobante de pago' : (currentLang === 'en' ? 'Payment receipt' : 'Comprovante de pagamento')} - ${money(payment.amount)}`
+                            });
+                        } else {
+                            downloadReceiptImage(generated.blob, generated.fileName);
+                            showToast('Imagem baixada. Compartilhe-a pelo aplicativo desejado.');
+                        }
+                    } catch (error) {
+                        if (error.name !== 'AbortError') {
+                            console.error('Erro ao compartilhar comprovante:', error);
+                            showToast('Não foi possível compartilhar. Você ainda pode baixar a imagem.', true);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Erro ao gerar imagem do comprovante:', error);
+                modal.querySelector('#generated-receipt-loading').innerHTML = `<p style="color:var(--danger-color);">Não foi possível gerar o comprovante.</p>`;
+                showToast('Erro ao gerar o comprovante.', true);
+            }
+        }
+
 
         // 2. GENERAR FACTURA INDIVIDUAL (Botón "Fatura")
          async function generateInvoicePDF(clientData, payment) {
@@ -3596,7 +4134,7 @@ if (loan.paymentFrequency === 'weekly' || loan.paymentFrequency === 'biweekly') 
 }
 
 const paymentDayLabelHtml = `
-    <div style="color: #dc3545; font-size: 0.75em; font-weight: 800; text-transform: uppercase; margin-top: 1px;">
+    <div class="client-card-payment-day" style="color: #dc3545; font-size: 0.75em; font-weight: 800; text-transform: uppercase; margin-top: 1px;">
         ${currentLang === 'es' ? 'Día de pago' : 'Dia de pagamento'}: ${pDayDisplay}
     </div>`;
 // --- FIN: LÓGICA DÍA DE PAGO ---
@@ -3780,7 +4318,7 @@ const paymentDayLabelHtml = `
 
                 const remainingDisplay = money(remainingBalance);
                 
-                const loanInfoLabel = `<span style="font-size: 0.95em; color: #d97706; font-weight: 800; display: block; margin-top: 0;">
+                const loanInfoLabel = `<span class="client-card-balance-label" style="font-size: 0.95em; color: #d97706; font-weight: 800; display: block; margin-top: 0;">
                     <i data-lucide="trending-down" style="width: 14px; height: 14px; vertical-align: text-bottom;"></i> Resta: ${remainingDisplay}
                 </span>`;
 
@@ -3821,7 +4359,7 @@ const paymentDayLabelHtml = `
 
                 card.innerHTML = `
                     <!-- HEADER: NOMBRE A LA IZQUIERDA, ETIQUETA A LA DERECHA -->
-                    <div style="width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="client-card-header">
                         <h4 class="client-name" style="margin: 0; font-size: 1.1em; color: var(--text-primary); font-weight: 700; line-height: 1.2; display: flex; align-items: center; flex-wrap: wrap;">
                             ${client.name} 
                             ${loanIndexBadge}
@@ -3836,15 +4374,16 @@ const paymentDayLabelHtml = `
                         ${routeOrderHtml} <!-- AQUÍ ESTÁ EL CAMBIO: A LA DERECHA EXTREMA -->
                     </div>
 
-                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div class="client-card-body">
                         
-                        <div style="display: flex; flex-direction: column; align-items: center; margin-right: 15px; min-width: 55px;">
+                        <div class="client-card-avatar-column">
                             <img src="${photoUrl}" alt="Foto" class="client-avatar" style="${borderStyle} width: 50px; height: 50px;">
                             <span style="font-size: 0.65em; font-weight: 800; color: ${reputationColor}; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;">${reputationLabel}</span>
                             ${labelHtml}
                         </div>
 
-                        <div class="client-info" style="flex-grow: 1; min-width: 0; margin-right: 10px;">
+                        <div class="client-card-financial-grid">
+                        <div class="client-info client-card-balance">
                             ${loanInfoLabel} 
                             ${statusLabelUnderName}
                         </div>
@@ -3860,6 +4399,7 @@ const paymentDayLabelHtml = `
                             <span class="payment-status" style="margin-top: 6px; display: block; text-align: right; font-size: 0.75em; padding: 4px 8px; border-radius: 4px; ${bottomStatusStyle}">
                                 ${bottomStatusText}
                             </span>
+                        </div>
                         </div>
                     </div>`;
                 
@@ -5568,6 +6108,9 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             let filesToUpload = [];
             let existingDocs = client.documents ? [...client.documents] : [];
+            let clientProfileBlob = null;
+            let removeClientProfilePicture = false;
+            let clientProfilePreviewObjectUrl = null;
 
             const clientFormModal = document.getElementById('clientFormModal');
             
@@ -5583,6 +6126,14 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             const prefillLoanAmount = prefillData ? prefillData.amount : '';
             const prefillInstallments = prefillData ? prefillData.installments : '';
+            const clientInitial = (client.name || 'C').charAt(0).toUpperCase();
+            const clientProfileFallback = `https://placehold.co/256x256/22c55e/FFFFFF?text=${encodeURIComponent(clientInitial)}`;
+            const clientProfileTranslations = {
+                pt: { title: 'Foto de identificação', take: 'Tirar foto', choose: 'Galeria', remove: 'Remover', hint: 'A foto aparecerá na rota para facilitar a identificação do cliente.' },
+                es: { title: 'Foto de identificación', take: 'Tomar foto', choose: 'Galería', remove: 'Eliminar', hint: 'La foto aparecerá en la ruta para facilitar la identificación del cliente.' },
+                en: { title: 'Identification photo', take: 'Take photo', choose: 'Gallery', remove: 'Remove', hint: 'The photo will appear on the route to make the client easier to identify.' }
+            };
+            const clientProfileCopy = clientProfileTranslations[currentLang] || clientProfileTranslations.pt;
 
             // --- GENERACIÓN AUTOMÁTICA DE CREDENCIALES ---
             const timestampSuffix = Date.now().toString().slice(-6);
@@ -5630,6 +6181,23 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                         </h3>
                         <hr style="border: 1px solid var(--border-color); margin-top: 10px; margin-bottom: 25px;">
 
+                        <div class="form-group" id="client-profile-picture-group" style="${isNewLoan ? 'display: none;' : ''}">
+                            <label style="display:block; margin-bottom:10px; font-weight:700;">${clientProfileCopy.title}</label>
+                            <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                                <img id="client-profile-preview" src="${client.profilePictureUrl || clientProfileFallback}" alt="${clientProfileCopy.title}" style="width:88px; height:88px; border-radius:50%; object-fit:cover; border:3px solid var(--accent-green); background:var(--bg);">
+                                <div style="display:flex; flex:1; min-width:210px; flex-direction:column; gap:8px;">
+                                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                        <button type="button" class="btn-secondary" id="client-profile-camera-btn"><i data-lucide="camera"></i> ${clientProfileCopy.take}</button>
+                                        <button type="button" class="btn-secondary" id="client-profile-gallery-btn"><i data-lucide="image-plus"></i> ${clientProfileCopy.choose}</button>
+                                        <button type="button" class="btn-secondary" id="client-profile-remove-btn" style="${client.profilePictureUrl ? '' : 'display:none;'} color:var(--accent-red);"><i data-lucide="trash-2"></i> ${clientProfileCopy.remove}</button>
+                                    </div>
+                                    <small style="color:var(--text-secondary); line-height:1.4;">${clientProfileCopy.hint}</small>
+                                </div>
+                            </div>
+                            <input type="file" id="client-profile-camera-input" accept="image/*" capture="environment" style="display:none;">
+                            <input type="file" id="client-profile-gallery-input" accept="image/*" style="display:none;">
+                        </div>
+
                         <div class="form-group"><label data-lang-key="clientName"></label><input type="text" id="client-name" required value="${client.name || ''}" ${isNewLoan ? 'readonly' : ''}></div>
                         
                         <div class="form-group">
@@ -5667,19 +6235,27 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 </div>
                         
                         <div style="display: none;">
-                            <h3 class="section-title">Acesso Oculto (Automático)</h3>
                             <div class="form-group">
                                 <label data-lang-key="username"></label>
                                 <input type="text" id="client-username" value="${autoUsername}" 
                                        autocomplete="off" autocapitalize="none">
                                 <div id="username-validation-msg" class="validation-message"></div>
                             </div>
-                            
+                        </div>
+
+                        ${isEditMode ? `
+                        <div class="form-group" style="background:var(--surface); border:1px solid var(--border-color); border-radius:12px; padding:15px;">
+                            <label for="client-password">Nova senha de acesso (opcional)</label>
+                            <input type="password" id="client-password" value="" minlength="6"
+                                   autocomplete="new-password" placeholder="Deixe em branco para não alterar">
+                            <p style="font-size:.8em; color:var(--text-secondary); margin:6px 0 0;">Mínimo de 6 caracteres. A conta de acesso será criada automaticamente se estiver ausente.</p>
+                        </div>` : `
+                        <div style="display:none;">
                             <div class="form-group">
                                 <label data-lang-key="password"></label>
                                 <input type="text" id="client-password" value="${autoPassword}">
                             </div>
-                        </div>
+                        </div>`}
 
                         <h3 class="section-title" style="margin-top:30px; border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
                            <i data-lucide="dollar-sign"></i> 
@@ -6028,6 +6604,52 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                 });
             }
 
+            const clientProfilePreview = document.getElementById('client-profile-preview');
+            const clientProfileCameraInput = document.getElementById('client-profile-camera-input');
+            const clientProfileGalleryInput = document.getElementById('client-profile-gallery-input');
+            const clientProfileRemoveBtn = document.getElementById('client-profile-remove-btn');
+            const updateClientProfilePreview = (src, hasPhoto) => {
+                if (clientProfilePreview) clientProfilePreview.src = src;
+                if (clientProfileRemoveBtn) clientProfileRemoveBtn.style.display = hasPhoto ? 'inline-flex' : 'none';
+            };
+            const selectClientProfileFile = (file) => {
+                if (!file) return;
+                if (!file.type.startsWith('image/')) {
+                    showToast('Selecione um arquivo de imagem válido.', true);
+                    return;
+                }
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast('A imagem deve ter no máximo 10 MB.', true);
+                    return;
+                }
+                showCropperModal(file, (blob) => {
+                    clientProfileBlob = blob;
+                    removeClientProfilePicture = false;
+                    if (clientProfilePreviewObjectUrl) URL.revokeObjectURL(clientProfilePreviewObjectUrl);
+                    clientProfilePreviewObjectUrl = URL.createObjectURL(blob);
+                    updateClientProfilePreview(clientProfilePreviewObjectUrl, true);
+                });
+            };
+            document.getElementById('client-profile-camera-btn')?.addEventListener('click', () => clientProfileCameraInput?.click());
+            document.getElementById('client-profile-gallery-btn')?.addEventListener('click', () => clientProfileGalleryInput?.click());
+            clientProfileCameraInput?.addEventListener('change', (event) => {
+                selectClientProfileFile(event.target.files?.[0]);
+                event.target.value = '';
+            });
+            clientProfileGalleryInput?.addEventListener('change', (event) => {
+                selectClientProfileFile(event.target.files?.[0]);
+                event.target.value = '';
+            });
+            clientProfileRemoveBtn?.addEventListener('click', () => {
+                clientProfileBlob = null;
+                removeClientProfilePicture = true;
+                if (clientProfilePreviewObjectUrl) {
+                    URL.revokeObjectURL(clientProfilePreviewObjectUrl);
+                    clientProfilePreviewObjectUrl = null;
+                }
+                updateClientProfilePreview(clientProfileFallback, false);
+            });
+
             const loanAmountInput = document.getElementById('client-loan-amount');
             const interestInput = document.getElementById('client-interest');
             const installmentsInput = document.getElementById('client-installments');
@@ -6177,12 +6799,15 @@ if (preSaleBtn) {
                         location: document.getElementById('client-location').value,
                         username: username,
                         email: email, 
-                        password: password,
                         documents: finalDocuments,
                         collectorId: currentCollectorUsername,
                         interestRate: interest,
                         customMessage: document.getElementById('client-custom-message').value.trim() // NUEVA LÍNEA
                     };
+                    if (!isNewLoan) {
+                        clientGeneralData.profilePictureUrl = removeClientProfilePicture ? '' : (client.profilePictureUrl || '');
+                    }
+                    if (!isEditMode && !isNewLoan) clientGeneralData.password = password;
 
                     const loanSpecificData = {
                         principalAmount: principalAmount,
@@ -6238,7 +6863,7 @@ if (preSaleBtn) {
                             loans: arrayUnion(loanSpecificData)
                         });
                     } else if (isEditMode) {
-                        if (password && password !== client.password) {
+                        if (password) {
                             showToast("Atualizando senha...", false);
                             if (!auth.currentUser) throw new Error("Cobrador não está autenticado.");
                             const updateClientAuth = httpsCallable(functions, 'updateClientAuth');
@@ -6296,6 +6921,38 @@ if (preSaleBtn) {
                         await setDoc(newClientRef, newClientData);
                     }
                     
+                    let profilePictureWarning = false;
+                    if (!isNewLoan && (clientProfileBlob || removeClientProfilePicture)) {
+                        const savedClientId = clientIdToSave || username;
+                        const clientRef = doc(db, 'companies', currentCompanyId, 'clients', savedClientId);
+                        const profileStorageRef = ref(storage, `companies/${currentCompanyId}/clients/${savedClientId}/profile.jpg`);
+                        try {
+                            if (clientProfileBlob) {
+                                await uploadBytes(profileStorageRef, clientProfileBlob, { contentType: 'image/jpeg' });
+                                const profilePictureUrl = await getDownloadURL(profileStorageRef);
+                                await updateDoc(clientRef, {
+                                    profilePictureUrl,
+                                    profilePictureUpdatedAt: serverTimestamp(),
+                                    profilePictureUpdatedBy: currentCollectorUsername
+                                });
+                            } else {
+                                await updateDoc(clientRef, {
+                                    profilePictureUrl: '',
+                                    profilePictureUpdatedAt: serverTimestamp(),
+                                    profilePictureUpdatedBy: currentCollectorUsername
+                                });
+                                try {
+                                    await deleteObject(profileStorageRef);
+                                } catch (deleteError) {
+                                    if (deleteError?.code !== 'storage/object-not-found') console.warn('Não foi possível apagar o arquivo antigo da foto:', deleteError);
+                                }
+                            }
+                        } catch (profileError) {
+                            profilePictureWarning = true;
+                            console.error('Cliente salvo, mas a foto de identificação não foi atualizada:', profileError);
+                        }
+                    }
+
                     if (saveButton.dataset.isRefinance === 'true') {
                         const clientRef = doc(db, 'companies', currentCompanyId, 'clients', clientIdToSave);
                         await updateDoc(clientRef, { refinanceRequest: null });
@@ -6304,6 +6961,10 @@ if (preSaleBtn) {
                     window.history.back();
                     const successToastMessage = isEditMode ? translations[currentLang].clientUpdatedSuccess : translations[currentLang].clientRegisteredSuccess;
                     showToast(successToastMessage);
+                    if (profilePictureWarning) {
+                        setTimeout(() => showToast('Cliente salvo, mas não foi possível atualizar a foto de identificação.', true), 300);
+                    }
+                    if (clientProfilePreviewObjectUrl) URL.revokeObjectURL(clientProfilePreviewObjectUrl);
 
                     if (!isEditMode) { 
                         setTimeout(() => { showShareCredentialsModal(clientGeneralData, isEditMode); }, 400);
@@ -6743,12 +7404,23 @@ function showSettlementFormModal() {
                  lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
 
                  try {
+                    const settlementRef = doc(collection(db, 'companies', currentCompanyId, 'settlements'));
                     let receiptUrl = '';
+                    let receiptUploadPending = false;
                     if (receiptFile) {
-                         const tempSettlementId = `settlement_${Date.now()}`;
-                         const storageRef = ref(storage, `companies/${currentCompanyId}/settlements/${currentCollectorUsername}/${tempSettlementId}/${receiptFile.name.replace(/\s+/g, '_')}`)
-                         await uploadBytes(storageRef, receiptFile);
-                         receiptUrl = await getDownloadURL(storageRef);
+                         const storagePath = `companies/${currentCompanyId}/settlements/${currentCollectorUsername}/${settlementRef.id}/${receiptFile.name.replace(/\s+/g, '_')}`;
+                         const uploadResult = await uploadNowOrQueue({
+                             id: `settlement-receipt:${settlementRef.id}`,
+                             kind: 'document-attachment',
+                             documentPath: ['companies', currentCompanyId, 'settlements', settlementRef.id],
+                             field: 'receiptUrl',
+                             storagePath,
+                             contentType: receiptFile.type || 'application/octet-stream',
+                             blob: receiptFile,
+                             createdAt: new Date().toISOString()
+                         });
+                         receiptUrl = uploadResult.downloadUrl;
+                         receiptUploadPending = uploadResult.queued;
                     }
 
                     const collectorName = document.querySelector('.profile-name')?.textContent || currentCollectorUsername; 
@@ -6760,6 +7432,7 @@ function showSettlementFormModal() {
                         amount: amount,
                         notes: document.getElementById('settlement-form-notes').value.trim(),
                         receiptUrl: receiptUrl,
+                        receiptUploadPending,
                         date: serverTimestamp(),
                         
                         // === CAMBIO: ESTADO APROBADO DIRECTAMENTE ===
@@ -6767,11 +7440,16 @@ function showSettlementFormModal() {
                         status: 'approved' 
                     };
 
-                    await addDoc(collection(db, 'companies', currentCompanyId, 'settlements'), settlementData);
+                    const settlementWrite = await persistWithOfflineFeedback(
+                        setDoc(settlementRef, settlementData),
+                        'retirada'
+                    );
                     window.history.back();
                     
                     // Cambiamos el mensaje para reflejar que ya se hizo
-                    showToast('Retirada registrada e descontada!');
+                    showToast(settlementWrite?.queued || receiptUploadPending
+                        ? 'Retirada salva no aparelho. Será sincronizada quando a internet voltar.'
+                        : 'Retirada registrada e descontada!');
                  } catch (err) {
                      console.error(err);
                      showToast('Erro ao enviar', true);
@@ -6869,36 +7547,45 @@ function showSettlementFormModal() {
                 lucide.createIcons({ nodes: [saveButton.querySelector('i')] });
 
                 try {
-                    
-                    let receiptUrl = ''; // Inicializa receiptUrl
-if (receiptFile) {
-     // Usaremos un ID temporal para la ruta, Firestore generará el ID real después
-     const tempExpenseId = `expense_${Date.now()}`;
-     // 1. Crear referencia (expenses/ID_COBRADOR/ID_GASTO/receipt.ext)
-     const storageRef = ref(storage, `companies/${currentCompanyId}/expenses/${currentCollectorUsername}/${tempExpenseId}/${receiptFile.name.replace(/\s+/g, '_')}`);
+                    const expenseRef = doc(collection(db, 'companies', currentCompanyId, 'expenses'));
+                    let receiptUrl = '';
+                    let receiptUploadPending = false;
+                    if (receiptFile) {
+                        const storagePath = `companies/${currentCompanyId}/expenses/${currentCollectorUsername}/${expenseRef.id}/${receiptFile.name.replace(/\s+/g, '_')}`;
+                        const uploadResult = await uploadNowOrQueue({
+                            id: `expense-receipt:${expenseRef.id}`,
+                            kind: 'document-attachment',
+                            documentPath: ['companies', currentCompanyId, 'expenses', expenseRef.id],
+                            field: 'receiptUrl',
+                            storagePath,
+                            contentType: receiptFile.type || 'application/octet-stream',
+                            blob: receiptFile,
+                            createdAt: new Date().toISOString()
+                        });
+                        receiptUrl = uploadResult.downloadUrl;
+                        receiptUploadPending = uploadResult.queued;
+                    }
 
-     // 2. Subir archivo
-     await uploadBytes(storageRef, receiptFile);
-
-     // 3. Obtener URL
-     receiptUrl = await getDownloadURL(storageRef); // Asigna la URL
-}
-
-const expenseData = {
-    type: 'expense', // Asegúrate que este campo exista
-    collectorId: currentCollectorUsername,
-    category: document.getElementById('expense-category').value,
-    value: parseFloat(valueInput.value),
-    observations: document.getElementById('expense-obs').value,
-    receiptUrl, // Aquí ya va la URL de Firebase
-    date: serverTimestamp()
-};
-// Guardar en Firestore (igual que antes)
-await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseData);
+                    const expenseData = {
+                        type: 'expense',
+                        collectorId: currentCollectorUsername,
+                        category: document.getElementById('expense-category').value,
+                        value: parseFloat(valueInput.value),
+                        observations: document.getElementById('expense-obs').value,
+                        receiptUrl,
+                        receiptUploadPending,
+                        date: serverTimestamp()
+                    };
+                    const expenseWrite = await persistWithOfflineFeedback(
+                        setDoc(expenseRef, expenseData),
+                        'gasto'
+                    );
 
                     
                     window.history.back();
-                    showToast(translations[currentLang].expenseSaved, 'success');
+                    showToast(expenseWrite?.queued || receiptUploadPending
+                        ? 'Gasto salvo no aparelho. Será sincronizado quando a internet voltar.'
+                        : translations[currentLang].expenseSaved, 'success');
 
                 } catch (err) {
                     console.error("Falha ao salvar gasto:", err);
@@ -7087,11 +7774,27 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
                 btns.forEach(b => b.disabled = true);
                 
                 try {
+                    const paymentDate = new Date();
+                    const paymentId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                        ? window.crypto.randomUUID()
+                        : `pay_${paymentDate.getTime()}_${Math.random().toString(36).slice(2, 10)}`;
                     let receiptUrl = '';
+                    let receiptUploadPending = false;
                     if (file && (method === 'pix' || method === 'cartao')) {
-                        const storageRef = ref(storage, `companies/${currentCompanyId}/clients/${cId}/payments/${Date.now()}_${file.name}`);
-                        await uploadBytes(storageRef, file);
-                        receiptUrl = await getDownloadURL(storageRef);
+                        const storagePath = `companies/${currentCompanyId}/clients/${cId}/payments/${paymentId}_${file.name.replace(/\s+/g, '_')}`;
+                        const uploadResult = await uploadNowOrQueue({
+                            id: `payment-receipt:${paymentId}`,
+                            kind: 'payment-receipt',
+                            companyId: currentCompanyId,
+                            clientId: cId,
+                            paymentId,
+                            storagePath,
+                            contentType: file.type || 'application/octet-stream',
+                            blob: file,
+                            createdAt: paymentDate.toISOString()
+                        });
+                        receiptUrl = uploadResult.downloadUrl;
+                        receiptUploadPending = uploadResult.queued;
                     }
 
                     const clientRef = doc(db, 'companies', currentCompanyId, "clients", cId);
@@ -7102,13 +7805,20 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
                     if (!currentLoan.history) currentLoan.history = [];
                     
-                    currentLoan.history.push({
+                    const paymentTiming = status === 'approved'
+                        ? createPaymentTimingSnapshot(calculateLoanDetails(currentLoan, paymentDate))
+                        : null;
+                    const savedPayment = {
+                        paymentId: paymentId,
                         amount: amount,
-                        date: new Date(),
+                        date: paymentDate,
                         status: status,
                         method: method || 'dinheiro',
-                        receiptUrl: receiptUrl
-                    });
+                        receiptUrl: receiptUrl,
+                        receiptUploadPending,
+                        ...(paymentTiming || {})
+                    };
+                    currentLoan.history.push(savedPayment);
 
                     const validHistory = currentLoan.history.filter(h => h.status === 'approved' || h.method === 'migration');
                     const newTotalPaid = validHistory.reduce((sum, h) => sum + (h.amount || 0), 0);
@@ -7120,19 +7830,55 @@ await addDoc(collection(db, 'companies', currentCompanyId, 'expenses'), expenseD
 
                     currentLoan.paid = newTotalPaid;
                     currentLoan.installments = `${paidCount}/${totalInst}`;
+
+                    if (status === 'approved') {
+                        const updatedDetails = calculateLoanDetails(currentLoan);
+                        const totalDebtAfterPayment = (parseFloat(currentLoan.totalLoan) || 0) + (updatedDetails.lateFeesAccumulated || 0);
+                        savedPayment.receiptSnapshot = {
+                            companyName: currentCompanyData?.name || 'LUMIX Finanças',
+                            collectorName: currentCollectorData?.name || currentCollectorUsername || 'Cobrador',
+                            clientName: currentClient.name || 'Cliente',
+                            currencyCode: currentCollectorData?.paymentSettings?.currency || currentCompanyData?.settings?.currency || 'BRL',
+                            totalDebt: totalDebtAfterPayment,
+                            totalPaid: newTotalPaid,
+                            remainingBalance: Math.max(0, totalDebtAfterPayment - newTotalPaid),
+                            paidInstallments: paidCount,
+                            totalInstallments: totalInst,
+                            installmentValue: instVal,
+                            paymentTimingStatus: paymentTiming.paymentTimingStatus,
+                            paymentDelayDays: paymentTiming.paymentDelayDays
+                        };
+                    }
                     
                     const updatedLoans = [...currentClient.loans];
                     updatedLoans[lIndex] = currentLoan;
                     
-                    await updateDoc(clientRef, { loans: updatedLoans });
+                    const paymentWrite = await persistWithOfflineFeedback(
+                        updateDoc(clientRef, { loans: updatedLoans }),
+                        'pagamento'
+                    );
+
+                    // Mantém a ficha que está por trás do comprovante sincronizada,
+                    // mesmo se o listener em tempo real disparar enquanto ela estiver oculta.
+                    currentClient.loans = updatedLoans;
+                    if (currentDetailClientId === cId && currentDetailLoanIndex === lIndex) {
+                        showClientDetails(cId, lIndex, true);
+                    }
 
                     
                     // --- CORRECCIÓN IDIOMA MENSAJE ---
-                    const successMsg = currentLang === 'es' ? '¡Acción registrada con éxito!' : (currentLang === 'en' ? 'Action registered successfully!' : 'Ação registrada com sucesso!');
+                    const wasQueued = paymentWrite?.queued || receiptUploadPending;
+                    const successMsg = wasQueued
+                        ? (currentLang === 'es' ? 'Pago guardado en el dispositivo. Se sincronizará al volver internet.' : (currentLang === 'en' ? 'Payment saved on this device. It will sync when the connection returns.' : 'Pagamento salvo no aparelho. Será sincronizado quando a internet voltar.'))
+                        : (currentLang === 'es' ? '¡Acción registrada con éxito!' : (currentLang === 'en' ? 'Action registered successfully!' : 'Ação registrada com sucesso!'));
 
                     // Agregamos 'success' aquí para que salga VERDE
                     showToast(successMsg, 'success');
-                    window.history.back();
+                    if (status === 'approved') {
+                        await showGeneratedPaymentReceipt(currentClient, savedPayment, true);
+                    } else {
+                        window.history.back();
+                    }
 
                 } catch (error) {
                     console.error(error);
@@ -8138,6 +8884,55 @@ function showReportDateModal() {
     });
 }
 
+        function showCropperModal(file, onCropped = handleProfilePictureChange) {
+            const cropperModal = document.getElementById('cropperModal');
+            if (!cropperModal || !file) return;
+
+            cropperModal.innerHTML = `
+                <header class="modal-header">
+                    <button type="button" id="closeCropperModal"><i data-lucide="x"></i></button>
+                    <span class="modal-title">${translations[currentLang]?.cropImage || 'Recortar imagem'}</span>
+                </header>
+                <div class="modal-content-wrapper">
+                    <div id="cropper-container" class="container"><img id="cropper-image" alt="Imagem para recorte"></div>
+                </div>
+                <div class="action-buttons" style="display:flex; gap:10px;">
+                    <button type="button" class="btn-secondary" id="cancelCropBtn">${translations[currentLang]?.cancel || 'Cancelar'}</button>
+                    <button type="button" class="btn-primary" id="confirmCropBtn"><i data-lucide="check-circle"></i> ${translations[currentLang]?.confirmCrop || 'Confirmar'}</button>
+                </div>`;
+            cropperModal.classList.add('active');
+            lucide.createIcons({ nodes: cropperModal.querySelectorAll('[data-lucide]') });
+
+            const image = cropperModal.querySelector('#cropper-image');
+            const objectUrl = URL.createObjectURL(file);
+            image.src = objectUrl;
+            let cropper = null;
+
+            const cleanup = () => {
+                cropper?.destroy();
+                cropper = null;
+                URL.revokeObjectURL(objectUrl);
+                cropperModal.classList.remove('active');
+                cropperModal.replaceChildren();
+            };
+            image.addEventListener('load', () => {
+                cropper = new Cropper(image, { aspectRatio: 1, viewMode: 1, background: false, autoCropArea: 1 });
+            }, { once: true });
+            cropperModal.querySelector('#closeCropperModal').addEventListener('click', cleanup);
+            cropperModal.querySelector('#cancelCropBtn').addEventListener('click', cleanup);
+            cropperModal.querySelector('#confirmCropBtn').addEventListener('click', () => {
+                if (!cropper) return;
+                cropper.getCroppedCanvas({ width: 256, height: 256, imageSmoothingQuality: 'high' }).toBlob((blob) => {
+                    if (!blob) {
+                        showToast('Não foi possível processar a imagem.', true);
+                        return;
+                    }
+                    cleanup();
+                    onCropped(blob);
+                }, 'image/jpeg', 0.86);
+            });
+        }
+
         async function handleProfilePictureChange(blob) {
             if (!blob) return;
             const profileImageView = document.getElementById('profile-view-img');
@@ -8469,6 +9264,7 @@ function showReportDateModal() {
             try {
                 // [CAMBIO] Inicia sesión con el 'email' construido
                 console.log(`Tentando login com email construído: ${email}`);
+                await authPersistenceReady;
                 await signInWithEmailAndPassword(auth, email, pass);
         
                 // SUCESSO! O onAuthStateChanged vai ser chamado automaticamente
@@ -8498,31 +9294,6 @@ function showReportDateModal() {
             }
         }
 
-
-        async function handleCollectorPasswordReset() {
-            const usernameInput = document.getElementById('username');
-            const username = usernameInput.value.trim();
-            const t = translations[currentLang];
-
-            if (!username) {
-                showToast(t.usernameRequired || 'Informe o usuário.', true);
-                usernameInput.focus();
-                return;
-            }
-
-            const resetButton = document.getElementById('forgot-collector-password-btn');
-            resetButton.disabled = true;
-
-            try {
-                await sendPasswordResetEmail(auth, `${username}@gmail.com`);
-                showToast(t.passwordResetSent || 'Instruções de redefinição enviadas.');
-            } catch (error) {
-                console.error('Erro ao solicitar redefinição de senha:', error.code);
-                showToast('Não foi possível solicitar a redefinição. Verifique o usuário e tente novamente.', true);
-            } finally {
-                resetButton.disabled = false;
-            }
-        }
 
         async function handleClearCollectorNotifications() {
             console.log("[COBRADOR-APP] Solicitado para limpar notificações...");
@@ -8997,15 +9768,25 @@ function renderVerificationResults(container, warnings, systemLoans) {
     const collectorQuery = query(collection(db, 'collectors'), where('authUid', '==', authUid));
 
     getDocs(collectorQuery).then(snapshot => {
+        let collectorDoc = snapshot.docs[0];
         if (snapshot.empty) {
             console.error(`Nenhum documento de cobrador encontrado para authUid: ${authUid}`);
-            showBlockedView("Erro: Dados do cobrador não encontrados no banco de dados."); 
-            signOut(auth);
-            return;
+            const cachedCollectorId = localStorage.getItem(`lumix-cobrador-id:${authUid}`);
+            if (!navigator.onLine && cachedCollectorId) {
+                collectorDoc = { id: cachedCollectorId };
+            } else if (!navigator.onLine) {
+                showBlockedView('Sem conexão e sem dados anteriores do cobrador neste aparelho.');
+                updateConnectivityStatus();
+                return;
+            } else {
+                showBlockedView("Erro: Dados do cobrador não encontrados no banco de dados.");
+                signOut(auth);
+                return;
+            }
         }
         
-        const collectorDoc = snapshot.docs[0];
         currentCollectorUsername = collectorDoc.id; 
+        localStorage.setItem(`lumix-cobrador-id:${authUid}`, currentCollectorUsername);
         console.log(`Documento do cobrador encontrado. Username (Firestore ID): ${currentCollectorUsername}`);
 
         // Listener del Cobrador (Perfil y PERMISOS EN TIEMPO REAL)
@@ -9075,8 +9856,12 @@ function renderVerificationResults(container, warnings, systemLoans) {
             }
         }, (error) => { 
              console.error(`Erro ao escutar dados do cobrador ${currentCollectorUsername}:`, error);
-             showBlockedView("Erro de conexão ao carregar seus dados.");
-             signOut(auth);
+             if (isTransientConnectionError(error)) {
+                 showToast('Sem conexão. Exibindo os últimos dados salvos no aparelho.', true);
+                 updateConnectivityStatus();
+                 return;
+             }
+             showBlockedView("Erro ao carregar seus dados de cobrador.");
         });
 
         // Listener de Clientes
@@ -9085,7 +9870,9 @@ function renderVerificationResults(container, warnings, systemLoans) {
             where("collectorId", "==", currentCollectorUsername)
         );
 
-        onSnapshot(clientsQuery, (snapshot) => {
+        onSnapshot(clientsQuery, { includeMetadataChanges: true }, (snapshot) => {
+            firestoreMetadataPending = snapshot.metadata.hasPendingWrites;
+            updateConnectivityStatus(firestoreMetadataPending ? 'syncing' : (navigator.onLine ? 'synced' : null));
             console.log("[COBRADOR-APP][DIAG] Client onSnapshot disparado! Processando clientes...");
             allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
@@ -9228,8 +10015,12 @@ function renderVerificationResults(container, warnings, systemLoans) {
 
     }).catch(error => { 
          console.error("Erro crítico ao buscar documento do cobrador por authUid:", error);
+         if (isTransientConnectionError(error)) {
+             showBlockedView('Sem conexão e sem dados suficientes em cache para abrir esta rota.');
+             updateConnectivityStatus();
+             return;
+         }
          showBlockedView("Erro crítico ao carregar seus dados iniciais.");
-         signOut(auth);
     });
     }
 
@@ -9244,17 +10035,10 @@ function renderVerificationResults(container, warnings, systemLoans) {
             let lastCheckedDate = new Date().getDate();
 
             document.body.classList.add('dark-mode');
-            
-            // --- NUEVO: DESTRUCTOR DE CACHÉ SILENCIOSO ---
-            // Obliga al celular a vaciar su memoria interna PWA al arrancar
-            if ('caches' in window) {
-                caches.keys().then(function(cacheNames) {
-                    cacheNames.forEach(function(cacheName) {
-                        caches.delete(cacheName);
-                    });
-                });
-            }
-            // ---------------------------------------------
+            refreshPendingUploadCount().then(() => {
+                updateConnectivityStatus();
+                if (navigator.onLine) processPendingUploads();
+            });
             
             // --- PWA Banner ---
             window.addEventListener('beforeinstallprompt', (e) => {
@@ -9396,8 +10180,25 @@ function renderVerificationResults(container, warnings, systemLoans) {
                 if (user) {
                     try {
                         console.log("Verificando permissões...");
-                        const tokenResult = await user.getIdTokenResult(true); 
-                        const claims = tokenResult.claims; 
+                        const authContextKey = `lumix-cobrador-auth:${user.uid}`;
+                        let claims;
+                        try {
+                            const tokenResult = await user.getIdTokenResult(false);
+                            claims = tokenResult.claims;
+                            localStorage.setItem(authContextKey, JSON.stringify({
+                                role: claims.role,
+                                companyId: claims.companyId,
+                                verifiedAt: new Date().toISOString()
+                            }));
+                        } catch (tokenError) {
+                            if (!isTransientConnectionError(tokenError)) throw tokenError;
+                            const cachedContext = localStorage.getItem(authContextKey);
+                            if (!cachedContext) throw tokenError;
+                            claims = JSON.parse(cachedContext);
+                            const contextAge = Date.now() - new Date(claims.verifiedAt || 0).getTime();
+                            if (!Number.isFinite(contextAge) || contextAge > 24 * 60 * 60 * 1000) throw tokenError;
+                            updateConnectivityStatus();
+                        }
                         
                         if (claims.role !== 'collector' || !claims.companyId) {
                             showBlockedView("Conta sem permissão de cobrador.");
@@ -9408,13 +10209,26 @@ function renderVerificationResults(container, warnings, systemLoans) {
                         currentCollectorUid = user.uid; 
                         currentCompanyId = claims.companyId; 
                         
-                        const companySnap = await getDoc(doc(db, 'companies', currentCompanyId));
-                        if (!companySnap.exists()) {
-                            showBlockedView("Empresa não encontrada.");
-                            await signOut(auth);
-                            return;
+                        const companyCacheKey = `lumix-cobrador-company:${currentCompanyId}`;
+                        try {
+                            const companySnap = await getDoc(doc(db, 'companies', currentCompanyId));
+                            if (!companySnap.exists()) {
+                                showBlockedView("Empresa não encontrada.");
+                                await signOut(auth);
+                                return;
+                            }
+                            currentCompanyData = companySnap.data();
+                            localStorage.setItem(companyCacheKey, JSON.stringify(currentCompanyData));
+                        } catch (companyError) {
+                            if (!isTransientConnectionError(companyError)) throw companyError;
+                            const cachedCompany = localStorage.getItem(companyCacheKey);
+                            if (!cachedCompany) {
+                                showBlockedView('Sem conexão e sem dados anteriores desta empresa neste aparelho.');
+                                return;
+                            }
+                            currentCompanyData = JSON.parse(cachedCompany);
+                            updateConnectivityStatus();
                         }
-                        currentCompanyData = companySnap.data(); 
 
                         if (currentCompanyData.status === 'suspended') {
                             showBlockedView("Conta da empresa suspensa."); 
@@ -9434,6 +10248,11 @@ function renderVerificationResults(container, warnings, systemLoans) {
 
                     } catch (error) {
                         console.error("Erro auth:", error);
+                        if (isTransientConnectionError(error)) {
+                            showBlockedView('Sem conexão. Reconecte uma vez para validar este aparelho.');
+                            updateConnectivityStatus();
+                            return;
+                        }
                         showBlockedView(`Erro de verificação: ${error.message}`);
                         await signOut(auth);
                     }
@@ -9451,10 +10270,6 @@ function renderVerificationResults(container, warnings, systemLoans) {
                     if (loginForm) {
                         loginForm.removeEventListener('submit', handleLogin); 
                         loginForm.addEventListener('submit', handleLogin); 
-                    }
-                    const forgotPasswordBtn = document.getElementById('forgot-collector-password-btn');
-                    if (forgotPasswordBtn) {
-                        forgotPasswordBtn.onclick = handleCollectorPasswordReset;
                     }
                 }
             });

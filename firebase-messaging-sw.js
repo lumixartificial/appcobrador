@@ -1,4 +1,104 @@
-const SW_VERSION = "v5.1-loop-fix"; // Versión actualizada para forzar la actualización
+const SW_VERSION = "v6.1-production-offline-shell";
+const CACHE_PREFIX = 'lumix-cobrador-';
+const SHELL_CACHE = `${CACHE_PREFIX}shell-${SW_VERSION}`;
+const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-${SW_VERSION}`;
+const APP_SHELL = [
+  './',
+  './index.html',
+  './manifest.json',
+  './loan-calculations.js?v=20261023-0100',
+  './payment-timing.mjs?v=20261103-1600'
+];
+const OPTIONAL_STATIC_ASSETS = [
+  'https://unpkg.com/lucide@latest',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js',
+  'https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const shell = await caches.open(SHELL_CACHE);
+    await shell.addAll(APP_SHELL);
+    const runtime = await caches.open(RUNTIME_CACHE);
+    await Promise.allSettled(OPTIONAL_STATIC_ASSETS.map(url => runtime.add(url)));
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames
+      .filter(name => name.startsWith(CACHE_PREFIX) && ![SHELL_CACHE, RUNTIME_CACHE].includes(name))
+      .map(name => caches.delete(name)));
+    await self.clients.claim();
+  })());
+});
+
+function isCacheableStaticRequest(requestUrl) {
+  const allowedHosts = new Set([
+    'unpkg.com',
+    'cdnjs.cloudflare.com',
+    'fonts.googleapis.com',
+    'fonts.gstatic.com',
+    'www.gstatic.com',
+    'firebasestorage.googleapis.com',
+    'placehold.co',
+    'raw.githubusercontent.com'
+  ]);
+  return allowedHosts.has(requestUrl.hostname);
+}
+
+async function networkFirst(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch (error) {
+    return (await cache.match(request))
+      || (await cache.match('./index.html'))
+      || Response.error();
+  }
+}
+
+async function cacheFirstWithRefresh(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  const cached = await cache.match(request);
+  const refresh = fetch(request).then(response => {
+    if (response && (response.ok || response.type === 'opaque')) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  }).catch(() => null);
+  return cached || (await refresh) || Response.error();
+}
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+  if (url.origin === self.location.origin) {
+    event.respondWith(cacheFirstWithRefresh(request));
+    return;
+  }
+  if (isCacheableStaticRequest(url)) {
+    event.respondWith(cacheFirstWithRefresh(request));
+  }
+});
 
 // Importa los scripts de Firebase. Esto debe hacerse primero.
 importScripts("https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js");
@@ -9,7 +109,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyBRxJjpH6PBi-GRxOXS8klv-8v91sO4X-Y",
     authDomain: "lumix-financas-app.firebaseapp.com",
     projectId: "lumix-financas-app",
-    storageBucket: "lumix-financas-app.appspot.com",
+    storageBucket: "lumix-financas-app.firebasestorage.app",
     messagingSenderId: "463777495321",
     // [CORRECCIÓN CRÍTICA] Se ha corregido el appId. Ahora es idéntico al de la aplicación principal.
     appId: "1:463777495321:web:106118f53f56abd206ed88"
