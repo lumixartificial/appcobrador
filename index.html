@@ -544,7 +544,7 @@
         .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; font-size: 1em; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--surface); color: var(--text-primary); }
         .form-group textarea { resize: vertical; min-height: 80px; }
-        .form-group .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .form-group input[readonly] { background-color: var(--bg); opacity: 0.7; }
         .radio-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin-bottom: 20px; }
         .radio-group label, .day-selector label { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background-color: var(--surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; cursor: pointer; text-align: center; }
@@ -648,7 +648,7 @@
         }
 
         @media (max-width: 480px) {
-            .form-group .grid-2 {
+            .form-group.grid-2 {
                 grid-template-columns: 1fr; /* Apila los campos del formulario */
             }
             .profile-info {
@@ -1511,6 +1511,64 @@ const BLACKLIST_DATA = {
 
 
         
+        function parseLoanDate(rawDate) {
+            if (!rawDate) return null;
+            if (typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+                const [year, month, day] = rawDate.split('-').map(Number);
+                const localDate = new Date(year, month - 1, day);
+                return isNaN(localDate.getTime()) ? null : localDate;
+            }
+            const parsed = rawDate?.toDate
+                ? rawDate.toDate()
+                : (rawDate?.seconds ? new Date(rawDate.seconds * 1000) : new Date(rawDate));
+            return parsed && !isNaN(parsed.getTime()) ? parsed : null;
+        }
+
+        function getLoanStartDate(loan) {
+            return parseLoanDate(loan?.startDate);
+        }
+
+        function getFirstPaymentDate(loan) {
+            return parseLoanDate(loan?.firstPaymentDate);
+        }
+
+        function formatDateInputValue(date) {
+            if (!date) return '';
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getConfiguredMonthlyDay(loan) {
+            const firstPaymentDate = getFirstPaymentDate(loan);
+            if (firstPaymentDate) return firstPaymentDate.getDate();
+
+            const configuredDay = Number.parseInt(loan?.paymentDays?.[0], 10);
+            if (Number.isInteger(configuredDay) && configuredDay >= 1 && configuredDay <= 31) {
+                return configuredDay;
+            }
+
+            const startDate = getLoanStartDate(loan);
+            return startDate ? startDate.getDate() : null;
+        }
+
+        function isMonthlyPaymentDay(loan, referenceDate) {
+            const configuredDay = getConfiguredMonthlyDay(loan);
+            const paymentDate = parseLoanDate(referenceDate);
+            if (!configuredDay || !paymentDate) return false;
+
+            const firstPaymentDate = getFirstPaymentDate(loan);
+            if (firstPaymentDate) {
+                const normalizedPaymentDate = new Date(paymentDate.getFullYear(), paymentDate.getMonth(), paymentDate.getDate());
+                const normalizedFirstPaymentDate = new Date(firstPaymentDate.getFullYear(), firstPaymentDate.getMonth(), firstPaymentDate.getDate());
+                if (normalizedPaymentDate < normalizedFirstPaymentDate) return false;
+            }
+
+            const lastDayOfMonth = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 0).getDate();
+            return paymentDate.getDate() === Math.min(configuredDay, lastDayOfMonth);
+        }
+
        function calculateDailyTotals() {
             let todayLogico = new Date();
             if (todayLogico.getHours() < 5) todayLogico.setDate(todayLogico.getDate() - 1);
@@ -1734,7 +1792,7 @@ const BLACKLIST_DATA = {
                            }
                        }
                    } else if (frequency === 'monthly') {
-                       isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfMonth;
+                       isPaymentDay = isMonthlyPaymentDay(loan, today);
                    }
 
                    if (isPaymentDay) {
@@ -2129,6 +2187,18 @@ async function showRefinanceModal(clientId, notificationId) {
     console.log(`[DIAG-REFI] showRefinanceModal chamada com clientId=${clientId}, notifId=${notificationId}`);
 
     const request = client.refinanceRequest;
+    const lastLoanForRefinance = client.loans && client.loans.length > 0 ? client.loans[client.loans.length - 1] : {};
+    const refinanceFrequency = lastLoanForRefinance.paymentFrequency || 'daily';
+    let suggestedRefinanceFirstPaymentDate = '';
+    if (refinanceFrequency === 'monthly') {
+        const recurringDay = getConfiguredMonthlyDay(lastLoanForRefinance) || new Date().getDate();
+        const nextMonth = new Date();
+        nextMonth.setDate(1);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        const lastDayOfNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+        nextMonth.setDate(Math.min(recurringDay, lastDayOfNextMonth));
+        suggestedRefinanceFirstPaymentDate = formatDateInputValue(nextMonth);
+    }
 
     const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
     const placeholderUrl = `https://placehold.co/80x80/6f42c1/FFFFFF?text=${nameInitial}`;
@@ -2163,6 +2233,12 @@ async function showRefinanceModal(clientId, notificationId) {
                     </div>
                 </div>
             </div>
+            ${refinanceFrequency === 'monthly' ? `
+                <div class="form-group" style="margin-top:20px;">
+                    <label for="refinance-first-payment-date" style="font-weight:700;">${currentLang === 'es' ? 'Fecha de la Primera Cuota' : (currentLang === 'en' ? 'First Installment Date' : 'Data da Primeira Parcela')}</label>
+                    <input type="date" id="refinance-first-payment-date" value="${suggestedRefinanceFirstPaymentDate}" required>
+                    <small style="display:block; margin-top:7px; color:var(--text-secondary);">${currentLang === 'es' ? 'La renovación no generará cobro antes de esta fecha.' : (currentLang === 'en' ? 'The renewal will not generate a collection before this date.' : 'A renovação não gerará cobrança antes desta data.')}</small>
+                </div>` : ''}
         </div>
         <div class="action-buttons">
             <button class="btn-danger" id="reject-refinance-btn"><i data-lucide="x-circle"></i> <span data-lang-key="reject"></span></button>
@@ -2186,6 +2262,16 @@ async function showRefinanceModal(clientId, notificationId) {
         lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
 
         try {
+            const refinanceFirstPaymentDateValue = refinanceFrequency === 'monthly' ? modal.querySelector('#refinance-first-payment-date')?.value : '';
+            const refinanceFirstPaymentDate = parseLoanDate(refinanceFirstPaymentDateValue);
+            if (refinanceFrequency === 'monthly' && !refinanceFirstPaymentDate) {
+                showToast('Selecione a data da primeira parcela.', true);
+                modal.querySelector('#refinance-first-payment-date')?.focus();
+                approveBtn.disabled = false;
+                approveBtn.innerHTML = `<i data-lucide="check-circle"></i> Aprovar e Criar`;
+                lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
+                return;
+            }
             // --- INICIO DE LA NUEVA LÓGICA (EL ARREGLO) ---
             
             // 1. Construir el objeto del nuevo préstamo (lógica de showClientFormModal)
@@ -2205,9 +2291,23 @@ async function showRefinanceModal(clientId, notificationId) {
             // ----------------------------------------------
             
             // Heredar la tasa de mora y la frecuencia del último préstamo (o usar defaults)
-            const lastLoan = client.loans && client.loans.length > 0 ? client.loans[client.loans.length - 1] : {};
+            const lastLoan = lastLoanForRefinance;
             const lateFeeRate = lastLoan.lateFeeRate !== undefined ? lastLoan.lateFeeRate : (currentCompanyData?.defaultInterest || 0);
             const inheritedLateFeeDelay = Number.parseInt(lastLoan.lateFeeDelay, 10);
+            const inheritedFrequency = lastLoan.paymentFrequency || 'daily';
+            const rawInheritedDays = Array.isArray(lastLoan.paymentDays) ? lastLoan.paymentDays : [];
+            let inheritedPaymentDays;
+            let inheritedFirstPaymentDate = null;
+            if (inheritedFrequency === 'monthly') {
+                inheritedPaymentDays = [refinanceFirstPaymentDate.getDate()];
+                inheritedFirstPaymentDate = refinanceFirstPaymentDateValue;
+            } else if (inheritedFrequency === 'weekly' || inheritedFrequency === 'biweekly') {
+                const inheritedWeekDay = Number.parseInt(rawInheritedDays[0], 10);
+                inheritedPaymentDays = [Number.isInteger(inheritedWeekDay) && inheritedWeekDay >= 0 && inheritedWeekDay <= 6 ? inheritedWeekDay : new Date().getDay()];
+            } else {
+                inheritedPaymentDays = rawInheritedDays.map(day => Number.parseInt(day, 10)).filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
+                if (inheritedPaymentDays.length === 0) inheritedPaymentDays = [1, 2, 3, 4, 5, 6];
+            }
 
             const loanSpecificData = {
                 principalAmount: loanAmount,
@@ -2224,8 +2324,9 @@ async function showRefinanceModal(clientId, notificationId) {
                 status: 'active', // Estado inicial
                 startDate: new Date(), // ¡Nuevo préstamo empieza hoy!
                 history: [],
-                paymentFrequency: lastLoan.paymentFrequency || 'daily',
-                paymentDays: lastLoan.paymentDays || [1, 2, 3, 4, 5, 6],
+                paymentFrequency: inheritedFrequency,
+                paymentDays: inheritedPaymentDays,
+                firstPaymentDate: inheritedFirstPaymentDate,
                 collectionTime: lastLoan.collectionTime || '',
             };
 
@@ -2385,7 +2486,7 @@ async function showRefinanceModal(clientId, notificationId) {
                                 if (!isHol) {
                                     if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
                                     else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
-                                    else if (freq === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                    else if (freq === 'monthly') isPayDay = isMonthlyPaymentDay(loan, currentD);
                                     else if (freq === 'biweekly') {
                                         if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
                                             const diffT = Math.abs(currentD - startD);
@@ -2747,7 +2848,7 @@ async function showRefinanceModal(clientId, notificationId) {
                                     if (!isHol) {
                                         if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
                                         else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
-                                        else if (freq === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                        else if (freq === 'monthly') isPayDay = isMonthlyPaymentDay(loan, currentD);
                                         else if (freq === 'biweekly') {
                                             if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
                                                 const diffT = Math.abs(currentD - startD);
@@ -3695,7 +3796,7 @@ async function showRefinanceModal(clientId, notificationId) {
                              if (Math.floor(diffDays / 7) % 2 === 0) isInRoute = true;
                          }
                      } else if (frequency === 'monthly') {
-                         isInRoute = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+                         isInRoute = isMonthlyPaymentDay(loan, today);
                      }
 
                      const isLate = details.status === 'late';
@@ -3778,7 +3879,7 @@ async function showRefinanceModal(clientId, notificationId) {
                             const diffDays = Math.round(Math.abs(today.getTime() - startDate.getTime()) / 86400000); 
                             if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
                         }
-                    } else if (frequency === 'monthly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+                    } else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, today);
 
                     // Solo sumamos a la meta si NO está finalizado y HOY le toca pagar
                     if (isPaymentDay && !isFinished) {
@@ -4009,7 +4110,7 @@ function legacyCalculateLoanDetails(loan) {
         
         if (frequency === 'daily') isPaymentDay = pDays.some(d => String(d) === String(dayOfWeek));
         else if (frequency === 'weekly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfWeek);
-        else if (frequency === 'monthly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfMonth);
+        else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, checkDate);
         else if (frequency === 'biweekly') {
             if (pDays.length > 0 && String(pDays[0]) === String(dayOfWeek)) {
                 const diffTime = checkDate.getTime() - startDateObj.getTime();
@@ -4128,7 +4229,15 @@ if (loan.paymentFrequency === 'weekly' || loan.paymentFrequency === 'biweekly') 
     const dIdx = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays[0] : null;
     pDayDisplay = dIdx !== null ? dayNames[dIdx] : '';
 } else if (loan.paymentFrequency === 'monthly') {
-    pDayDisplay = `Día ${(loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays[0] : ''}`;
+    const monthlyDay = getConfiguredMonthlyDay(loan);
+    const monthlyDayPrefix = currentLang === 'es' ? 'Día' : (currentLang === 'en' ? 'Day' : 'Dia');
+    const firstPaymentDate = getFirstPaymentDate(loan);
+    if (firstPaymentDate) {
+        const firstDateLabel = currentLang === 'es' ? 'Primera cuota' : (currentLang === 'en' ? 'First installment' : 'Primeira parcela');
+        pDayDisplay = `${firstDateLabel}: ${firstPaymentDate.toLocaleDateString()} · ${monthlyDayPrefix} ${monthlyDay}`;
+    } else {
+        pDayDisplay = `${monthlyDayPrefix} ${monthlyDay || ''}`;
+    }
 } else {
     pDayDisplay = (translations[currentLang].daily || 'Diário');
 }
@@ -4697,7 +4806,7 @@ const paymentDayLabelHtml = `
                             const diffDays = Math.round(Math.abs(today.getTime() - startDate.getTime()) / 86400000); 
                             if (Math.floor(diffDays / 7) % 2 === 0) isScheduledForToday = true;
                         }
-                    } else if (frequency === 'monthly') isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+                    } else if (frequency === 'monthly') isScheduledForToday = isMonthlyPaymentDay(loan, today);
 
                     let hasActionToday = (loan.history || []).some(h => {
                         if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
@@ -4833,7 +4942,7 @@ const paymentDayLabelHtml = `
                             const diffDays = Math.round(Math.abs(todayStart.getTime() - startDate.getTime()) / 86400000); 
                             if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
                         }
-                    } else if (frequency === 'monthly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfMonth;
+                    } else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, todayStart);
 
 
                     let passesCategory = true;
@@ -4846,7 +4955,7 @@ const paymentDayLabelHtml = `
 
                     if (passesCategory) {
                         if (filter === 'all') {
-                            if (!hasActivityToday) passesCategory = false;
+                            if (currentStatus === 'finished') passesCategory = false;
                         } else if (filter === 'weekly') {
                             if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                         } else if (filter === 'biweekly') {
@@ -5243,7 +5352,7 @@ if (!loan) {
                             if (!isHol) {
                                 if (loan.paymentFrequency === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
                                 else if (loan.paymentFrequency === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
-                                else if (loan.paymentFrequency === 'monthly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayM);
+                                else if (loan.paymentFrequency === 'monthly') isPayDay = isMonthlyPaymentDay(loan, currentD);
                                 else if (loan.paymentFrequency === 'biweekly') {
                                     if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
                                         const diffT = Math.abs(currentD - startD);
@@ -6236,6 +6345,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const t_lateFeeAmount = { pt: 'Valor da Multa', es: 'Valor de la Multa', en: 'Fine Amount' }[currentLang] || 'Valor da Multa';
             const t_lateFeeDelay = { pt: 'Aplicar multa após', es: 'Aplicar multa después de', en: 'Apply fine after' }[currentLang] || 'Aplicar multa após';
             const t_days = { pt: 'dias de atraso', es: 'días de retraso', en: 'late days' }[currentLang] || 'dias de atraso';
+            const migrationTranslations = {
+                pt: { title: 'Empréstimo Antigo (Migração)', description: 'Ative esta opção <strong>APENAS</strong> se estiver migrando um empréstimo antigo que já possui pagamentos.', paidInstallments: 'Parcelas Pagas no Início', partialAmount: 'Valor Parcial Adicional', guideTitle: 'Guia de Migração:', guideInstallments: '<strong>Parcelas Pagas:</strong> informe o número de parcelas <strong>completas</strong> (ex.: 12).', guidePartial: '<strong>Valor Parcial:</strong> se o cliente pagou parte da parcela seguinte, informe o valor aqui.', guideEmpty: 'Deixe em <strong>R$ 0,00</strong> se não houver valor parcial.' },
+                es: { title: 'Préstamo Antiguo (Migración)', description: 'Active esta opción <strong>SOLO</strong> si está migrando un préstamo antiguo que ya tiene pagos.', paidInstallments: 'Cuotas Pagadas al Inicio', partialAmount: 'Valor Parcial Adicional', guideTitle: 'Guía de Migración:', guideInstallments: '<strong>Cuotas Pagadas:</strong> ingrese el número de cuotas <strong>completas</strong>.', guidePartial: '<strong>Valor Parcial:</strong> si el cliente pagó parte de la siguiente cuota, ingrese el valor aquí.', guideEmpty: 'Deje en <strong>0,00</strong> si no existe un valor parcial.' },
+                en: { title: 'Existing Loan (Migration)', description: 'Enable this option <strong>ONLY</strong> when migrating an existing loan that already has payments.', paidInstallments: 'Installments Paid Initially', partialAmount: 'Additional Partial Amount', guideTitle: 'Migration Guide:', guideInstallments: '<strong>Paid Installments:</strong> enter the number of <strong>full</strong> installments.', guidePartial: '<strong>Partial Amount:</strong> if the client paid part of the next installment, enter the amount here.', guideEmpty: 'Leave it at <strong>0.00</strong> when there is no partial amount.' }
+            };
+            const migrationCopy = migrationTranslations[currentLang] || migrationTranslations.pt;
             const configuredLateFeeDelay = Number.parseInt(loan.lateFeeDelay, 10);
             const selectedLateFeeDelay = Number.isInteger(configuredLateFeeDelay) && configuredLateFeeDelay >= 1 && configuredLateFeeDelay <= 5
                 ? configuredLateFeeDelay
@@ -6356,7 +6471,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <label for="migration-toggle-input" style="font-weight: 600; font-size: 1.05em; color: var(--text-primary); margin: 0;">
                                     <i data-lucide="arrow-right-circle" style="width: 18px; height: 18px; margin-right: 5px; vertical-align: -3px;"></i>
-                                    Préstamo Antigo (Migração)
+                                    ${migrationCopy.title}
                                 </label>
                                 <div class="switch">
                                     <input type="checkbox" id="migration-toggle-input">
@@ -6364,7 +6479,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                 </div>
                             </div>
                             <p style="font-size: 0.85em; color: var(--text-secondary); margin: 8px 0 0;">
-                                Ative esta opção <strong>APENAS</strong> se estiver migrando um empréstimo antigo que já possui pagamentos.
+                                ${migrationCopy.description}
                             </p>
                         </div>
 
@@ -6381,31 +6496,25 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                        value="${client.interestRate || '20'}" ${isNewLoan || isEditMode ? 'readonly' : ''}>
                             </div>
                         </div>
-                            <div>
-                                <label data-lang-key="interest"></label>
-                                <input type="number" id="client-interest" required 
-                                       value="${client.interestRate || '20'}" ${isNewLoan || isEditMode ? 'readonly' : ''}>
-                            </div>
-                        </div>
                         
                         <div class="form-group" id="migration-paid-installments-group" style="display: none;">
-                            <label for="client-initial-paid-installments" style="font-weight: 600; color: var(--accent-purple);">Cuotas Pagadas ao Início</label>
+                            <label for="client-initial-paid-installments" style="font-weight: 600; color: var(--accent-purple);">${migrationCopy.paidInstallments}</label>
                             <input type="number" id="client-initial-paid-installments" value="0" min="0" style="background-color: var(--surface);">
                         </div>
 
                         <div class="form-group" id="migration-partial-payment-group" style="display: none;">
-                            <label for="client-initial-partial-payment" style="font-weight: 600; color: var(--accent-orange);">Valor Parcial Adicional (${money(0).replace(/\d+,\d+/g, '')})</label>
+                            <label for="client-initial-partial-payment" style="font-weight: 600; color: var(--accent-orange);">${migrationCopy.partialAmount} (${money(0).replace(/\d+,\d+/g, '')})</label>
                             <input type="number" id="client-initial-partial-payment" value="0.00" step="0.01" min="0" style="background-color: var(--surface);">
                         </div>
                         
                         <div id="migration-info-box" style="background-color: color-mix(in srgb, var(--accent-purple) 5%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent); padding: 15px; border-radius: 12px; margin: -10px 0 20px 0; display: none; align-items: flex-start; gap: 12px;">
                             <i data-lucide="info" style="color: var(--accent-purple); width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px;"></i>
                             <div style="font-size: 0.85em; color: var(--text-secondary); line-height: 1.5;">
-                                <strong style="color: var(--text-primary);">Guia de Migração:</strong>
+                                <strong style="color: var(--text-primary);">${migrationCopy.guideTitle}</strong>
                                 <ul style="margin: 8px 0 0 18px; padding: 0;">
-                                    <li><strong>Parcelas Pagas:</strong> Insira o número de parcelas <strong>completas</strong> (ex: 12).</li>
-                                    <li><strong>Valor Parcial:</strong> Se o cliente pagou uma parte da parcela seguinte (ex: R$50 da parcela #13), insira o valor aqui.</li>
-                                    <li>Deixe em <strong>R$ 0,00</strong> se não houver valor parcial.</li>
+                                    <li>${migrationCopy.guideInstallments}</li>
+                                    <li>${migrationCopy.guidePartial}</li>
+                                    <li>${migrationCopy.guideEmpty}</li>
                                 </ul>
                             </div>
                         </div>
@@ -6483,8 +6592,11 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                             </div>
                             <div id="monthly-payment-selector" style="display: none;">
                                  <div class="form-group">
-                                    <label data-lang-key="dayOfMonth"></label>
-                                    <input type="number" id="monthly-day-input" min="1" max="31" class="form-control">
+                                    <label for="monthly-first-payment-date">${currentLang === 'es' ? 'Fecha de la Primera Cuota' : (currentLang === 'en' ? 'First Installment Date' : 'Data da Primeira Parcela')}</label>
+                                    <input type="date" id="monthly-first-payment-date" class="form-control">
+                                    <small style="display:block; margin-top:7px; color:var(--text-secondary); line-height:1.4;">
+                                        ${currentLang === 'es' ? 'No habrá cobro antes de esta fecha. Las siguientes cuotas vencerán el mismo día de cada mes.' : (currentLang === 'en' ? 'There will be no collection before this date. The following installments will be due on the same day each month.' : 'Não haverá cobrança antes desta data. As parcelas seguintes vencerão no mesmo dia de cada mês.')}
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -6566,17 +6678,20 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             const dailySelector = document.getElementById('daily-payment-selector');
             const weeklySelector = document.getElementById('weekly-payment-selector');
             const monthlySelector = document.getElementById('monthly-payment-selector');
+            const monthlyFirstPaymentDateInput = document.getElementById('monthly-first-payment-date');
 
             const handleFrequencyChange = (frequency) => {
                 dailySelector.style.display = 'none';
                 weeklySelector.style.display = 'none';
                 monthlySelector.style.display = 'none';
+                monthlyFirstPaymentDateInput.required = false;
                 if (frequency === 'daily') {
                     dailySelector.style.display = 'block';
                 } else if (frequency === 'weekly') {
                     weeklySelector.style.display = 'block';
                 } else if (frequency === 'monthly') {
                     monthlySelector.style.display = 'block';
+                    monthlyFirstPaymentDateInput.required = true;
                 }
             };
 
@@ -6595,7 +6710,7 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
             } else if (frequency === 'weekly') {
                 document.getElementById('weekly-day-select').value = paymentDays[0];
             } else if (frequency === 'monthly') {
-                document.getElementById('monthly-day-input').value = paymentDays[0];
+                monthlyFirstPaymentDateInput.value = formatDateInputValue(getFirstPaymentDate(loan));
             }
 
             let isUsernameAvailable = (isEditMode || isNewLoan);
@@ -6804,6 +6919,18 @@ if (preSaleBtn) {
             saveButton.addEventListener('click', async (e) => {
                 const saveButton = e.currentTarget;
                 const originalButtonHTML = saveButton.innerHTML;
+                const selectedPaymentFrequency = document.getElementById('payment-frequency').value;
+                const selectedFirstPaymentDateValue = document.getElementById('monthly-first-payment-date').value;
+                const selectedFirstPaymentDate = parseLoanDate(selectedFirstPaymentDateValue);
+
+                if (selectedPaymentFrequency === 'monthly' && !selectedFirstPaymentDate) {
+                    const firstPaymentDateField = document.getElementById('monthly-first-payment-date');
+                    firstPaymentDateField.focus();
+                    firstPaymentDateField.style.borderColor = 'var(--danger-color)';
+                    showToast(currentLang === 'es' ? 'Seleccione la fecha de la primera cuota.' : (currentLang === 'en' ? 'Select the first installment date.' : 'Selecione a data da primeira parcela.'), true);
+                    setTimeout(() => { firstPaymentDateField.style.borderColor = ''; }, 2500);
+                    return;
+                }
 
                 if (!document.getElementById('client-form').checkValidity()) {
                     showToast('Por favor, preencha os campos obrigatórios.', true);
@@ -6853,14 +6980,14 @@ if (preSaleBtn) {
                     const lateFeeRate = 0; 
                     // ---------------------------------------------------------
 
-                    const paymentFrequency = document.getElementById('payment-frequency').value;
+                    const paymentFrequency = selectedPaymentFrequency;
                     let paymentDaysValue = [];
                     if (paymentFrequency === 'daily') {
                         paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
                     } else if (paymentFrequency === 'weekly') {
                         paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
                     } else if (paymentFrequency === 'monthly') {
-                        paymentDaysValue = [parseInt(document.getElementById('monthly-day-input').value)];
+                        paymentDaysValue = [selectedFirstPaymentDate.getDate()];
                     }
                     
                     const finalDocuments = [...existingDocs, ...newUploadedDocuments];
@@ -6902,6 +7029,7 @@ if (preSaleBtn) {
                         history: [],
                         paymentFrequency: paymentFrequency,
                         paymentDays: paymentDaysValue,
+                        firstPaymentDate: paymentFrequency === 'monthly' ? selectedFirstPaymentDateValue : null,
                         collectionTime: document.getElementById('client-collection-time').value,
                     };
                     
@@ -6961,6 +7089,7 @@ if (preSaleBtn) {
                              installments: `${(loan.installments || '0/0').split('/')[0]}/${installments}`,
                              paymentFrequency: paymentFrequency,
                              paymentDays: paymentDaysValue,
+                             firstPaymentDate: paymentFrequency === 'monthly' ? selectedFirstPaymentDateValue : null,
                              collectionTime: document.getElementById('client-collection-time').value,
                          };
                         await updateDoc(clientRef, {
@@ -7936,6 +8065,10 @@ function showSettlementFormModal() {
                     // Mantém a ficha que está por trás do comprovante sincronizada,
                     // mesmo se o listener em tempo real disparar enquanto ela estiver oculta.
                     currentClient.loans = updatedLoans;
+                    updateTodaysRouteList();
+                    updateRouteProgress();
+                    updateAllClientsList();
+                    updateProfileView(currentCollectorData);
                     if (currentDetailClientId === cId && currentDetailLoanIndex === lIndex) {
                         showClientDetails(cId, lIndex, true);
                     }
@@ -8231,7 +8364,7 @@ function showSettlementFormModal() {
 
                     if (freq === 'daily') isToday = pDays.some(d => parseInt(d) === reportDayOfWeek);
                     else if (freq === 'weekly') isToday = pDays.length > 0 && parseInt(pDays[0]) === reportDayOfWeek;
-                    else if (freq === 'monthly') isToday = pDays.length > 0 && parseInt(pDays[0]) === reportDayOfMonth;
+                    else if (freq === 'monthly') isToday = isMonthlyPaymentDay(l, reportDate);
                     else if (freq === 'biweekly') {
                         if (pDays.length > 0 && parseInt(pDays[0]) === reportDayOfWeek) {
                             const startDate = l.startDate?.seconds ? new Date(l.startDate.seconds * 1000) : new Date(l.startDate);
