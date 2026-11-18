@@ -1,4 +1,4 @@
-const SW_VERSION = "v6.3-production-ciclo-mensal";
+const SW_VERSION = "v6.4-production-agenda-frequencias";
 const CACHE_PREFIX = 'lumix-cobrador-';
 const SHELL_CACHE = `${CACHE_PREFIX}shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-${SW_VERSION}`;

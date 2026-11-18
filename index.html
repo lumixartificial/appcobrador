@@ -1532,6 +1532,24 @@ const BLACKLIST_DATA = {
             return parseLoanDate(loan?.firstPaymentDate);
         }
 
+        function getCalendarDayNumber(date) {
+            const parsed = parseLoanDate(date);
+            return parsed ? Math.floor(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) / 86400000) : null;
+        }
+
+        function getScheduleIterationStartDate(loan) {
+            const firstPaymentDate = getFirstPaymentDate(loan);
+            if (firstPaymentDate) {
+                return new Date(firstPaymentDate.getFullYear(), firstPaymentDate.getMonth(), firstPaymentDate.getDate());
+            }
+
+            const startDate = getLoanStartDate(loan);
+            if (!startDate) return null;
+            const iterationStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            iterationStart.setDate(iterationStart.getDate() + 1);
+            return iterationStart;
+        }
+
         function formatDateInputValue(date) {
             if (!date) return '';
             const year = date.getFullYear();
@@ -1567,6 +1585,39 @@ const BLACKLIST_DATA = {
 
             const lastDayOfMonth = new Date(paymentDate.getFullYear(), paymentDate.getMonth() + 1, 0).getDate();
             return paymentDate.getDate() === Math.min(configuredDay, lastDayOfMonth);
+        }
+
+        function isWeeklyPaymentDay(loan, referenceDate) {
+            const paymentDate = parseLoanDate(referenceDate);
+            if (!paymentDate) return false;
+
+            const firstPaymentDate = getFirstPaymentDate(loan);
+            if (firstPaymentDate) {
+                const difference = getCalendarDayNumber(paymentDate) - getCalendarDayNumber(firstPaymentDate);
+                return difference >= 0 && difference % 7 === 0;
+            }
+
+            const configuredDay = Number.parseInt(loan?.paymentDays?.[0], 10);
+            return Number.isInteger(configuredDay) && configuredDay === paymentDate.getDay();
+        }
+
+        function isBiweeklyPaymentDay(loan, referenceDate) {
+            const paymentDate = parseLoanDate(referenceDate);
+            if (!paymentDate) return false;
+
+            const configuredDay = Number.parseInt(loan?.paymentDays?.[0], 10);
+            if (Number.isInteger(configuredDay) && configuredDay !== paymentDate.getDay()) return false;
+
+            const firstPaymentDate = getFirstPaymentDate(loan);
+            if (firstPaymentDate) {
+                const difference = getCalendarDayNumber(paymentDate) - getCalendarDayNumber(firstPaymentDate);
+                return difference >= 0 && difference % 14 === 0;
+            }
+
+            const startDate = getLoanStartDate(loan);
+            if (!startDate) return false;
+            const legacyDifference = getCalendarDayNumber(paymentDate) - getCalendarDayNumber(startDate);
+            return legacyDifference >= 0 && Math.floor(legacyDifference / 7) % 2 === 0;
         }
 
        function calculateDailyTotals() {
@@ -1776,21 +1827,9 @@ const BLACKLIST_DATA = {
                    if (frequency === 'daily') {
                        isPaymentDay = paymentDays.includes(dayOfWeek);
                    } else if (frequency === 'weekly') {
-                       isPaymentDay = paymentDays.length > 0 && paymentDays[0] === dayOfWeek;
+                       isPaymentDay = isWeeklyPaymentDay(loan, today);
                    } else if (frequency === 'biweekly') {
-                       // LÓGICA QUINCENAL: Mismo día de la semana cada 14 días
-                       if (paymentDays.length > 0 && paymentDays[0] === dayOfWeek) {
-                           const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                           startDate.setHours(0,0,0,0);
-                           
-                           const diffTime = Math.abs(today - startDate);
-                           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                           
-                           // Verificamos si han pasado semanas pares (0, 2, 4...) desde el inicio
-                           if (Math.floor(diffDays / 7) % 2 === 0) {
-                               isPaymentDay = true;
-                           }
-                       }
+                       isPaymentDay = isBiweeklyPaymentDay(loan, today);
                    } else if (frequency === 'monthly') {
                        isPaymentDay = isMonthlyPaymentDay(loan, today);
                    }
@@ -2198,6 +2237,10 @@ async function showRefinanceModal(clientId, notificationId) {
         const lastDayOfNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
         nextMonth.setDate(Math.min(recurringDay, lastDayOfNextMonth));
         suggestedRefinanceFirstPaymentDate = formatDateInputValue(nextMonth);
+    } else if (refinanceFrequency === 'weekly' || refinanceFrequency === 'biweekly') {
+        const suggestedDate = new Date();
+        suggestedDate.setDate(suggestedDate.getDate() + (refinanceFrequency === 'weekly' ? 7 : 14));
+        suggestedRefinanceFirstPaymentDate = formatDateInputValue(suggestedDate);
     }
 
     const nameInitial = (client.name || 'C').charAt(0).toUpperCase();
@@ -2233,9 +2276,9 @@ async function showRefinanceModal(clientId, notificationId) {
                     </div>
                 </div>
             </div>
-            ${refinanceFrequency === 'monthly' ? `
+            ${refinanceFrequency !== 'daily' ? `
                 <div class="form-group" style="margin-top:20px;">
-                    <label for="refinance-first-payment-date" style="font-weight:700;">${currentLang === 'es' ? 'Fecha de la Primera Cuota' : (currentLang === 'en' ? 'First Installment Date' : 'Data da Primeira Parcela')}</label>
+                    <label for="refinance-first-payment-date" style="font-weight:700;">${currentLang === 'es' ? 'Fecha del Primer Pago' : (currentLang === 'en' ? 'First Payment Date' : 'Data do Primeiro Pagamento')}</label>
                     <input type="date" id="refinance-first-payment-date" value="${suggestedRefinanceFirstPaymentDate}" required>
                     <small style="display:block; margin-top:7px; color:var(--text-secondary);">${currentLang === 'es' ? 'La renovación no generará cobro antes de esta fecha.' : (currentLang === 'en' ? 'The renewal will not generate a collection before this date.' : 'A renovação não gerará cobrança antes desta data.')}</small>
                 </div>` : ''}
@@ -2262,10 +2305,10 @@ async function showRefinanceModal(clientId, notificationId) {
         lucide.createIcons({ nodes: [approveBtn.querySelector('i')] });
 
         try {
-            const refinanceFirstPaymentDateValue = refinanceFrequency === 'monthly' ? modal.querySelector('#refinance-first-payment-date')?.value : '';
+            const refinanceFirstPaymentDateValue = refinanceFrequency !== 'daily' ? modal.querySelector('#refinance-first-payment-date')?.value : '';
             const refinanceFirstPaymentDate = parseLoanDate(refinanceFirstPaymentDateValue);
-            if (refinanceFrequency === 'monthly' && !refinanceFirstPaymentDate) {
-                showToast('Selecione a data da primeira parcela.', true);
+            if (refinanceFrequency !== 'daily' && !refinanceFirstPaymentDate) {
+                showToast('Selecione a data do primeiro pagamento.', true);
                 modal.querySelector('#refinance-first-payment-date')?.focus();
                 approveBtn.disabled = false;
                 approveBtn.innerHTML = `<i data-lucide="check-circle"></i> Aprovar e Criar`;
@@ -2302,8 +2345,8 @@ async function showRefinanceModal(clientId, notificationId) {
                 inheritedPaymentDays = [refinanceFirstPaymentDate.getDate()];
                 inheritedFirstPaymentDate = refinanceFirstPaymentDateValue;
             } else if (inheritedFrequency === 'weekly' || inheritedFrequency === 'biweekly') {
-                const inheritedWeekDay = Number.parseInt(rawInheritedDays[0], 10);
-                inheritedPaymentDays = [Number.isInteger(inheritedWeekDay) && inheritedWeekDay >= 0 && inheritedWeekDay <= 6 ? inheritedWeekDay : new Date().getDay()];
+                inheritedPaymentDays = [refinanceFirstPaymentDate.getDay()];
+                inheritedFirstPaymentDate = refinanceFirstPaymentDateValue;
             } else {
                 inheritedPaymentDays = rawInheritedDays.map(day => Number.parseInt(day, 10)).filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
                 if (inheritedPaymentDays.length === 0) inheritedPaymentDays = [1, 2, 3, 4, 5, 6];
@@ -2472,8 +2515,7 @@ async function showRefinanceModal(clientId, notificationId) {
                             if (endD) endDateStr = endD.toLocaleDateString(locale);
                         } else {
                             let count = 0;
-                            let currentD = new Date(startD);
-                            currentD.setDate(currentD.getDate() + 1); 
+                            let currentD = getScheduleIterationStartDate(loan) || new Date(startD);
                             let safetyLoop = 0;
                             while (count < totalInstallments && safetyLoop < 2000) { 
                                 const dayW = currentD.getDay();
@@ -2485,15 +2527,9 @@ async function showRefinanceModal(clientId, notificationId) {
                                 const pDays = loan.paymentDays || [];
                                 if (!isHol) {
                                     if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
-                                    else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                    else if (freq === 'weekly') isPayDay = isWeeklyPaymentDay(loan, currentD);
                                     else if (freq === 'monthly') isPayDay = isMonthlyPaymentDay(loan, currentD);
-                                    else if (freq === 'biweekly') {
-                                        if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
-                                            const diffT = Math.abs(currentD - startD);
-                                            const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
-                                            if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
-                                        }
-                                    }
+                                    else if (freq === 'biweekly') isPayDay = isBiweeklyPaymentDay(loan, currentD);
                                 }
                                 if (isPayDay) count++;
                                 if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
@@ -2831,8 +2867,7 @@ async function showRefinanceModal(clientId, notificationId) {
                                 if (endD) endDateStr = endD.toLocaleDateString(localeCode);
                             } else {
                                 let count = 0;
-                                let currentD = new Date(startD);
-                                currentD.setDate(currentD.getDate() + 1); 
+                                let currentD = getScheduleIterationStartDate(loan) || new Date(startD);
                                 let safetyLoop = 0;
                                 
                                 while (count < totalInstallments && safetyLoop < 2000) { 
@@ -2847,15 +2882,9 @@ async function showRefinanceModal(clientId, notificationId) {
 
                                     if (!isHol) {
                                         if (freq === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
-                                        else if (freq === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                        else if (freq === 'weekly') isPayDay = isWeeklyPaymentDay(loan, currentD);
                                         else if (freq === 'monthly') isPayDay = isMonthlyPaymentDay(loan, currentD);
-                                        else if (freq === 'biweekly') {
-                                            if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
-                                                const diffT = Math.abs(currentD - startD);
-                                                const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
-                                                if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
-                                            }
-                                        }
+                                        else if (freq === 'biweekly') isPayDay = isBiweeklyPaymentDay(loan, currentD);
                                     }
                                     if (isPayDay) count++;
                                     if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
@@ -3521,9 +3550,22 @@ async function showRefinanceModal(clientId, notificationId) {
                         startDateStr = startD.toLocaleDateString(localeCode);
                         const totalInst = parseInt((activeLoan.installments || "0/0").split('/')[1], 10) || 0;
                         if(totalInst > 0) {
-                            let currentD = new Date(startD);
-                            const daysToAdd = totalInst * (activeLoan.paymentFrequency === 'weekly' ? 7 : (activeLoan.paymentFrequency === 'monthly' ? 30 : 1));
-                            currentD.setDate(currentD.getDate() + daysToAdd);
+                            let currentD = getFirstPaymentDate(activeLoan) || new Date(startD);
+                            const frequency = activeLoan.paymentFrequency || 'daily';
+                            if (frequency === 'weekly') {
+                                currentD.setDate(currentD.getDate() + (Math.max(0, totalInst - 1) * 7));
+                            } else if (frequency === 'biweekly') {
+                                currentD.setDate(currentD.getDate() + (Math.max(0, totalInst - 1) * 14));
+                            } else if (frequency === 'monthly') {
+                                const configuredDay = getConfiguredMonthlyDay(activeLoan) || currentD.getDate();
+                                const targetMonth = currentD.getMonth() + Math.max(0, totalInst - 1);
+                                const targetYear = currentD.getFullYear() + Math.floor(targetMonth / 12);
+                                const normalizedTargetMonth = ((targetMonth % 12) + 12) % 12;
+                                const lastDay = new Date(targetYear, normalizedTargetMonth + 1, 0).getDate();
+                                currentD = new Date(targetYear, normalizedTargetMonth, Math.min(configuredDay, lastDay));
+                            } else {
+                                currentD.setDate(currentD.getDate() + totalInst);
+                            }
                             endDateStr = currentD.toLocaleDateString(localeCode);
                         }
                     }
@@ -3786,15 +3828,9 @@ async function showRefinanceModal(clientId, notificationId) {
                          // Lógica idéntica a la lista de tarjetas
                          isInRoute = paymentDays.includes(dayOfWeek); 
                      } else if (frequency === 'weekly') {
-                         isInRoute = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
+                         isInRoute = isWeeklyPaymentDay(loan, today);
                      } else if (frequency === 'biweekly') {
-                         if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
-                             const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                             startDate.setHours(0,0,0,0);
-                             const diffTime = today.getTime() - startDate.getTime();
-                             const diffDays = Math.round(diffTime / 86400000); 
-                             if (Math.floor(diffDays / 7) % 2 === 0) isInRoute = true;
-                         }
+                         isInRoute = isBiweeklyPaymentDay(loan, today);
                      } else if (frequency === 'monthly') {
                          isInRoute = isMonthlyPaymentDay(loan, today);
                      }
@@ -3871,15 +3907,9 @@ async function showRefinanceModal(clientId, notificationId) {
                     const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
 
                     if (frequency === 'daily') isPaymentDay = paymentDays.includes(dayOfWeek); 
-                    else if (frequency === 'weekly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
-                    else if (frequency === 'biweekly') {
-                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
-                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                            startDate.setHours(0,0,0,0);
-                            const diffDays = Math.round(Math.abs(today.getTime() - startDate.getTime()) / 86400000); 
-                            if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
-                        }
-                    } else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, today);
+                    else if (frequency === 'weekly') isPaymentDay = isWeeklyPaymentDay(loan, today);
+                    else if (frequency === 'biweekly') isPaymentDay = isBiweeklyPaymentDay(loan, today);
+                    else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, today);
 
                     // Solo sumamos a la meta si NO está finalizado y HOY le toca pagar
                     if (isPaymentDay && !isFinished) {
@@ -4090,14 +4120,17 @@ function legacyCalculateLoanDetails(loan) {
     if (!startDateObj || isNaN(startDateObj.getTime())) return details;
     startDateObj.setHours(0, 0, 0, 0);
 
-    let checkDate = new Date(startDateObj); 
-    checkDate.setDate(checkDate.getDate() + 1); 
+    let checkDate = getScheduleIterationStartDate(loan) || new Date(startDateObj);
     
     const installmentAmount = parseFloat(loan.originalInstallmentAmount) || parseFloat(loan.amount) || 0;
     let installmentsDueCount = 0; 
     
     let stopDate = new Date(today);
     stopDate.setDate(stopDate.getDate() + 90); 
+    const configuredFirstPaymentDate = getFirstPaymentDate(loan);
+    if (configuredFirstPaymentDate && configuredFirstPaymentDate > stopDate) {
+        stopDate = new Date(configuredFirstPaymentDate);
+    }
 
     while (checkDate <= stopDate) {
         const dayOfWeek = checkDate.getDay();
@@ -4109,16 +4142,9 @@ function legacyCalculateLoanDetails(loan) {
         const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
         
         if (frequency === 'daily') isPaymentDay = pDays.some(d => String(d) === String(dayOfWeek));
-        else if (frequency === 'weekly') isPaymentDay = pDays.length > 0 && String(pDays[0]) === String(dayOfWeek);
+        else if (frequency === 'weekly') isPaymentDay = isWeeklyPaymentDay(loan, checkDate);
         else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, checkDate);
-        else if (frequency === 'biweekly') {
-            if (pDays.length > 0 && String(pDays[0]) === String(dayOfWeek)) {
-                const diffTime = checkDate.getTime() - startDateObj.getTime();
-                const diffDays = Math.round(diffTime / 86400000);
-                // Mantenemos flexibilidad: Semana 0, 2, 4... son semanas de cobro.
-                if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
-            }
-        }
+        else if (frequency === 'biweekly') isPaymentDay = isBiweeklyPaymentDay(loan, checkDate);
 
         if (isPaymentDay && !isHoliday) {
             if (checkDate < today) {
@@ -4226,8 +4252,17 @@ const dayNames = dayNamesMapping[currentLang] || dayNamesMapping.pt;
 let pDayDisplay = '';
 
 if (loan.paymentFrequency === 'weekly' || loan.paymentFrequency === 'biweekly') {
-    const dIdx = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays[0] : null;
-    pDayDisplay = dIdx !== null ? dayNames[dIdx] : '';
+    const firstPaymentDate = getFirstPaymentDate(loan);
+    if (firstPaymentDate) {
+        const firstDateLabel = currentLang === 'es' ? 'Primer pago' : (currentLang === 'en' ? 'First payment' : 'Primeiro pagamento');
+        const recurrenceLabel = loan.paymentFrequency === 'weekly'
+            ? (currentLang === 'es' ? 'cada 7 días' : (currentLang === 'en' ? 'every 7 days' : 'a cada 7 dias'))
+            : (currentLang === 'es' ? 'cada 14 días' : (currentLang === 'en' ? 'every 14 days' : 'a cada 14 dias'));
+        pDayDisplay = `${firstDateLabel}: ${firstPaymentDate.toLocaleDateString()} · ${recurrenceLabel}`;
+    } else {
+        const dIdx = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays[0] : null;
+        pDayDisplay = dIdx !== null ? dayNames[dIdx] : '';
+    }
 } else if (loan.paymentFrequency === 'monthly') {
     const monthlyDay = getConfiguredMonthlyDay(loan);
     const monthlyDayPrefix = currentLang === 'es' ? 'Día' : (currentLang === 'en' ? 'Day' : 'Dia');
@@ -4798,15 +4833,9 @@ const paymentDayLabelHtml = `
                     const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
 
                     if (frequency === 'daily') isScheduledForToday = paymentDays.includes(dayOfWeek); 
-                    else if (frequency === 'weekly') isScheduledForToday = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
-                    else if (frequency === 'biweekly') {
-                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
-                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                            startDate.setHours(0,0,0,0);
-                            const diffDays = Math.round(Math.abs(today.getTime() - startDate.getTime()) / 86400000); 
-                            if (Math.floor(diffDays / 7) % 2 === 0) isScheduledForToday = true;
-                        }
-                    } else if (frequency === 'monthly') isScheduledForToday = isMonthlyPaymentDay(loan, today);
+                    else if (frequency === 'weekly') isScheduledForToday = isWeeklyPaymentDay(loan, today);
+                    else if (frequency === 'biweekly') isScheduledForToday = isBiweeklyPaymentDay(loan, today);
+                    else if (frequency === 'monthly') isScheduledForToday = isMonthlyPaymentDay(loan, today);
 
                     let hasActionToday = (loan.history || []).some(h => {
                         if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
@@ -4934,15 +4963,9 @@ const paymentDayLabelHtml = `
                     const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
 
                     if (frequency === 'daily') isPaymentDay = paymentDays.includes(dayOfWeek); 
-                    else if (frequency === 'weekly') isPaymentDay = paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek;
-                    else if (frequency === 'biweekly') {
-                        if (paymentDays.length > 0 && parseInt(paymentDays[0]) === dayOfWeek) {
-                            const startDate = loan.startDate?.seconds ? new Date(loan.startDate.seconds * 1000) : new Date(loan.startDate);
-                            startDate.setHours(0,0,0,0);
-                            const diffDays = Math.round(Math.abs(todayStart.getTime() - startDate.getTime()) / 86400000); 
-                            if (Math.floor(diffDays / 7) % 2 === 0) isPaymentDay = true;
-                        }
-                    } else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, todayStart);
+                    else if (frequency === 'weekly') isPaymentDay = isWeeklyPaymentDay(loan, todayStart);
+                    else if (frequency === 'biweekly') isPaymentDay = isBiweeklyPaymentDay(loan, todayStart);
+                    else if (frequency === 'monthly') isPaymentDay = isMonthlyPaymentDay(loan, todayStart);
 
 
                     let passesCategory = true;
@@ -5338,8 +5361,7 @@ if (!loan) {
                     startDateStr = startD.toLocaleDateString('pt-BR'); 
                     // [CORRECCIÓN] Usamos la variable ya definida arriba, evitando el error de inicialización
                     if(totalInstallments > 0) {
-                        let currentD = new Date(startD);
-                        currentD.setDate(currentD.getDate() + 1);
+                        let currentD = getScheduleIterationStartDate(loan) || new Date(startD);
                         let count = 0;
                         let safety = 0;
                         const pDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6]; 
@@ -5351,15 +5373,9 @@ if (!loan) {
                             let isPayDay = false;
                             if (!isHol) {
                                 if (loan.paymentFrequency === 'daily') isPayDay = pDays.some(d => String(d) === String(dayW));
-                                else if (loan.paymentFrequency === 'weekly') isPayDay = pDays.length > 0 && String(pDays[0]) === String(dayW);
+                                else if (loan.paymentFrequency === 'weekly') isPayDay = isWeeklyPaymentDay(loan, currentD);
                                 else if (loan.paymentFrequency === 'monthly') isPayDay = isMonthlyPaymentDay(loan, currentD);
-                                else if (loan.paymentFrequency === 'biweekly') {
-                                    if (pDays.length > 0 && String(pDays[0]) === String(dayW)) {
-                                        const diffT = Math.abs(currentD - startD);
-                                        const diffD = Math.ceil(diffT / (1000 * 60 * 60 * 24));
-                                        if (Math.floor(diffD / 7) % 2 === 0) isPayDay = true;
-                                    }
-                                }
+                                else if (loan.paymentFrequency === 'biweekly') isPayDay = isBiweeklyPaymentDay(loan, currentD);
                             }
                             if (isPayDay) count++;
                             if (count < totalInstallments) currentD.setDate(currentD.getDate() + 1);
@@ -6576,26 +6592,12 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                                     ${t_dayLabels.map((day, i) => `<div><input type="checkbox" id="form-day-${i}" value="${i}"><label for="form-day-${i}">${day}</label></div>`).join('')}
                                 </div>
                             </div>
-                            <div id="weekly-payment-selector" style="display: none;">
+                            <div id="scheduled-first-payment-selector" style="display: none;">
                                  <div class="form-group">
-                                    <label data-lang-key="dayOfWeek"></label>
-                                    <select id="weekly-day-select" class="form-control">
-                                        <option value="1" data-lang-key="monday"></option>
-                                        <option value="2" data-lang-key="tuesday"></option>
-                                        <option value="3" data-lang-key="wednesday"></option>
-                                        <option value="4" data-lang-key="thursday"></option>
-                                        <option value="5" data-lang-key="friday"></option>
-                                        <option value="6" data-lang-key="saturday"></option>
-                                        <option value="0" data-lang-key="sunday"></option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div id="monthly-payment-selector" style="display: none;">
-                                 <div class="form-group">
-                                    <label for="monthly-first-payment-date">${currentLang === 'es' ? 'Fecha de la Primera Cuota' : (currentLang === 'en' ? 'First Installment Date' : 'Data da Primeira Parcela')}</label>
-                                    <input type="date" id="monthly-first-payment-date" class="form-control">
+                                    <label for="scheduled-first-payment-date">${currentLang === 'es' ? 'Fecha del Primer Pago' : (currentLang === 'en' ? 'First Payment Date' : 'Data do Primeiro Pagamento')}</label>
+                                    <input type="date" id="scheduled-first-payment-date" class="form-control">
                                     <small style="display:block; margin-top:7px; color:var(--text-secondary); line-height:1.4;">
-                                        ${currentLang === 'es' ? 'No habrá cobro antes de esta fecha. Las siguientes cuotas vencerán el mismo día de cada mes.' : (currentLang === 'en' ? 'There will be no collection before this date. The following installments will be due on the same day each month.' : 'Não haverá cobrança antes desta data. As parcelas seguintes vencerão no mesmo dia de cada mês.')}
+                                        ${currentLang === 'es' ? 'No habrá cobro antes de esta fecha. La repetición seguirá la frecuencia seleccionada.' : (currentLang === 'en' ? 'There will be no collection before this date. Recurrence will follow the selected frequency.' : 'Não haverá cobrança antes desta data. A repetição seguirá a frequência selecionada.')}
                                     </small>
                                 </div>
                             </div>
@@ -6676,22 +6678,18 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
 
             const paymentFrequencySelect = document.getElementById('payment-frequency');
             const dailySelector = document.getElementById('daily-payment-selector');
-            const weeklySelector = document.getElementById('weekly-payment-selector');
-            const monthlySelector = document.getElementById('monthly-payment-selector');
-            const monthlyFirstPaymentDateInput = document.getElementById('monthly-first-payment-date');
+            const scheduledFirstPaymentSelector = document.getElementById('scheduled-first-payment-selector');
+            const scheduledFirstPaymentDateInput = document.getElementById('scheduled-first-payment-date');
 
             const handleFrequencyChange = (frequency) => {
                 dailySelector.style.display = 'none';
-                weeklySelector.style.display = 'none';
-                monthlySelector.style.display = 'none';
-                monthlyFirstPaymentDateInput.required = false;
+                scheduledFirstPaymentSelector.style.display = 'none';
+                scheduledFirstPaymentDateInput.required = false;
                 if (frequency === 'daily') {
                     dailySelector.style.display = 'block';
-                } else if (frequency === 'weekly') {
-                    weeklySelector.style.display = 'block';
-                } else if (frequency === 'monthly') {
-                    monthlySelector.style.display = 'block';
-                    monthlyFirstPaymentDateInput.required = true;
+                } else if (frequency === 'weekly' || frequency === 'biweekly' || frequency === 'monthly') {
+                    scheduledFirstPaymentSelector.style.display = 'block';
+                    scheduledFirstPaymentDateInput.required = true;
                 }
             };
 
@@ -6707,10 +6705,8 @@ function showVerificationModal(clientId, historyIndex, loanIndex, notificationId
                     const checkbox = document.getElementById(`form-day-${day}`);
                     if (checkbox) checkbox.checked = true;
                 });
-            } else if (frequency === 'weekly') {
-                document.getElementById('weekly-day-select').value = paymentDays[0];
-            } else if (frequency === 'monthly') {
-                monthlyFirstPaymentDateInput.value = formatDateInputValue(getFirstPaymentDate(loan));
+            } else {
+                scheduledFirstPaymentDateInput.value = formatDateInputValue(getFirstPaymentDate(loan));
             }
 
             let isUsernameAvailable = (isEditMode || isNewLoan);
@@ -6920,14 +6916,15 @@ if (preSaleBtn) {
                 const saveButton = e.currentTarget;
                 const originalButtonHTML = saveButton.innerHTML;
                 const selectedPaymentFrequency = document.getElementById('payment-frequency').value;
-                const selectedFirstPaymentDateValue = document.getElementById('monthly-first-payment-date').value;
+                const selectedFirstPaymentDateValue = document.getElementById('scheduled-first-payment-date').value;
                 const selectedFirstPaymentDate = parseLoanDate(selectedFirstPaymentDateValue);
+                const requiresFirstPaymentDate = ['weekly', 'biweekly', 'monthly'].includes(selectedPaymentFrequency);
 
-                if (selectedPaymentFrequency === 'monthly' && !selectedFirstPaymentDate) {
-                    const firstPaymentDateField = document.getElementById('monthly-first-payment-date');
+                if (requiresFirstPaymentDate && !selectedFirstPaymentDate) {
+                    const firstPaymentDateField = document.getElementById('scheduled-first-payment-date');
                     firstPaymentDateField.focus();
                     firstPaymentDateField.style.borderColor = 'var(--danger-color)';
-                    showToast(currentLang === 'es' ? 'Seleccione la fecha de la primera cuota.' : (currentLang === 'en' ? 'Select the first installment date.' : 'Selecione a data da primeira parcela.'), true);
+                    showToast(currentLang === 'es' ? 'Seleccione la fecha del primer pago.' : (currentLang === 'en' ? 'Select the first payment date.' : 'Selecione a data do primeiro pagamento.'), true);
                     setTimeout(() => { firstPaymentDateField.style.borderColor = ''; }, 2500);
                     return;
                 }
@@ -6984,10 +6981,10 @@ if (preSaleBtn) {
                     let paymentDaysValue = [];
                     if (paymentFrequency === 'daily') {
                         paymentDaysValue = Array.from(document.querySelectorAll('#daily-payment-selector input:checked')).map(el => parseInt(el.value));
-                    } else if (paymentFrequency === 'weekly') {
-                        paymentDaysValue = [parseInt(document.getElementById('weekly-day-select').value)];
                     } else if (paymentFrequency === 'monthly') {
                         paymentDaysValue = [selectedFirstPaymentDate.getDate()];
+                    } else if (paymentFrequency === 'weekly' || paymentFrequency === 'biweekly') {
+                        paymentDaysValue = [selectedFirstPaymentDate.getDay()];
                     }
                     
                     const finalDocuments = [...existingDocs, ...newUploadedDocuments];
@@ -7029,7 +7026,7 @@ if (preSaleBtn) {
                         history: [],
                         paymentFrequency: paymentFrequency,
                         paymentDays: paymentDaysValue,
-                        firstPaymentDate: paymentFrequency === 'monthly' ? selectedFirstPaymentDateValue : null,
+                        firstPaymentDate: requiresFirstPaymentDate ? selectedFirstPaymentDateValue : null,
                         collectionTime: document.getElementById('client-collection-time').value,
                     };
                     
@@ -7089,7 +7086,7 @@ if (preSaleBtn) {
                              installments: `${(loan.installments || '0/0').split('/')[0]}/${installments}`,
                              paymentFrequency: paymentFrequency,
                              paymentDays: paymentDaysValue,
-                             firstPaymentDate: paymentFrequency === 'monthly' ? selectedFirstPaymentDateValue : null,
+                             firstPaymentDate: requiresFirstPaymentDate ? selectedFirstPaymentDateValue : null,
                              collectionTime: document.getElementById('client-collection-time').value,
                          };
                         await updateDoc(clientRef, {
@@ -8363,17 +8360,9 @@ function showSettlementFormModal() {
                     const pDays = l.paymentDays || [];
 
                     if (freq === 'daily') isToday = pDays.some(d => parseInt(d) === reportDayOfWeek);
-                    else if (freq === 'weekly') isToday = pDays.length > 0 && parseInt(pDays[0]) === reportDayOfWeek;
+                    else if (freq === 'weekly') isToday = isWeeklyPaymentDay(l, reportDate);
                     else if (freq === 'monthly') isToday = isMonthlyPaymentDay(l, reportDate);
-                    else if (freq === 'biweekly') {
-                        if (pDays.length > 0 && parseInt(pDays[0]) === reportDayOfWeek) {
-                            const startDate = l.startDate?.seconds ? new Date(l.startDate.seconds * 1000) : new Date(l.startDate);
-                            startDate.setHours(0,0,0,0);
-                            const diffTime = Math.abs(reportDate.getTime() - startDate.getTime());
-                            const diffDays = Math.round(diffTime / 86400000);
-                            if (Math.floor(diffDays / 7) % 2 === 0) isToday = true;
-                        }
-                    }
+                    else if (freq === 'biweekly') isToday = isBiweeklyPaymentDay(l, reportDate);
 
                     if (isToday) {
                         // 3. Calcular deuda al inicio de ese día para no cobrar de más
