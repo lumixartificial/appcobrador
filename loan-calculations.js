@@ -5,6 +5,11 @@ function asDate(value) {
     if (!value) return null;
     if (typeof value.toDate === 'function') return value.toDate();
     if (Number.isFinite(value.seconds)) return new Date(value.seconds * 1000);
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const [year, month, day] = value.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        return Number.isNaN(localDate.getTime()) ? null : localDate;
+    }
     const parsed = value instanceof Date ? new Date(value) : new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -26,13 +31,29 @@ function isScheduledPaymentDay(date, loan, startDate) {
         ? loan.paymentDays.map(String)
         : ['1', '2', '3', '4', '5', '6'];
     const dayOfWeek = String(date.getDay());
-    const dayOfMonth = String(date.getDate());
+    const firstPaymentDate = asDate(loan.firstPaymentDate);
+    if (firstPaymentDate) firstPaymentDate.setHours(0, 0, 0, 0);
 
     if (frequency === 'daily') return paymentDays.includes(dayOfWeek);
-    if (frequency === 'weekly') return paymentDays[0] === dayOfWeek;
-    if (frequency === 'monthly') return paymentDays[0] === dayOfMonth;
+    if (frequency === 'weekly') {
+        if (firstPaymentDate) {
+            const elapsedDays = dayNumber(date) - dayNumber(firstPaymentDate);
+            return elapsedDays >= 0 && elapsedDays % 7 === 0;
+        }
+        return paymentDays[0] === dayOfWeek;
+    }
+    if (frequency === 'monthly') {
+        const configuredDay = firstPaymentDate?.getDate() || Number.parseInt(paymentDays[0], 10);
+        if (!configuredDay) return false;
+        if (firstPaymentDate && dayNumber(date) < dayNumber(firstPaymentDate)) return false;
+        const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        return date.getDate() === Math.min(configuredDay, lastDay);
+    }
     if (frequency === 'biweekly' && paymentDays[0] === dayOfWeek) {
-        const elapsedDays = dayNumber(date) - dayNumber(startDate);
+        const anchorDate = firstPaymentDate || startDate;
+        const elapsedDays = dayNumber(date) - dayNumber(anchorDate);
+        if (elapsedDays < 0) return false;
+        if (firstPaymentDate) return elapsedDays % 14 === 0;
         return Math.floor(elapsedDays / 7) % 2 === 0;
     }
     return false;
@@ -94,10 +115,13 @@ export function calculateLoanDetails(loan, now = new Date()) {
         : Math.ceil(totalDebt / installmentAmount);
 
     const dueDates = [];
-    const cursor = new Date(startDate);
-    cursor.setDate(cursor.getDate() + 1);
+    const firstPaymentDate = asDate(loan.firstPaymentDate);
+    const cursor = firstPaymentDate ? new Date(firstPaymentDate) : new Date(startDate);
+    cursor.setHours(0, 0, 0, 0);
+    if (!firstPaymentDate) cursor.setDate(cursor.getDate() + 1);
     const searchLimit = new Date(today);
     searchLimit.setFullYear(searchLimit.getFullYear() + 2);
+    if (firstPaymentDate && firstPaymentDate > searchLimit) searchLimit.setTime(firstPaymentDate.getTime());
 
     for (let guard = 0; guard < 5000 && cursor <= searchLimit && dueDates.length < totalInstallments; guard++) {
         const holidayKey = `${String(cursor.getDate()).padStart(2, '0')}/${String(cursor.getMonth() + 1).padStart(2, '0')}`;

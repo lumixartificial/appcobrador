@@ -1,4 +1,4 @@
-const SW_VERSION = "v6.4-production-agenda-frequencias";
+const SW_VERSION = "v6.5-parcelas-atrasadas";
 const CACHE_PREFIX = 'lumix-cobrador-';
 const SHELL_CACHE = `${CACHE_PREFIX}shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-${SW_VERSION}`;
@@ -7,7 +7,7 @@ const APP_SHELL = [
   './index.html',
   './manifest.json',
   './MotoIcono.png',
-  './loan-calculations.js?v=20261023-0100',
+  './loan-calculations.js?v=20261124-parcelas-atrasadas',
   './payment-timing.mjs?v=20261103-1600'
 ];
 const OPTIONAL_STATIC_ASSETS = [
