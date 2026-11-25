@@ -953,6 +953,7 @@
 
     <script type="module">
         import { calculateLoanDetails } from "./loan-calculations.js?v=20261124-parcelas-atrasadas";
+        import { paymentDaySummary, shouldCollectToday, operationalDayKey } from "./daily-listings.mjs?v=20261124-listagens";
         import { createPaymentTimingSnapshot, readPaymentTiming } from "./payment-timing.mjs?v=20261103-1600";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
@@ -1275,6 +1276,17 @@ try {
         const LOGO_BASE64_JPG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAOEAcIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigA"
 
         let allClients = [];
+        let listingsOperationalDay = operationalDayKey();
+        const refreshListingsDay = () => {
+            const day = operationalDayKey();
+            if (day === listingsOperationalDay) return;
+            listingsOperationalDay = day;
+            if (!currentCollectorData) return;
+            updateTodaysRouteList();
+            updateAllClientsList();
+        };
+        setInterval(refreshListingsDay, 30000);
+        document.addEventListener('visibilitychange', refreshListingsDay);
         let currentDetailClientId = null; // Guarda el ID del cliente en vista detallada
         let currentDetailLoanIndex = null; // Guarda el índice del préstamo en vista detallada
         let currentPaymentDetailState = null;
@@ -4800,24 +4812,6 @@ const paymentDayLabelHtml = `
         /* STREAMING_CHUNK: Función updateTodaysRouteList Completa y Segura */
 
         function updateTodaysRouteList() {
-            const today = new Date();
-            if (today.getHours() < 5) today.setDate(today.getDate() - 1);
-            today.setHours(0, 0, 0, 0);
-            const dayOfWeek = today.getDay();
-            const dayOfMonth = today.getDate();
-
-            const getPaymentDate = (dateObj) => {
-                if (!dateObj) return null;
-                let d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj);
-                if (d && !isNaN(d.getTime())) {
-                    let logicalDate = new Date(d);
-                    if (logicalDate.getHours() < 5) logicalDate.setDate(logicalDate.getDate() - 1);
-                    logicalDate.setHours(0, 0, 0, 0);
-                    return logicalDate;
-                }
-                return null;
-            };
-
             let clientsForRoute = [];
 
             allClients.forEach(client => {
@@ -4828,27 +4822,7 @@ const paymentDayLabelHtml = `
                     const details = calculateLoanDetails(loan);
                     if (details.status === 'finished') return;
 
-                    let isScheduledForToday = false;
-                    const frequency = loan.paymentFrequency || 'daily';
-                    const paymentDays = (loan.paymentDays && loan.paymentDays.length > 0) ? loan.paymentDays : [1,2,3,4,5,6];
-
-                    if (frequency === 'daily') isScheduledForToday = paymentDays.includes(dayOfWeek); 
-                    else if (frequency === 'weekly') isScheduledForToday = isWeeklyPaymentDay(loan, today);
-                    else if (frequency === 'biweekly') isScheduledForToday = isBiweeklyPaymentDay(loan, today);
-                    else if (frequency === 'monthly') isScheduledForToday = isMonthlyPaymentDay(loan, today);
-
-                    let hasActionToday = (loan.history || []).some(h => {
-                        if (h.status === 'postponed' || h.status === 'rejected' || h.method === 'migration') return false;
-                        const pDate = getPaymentDate(h.date);
-                        // CORRECCIÓN MÁXIMA DE FECHAS
-                        return pDate && 
-                               pDate.getFullYear() === today.getFullYear() &&
-                               pDate.getMonth() === today.getMonth() &&
-                               pDate.getDate() === today.getDate() && 
-                               (h.status === 'approved' || h.status === 'skipped' || h.status === 'pending_verification');
-                    });
-
-                    if ((isScheduledForToday || details.status === 'late') && !hasActionToday) {
+                    if (shouldCollectToday(loan, details)) {
                         clientsForRoute.push({ 
                             client, 
                             loan: { ...loan, status: details.status, lateDays: details.lateDays, overdueInstallments: details.overdueInstallments, amountDueToday: details.amountDueToday },
@@ -4945,17 +4919,7 @@ const paymentDayLabelHtml = `
                     const details = calculateLoanDetails(loan);
                     const currentStatus = details.status; 
                     
-                    let hasActivityToday = false;
-                    let hasPaidMoneyToday = false;
-
-                    (loan.history || []).forEach(h => {
-                        if (h.status === 'postponed' || h.status === 'rejected' || h.status === 'pending_verification' || h.method === 'migration') return; 
-                        const pDate = getPaymentDate(h.date);
-                        if (pDate && pDate.getFullYear() === todayStart.getFullYear() && pDate.getMonth() === todayStart.getMonth() && pDate.getDate() === todayStart.getDate()) {
-                            hasActivityToday = true;
-                            if (h.status === 'approved') hasPaidMoneyToday = true;
-                        }
-                    });
+                    const hasPaidMoneyToday = paymentDaySummary(loan).approved;
 
                     // LÓGICA DE DÍA DE DESCANSO (No le toca pagar hoy)
                     let isPaymentDay = false;
@@ -4978,7 +4942,7 @@ const paymentDayLabelHtml = `
 
                     if (passesCategory) {
                         if (filter === 'all') {
-                            if (currentStatus === 'finished') passesCategory = false;
+                            if (!shouldCollectToday(loan, details)) passesCategory = false;
                         } else if (filter === 'weekly') {
                             if (loan.paymentFrequency !== 'weekly' || currentStatus === 'finished') passesCategory = false;
                         } else if (filter === 'biweekly') {
@@ -4989,7 +4953,7 @@ const paymentDayLabelHtml = `
                             // CORRECCIÓN EXACTA: Mostrar los activos cuyo día de hoy NO está en su contrato
                             if (currentStatus === 'finished' || isPaymentDay === true) passesCategory = false;
                         } else if (filter === 'todo_today') {
-                            if (currentStatus === 'finished' || hasPaidMoneyToday) passesCategory = false;
+                            if (!shouldCollectToday(loan, details)) passesCategory = false;
                         } else if (filter === 'paid') {
                             if (!hasPaidMoneyToday) passesCategory = false;
                         } else if (filter === 'late') {
@@ -5507,7 +5471,7 @@ if (!loan) {
                         </div>
                     </div>
 
-                    <div class="kpi-card" style="margin-bottom: 20px; text-align: center;"><h3 class="kpi-title" style="justify-content: center;">${labels.status} ${currentLoanIndex + 1}</h3><span class="payment-status ${statusClass}" style="font-size: 1.2em; font-weight: 600; padding: 8px 20px;">${statusText}</span></div>
+                    <div class="kpi-card" style="margin-bottom: 20px; text-align: center;"><h3 class="kpi-title" style="justify-content: center;">${labels.status} ${currentLoanIndex + 1}</h3><span class="payment-status ${statusClass}" style="display: inline-block; max-width: 100%; box-sizing: border-box; height: auto; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; vertical-align: top; font-size: 1.2em; font-weight: 600; padding: 8px 20px;">${statusText}</span></div>
 
                     <div class="kpi-card" style="margin-bottom: 20px; padding: 15px; display: flex; align-items: center; gap: 15px; background-color: var(--surface);">
                         <div style="background-color: color-mix(in srgb, var(--accent-purple) 10%, transparent); padding: 10px; border-radius: 50%;"><i data-lucide="map-pin" style="color: var(--accent-purple); width: 20px; height: 20px;"></i></div>
