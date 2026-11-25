@@ -1,4 +1,4 @@
-const SW_VERSION = "v6.7-layout-status";
+const SW_VERSION = "v6.10-listagem-restaurada";
 const CACHE_PREFIX = 'lumix-cobrador-';
 const SHELL_CACHE = `${CACHE_PREFIX}shell-${SW_VERSION}`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-${SW_VERSION}`;
@@ -8,7 +8,6 @@ const APP_SHELL = [
   './manifest.json',
   './MotoIcono.png',
   './loan-calculations.js?v=20261124-parcelas-atrasadas',
-  './daily-listings.mjs?v=20261124-listagens',
   './payment-timing.mjs?v=20261103-1600'
 ];
 const OPTIONAL_STATIC_ASSETS = [
